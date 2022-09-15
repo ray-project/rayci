@@ -1,8 +1,9 @@
 import collections
 import json
 import os
+from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import click
 import yaml
@@ -10,6 +11,8 @@ import yaml
 
 # Todo: Early setup commands
 EARLY_SETUP_COMMANDS = []
+
+BASE_STEPS_JSON = Path(__file__).parent / "step.json"
 
 
 def read_pipeline(pipeline_path: Path):
@@ -46,10 +49,12 @@ def deep_update(d, u) -> Dict:
     return d
 
 
-def update_steps(steps: List[Dict[str, Any]], update: Dict[str, Any]):
+def update_steps(
+    steps: List[Dict[str, Any]], callback: Callable[[Dict[str, Any]], None]
+):
     steps = steps.copy()
     for step in steps:
-        deep_update(step, update)
+        callback(step)
     return steps
 
 
@@ -102,7 +107,7 @@ def main(
     if not image:
         raise ValueError("Please specify a docker image using --image")
 
-    if not image:
+    if not queue:
         raise ValueError("Please specify a runner queue using --queue")
 
     if early_only and not_early_only:
@@ -112,8 +117,7 @@ def main(
     if not pipeline_path.exists():
         raise ValueError(f"Pipeline file does not exist: {pipeline}")
 
-    base_steps_path = Path("step.json")
-    with open(base_steps_path, "r") as f:
+    with open(BASE_STEPS_JSON, "r") as f:
         base_step = json.load(f)
 
     artifact_destination = os.environ["BUCKET_PATH"] + os.environ["BUILDKITE_COMMIT"]
@@ -121,7 +125,7 @@ def main(
     assert pipeline
     assert image
     assert queue
-    assert early_only ^ not_early_only
+    assert not (early_only and not_early_only)
 
     pipeline_steps = read_pipeline(pipeline_path)
 
@@ -143,17 +147,16 @@ def main(
     )
 
     # Merge with base step
-    pipeline_steps = update_steps(pipeline_steps, base_step)
+    pipeline_steps = update_steps(pipeline_steps, partial(deep_update, u=base_step))
 
     # Merge pipeline/queue-specific settings
-    pipeline_steps = update_steps(
-        pipeline_steps,
-        {
-            "plugins": {"docker#v3.7.0": image},
-            "agents": {"queue": queue},
-            "env": {"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifact_destination},
-        },
-    )
+
+    def _update_step(step: Dict[str, Any]):
+        step["plugins"][1]["docker#v3.7.0"]["image"] = image
+        step["agents"]["queue"] = queue
+        step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
+
+    pipeline_steps = update_steps(pipeline_steps, _update_step)
 
     # Drop conditions key as it is custom (and not supported by buildkite)
     pipeline_steps = drop_pipeline_keys(pipeline_steps, ["conditions"])
@@ -165,3 +168,7 @@ def main(
     # Print to stdout
     steps_str = json.dumps(pipeline_steps)
     print(steps_str)
+
+
+if __name__ == "__main__":
+    main()
