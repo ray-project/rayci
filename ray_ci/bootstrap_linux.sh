@@ -76,7 +76,7 @@ echo "--- :arrow_down: Pulling pre-built BASE TEST image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE_TEST"
 
-echo "--- :docker: :python: Building docker image TEST for regular CI tests"
+echo "--- :docker: Building docker image TEST for regular CI tests :python:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
