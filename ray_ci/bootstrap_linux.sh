@@ -43,7 +43,7 @@ fi
 
 echo "--- :arrow_down: Pulling pre-built BASE image"
 date +"%Y-%m-%d %H:%M:%S"
-time docker pull "$DOCKER_IMAGE_BASE"
+time docker pull "$DOCKER_IMAGE_BASE_BUILD"
 
 echo "--- :docker: :gear: Building docker image BUILD with compiled Ray"
 date +"%Y-%m-%d %H:%M:%S"
