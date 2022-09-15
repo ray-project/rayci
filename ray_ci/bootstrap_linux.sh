@@ -45,7 +45,7 @@ echo "--- :arrow_down: Pulling pre-built BASE image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE_BUILD"
 
-echo "--- :docker: :gear: Building docker image BUILD with compiled Ray"
+echo "--- :docker: Building docker image BUILD with compiled Ray :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
@@ -60,10 +60,13 @@ time docker build \
 # --- extract compiled Ray
 echo "--- :chopsticks: Extracting compiled Ray from image"
 
+rm -rf /tmp/extracted_ray
 CID=$(docker create $DOCKER_IMAGE_BUILD)
 echo Docker extraction container ID: $CID
-docker cp -rf $CID:/ray/* ./
+docker cp $CID:/ray/ /tmp/extracted_ray
 docker rm $CID
+cp -rf /tmp/extracted_ray/* ./
+rm -rf /tmp/extracted_ray
 
 # --- TEST image + pipeline
 
@@ -92,7 +95,7 @@ fi
 
 # --- ML image + pipeline
 
-echo "--- :docker: :airplane: Building docker image ML with ML dependencies"
+echo "--- :docker: Building docker image ML with ML dependencies :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build -t "$DOCKER_IMAGE_ML" -f ci/docker/Dockerfile.ml .
@@ -114,7 +117,7 @@ fi
 
 # --- GPU image + pipeline
 
-echo "--- :docker: :tv: Building docker image GPU with ML dependencies"
+echo "--- :docker: Building docker image GPU with ML dependencies :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build -t "$DOCKER_IMAGE_GPU" -f ci/docker/Dockerfile.gpu .
