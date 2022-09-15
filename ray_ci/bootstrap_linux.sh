@@ -3,7 +3,7 @@ set -e
 cd "$RAY_REPO_DIR" || true
 
 # Export some docker image names
-export DOCKER_IMAGE_BASE=$ECR_REPO:oss-ci-base_latest
+export DOCKER_IMAGE_BASE=$ECR_BASE_REPO:oss-ci-base_latest
 export DOCKER_IMAGE_BUILD=$ECR_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_REPO:oss-ci-test_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_ML=$ECR_REPO:oss-ci-ml_$BUILDKITE_COMMIT
