@@ -23,6 +23,6 @@ echo "--- :arrow_up: Pushing docker image to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BASE"
-time docker push '$DOCKER_IMAGE_TAG'
+time docker push "$DOCKER_IMAGE_TAG"
 
 date +"%Y-%m-%d %H:%M:%S"
