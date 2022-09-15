@@ -8,7 +8,7 @@ export DOCKER_IMAGE_BASE_TEST=$ECR_REPO:oss-ci-base_test_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TAG_TEST=$ECR_REPO:oss-ci-base_test_latest_$BUILDKITE_BRANCH_CLEAN
 
 export DOCKER_IMAGE_BASE_BUILD=$ECR_REPO:oss-ci-base_build_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG_BUILD=$ECR_REPO:oss-ci-base_build_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG_BUILD=$ECR_REPO:oss-ci-base_build_latest_$BUILDKITE_BRANCH_CLEAN
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
 date +"%Y-%m-%d %H:%M:%S"
