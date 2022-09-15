@@ -12,10 +12,12 @@ export DOCKER_IMAGE_ML=$ECR_REPO:oss-ci-ml_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_GPU=$ECR_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
 export EARLY_IMAGE=$ECR_REPO:oss-ci-test_latest-master
 
+python3 -m pip install -U click pyyaml
+
 echo "--- :alarm_clock: Determine if we should kick-off some steps early"
 
 # Fix: path to ray repo
-export $(python ci/pipeline/determine_tests_to_run.py)
+export $(python3 ci/pipeline/determine_tests_to_run.py)
 
 # On pull requests, allow to run on latest available image if wheels are not affected
 if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ]; then
@@ -23,20 +25,20 @@ if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" !
   echo "Kicking off some tests early, as this is a PR, and the core C++ is not affected. "
 else
   export KICK_OFF_EARLY=0
-  echo "This is a branch build (${BUILDKITE_PULL_REQUEST}) or C++ is affected ($RAY_CI_CORE_CPP_AFFECTED). "
+  echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED). "
   echo "We can't kick off tests early."
 fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "--- :running: Kicking off some tests early"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_NORM" \
+    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
 fi
 
 # --- BUILD image
@@ -85,12 +87,12 @@ time docker push "$DOCKER_IMAGE_TEST"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the TEST pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
 else
   echo "Kicking off the full TEST pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
 fi
 
 # --- ML image + pipeline
@@ -107,12 +109,12 @@ time docker push "$DOCKER_IMAGE_ML"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the ML pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
 else
   echo "Kicking off the full ML pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
 fi
 
 # --- GPU image + pipeline
@@ -129,16 +131,16 @@ time docker push "$DOCKER_IMAGE_GPU"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the GPU pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-    python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
 else
   echo "Kicking off the full GPU pipeline"
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
 fi
 
 # --- BUILD pipeline
@@ -148,4 +150,4 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BUILD"
 
-python "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" "./buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
+python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
