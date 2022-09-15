@@ -55,6 +55,14 @@ time docker build \
   -t "$DOCKER_IMAGE_BUILD" \
   -f ci/docker/Dockerfile.build .
 
+# --- extract compiled Ray
+echo "--- :chopsticks: Extracting compiled Ray from image"
+
+CID=$(docker create $DOCKER_IMAGE_BUILD)
+echo Docker extraction container ID: $CID
+docker cp -rf $CID:/ray/* ./
+docker rm $CID
+
 # --- TEST image + pipeline
 
 echo "--- :docker: :python: Building docker image TEST for regular CI tests"
