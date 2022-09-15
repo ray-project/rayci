@@ -1,7 +1,7 @@
 import pytest
 import sys
 
-from pipeline_ci import filter_pipeline_conditions
+from pipeline_ci import filter_pipeline_conditions, inject_commands
 
 
 def test_filter_pipeline_conditions():
@@ -71,6 +71,16 @@ def test_filter_pipeline_conditions():
     assert "b" in filtered
     assert "c" not in filtered
     assert "d" not in filtered
+
+
+def test_inject_commands():
+    pipeline_steps = [
+        {"name": "a", "commands": ["A", "B", "C"]},
+        {"name": "b", "commands": ["B", "C"]},
+    ]
+    inject_commands(pipeline_steps, before=["X"], after=["Z"])
+    assert all(step["commands"][0] == "X" for step in pipeline_steps)
+    assert all(step["commands"][-1] == "Z" for step in pipeline_steps)
 
 
 if __name__ == "__main__":

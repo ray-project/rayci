@@ -8,6 +8,10 @@ import click
 import yaml
 
 
+# Todo: Early setup commands
+EARLY_SETUP_COMMANDS = []
+
+
 def read_pipeline(pipeline_path: Path):
     with open(pipeline_path, "r") as f:
         steps = yaml.safe_load(f)
@@ -57,6 +61,31 @@ def drop_pipeline_keys(steps: List[Dict[str, Any]], keys: List[str]):
     return steps
 
 
+def get_affected_set_conditions():
+    conditions = []
+    for key, val in os.environ.items():
+        if key.startswith("RAY_CI_"):
+            conditions.append(key)
+    return ["ALWAYS"] + conditions
+
+
+def inject_commands(
+    steps: List[Dict[str, Any]],
+    before: Optional[List[str]] = None,
+    after: Optional[List[str]] = None,
+    key: str = "commands",
+):
+    steps = steps.copy()
+
+    before = before or []
+    after = after or []
+
+    for step in steps:
+        step[key] = before + step[key] + after
+
+    return steps
+
+
 @click.command()
 @click.argument("pipeline", required=True, type=str)
 @click.option("--image", type=str, default=None)
@@ -96,6 +125,7 @@ def main(
 
     pipeline_steps = read_pipeline(pipeline_path)
 
+    # Filter early kick-off
     if early_only:
         pipeline_steps = filter_pipeline_conditions(
             pipeline_steps, include=["NO_WHEELS_REQUIRED"]
@@ -105,10 +135,17 @@ def main(
             pipeline_steps, exclude=["NO_WHEELS_REQUIRED"]
         )
 
-    # Todo: Filter affected set conditions
+    # Filter include conditions ("conditions" field in pipeline yamls)
+    include_conditions = get_affected_set_conditions()
 
+    pipeline_steps = filter_pipeline_conditions(
+        pipeline_steps, include=include_conditions
+    )
+
+    # Merge with base step
     pipeline_steps = update_steps(pipeline_steps, base_step)
 
+    # Merge pipeline/queue-specific settings
     pipeline_steps = update_steps(
         pipeline_steps,
         {
@@ -118,8 +155,13 @@ def main(
         },
     )
 
-    # Todo: Inject command
-
+    # Drop conditions key as it is custom (and not supported by buildkite)
     pipeline_steps = drop_pipeline_keys(pipeline_steps, ["conditions"])
 
-    # Todo: Print as json
+    # On early start, inject early setup commands
+    if early_only:
+        pipeline_steps = inject_commands(pipeline_steps, before=EARLY_SETUP_COMMANDS)
+
+    # Print to stdout
+    steps_str = json.dumps(pipeline_steps)
+    print(steps_str)
