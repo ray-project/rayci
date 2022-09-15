@@ -3,6 +3,7 @@ set -e
 cd "$RAY_REPO_DIR" || true
 
 # Export some docker image names
+export DOCKER_IMAGE_BASE=$ECR_REPO/oss-ci-base:latest
 export DOCKER_IMAGE_BUILD=$ECR_REPO/oss-ci-build:$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_REPO/oss-ci-test:$BUILDKITE_COMMIT
 export DOCKER_IMAGE_ML=$ECR_REPO/oss-ci-ml:$BUILDKITE_COMMIT
@@ -41,12 +42,13 @@ fi
 echo "--- :docker: :gear: Building docker image BUILD with compiled Ray"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build
-  --build-arg REMOTE_CACHE_URL
-  --build-arg BUILDKITE_PULL_REQUEST
-  --build-arg BUILDKITE_COMMIT
-  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH
-  -t DOCKER_IMAGE_BUILD
+time docker build \
+  --build-arg DOCKER_IMAGE_BASE \
+  --build-arg REMOTE_CACHE_URL \
+  --build-arg BUILDKITE_PULL_REQUEST \
+  --build-arg BUILDKITE_COMMIT \
+  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
+  -t DOCKER_IMAGE_BUILD \
   -f ci/docker/Dockerfile.build .
 
 # --- TEST image + pipeline
