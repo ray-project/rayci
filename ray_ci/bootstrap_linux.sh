@@ -43,7 +43,7 @@ fi
 
 # --- BUILD image
 
-echo "--- :arrow_down: Pulling pre-built BASE image"
+echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE_BUILD"
 
@@ -71,6 +71,10 @@ cp -rf /tmp/extracted_ray/* ./
 rm -rf /tmp/extracted_ray
 
 # --- TEST image + pipeline
+
+echo "--- :arrow_down: Pulling pre-built BASE TEST image"
+date +"%Y-%m-%d %H:%M:%S"
+time docker pull "$DOCKER_IMAGE_BASE_TEST"
 
 echo "--- :docker: :python: Building docker image TEST for regular CI tests"
 date +"%Y-%m-%d %H:%M:%S"
@@ -100,7 +104,10 @@ fi
 echo "--- :docker: Building docker image ML with ML dependencies :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build -t "$DOCKER_IMAGE_ML" -f ci/docker/Dockerfile.ml .
+time docker build \
+  --build-arg DOCKER_IMAGE_TEST \
+  -t "$DOCKER_IMAGE_ML" \
+  -f ci/docker/Dockerfile.ml .
 
 echo "--- :arrow_up: :airplane: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
@@ -119,10 +126,17 @@ fi
 
 # --- GPU image + pipeline
 
+echo "--- :arrow_down: Pulling pre-built BASE GPU image"
+date +"%Y-%m-%d %H:%M:%S"
+time docker pull "$DOCKER_IMAGE_BASE_GPU"
+
 echo "--- :docker: Building docker image GPU with ML dependencies :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build -t "$DOCKER_IMAGE_GPU" -f ci/docker/Dockerfile.gpu .
+time docker build \
+  --build-arg $DOCKER_IMAGE_BASE_GPU \
+  -t "$DOCKER_IMAGE_GPU" \
+  -f ci/docker/Dockerfile.gpu .
 
 echo "--- :arrow_up: :tv: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
