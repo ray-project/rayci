@@ -2,8 +2,8 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
-export DOCKER_IMAGE_BASE=$ECR_REPO/oss-ci-base:$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG=$ECR_REPO/oss-ci-base:latest
+export DOCKER_IMAGE_BASE=$ECR_REPO:oss-ci-base_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG=$ECR_REPO:oss-ci-base_latest
 
 echo "--- :docker: Building base dependency image"
 date +"%Y-%m-%d %H:%M:%S"

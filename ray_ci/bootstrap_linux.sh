@@ -3,12 +3,12 @@ set -e
 cd "$RAY_REPO_DIR" || true
 
 # Export some docker image names
-export DOCKER_IMAGE_BASE=$ECR_REPO/oss-ci-base:latest
-export DOCKER_IMAGE_BUILD=$ECR_REPO/oss-ci-build:$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TEST=$ECR_REPO/oss-ci-test:$BUILDKITE_COMMIT
-export DOCKER_IMAGE_ML=$ECR_REPO/oss-ci-ml:$BUILDKITE_COMMIT
-export DOCKER_IMAGE_GPU=$ECR_REPO/oss-ci-gpu:$BUILDKITE_COMMIT
-export EARLY_IMAGE=$ECR_REPO/oss-ci-test:latest-master
+export DOCKER_IMAGE_BASE=$ECR_REPO:oss-ci-base_latest
+export DOCKER_IMAGE_BUILD=$ECR_REPO:oss-ci-build_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TEST=$ECR_REPO:oss-ci-test_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_ML=$ECR_REPO:oss-ci-ml_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_GPU=$ECR_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
+export EARLY_IMAGE=$ECR_REPO:oss-ci-test_latest-master
 
 echo "--- :alarm_clock: Determine if we should kick-off some steps early"
 
