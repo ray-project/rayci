@@ -13,8 +13,8 @@ time docker build \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
-  -t $DOCKER_IMAGE_BASE \
-  -t $DOCKER_IMAGE_TAG \
+  -t "$DOCKER_IMAGE_BASE" \
+  -t "$DOCKER_IMAGE_TAG" \
   -f ci/docker/Dockerfile.base .
 
 date +"%Y-%m-%d %H:%M:%S"
@@ -22,7 +22,7 @@ date +"%Y-%m-%d %H:%M:%S"
 echo "--- :arrow-up: Pushing docker image to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker push $DOCKER_IMAGE_BASE
-time docker push $DOCKER_IMAGE_TAG
+time docker push "$DOCKER_IMAGE_BASE"
+time docker push '$DOCKER_IMAGE_TAG'
 
 date +"%Y-%m-%d %H:%M:%S"

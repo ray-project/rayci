@@ -48,7 +48,7 @@ time docker build \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
-  -t DOCKER_IMAGE_BUILD \
+  -t "$DOCKER_IMAGE_BUILD" \
   -f ci/docker/Dockerfile.build .
 
 # --- TEST image + pipeline
