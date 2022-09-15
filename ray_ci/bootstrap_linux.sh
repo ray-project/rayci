@@ -3,7 +3,8 @@ set -e
 cd "$RAY_REPO_DIR" || true
 
 # Export some docker image names
-export DOCKER_IMAGE_BASE=$ECR_BASE_REPO:oss-ci-base_build_latest_ci_docker
+export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_ci_docker
+export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_ci_docker
 # Todo: latest_master
 export DOCKER_IMAGE_BUILD=$ECR_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_REPO:oss-ci-test_$BUILDKITE_COMMIT
@@ -48,7 +49,7 @@ echo "--- :docker: :gear: Building docker image BUILD with compiled Ray"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
-  --build-arg DOCKER_IMAGE_BASE \
+  --build-arg DOCKER_IMAGE_BASE_BUILD \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
@@ -69,7 +70,10 @@ docker rm $CID
 echo "--- :docker: :python: Building docker image TEST for regular CI tests"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build -t "$DOCKER_IMAGE_TEST" -f ci/docker/Dockerfile.test .
+time docker build \
+  --build-arg DOCKER_IMAGE_BASE_TEST \
+  -t "$DOCKER_IMAGE_TEST" \
+  -f ci/docker/Dockerfile.test .
 
 echo "--- :arrow_up: :python: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
