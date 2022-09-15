@@ -19,7 +19,7 @@ time docker build \
 
 date +"%Y-%m-%d %H:%M:%S"
 
-echo "--- :arrow-up: Pushing docker image to ECR"
+echo "--- :arrow_up: Pushing docker image to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BASE"

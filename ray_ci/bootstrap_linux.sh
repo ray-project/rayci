@@ -39,7 +39,7 @@ fi
 
 # --- BUILD image
 
-echo "--- :arrow-down: Pulling pre-built BASE image"
+echo "--- :arrow_down: Pulling pre-built BASE image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE"
 
@@ -62,7 +62,7 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build -t "$DOCKER_IMAGE_TEST" -f ci/docker/Dockerfile.test .
 
-echo "--- :arrow-up: :python: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: :python: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_TEST"
@@ -84,7 +84,7 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build -t "$DOCKER_IMAGE_ML" -f ci/docker/Dockerfile.ml .
 
-echo "--- :arrow-up: :airplane: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: :airplane: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_ML"
@@ -106,7 +106,7 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build -t "$DOCKER_IMAGE_GPU" -f ci/docker/Dockerfile.gpu .
 
-echo "--- :arrow-up: :tv: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: :tv: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_GPU"
@@ -127,7 +127,7 @@ fi
 
 # --- BUILD pipeline
 
-echo "--- :arrow-up: :gear: Pushing Build docker image to ECR"
+echo "--- :arrow_up: :gear: Pushing Build docker image to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BUILD"
