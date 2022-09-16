@@ -130,7 +130,7 @@ time docker build \
   -t "$DOCKER_IMAGE_LATEST_TEST" \
   -f ci/docker/Dockerfile.test .
 
-echo "--- :arrow_up: :python: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: Pushing Build docker image TEST to ECR :python:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_TEST"
@@ -139,6 +139,8 @@ time docker push "$DOCKER_IMAGE_TEST"
 if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
   time docker push "$DOCKER_IMAGE_LATEST_TEST"
 fi
+
+echo "--- :rocket: Launching TEST tests :python:"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the TEST pipeline"
@@ -176,6 +178,8 @@ time docker push "$DOCKER_IMAGE_ML"
 if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
   time docker push "$DOCKER_IMAGE_LATEST_ML"
 fi
+
+echo "--- :rocket: Launching ML tests :airplane:"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the ML pipeline"
@@ -220,6 +224,8 @@ if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
   time docker push "$DOCKER_IMAGE_LATEST_GPU"
 fi
 
+echo "--- :rocket: Launching GPU tests :tv:"
+
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the GPU pipeline"
   python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
@@ -245,5 +251,8 @@ time docker push "$DOCKER_IMAGE_BUILD"
 if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
   time docker push "$DOCKER_IMAGE_LATEST_BUILD"
 fi
+
+echo "--- :rocket: Launching BUILD tests :gear:"
+echo "Kicking off the full BUILD pipeline"
 
 python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
