@@ -22,7 +22,8 @@ export DOCKER_IMAGE_BUILD=$ECR_BASE_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
-export EARLY_IMAGE=$ECR_BASE_REPO:oss-ci-test_latest_master
+
+export EARLY_IMAGE=$ECR_BASE_REPO:oss-ci-test_latest_$BUILDKITE_BRANCH_CLEAN
 
 python3 -m pip install -U click pyyaml
 
@@ -40,6 +41,14 @@ else
   export KICK_OFF_EARLY=0
   echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED). "
   echo "We can't kick off tests early."
+fi
+
+if [ "${KICK_OFF_EARLY}" = "1" ] && [[ "$(docker manifest inspect $EARLY_IMAGE)" ]]; then
+  echo "Docker image found for early kick-off: ${EARLY_IMAGE}"
+else
+  echo "Docker image NOT FOUND for early kick-off: ${EARLY_IMAGE}!"
+  echo "Not kicking off early after all."
+  KICK_OFF_EARLY=0
 fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
