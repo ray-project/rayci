@@ -45,14 +45,6 @@ else
   echo "We can't kick off tests early."
 fi
 
-if [ "${KICK_OFF_EARLY}" = "1" ] && [[ "$(docker manifest inspect $EARLY_IMAGE)" ]]; then
-  echo "Docker image found for early kick-off: ${EARLY_IMAGE}"
-else
-  echo "Docker image NOT FOUND for early kick-off: ${EARLY_IMAGE}!"
-  echo "Not kicking off early after all."
-  KICK_OFF_EARLY=0
-fi
-
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "--- :running: Kicking off some tests early"
 
