@@ -205,7 +205,7 @@ echo "--- :docker: Building docker image GPU with ML dependencies :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
-  --build-arg $DOCKER_IMAGE_BASE_GPU \
+  --build-arg DOCKER_IMAGE_BASE_GPU \
   -t "$DOCKER_IMAGE_GPU" \
   -t "$DOCKER_IMAGE_LATEST_GPU" \
   -f ci/docker/Dockerfile.gpu .
