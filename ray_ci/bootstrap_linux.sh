@@ -172,7 +172,7 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
   --build-arg $DOCKER_IMAGE_BASE_GPU \
-  -t "$DOCKER_IMAGE_GPU" \
+  -t "$DOCKER_IMAGE_BASE_GPU" \
   -f ci/docker/Dockerfile.gpu .
 
 echo "--- :arrow_up: Pushing Build docker image TEST to ECR :tv:"
