@@ -17,11 +17,15 @@ export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_$BUILDKITE_
 export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_$BUILDKITE_BRANCH_CLEAN
 export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_$BUILDKITE_BRANCH_CLEAN
 
-# Todo: latest_master
 export DOCKER_IMAGE_BUILD=$ECR_BASE_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
+
+export DOCKER_IMAGE_LATEST_BUILD=$ECR_BASE_REPO:oss-ci-build_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_LATEST_TEST=$ECR_BASE_REPO:oss-ci-test_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_LATEST_ML=$ECR_BASE_REPO:oss-ci-ml_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_LATEST_GPU=$ECR_BASE_REPO:oss-ci-gpu_latest_$BUILDKITE_BRANCH_CLEAN
 
 export EARLY_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_latest_$BUILDKITE_BRANCH_CLEAN
 export EARLY_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_latest_$BUILDKITE_BRANCH_CLEAN
@@ -123,12 +127,18 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker build \
   --build-arg DOCKER_IMAGE_BASE_TEST \
   -t "$DOCKER_IMAGE_TEST" \
+  -t "$DOCKER_IMAGE_LATEST_TEST" \
   -f ci/docker/Dockerfile.test .
 
 echo "--- :arrow_up: :python: Pushing Build docker image TEST to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_TEST"
+
+# Only push latest images for branch builds
+if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+  time docker push "$DOCKER_IMAGE_LATEST_TEST"
+fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the TEST pipeline"
@@ -154,12 +164,18 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker build \
   --build-arg DOCKER_IMAGE_BASE_ML \
   -t "$DOCKER_IMAGE_ML" \
+  -t "$DOCKER_IMAGE_LATEST_ML" \
   -f ci/docker/Dockerfile.ml .
 
 echo "--- :arrow_up: Pushing Build docker image ML to ECR :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_ML"
+
+# Only push latest images for branch builds
+if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+  time docker push "$DOCKER_IMAGE_LATEST_ML"
+fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the ML pipeline"
@@ -190,13 +206,19 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
   --build-arg $DOCKER_IMAGE_BASE_GPU \
-  -t "$DOCKER_IMAGE_BASE_GPU" \
+  -t "$DOCKER_IMAGE_GPU" \
+  -t "$DOCKER_IMAGE_LATEST_GPU" \
   -f ci/docker/Dockerfile.gpu .
 
 echo "--- :arrow_up: Pushing Build docker image TEST to ECR :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_GPU"
+
+# Only push latest images for branch builds
+if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+  time docker push "$DOCKER_IMAGE_LATEST_GPU"
+fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the GPU pipeline"
@@ -218,5 +240,10 @@ echo "--- :arrow_up: Pushing Build docker image to ECR :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BUILD"
+
+# Only push latest images for branch builds
+if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+  time docker push "$DOCKER_IMAGE_LATEST_BUILD"
+fi
 
 python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
