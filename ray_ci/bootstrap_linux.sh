@@ -8,11 +8,11 @@ export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_ci_docker
 export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_ci_docker
 export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_ci_docker
 # Todo: latest_master
-export DOCKER_IMAGE_BUILD=$ECR_REPO:oss-ci-build_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TEST=$ECR_REPO:oss-ci-test_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_ML=$ECR_REPO:oss-ci-ml_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_GPU=$ECR_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
-export EARLY_IMAGE=$ECR_REPO:oss-ci-test_latest-master
+export DOCKER_IMAGE_BUILD=$ECR_BASE_REPO:oss-ci-build_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
+export EARLY_IMAGE=$ECR_BASE_REPO:oss-ci-test_latest_master
 
 python3 -m pip install -U click pyyaml
 
