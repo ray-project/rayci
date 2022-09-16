@@ -9,11 +9,14 @@ import click
 import yaml
 
 
-# Todo: Early setup commands
 EARLY_SETUP_COMMANDS = [
     "git remote add pr_repo {repo_url}",
     "git fetch pr_repo {repo_branch}",
     "git checkout pr_repo/{repo_branch}",
+    (
+        '[[ "$(git log -1 --format="%H")" == "{git_hash}" ]] || '
+        '(echo "Quick start failed: Wrong commit hash!" && exit 1)'
+    ),
 ]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
@@ -100,10 +103,14 @@ def clean_repo_branch(repo_branch_full: str) -> str:
     return repo_branch_full.split(":", maxsplit=1)[-1]
 
 
-def create_setup_commands(repo_url: str, repo_branch: str) -> List[str]:
+def create_setup_commands(repo_url: str, repo_branch: str, git_hash: str) -> List[str]:
     commands = []
     for command in EARLY_SETUP_COMMANDS:
-        commands.append(command.format(repo_url=repo_url, repo_branch=repo_branch))
+        commands.append(
+            command.format(
+                repo_url=repo_url, repo_branch=repo_branch, git_hash=git_hash
+            )
+        )
     return commands
 
 
@@ -184,6 +191,7 @@ def main(
         setup_commands = create_setup_commands(
             repo_url=os.environ["BUILDKITE_PULL_REQUEST_REPO"],
             repo_branch=clean_repo_branch(os.environ["BUILDKITE_BRANCH"]),
+            git_hash=os.environ["BUILDKITE_COMMIT"],
         )
         pipeline_steps = inject_commands(pipeline_steps, before=setup_commands)
 

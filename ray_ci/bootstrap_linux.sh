@@ -2,6 +2,11 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
+if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
+  export BUILDKITE_COMMIT=$(git log -1 --format="%H")
+  echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
+fi
+
 # Convert / into _
 if [ -z "${BUILDKITE_PULL_REQUEST_BASE_BRANCH-}" ]; then
   # In branches, use the BUILDKITE_BRANCH

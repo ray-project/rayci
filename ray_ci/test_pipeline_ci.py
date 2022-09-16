@@ -96,10 +96,13 @@ def test_clean_repo_branch():
 
 
 def test_create_setup_commands():
-    commands = create_setup_commands(repo_url="SOME_URL", repo_branch="SOME_BRANCH")
+    commands = create_setup_commands(
+        repo_url="SOME_URL", repo_branch="SOME_BRANCH", git_hash="abcd1234"
+    )
     assert commands[0] == "git remote add pr_repo SOME_URL"
     assert commands[1] == "git fetch pr_repo SOME_BRANCH"
     assert commands[2] == "git checkout pr_repo/SOME_BRANCH"
+    assert "abcd1234" in commands[3]
 
 
 if __name__ == "__main__":
