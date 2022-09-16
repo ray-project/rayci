@@ -100,6 +100,7 @@ time docker build \
   --build-arg BUILDKITE_COMMIT \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
   -t "$DOCKER_IMAGE_BUILD" \
+  -t "$DOCKER_IMAGE_LATEST_BUILD" \
   -f ci/docker/Dockerfile.build .
 
 # --- extract compiled Ray
@@ -130,7 +131,7 @@ time docker build \
   -t "$DOCKER_IMAGE_LATEST_TEST" \
   -f ci/docker/Dockerfile.test .
 
-echo "--- :arrow_up: Pushing Build docker image TEST to ECR :python:"
+echo "--- :arrow_up: Pushing docker image TEST to ECR :python:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_TEST"
@@ -169,7 +170,7 @@ time docker build \
   -t "$DOCKER_IMAGE_LATEST_ML" \
   -f ci/docker/Dockerfile.ml .
 
-echo "--- :arrow_up: Pushing Build docker image ML to ECR :airplane:"
+echo "--- :arrow_up: Pushing docker image ML to ECR :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_ML"
@@ -214,7 +215,7 @@ time docker build \
   -t "$DOCKER_IMAGE_LATEST_GPU" \
   -f ci/docker/Dockerfile.gpu .
 
-echo "--- :arrow_up: Pushing Build docker image TEST to ECR :tv:"
+echo "--- :arrow_up: Pushing docker image GPU to ECR :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_GPU"
@@ -242,7 +243,7 @@ fi
 
 # --- BUILD pipeline
 
-echo "--- :arrow_up: Pushing Build docker image to ECR :gear:"
+echo "--- :arrow_up: Pushing docker image BUILD to ECR :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BUILD"
