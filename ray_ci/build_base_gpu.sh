@@ -4,8 +4,8 @@ cd "$RAY_REPO_DIR" || true
 
 export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
 
-export DOCKER_IMAGE_BASE_GPU=$ECR_REPO:oss-ci-base_gpu_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG_GPU=$ECR_REPO:oss-ci-base_gpu_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_$BUILDKITE_BRANCH_CLEAN
 
 echo "--- :docker: Building base dependency image for GPU tests :tv:"
 date +"%Y-%m-%d %H:%M:%S"

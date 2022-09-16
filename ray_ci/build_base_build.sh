@@ -4,14 +4,14 @@ cd "$RAY_REPO_DIR" || true
 
 export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
 
-export DOCKER_IMAGE_BASE_TEST=$ECR_REPO:oss-ci-base_test_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG_TEST=$ECR_REPO:oss-ci-base_test_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_$BUILDKITE_BRANCH_CLEAN
 
-export DOCKER_IMAGE_BASE_BUILD=$ECR_REPO:oss-ci-base_build_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG_BUILD=$ECR_REPO:oss-ci-base_build_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_$BUILDKITE_BRANCH_CLEAN
 
-export DOCKER_IMAGE_BASE_ML=$ECR_REPO:oss-ci-base_ml_$BUILDKITE_COMMIT
-export DOCKER_IMAGE_TAG_ML=$ECR_REPO:oss-ci-base_ml_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_$BUILDKITE_COMMIT
+export DOCKER_IMAGE_TAG_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_$BUILDKITE_BRANCH_CLEAN
 
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
