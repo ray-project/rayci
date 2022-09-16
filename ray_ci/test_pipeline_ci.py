@@ -1,7 +1,12 @@
 import pytest
 import sys
 
-from pipeline_ci import filter_pipeline_conditions, inject_commands
+from pipeline_ci import (
+    filter_pipeline_conditions,
+    inject_commands,
+    clean_repo_branch,
+    create_setup_commands,
+)
 
 
 def test_filter_pipeline_conditions():
@@ -81,6 +86,20 @@ def test_inject_commands():
     inject_commands(pipeline_steps, before=["X"], after=["Z"])
     assert all(step["commands"][0] == "X" for step in pipeline_steps)
     assert all(step["commands"][-1] == "Z" for step in pipeline_steps)
+
+
+def test_clean_repo_branch():
+    assert clean_repo_branch("bar") == "bar"
+    assert clean_repo_branch("foo:bar") == "bar"
+    assert clean_repo_branch("foo:bar/boo") == "bar/boo"
+    assert clean_repo_branch("foo:bar:boo") == "bar:boo"
+
+
+def test_create_setup_commands():
+    commands = create_setup_commands(repo_url="SOME_URL", repo_branch="SOME_BRANCH")
+    assert commands[0] == "git remote add pr_repo SOME_URL"
+    assert commands[1] == "git fetch pr_repo SOME_BRANCH"
+    assert commands[2] == "git checkout pr_repo/SOME_BRANCH"
 
 
 if __name__ == "__main__":

@@ -2,7 +2,14 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
-export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
+# Convert / into _
+if [ -z "${BUILDKITE_PULL_REQUEST_BASE_BRANCH-}" ]; then
+  # In branches, use the BUILDKITE_BRANCH
+  export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
+else
+  # In PRs, use the BUILDKITE_PULL_REQUEST_BASE_BRANCH
+  export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_PULL_REQUEST_BASE_BRANCH/\//_}
+fi
 
 # Export some docker image names
 export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_$BUILDKITE_BRANCH_CLEAN
@@ -23,6 +30,7 @@ echo "--- :alarm_clock: Determine if we should kick-off some steps early"
 
 # Fix: path to ray repo
 export $(python3 ci/pipeline/determine_tests_to_run.py)
+
 
 # On pull requests, allow to run on latest available image if wheels are not affected
 if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ]; then

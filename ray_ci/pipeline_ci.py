@@ -10,7 +10,11 @@ import yaml
 
 
 # Todo: Early setup commands
-EARLY_SETUP_COMMANDS = []
+EARLY_SETUP_COMMANDS = [
+    "git remote add pr_repo {repo_url}",
+    "git fetch pr_repo {repo_branch}",
+    "git checkout pr_repo/{repo_branch}",
+]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
 
@@ -91,6 +95,18 @@ def inject_commands(
     return steps
 
 
+def clean_repo_branch(repo_branch_full: str) -> str:
+    # Remove user: from user:branch
+    return repo_branch_full.split(":", maxsplit=1)[-1]
+
+
+def create_setup_commands(repo_url: str, repo_branch: str) -> List[str]:
+    commands = []
+    for command in EARLY_SETUP_COMMANDS:
+        commands.append(command.format(repo_url=repo_url, repo_branch=repo_branch))
+    return commands
+
+
 @click.command()
 @click.argument("pipeline", required=True, type=str)
 @click.option("--image", type=str, default=None)
@@ -163,7 +179,11 @@ def main(
 
     # On early start, inject early setup commands
     if early_only:
-        pipeline_steps = inject_commands(pipeline_steps, before=EARLY_SETUP_COMMANDS)
+        setup_commands = create_setup_commands(
+            repo_url=os.environ["BUILDKITE_PULL_REQUEST_REPO"],
+            repo_branch=clean_repo_branch(os.environ["BUILDKITE_BRANCH"]),
+        )
+        pipeline_steps = inject_commands(pipeline_steps, before=setup_commands)
 
     # Print to stdout
     steps_str = json.dumps(pipeline_steps)
