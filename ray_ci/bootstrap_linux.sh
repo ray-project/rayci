@@ -2,11 +2,14 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
+export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
+
 # Export some docker image names
-export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_ci_docker
-export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_ci_docker
-export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_ci_docker
-export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_ci_docker
+export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_$BUILDKITE_BRANCH_CLEAN
+export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_$BUILDKITE_BRANCH_CLEAN
+
 # Todo: latest_master
 export DOCKER_IMAGE_BUILD=$ECR_BASE_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_$BUILDKITE_COMMIT
@@ -49,6 +52,15 @@ echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE_BUILD"
 
+if [ "$?" != "0" ]; then
+  BUILD_OWN_BASE=1
+  # No pre-built image, so we have to build ourselves!
+  echo "--- :exclamation: No pre-built image found, building ourselves!"
+  bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_build.sh"
+else
+  BUILD_OWN_BASE=0
+fi
+
 echo "--- :docker: Building docker image BUILD with compiled Ray :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
@@ -74,9 +86,11 @@ rm -rf /tmp/extracted_ray
 
 # --- TEST image + pipeline
 
-echo "--- :arrow_down: Pulling pre-built BASE TEST image"
-date +"%Y-%m-%d %H:%M:%S"
-time docker pull "$DOCKER_IMAGE_BASE_TEST"
+if [ "${BUILD_OWN_BASE-}" != "1" ]; then
+  echo "--- :arrow_down: Pulling pre-built BASE TEST image"
+  date +"%Y-%m-%d %H:%M:%S"
+  time docker pull "$DOCKER_IMAGE_BASE_TEST"
+fi
 
 echo "--- :docker: Building docker image TEST for regular CI tests :python:"
 date +"%Y-%m-%d %H:%M:%S"
@@ -103,9 +117,11 @@ fi
 
 # --- ML image + pipeline
 
-echo "--- :arrow_down: Pulling pre-built BASE ML image"
-date +"%Y-%m-%d %H:%M:%S"
-time docker pull "$DOCKER_IMAGE_BASE_ML"
+if [ "${BUILD_OWN_BASE-}" != "1" ]; then
+  echo "--- :arrow_down: Pulling pre-built BASE ML image"
+  date +"%Y-%m-%d %H:%M:%S"
+  time docker pull "$DOCKER_IMAGE_BASE_ML"
+fi
 
 echo "--- :docker: Building docker image ML with ML dependencies :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
@@ -135,6 +151,12 @@ fi
 echo "--- :arrow_down: Pulling pre-built BASE GPU image"
 date +"%Y-%m-%d %H:%M:%S"
 time docker pull "$DOCKER_IMAGE_BASE_GPU"
+
+if [ "$?" != "0" ]; then
+  # No pre-built image, so we have to build ourselves!
+  echo "--- :exclamation: No pre-built image found, building ourselves!"
+  bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_gpu.sh"
+fi
 
 echo "--- :docker: Building docker image GPU with ML dependencies :tv:"
 date +"%Y-%m-%d %H:%M:%S"

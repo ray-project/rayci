@@ -21,6 +21,11 @@ time docker build \
 
 date +"%Y-%m-%d %H:%M:%S"
 
+if [ "${NO_PUSH}" = "1 "]; then
+  echo "--- :exclamation: Not pushing the image as this is a local build only!"
+  exit 0
+fi
+
 echo "--- :arrow_up: Pushing docker image to ECR"
 date +"%Y-%m-%d %H:%M:%S"
 
