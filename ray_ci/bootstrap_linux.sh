@@ -50,15 +50,14 @@ fi
 
 echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
 date +"%Y-%m-%d %H:%M:%S"
-time docker pull "$DOCKER_IMAGE_BASE_BUILD"
 
-if [ "$?" != "0" ]; then
+if [[ "$(time docker pull "$DOCKER_IMAGE_BASE_BUILD")" ]]; then
+  BUILD_OWN_BASE=0
+else
   BUILD_OWN_BASE=1
   # No pre-built image, so we have to build ourselves!
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_build.sh"
-else
-  BUILD_OWN_BASE=0
 fi
 
 echo "--- :docker: Building docker image BUILD with compiled Ray :gear:"
@@ -150,9 +149,11 @@ fi
 
 echo "--- :arrow_down: Pulling pre-built BASE GPU image"
 date +"%Y-%m-%d %H:%M:%S"
-time docker pull "$DOCKER_IMAGE_BASE_GPU"
 
-if [ "$?" != "0" ]; then
+if [[ "$(time docker pull "$DOCKER_IMAGE_BASE_GPU")" ]]; then
+  BUILD_OWN_GPU=0
+else
+  BUILD_OWN_GPU=1
   # No pre-built image, so we have to build ourselves!
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_gpu.sh"
