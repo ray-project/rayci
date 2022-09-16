@@ -5,6 +5,8 @@ cd "$RAY_REPO_DIR" || true
 # Export some docker image names
 export DOCKER_IMAGE_BASE_BUILD=$ECR_BASE_REPO:oss-ci-base_build_latest_ci_docker
 export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_latest_ci_docker
+export DOCKER_IMAGE_BASE_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_ci_docker
+export DOCKER_IMAGE_BASE_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_ci_docker
 # Todo: latest_master
 export DOCKER_IMAGE_BUILD=$ECR_REPO:oss-ci-build_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_TEST=$ECR_REPO:oss-ci-test_$BUILDKITE_COMMIT
@@ -101,15 +103,19 @@ fi
 
 # --- ML image + pipeline
 
+echo "--- :arrow_down: Pulling pre-built BASE ML image"
+date +"%Y-%m-%d %H:%M:%S"
+time docker pull "$DOCKER_IMAGE_BASE_ML"
+
 echo "--- :docker: Building docker image ML with ML dependencies :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
-  --build-arg DOCKER_IMAGE_TEST \
+  --build-arg DOCKER_IMAGE_BASE_ML \
   -t "$DOCKER_IMAGE_ML" \
   -f ci/docker/Dockerfile.ml .
 
-echo "--- :arrow_up: :airplane: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: Pushing Build docker image ML to ECR :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_ML"
@@ -138,7 +144,7 @@ time docker build \
   -t "$DOCKER_IMAGE_GPU" \
   -f ci/docker/Dockerfile.gpu .
 
-echo "--- :arrow_up: :tv: Pushing Build docker image TEST to ECR"
+echo "--- :arrow_up: Pushing Build docker image TEST to ECR :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_GPU"
@@ -159,7 +165,7 @@ fi
 
 # --- BUILD pipeline
 
-echo "--- :arrow_up: :gear: Pushing Build docker image to ECR"
+echo "--- :arrow_up: Pushing Build docker image to ECR :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
 time docker push "$DOCKER_IMAGE_BUILD"
