@@ -136,7 +136,9 @@ def main(
     with open(BASE_STEPS_JSON, "r") as f:
         base_step = json.load(f)
 
-    artifact_destination = os.environ["BUCKET_PATH"] + os.environ["BUILDKITE_COMMIT"]
+    artifact_destination = (
+        os.environ["BUCKET_PATH"] + "/" + os.environ["BUILDKITE_COMMIT"]
+    )
 
     assert pipeline
     assert image
