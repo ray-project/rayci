@@ -23,7 +23,9 @@ export DOCKER_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_$BUILDKITE_COMMIT
 export DOCKER_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_$BUILDKITE_COMMIT
 
-export EARLY_IMAGE=$ECR_BASE_REPO:oss-ci-test_latest_$BUILDKITE_BRANCH_CLEAN
+export EARLY_IMAGE_TEST=$ECR_BASE_REPO:oss-ci-test_latest_$BUILDKITE_BRANCH_CLEAN
+export EARLY_IMAGE_ML=$ECR_BASE_REPO:oss-ci-ml_latest_$BUILDKITE_BRANCH_CLEAN
+export EARLY_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_latest_$BUILDKITE_BRANCH_CLEAN
 
 python3 -m pip install -U click pyyaml
 
@@ -53,14 +55,29 @@ fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "--- :running: Kicking off some tests early"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+
+  if [[ "$(docker manifest inspect $EARLY_IMAGE_TEST)" ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+      "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+  else
+    echo "Docker image NOT FOUND for early test kick-off TEST: $EARLY_IMAGE_TEST"
+  fi
+
+  if [[ "$(docker manifest inspect $EARLY_IMAGE_ML)" ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+      "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
+  else
+      echo "Docker image NOT FOUND for early test kick-off ML: $EARLY_IMAGE_ML"
+  fi
+
+  if [[ "$(docker manifest inspect $EARLY_IMAGE_GPU)" ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  else
+      echo "Docker image NOT FOUND for early test kick-off GPU: $EARLY_IMAGE_GPU"
+  fi
 fi
 
 # --- BUILD image
