@@ -17,7 +17,7 @@ export DOCKER_IMAGE_TAG_GPU=$ECR_BASE_REPO:oss-ci-base_gpu_latest_$BUILDKITE_BRA
 echo "--- :docker: Building base dependency image for GPU tests :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \

@@ -24,7 +24,7 @@ export DOCKER_IMAGE_TAG_ML=$ECR_BASE_REPO:oss-ci-base_ml_latest_$BUILDKITE_BRANC
 echo "--- :docker: Building base dependency image for TESTS :python:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
@@ -36,7 +36,7 @@ time docker build \
 echo "--- :docker: Building base dependency image for BUILDS :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
@@ -49,7 +49,7 @@ time docker build \
 echo "--- :docker: Building base dependency image for ML :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \

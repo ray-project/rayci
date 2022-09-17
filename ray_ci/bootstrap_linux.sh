@@ -100,7 +100,7 @@ fi
 echo "--- :docker: Building docker image BUILD with compiled Ray :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_BUILD \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
@@ -131,7 +131,7 @@ fi
 echo "--- :docker: Building docker image TEST for regular CI tests :python:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_TEST \
   -t "$DOCKER_IMAGE_TEST" \
   -t "$DOCKER_IMAGE_LATEST_TEST" \
@@ -170,7 +170,7 @@ fi
 echo "--- :docker: Building docker image ML with ML dependencies :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_ML \
   -t "$DOCKER_IMAGE_ML" \
   -t "$DOCKER_IMAGE_LATEST_ML" \
@@ -215,7 +215,7 @@ fi
 echo "--- :docker: Building docker image GPU with ML dependencies :tv:"
 date +"%Y-%m-%d %H:%M:%S"
 
-time docker build \
+time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_GPU \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
