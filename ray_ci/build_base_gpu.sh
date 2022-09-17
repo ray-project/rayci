@@ -1,5 +1,7 @@
 set -e
 
+export DOCKER_BUILDKIT=1
+
 cd "$RAY_REPO_DIR" || true
 
 if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
