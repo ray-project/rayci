@@ -1,4 +1,4 @@
-set -xe
+set -e
 
 cd "$RAY_REPO_DIR" || true
 
@@ -100,7 +100,6 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
   --build-arg DOCKER_IMAGE_BASE_BUILD \
-  --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
@@ -216,6 +215,9 @@ date +"%Y-%m-%d %H:%M:%S"
 
 time docker build \
   --build-arg DOCKER_IMAGE_BASE_GPU \
+  --build-arg BUILDKITE_PULL_REQUEST \
+  --build-arg BUILDKITE_COMMIT \
+  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
   -t "$DOCKER_IMAGE_GPU" \
   -t "$DOCKER_IMAGE_LATEST_GPU" \
   -f ci/docker/Dockerfile.gpu .
