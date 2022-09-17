@@ -1,4 +1,4 @@
-set -e
+set -xe
 
 cd "$RAY_REPO_DIR" || true
 
