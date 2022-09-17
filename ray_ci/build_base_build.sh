@@ -2,6 +2,11 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
+if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
+  export BUILDKITE_COMMIT=$(git log -1 --format="%H")
+  echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
+fi
+
 export BUILDKITE_BRANCH_CLEAN=${BUILDKITE_BRANCH/\//_}
 
 export DOCKER_IMAGE_BASE_TEST=$ECR_BASE_REPO:oss-ci-base_test_$BUILDKITE_COMMIT
