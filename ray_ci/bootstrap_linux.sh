@@ -98,6 +98,8 @@ fi
 echo "--- :docker: Building docker image BUILD with compiled Ray :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
+env
+
 time docker build \
   --build-arg DOCKER_IMAGE_BASE_BUILD \
   --build-arg REMOTE_CACHE_URL \
