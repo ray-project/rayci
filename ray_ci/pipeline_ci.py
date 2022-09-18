@@ -204,7 +204,7 @@ def main(
 
     # Inject print commands
     def _print_command(cmd: str) -> List[str]:
-        cmd_str = f"echo --- :arrow_forward: {cmd}"
+        cmd_str = f"'echo --- :arrow_forward: {cmd}'"
         return [cmd_str, cmd]
 
     pipeline_steps = map_commands(pipeline_steps, map_fn=_print_command)
