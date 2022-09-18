@@ -81,6 +81,20 @@ def test_filter_pipeline_conditions():
     assert "d" not in filtered
 
 
+def test_filter_pipeline_conditions_always():
+    pipeline_steps = [
+        {"name": "a", "conditions": ["A", "B", "C"]},
+        {"name": "b"},
+        {"name": "c", "conditions": ["C"]},
+        {"name": "d", "conditions": ["D"]},
+    ]
+    filtered = [
+        item["name"]
+        for item in filter_pipeline_conditions(pipeline_steps, include=["ALWAYS", "C"])
+    ]
+    assert filtered == ["a", "b", "c"]
+
+
 def test_inject_commands():
     pipeline_steps = [
         {"name": "a", "commands": ["A", "B", "C"]},
