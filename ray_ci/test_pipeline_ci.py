@@ -1,11 +1,14 @@
 import pytest
 import sys
 
+from typing import List
+
 from pipeline_ci import (
     filter_pipeline_conditions,
     inject_commands,
     clean_repo_branch,
     create_setup_commands,
+    map_commands,
 )
 
 
@@ -99,10 +102,27 @@ def test_create_setup_commands():
     commands = create_setup_commands(
         repo_url="SOME_URL", repo_branch="SOME_BRANCH", git_hash="abcd1234"
     )
-    assert commands[0] == "git remote add pr_repo SOME_URL"
-    assert commands[1] == "git fetch pr_repo SOME_BRANCH"
-    assert commands[2] == "git checkout pr_repo/SOME_BRANCH"
+    assert commands[1] == "git remote add pr_repo SOME_URL"
+    assert commands[2] == "git fetch pr_repo SOME_BRANCH"
+    assert commands[3] == "git checkout pr_repo/SOME_BRANCH"
     assert "abcd1234" in commands[3]
+
+
+def test_pipeline_map_steps():
+    def _print_command(cmd: str) -> List[str]:
+        cmd_str = f"echo --- :arrow_forward: {cmd}"
+        return [cmd_str, cmd]
+
+    assert map_commands([{"commands": ["A", "B"]}], map_fn=_print_command) == [
+        {
+            "commands": [
+                "echo --- :arrow_forward: A",
+                "A",
+                "echo --- :arrow_forward: B",
+                "B",
+            ]
+        }
+    ]
 
 
 if __name__ == "__main__":

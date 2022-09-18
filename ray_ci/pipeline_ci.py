@@ -10,6 +10,7 @@ import yaml
 
 
 EARLY_SETUP_COMMANDS = [
+    "echo --- :running: Early kick-off: Checking out PR code revision"
     "git remote add pr_repo {repo_url}",
     "git fetch pr_repo {repo_branch}",
     "git checkout pr_repo/{repo_branch}",
@@ -36,7 +37,7 @@ def filter_pipeline_conditions(
 ):
     new_steps = []
     for step in steps:
-        conditions = step.get(key, [])
+        conditions = step.get(key, ["ALWAYS"])
         if include:
             if not any(cond in conditions for cond in include):
                 continue
@@ -114,6 +115,21 @@ def create_setup_commands(repo_url: str, repo_branch: str, git_hash: str) -> Lis
     return commands
 
 
+def map_commands(
+    steps: List[Dict[str, Any]],
+    map_fn: Callable[[str], List[str]],
+    key: str = "commands",
+):
+    steps = steps.copy()
+    for step in steps:
+        new_vals = []
+        for val in step[key]:
+            new_vals += map_fn(val)
+
+        step[key] = new_vals
+    return steps
+
+
 @click.command()
 @click.argument("pipeline", required=True, type=str)
 @click.option("--image", type=str, default=None)
@@ -185,6 +201,13 @@ def main(
 
     # Drop conditions key as it is custom (and not supported by buildkite)
     pipeline_steps = drop_pipeline_keys(pipeline_steps, ["conditions"])
+
+    # Inject print commands
+    def _print_command(cmd: str) -> List[str]:
+        cmd_str = f"echo --- :arrow_forward: {cmd}"
+        return [cmd_str, cmd]
+
+    pipeline_steps = map_commands(pipeline_steps, map_fn=_print_command)
 
     # On early start, inject early setup commands
     if early_only:
