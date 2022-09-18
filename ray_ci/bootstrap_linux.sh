@@ -109,6 +109,26 @@ time docker build --progress=plain \
   -t "$DOCKER_IMAGE_LATEST_BUILD" \
   -f ci/docker/Dockerfile.build .
 
+
+# --- BUILD pipeline
+
+echo "--- :arrow_up: Pushing docker image BUILD to ECR :gear:"
+date +"%Y-%m-%d %H:%M:%S"
+
+time docker push "$DOCKER_IMAGE_BUILD"
+
+# Only push latest images for branch builds
+if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+  time docker push "$DOCKER_IMAGE_LATEST_BUILD"
+fi
+
+echo "--- :rocket: Launching BUILD tests :gear:"
+echo "Kicking off the full BUILD pipeline"
+
+python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" --queue "$RUNNER_QUEUE_DEFAULT" \
+  "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
+
+
 # --- extract compiled Ray
 echo "--- :chopsticks: Extracting compiled Ray from image"
 
@@ -249,21 +269,3 @@ else
   python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
     "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
 fi
-
-# --- BUILD pipeline
-
-echo "--- :arrow_up: Pushing docker image BUILD to ECR :gear:"
-date +"%Y-%m-%d %H:%M:%S"
-
-time docker push "$DOCKER_IMAGE_BUILD"
-
-# Only push latest images for branch builds
-if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
-  time docker push "$DOCKER_IMAGE_LATEST_BUILD"
-fi
-
-echo "--- :rocket: Launching BUILD tests :gear:"
-echo "Kicking off the full BUILD pipeline"
-
-python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" --queue "$RUNNER_QUEUE_DEFAULT" \
-  "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
