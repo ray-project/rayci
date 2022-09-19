@@ -10,7 +10,7 @@ import yaml
 
 
 EARLY_SETUP_COMMANDS = [
-    "echo --- :running: Early kick-off: Checking out PR code revision",
+    "echo '--- :running: Early kick-off: Checking out PR code revision'"
     "git remote add pr_repo {repo_url}",
     "git fetch pr_repo {repo_branch}",
     "git checkout pr_repo/{repo_branch}",
@@ -204,7 +204,7 @@ def main(
 
     # Inject print commands
     def _print_command(cmd: str) -> List[str]:
-        cmd_str = f"echo --- :arrow_forward: {cmd}"
+        cmd_str = f"echo '--- :arrow_forward: {cmd}'"
         return [cmd_str, cmd]
 
     pipeline_steps = map_commands(pipeline_steps, map_fn=_print_command)
