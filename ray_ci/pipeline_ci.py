@@ -24,6 +24,9 @@ BASE_STEPS_JSON = Path(__file__).parent / "step.json"
 
 
 def read_pipeline(pipeline_path: Path):
+    if not pipeline_path.exists():
+        return []
+
     with open(pipeline_path, "r") as f:
         steps = yaml.safe_load(f)
     return steps
@@ -77,7 +80,7 @@ def drop_pipeline_keys(steps: List[Dict[str, Any]], keys: List[str]):
 def get_affected_set_conditions():
     conditions = []
     for key, val in os.environ.items():
-        if key.startswith("RAY_CI_"):
+        if key.startswith("RAY_CI_") and bool(int(val)):
             conditions.append(key)
     return ["ALWAYS"] + conditions
 
