@@ -10,7 +10,7 @@ import yaml
 
 
 EARLY_SETUP_COMMANDS = [
-    "echo '--- :running: Early kick-off: Checking out PR code revision'"
+    "echo '--- :running: Early kick-off: Checking out PR code revision'",
     "git remote add pr_repo {repo_url}",
     "git fetch pr_repo {repo_branch}",
     "git checkout pr_repo/{repo_branch}",
