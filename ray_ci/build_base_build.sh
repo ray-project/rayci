@@ -31,7 +31,7 @@ time docker build --progress=plain \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
   -t "$DOCKER_IMAGE_BASE_TEST" \
   -t "$DOCKER_IMAGE_TAG_TEST" \
-  -f ci/docker/Dockerfile.base_test .
+  -f ci/docker/base.test.Dockerfile .
 
 echo "--- :docker: Building base dependency image for BUILDS :gear:"
 date +"%Y-%m-%d %H:%M:%S"
@@ -44,7 +44,7 @@ time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_TEST \
   -t "$DOCKER_IMAGE_BASE_BUILD" \
   -t "$DOCKER_IMAGE_TAG_BUILD" \
-  -f ci/docker/Dockerfile.base_build .
+  -f ci/docker/base.build.Dockerfile .
 
 echo "--- :docker: Building base dependency image for ML :airplane:"
 date +"%Y-%m-%d %H:%M:%S"
@@ -57,7 +57,7 @@ time docker build --progress=plain \
   --build-arg DOCKER_IMAGE_BASE_TEST \
   -t "$DOCKER_IMAGE_BASE_ML" \
   -t "$DOCKER_IMAGE_TAG_ML" \
-  -f ci/docker/Dockerfile.base_ml .
+  -f ci/docker/base.ml.Dockerfile .
 
 date +"%Y-%m-%d %H:%M:%S"
 

@@ -24,7 +24,7 @@ time docker build --progress=plain \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
   -t "$DOCKER_IMAGE_BASE_GPU" \
   -t "$DOCKER_IMAGE_TAG_GPU" \
-  -f ci/docker/Dockerfile.base_gpu .
+  -f ci/docker/base.gpu.Dockerfile .
 
 date +"%Y-%m-%d %H:%M:%S"
 
