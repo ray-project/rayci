@@ -47,12 +47,12 @@ export $(python3 ci/pipeline/determine_tests_to_run.py)
 
 
 # On pull requests, allow to run on latest available image if wheels are not affected
-if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ]; then
+if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ] && [ "$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED" != "1" ]; then
   export KICK_OFF_EARLY=1
   echo "Kicking off some tests early, as this is a PR, and the core C++ is not affected. "
 else
   export KICK_OFF_EARLY=0
-  echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED). "
+  echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED), or requirements are affected (affected=$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED). "
   echo "We can't kick off tests early."
 fi
 
