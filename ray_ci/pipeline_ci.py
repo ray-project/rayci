@@ -139,12 +139,14 @@ def map_commands(
 @click.option("--queue", type=str, default=None)
 @click.option("--early-only", is_flag=True, default=False)
 @click.option("--not-early-only", is_flag=True, default=False)
+@click.option("--default-instance-type", type=str, default=None)
 def main(
     pipeline: str,
     image: Optional[str] = None,
     queue: Optional[str] = None,
     early_only: bool = False,
     not_early_only: bool = False,
+    default_instance_type: Optional[str] = None,
 ):
     if not image:
         raise ValueError("Please specify a docker image using --image")
@@ -199,6 +201,9 @@ def main(
         step["plugins"][1]["docker#v3.7.0"]["image"] = image
         step["agents"]["queue"] = queue
         step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
+
+        if default_instance_type:
+            step["agents"].setdefault("aws:instance-type", default_instance_type)
 
     pipeline_steps = update_steps(pipeline_steps, _update_step)
 

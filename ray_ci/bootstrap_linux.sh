@@ -1,5 +1,10 @@
 set -e
 
+# Some settings
+export DEFAULT_BUILD_INSTANCE_TYPE="m5.xlarge"
+export DEFAULT_TEST_INSTANCE_TYPE="m5.xlarge"
+export DEFAULT_ML_INSTANCE_TYPE="m5.xlarge"
+
 export DOCKER_BUILDKIT=1
 
 cd "$RAY_REPO_DIR" || true
@@ -60,23 +65,30 @@ if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "--- :running: Kicking off some tests early"
 
   if [[ "$(docker manifest inspect $EARLY_IMAGE_TEST)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+      --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+      --default-instance-type "$DEFAULT_TEST_INSTANCE_TYPE" \
       "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
   else
     echo "Docker image NOT FOUND for early test kick-off TEST: $EARLY_IMAGE_TEST"
   fi
 
   if [[ "$(docker manifest inspect $EARLY_IMAGE_ML)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+      --early-only --image "$EARLY_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+      --default-instance-type "$DEFAULT_ML_INSTANCE_TYPE" \
       "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
   else
       echo "Docker image NOT FOUND for early test kick-off ML: $EARLY_IMAGE_ML"
   fi
 
   if [[ "$(docker manifest inspect $EARLY_IMAGE_GPU)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+      --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
       "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+      --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
       "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
   else
       echo "Docker image NOT FOUND for early test kick-off GPU: $EARLY_IMAGE_GPU"
@@ -125,7 +137,9 @@ fi
 echo "--- :rocket: Launching BUILD tests :gear:"
 echo "Kicking off the full BUILD pipeline"
 
-python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_BUILD" --queue "$RUNNER_QUEUE_DEFAULT" \
+python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+  --image "$DOCKER_IMAGE_BUILD" --queue "$RUNNER_QUEUE_DEFAULT" \
+  --default-instance-type "$DEFAULT_BUILD_INSTANCE_TYPE" \
   "./.buildkite/pipeline.build.yml" | buildkite-agent pipeline upload
 
 
@@ -171,11 +185,15 @@ echo "--- :rocket: Launching TEST tests :python:"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the TEST pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+    --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    --default-instance-type "$DEFAULT_TEST_INSTANCE_TYPE" \
     "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
 else
   echo "Kicking off the full TEST pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+    --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    --default-instance-type "$DEFAULT_TEST_INSTANCE_TYPE" \
     "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
 fi
 
@@ -210,11 +228,15 @@ echo "--- :rocket: Launching ML tests :airplane:"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the ML pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+    --not-early-only --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+    --default-instance-type "$DEFAULT_ML_INSTANCE_TYPE" \
     "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
 else
   echo "Kicking off the full ML pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
+    --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
+    --default-instance-type "$DEFAULT_ML_INSTANCE_TYPE" \
     "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
 fi
 
