@@ -1,3 +1,4 @@
+#!/bin/bash
 set -e
 
 export DOCKER_BUILDKIT=1
@@ -7,6 +8,13 @@ cd "$RAY_REPO_DIR" || true
 if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
   export BUILDKITE_COMMIT=$(git log -1 --format="%H")
   echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
+fi
+
+if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
+   echo "Got build base trigger - rebuilding base images!"
+   export BUILD_OWN_BASE="1"
+   export BUILD_OWN_GPU="1"
+   export NO_PUSH="1"
 fi
 
 # Convert / into _
@@ -88,11 +96,16 @@ fi
 echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
 date +"%Y-%m-%d %H:%M:%S"
 
+BUILD_OWN_BASE="${BUILD_OWN_BASE-0}"
 if [[ "$(time docker pull "$DOCKER_IMAGE_BASE_BUILD")" ]]; then
-  BUILD_OWN_BASE=0
+  echo "Pre-built image found: $DOCKER_IMAGE_BASE_BUILD"
 else
-  BUILD_OWN_BASE=1
   # No pre-built image, so we have to build ourselves!
+  echo "Pre-built image NOT found: $DOCKER_IMAGE_BASE_BUILD"
+  BUILD_OWN_BASE=1
+fi
+
+if [ "$BUILD_OWN_BASE" = "1" ]; then
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_build.sh"
 fi
@@ -223,11 +236,16 @@ fi
 echo "--- :arrow_down: Pulling pre-built BASE GPU image"
 date +"%Y-%m-%d %H:%M:%S"
 
+BUILD_OWN_GPU="${BUILD_OWN_GPU-0}"
 if [[ "$(time docker pull "$DOCKER_IMAGE_BASE_GPU")" ]]; then
-  BUILD_OWN_GPU=0
+  echo "Pre-built image found: $DOCKER_IMAGE_BASE_GPU"
 else
-  BUILD_OWN_GPU=1
   # No pre-built image, so we have to build ourselves!
+  echo "Pre-built image NOT found: $DOCKER_IMAGE_BASE_GPU"
+  BUILD_OWN_GPU=1
+fi
+
+if [ "$BUILD_OWN_GPU" = "1" ]; then
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_gpu.sh"
 fi
