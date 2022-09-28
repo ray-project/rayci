@@ -36,7 +36,7 @@ time docker build --progress=plain \
 
 date +"%Y-%m-%d %H:%M:%S"
 
-if [ "${NO_PUSH}" = "1 "]; then
+if [ "${NO_PUSH}" = "1" ]; then
   echo "--- :exclamation: Not pushing the image as this is a local build only!"
   exit 0
 fi
