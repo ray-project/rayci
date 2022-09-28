@@ -10,6 +10,13 @@ if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
   echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
 fi
 
+if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
+   echo "Got build base trigger - rebuilding base images!"
+   export BUILD_OWN_BASE="1"
+   export BUILD_OWN_GPU="1"
+   export NO_PUSH="1"
+fi
+
 # Convert / into _
 if [ -z "${BUILDKITE_PULL_REQUEST_BASE_BRANCH-}" ]; then
   # In branches, use the BUILDKITE_BRANCH
