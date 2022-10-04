@@ -116,10 +116,10 @@ def test_create_setup_commands():
     commands = create_setup_commands(
         repo_url="SOME_URL", repo_branch="SOME_BRANCH", git_hash="abcd1234"
     )
-    assert commands[1] == "git remote add pr_repo SOME_URL"
-    assert commands[2] == "git fetch pr_repo SOME_BRANCH"
-    assert commands[3] == "git checkout pr_repo/SOME_BRANCH"
-    assert "abcd1234" in commands[3]
+    assert commands[-5] == "git remote add pr_repo SOME_URL"
+    assert commands[-4] == "git fetch pr_repo SOME_BRANCH"
+    assert commands[-3] == "git checkout pr_repo/SOME_BRANCH"
+    assert "abcd1234" in commands[-2]
 
 
 def test_pipeline_map_steps():

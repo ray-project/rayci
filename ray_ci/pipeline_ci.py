@@ -18,6 +18,7 @@ EARLY_SETUP_COMMANDS = [
         '[[ "$(git log -1 --format="%H")" == "{git_hash}" ]] || '
         '(echo "Quick start failed: Wrong commit hash!" && exit 1)'
     ),
+    "BAZEL_CONFIG_ONLY=1 ./ci/env/install-bazel.sh",
 ]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
