@@ -19,6 +19,7 @@ EARLY_SETUP_COMMANDS = [
         '(echo "Quick start failed: Wrong commit hash!" && exit 1)'
     ),
     "BAZEL_CONFIG_ONLY=1 ./ci/env/install-bazel.sh",
+    'echo "build --remote_upload_local_results=false" >> /root/.bazelrc',
 ]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
