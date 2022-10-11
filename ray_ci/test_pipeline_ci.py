@@ -164,13 +164,21 @@ def test_pipeline_update_queue():
 
     assert step["agents"]["queue"] == queue
 
-    # Changes
+    # small instance size
     step = base_step.copy()
     step["instance_size"] = "small"
 
     _update_step(step, queue=queue, image="", artifact_destination="")
 
     assert step["agents"]["queue"] == small_queue
+
+    # invalid instance size
+    step = base_step.copy()
+    step["instance_size"] = "invalid"
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == queue
 
     # Cleanup
     os.environ.pop("RUNNER_QUEUE_DEFAULT", None)
