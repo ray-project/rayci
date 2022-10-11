@@ -20,6 +20,7 @@ EARLY_SETUP_COMMANDS = [
     ),
     "BAZEL_CONFIG_ONLY=1 ./ci/env/install-bazel.sh",
     'echo "build --remote_upload_local_results=false" >> /root/.bazelrc',
+    'export PS4=">"',
 ]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
