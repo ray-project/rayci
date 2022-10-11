@@ -29,7 +29,6 @@ BASE_STEPS_JSON = Path(__file__).parent / "step.json"
 def get_specific_queues():
     return {
         os.environ.get("RUNNER_QUEUE_DEFAULT", "__runner_queue_default"): {
-            "tiny": os.environ.get("RUNNER_QUEUE_TINY", "__runner_queue_tiny"),
             "small": os.environ.get("RUNNER_QUEUE_SMALL", "__runner_queue_small"),
             "medium": os.environ.get("RUNNER_QUEUE_MEDIUM", "__runner_queue_medium"),
             "large": os.environ.get("RUNNER_QUEUE_LARGE", "__runner_queue_large"),
