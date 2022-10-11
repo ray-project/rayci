@@ -32,7 +32,8 @@
           "BUILDKITE_PARALLEL_JOB",
           "BUILDKITE_PARALLEL_JOB_COUNT",
           "BUILDKITE_MESSAGE",
-          "BUILDKITE_BUILD_NUMBER"
+          "BUILDKITE_BUILD_NUMBER",
+          "PS4"
         ]
       }
     }
@@ -44,7 +45,8 @@
   "retry": {"manual": {"permit_on_passed": true}},
   "artifact_paths": "/tmp/artifacts/.*/**",
   "env": {
-    "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!"
+    "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!",
+    "PS4": ">"
   },
   "notify": ["github_commit_status"]
 }

@@ -10,6 +10,10 @@ if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
   echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
 fi
 
+echo Just a test
+
+exit 0
+
 if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
    echo "Got build base trigger - rebuilding base images!"
    export BUILD_OWN_BASE="1"
