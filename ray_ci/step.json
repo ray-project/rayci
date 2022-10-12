@@ -46,5 +46,6 @@
   "env": {
     "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!"
   },
-  "notify": ["github_commit_status"]
+  "notify": ["github_commit_status"],
+  "depends_on": null
 }
