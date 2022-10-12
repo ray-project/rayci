@@ -32,7 +32,8 @@
           "BUILDKITE_PARALLEL_JOB",
           "BUILDKITE_PARALLEL_JOB_COUNT",
           "BUILDKITE_MESSAGE",
-          "BUILDKITE_BUILD_NUMBER"
+          "BUILDKITE_BUILD_NUMBER",
+          "PS4"
         ]
       }
     }
@@ -41,10 +42,17 @@
     "queue": "!!REPLACE!!"
   },
   "timeout_in_minutes": 180,
-  "retry": {"manual": {"permit_on_passed": true}},
+  "retry": {
+    "manual": {"permit_on_passed": true},
+    "automatic": [
+      {"exit_status": -1, "limit":  2},
+      {"exit_status": 255, "limit":  2}
+    ]
+  },
   "artifact_paths": "/tmp/artifacts/.*/**",
   "env": {
-    "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!"
+    "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!",
+    "PS4": ">"
   },
   "notify": ["github_commit_status"],
   "depends_on": null

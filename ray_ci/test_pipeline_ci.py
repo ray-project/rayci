@@ -1,3 +1,6 @@
+import json
+import os
+
 import pytest
 import sys
 
@@ -9,6 +12,8 @@ from pipeline_ci import (
     clean_repo_branch,
     create_setup_commands,
     map_commands,
+    BASE_STEPS_JSON,
+    _update_step,
 )
 
 
@@ -116,10 +121,12 @@ def test_create_setup_commands():
     commands = create_setup_commands(
         repo_url="SOME_URL", repo_branch="SOME_BRANCH", git_hash="abcd1234"
     )
-    assert commands[-6] == "git remote add pr_repo SOME_URL"
-    assert commands[-5] == "git fetch pr_repo SOME_BRANCH"
-    assert commands[-4] == "git checkout pr_repo/SOME_BRANCH"
-    assert "abcd1234" in commands[-3]
+    cmds_before_git = 4
+
+    assert commands[-cmds_before_git - 3] == "git remote add pr_repo SOME_URL"
+    assert commands[-cmds_before_git - 2] == "git fetch pr_repo SOME_BRANCH"
+    assert commands[-cmds_before_git - 1] == "git checkout pr_repo/SOME_BRANCH"
+    assert "abcd1234" in commands[-cmds_before_git]
 
 
 def test_pipeline_map_steps():
@@ -137,6 +144,53 @@ def test_pipeline_map_steps():
             ]
         }
     ]
+
+
+def test_pipeline_update_queue():
+    queue = "queue_default"
+    small_queue = "queue_small"
+
+    with open(BASE_STEPS_JSON, "r") as f:
+        base_step = json.load(f)
+
+    # Changes to env
+    os.environ["RUNNER_QUEUE_DEFAULT"] = queue
+    os.environ["RUNNER_QUEUE_SMALL"] = small_queue
+
+    # No changes
+    step = base_step.copy()
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == queue
+
+    # small instance size
+    step = base_step.copy()
+    step["instance_size"] = "small"
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == small_queue
+
+    # medium instance size (not set, so should be ignored)
+    step = base_step.copy()
+    step["instance_size"] = "medium"
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == queue
+
+    # invalid instance size
+    step = base_step.copy()
+    step["instance_size"] = "invalid"
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == queue
+
+    # Cleanup
+    os.environ.pop("RUNNER_QUEUE_DEFAULT", None)
+    os.environ.pop("RUNNER_QUEUE_SMALL", None)
 
 
 if __name__ == "__main__":

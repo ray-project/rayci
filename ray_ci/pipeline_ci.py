@@ -20,9 +20,20 @@ EARLY_SETUP_COMMANDS = [
     ),
     "BAZEL_CONFIG_ONLY=1 ./ci/env/install-bazel.sh",
     'echo "build --remote_upload_local_results=false" >> /root/.bazelrc',
+    "echo 'export PS4=\">\"' >> ~/.bashrc",
 ]
 
 BASE_STEPS_JSON = Path(__file__).parent / "step.json"
+
+
+def get_specific_queues():
+    return {
+        os.environ.get("RUNNER_QUEUE_DEFAULT", "__runner_queue_default"): {
+            "small": os.environ.get("RUNNER_QUEUE_SMALL", "__runner_queue_small"),
+            "medium": os.environ.get("RUNNER_QUEUE_MEDIUM", "__runner_queue_medium"),
+            "large": os.environ.get("RUNNER_QUEUE_LARGE", "__runner_queue_large"),
+        }
+    }
 
 
 def read_pipeline(pipeline_path: Path):
@@ -135,6 +146,26 @@ def map_commands(
     return steps
 
 
+def _update_step(
+    step: Dict[str, Any], queue: str, image: str, artifact_destination: str
+):
+    step["plugins"][1]["docker#v3.7.0"]["image"] = image
+
+    queue_to_use = queue
+
+    specific_queues = get_specific_queues()
+
+    # Potentially overwrite with specific queue
+    specific_queue_name = step.get("instance_size", None)
+    if specific_queue_name:
+        new_queue = specific_queues.get(queue, {}).get(specific_queue_name)
+        if new_queue and not new_queue.startswith("__"):
+            queue_to_use = new_queue
+
+    step["agents"]["queue"] = queue_to_use
+    step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
+
+
 @click.command()
 @click.argument("pipeline", required=True, type=str)
 @click.option("--image", type=str, default=None)
@@ -196,16 +227,18 @@ def main(
     pipeline_steps = update_steps(pipeline_steps, partial(deep_update, u=base_step))
 
     # Merge pipeline/queue-specific settings
-
-    def _update_step(step: Dict[str, Any]):
-        step["plugins"][1]["docker#v3.7.0"]["image"] = image
-        step["agents"]["queue"] = queue
-        step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
-
-    pipeline_steps = update_steps(pipeline_steps, _update_step)
+    pipeline_steps = update_steps(
+        pipeline_steps,
+        partial(
+            _update_step,
+            queue=queue,
+            image=image,
+            artifact_destination=artifact_destination,
+        ),
+    )
 
     # Drop conditions key as it is custom (and not supported by buildkite)
-    pipeline_steps = drop_pipeline_keys(pipeline_steps, ["conditions"])
+    pipeline_steps = drop_pipeline_keys(pipeline_steps, ["conditions", "instance_size"])
 
     # Inject print commands
     def _print_command(cmd: str) -> List[str]:
