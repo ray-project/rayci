@@ -172,6 +172,14 @@ def test_pipeline_update_queue():
 
     assert step["agents"]["queue"] == small_queue
 
+    # medium instance size (not set, so should be ignored)
+    step = base_step.copy()
+    step["instance_size"] = "medium"
+
+    _update_step(step, queue=queue, image="", artifact_destination="")
+
+    assert step["agents"]["queue"] == queue
+
     # invalid instance size
     step = base_step.copy()
     step["instance_size"] = "invalid"

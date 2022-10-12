@@ -159,7 +159,7 @@ def _update_step(
     specific_queue_name = step.get("instance_size", None)
     if specific_queue_name:
         new_queue = specific_queues.get(queue, {}).get(specific_queue_name)
-        if new_queue:
+        if new_queue and not new_queue.startswith("__"):
             queue_to_use = new_queue
 
     step["agents"]["queue"] = queue_to_use
