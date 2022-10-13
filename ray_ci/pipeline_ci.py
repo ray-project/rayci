@@ -216,12 +216,14 @@ def main(
             pipeline_steps, exclude=["NO_WHEELS_REQUIRED"]
         )
 
-    # Filter include conditions ("conditions" field in pipeline yamls)
-    include_conditions = get_affected_set_conditions()
+    # If ALL_TESTS is set, skip filtering and run all tests instead
+    if os.environ.get("ALL_TESTS") != "1":
+        # Filter include conditions ("conditions" field in pipeline yamls)
+        include_conditions = get_affected_set_conditions()
 
-    pipeline_steps = filter_pipeline_conditions(
-        pipeline_steps, include=include_conditions
-    )
+        pipeline_steps = filter_pipeline_conditions(
+            pipeline_steps, include=include_conditions
+        )
 
     # Merge with base step
     pipeline_steps = update_steps(pipeline_steps, partial(deep_update, u=base_step))
