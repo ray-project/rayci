@@ -5,14 +5,14 @@ export DOCKER_BUILDKIT=1
 
 cd "$RAY_REPO_DIR" || true
 
-if [ "$BUILDKITE_MESSAGE" =~ "NO_CI" ]; then
-  echo "Bypassing linux build and testing!"
-  exit 0
-fi
-
 if [ "$BUILDKITE_COMMIT" = "HEAD" ]; then
   export BUILDKITE_COMMIT=$(git log -1 --format="%H")
   echo "Resolved BUILDKITE_COMMIT to $BUILDKITE_COMMIT"
+fi
+
+if [[ "$BUILDKITE_MESSAGE" =~ "[no_ci]" ]]; then
+  echo "no_ci is tagged. Bypassing linux build and testing!"
+  exit 0
 fi
 
 if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
