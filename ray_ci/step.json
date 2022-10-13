@@ -52,7 +52,7 @@
   "artifact_paths": "/tmp/artifacts/.*/**",
   "env": {
     "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!",
-    "PS4": ">"
+    "PS4": "> "
   },
   "notify": ["github_commit_status"],
   "depends_on": null
