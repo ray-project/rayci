@@ -45,8 +45,8 @@
   "retry": {
     "manual": {"permit_on_passed": true},
     "automatic": [
-      {"exit_status": -1, "limit":  2},
-      {"exit_status": 255, "limit":  2}
+      {"exit_status": -1, "limit":  3},
+      {"exit_status": 255, "limit":  3}
     ]
   },
   "artifact_paths": "/tmp/artifacts/.*/**",
