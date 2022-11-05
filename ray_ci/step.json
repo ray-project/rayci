@@ -16,6 +16,7 @@
         "mount-checkout": false,
         "mount-buildkite-agent": false,
         "workdir": "/ray",
+        "add-caps": ["SYS_PTRACE"],
         "network": "dind-network",
         "volumes": [
           "ray-docker-certs-client:/certs/client:ro",
