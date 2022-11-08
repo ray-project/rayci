@@ -149,7 +149,7 @@ def map_commands(
 def _update_step(
     step: Dict[str, Any], queue: str, image: str, artifact_destination: str
 ):
-    step["plugins"][1]["docker#v3.7.0"]["image"] = image
+    step["plugins"][1]["docker#v5.3.0"]["image"] = image
 
     queue_to_use = queue
 
