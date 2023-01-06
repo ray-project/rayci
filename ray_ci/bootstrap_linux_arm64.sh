@@ -23,14 +23,15 @@ fi
 echo "--- :docker: Building docker image ARM64 with compiled Ray :gear:"
 date +"%Y-%m-%d %H:%M:%S"
 
+# Overwrite base image
 time docker build --progress=plain \
-  --build-arg DOCKER_IMAGE_BASE_ARM64 \
+  --build-arg DOCKER_IMAGE_BASE_BUILD="$DOCKER_IMAGE_BASE_ARM64" \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
   --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
   -t "$DOCKER_IMAGE_ARM64" \
   -t "$DOCKER_IMAGE_LATEST_ARM64" \
-  -f ci/docker/arm64.Dockerfile .
+  -f ci/docker/build.Dockerfile .
 
 # --- BUILD pipeline
 
