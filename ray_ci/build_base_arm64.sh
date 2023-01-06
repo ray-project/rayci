@@ -25,11 +25,7 @@ export DOCKER_IMAGE_TAG_ARM64=$ECR_BASE_REPO:oss-ci-base_arm64_latest_$BUILDKITE
 echo "--- :docker: Building base dependency image for ARM64 tests :mechanical_arm:"
 date +"%Y-%m-%d %H:%M:%S"
 
-# Pass base image
-export DOCKER_IMAGE_BASE_UBUNTU=arm64v8/ubuntu:focal
-
 time docker build --progress=plain \
-  --build-arg DOCKER_IMAGE_BASE_UBUNTU \
   --build-arg REMOTE_CACHE_URL \
   --build-arg BUILDKITE_PULL_REQUEST \
   --build-arg BUILDKITE_COMMIT \
