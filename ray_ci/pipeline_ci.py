@@ -32,6 +32,9 @@ def get_specific_queues():
             "small": os.environ.get("RUNNER_QUEUE_SMALL", "__runner_queue_small"),
             "medium": os.environ.get("RUNNER_QUEUE_MEDIUM", "__runner_queue_medium"),
             "large": os.environ.get("RUNNER_QUEUE_LARGE", "__runner_queue_large"),
+            "arm64-medium": os.environ.get(
+                "RUNNER_QUEUE_ARM64_MEDIUM", "__runner_queue_arm64_medium"
+            ),
         }
     }
 
