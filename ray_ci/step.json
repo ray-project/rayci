@@ -1,7 +1,7 @@
 {
   "plugins": [
     {
-      "ray-project/dind#v1.0.9": {
+      "ray-project/dind#v1.0.10": {
         "network-name": "dind-network",
         "certs-volume-name": "ray-docker-certs-client",
         "additional-volume-mount":  "ray-volume:/ray"
