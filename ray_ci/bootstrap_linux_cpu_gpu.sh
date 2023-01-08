@@ -3,10 +3,6 @@ set -e
 
 echo "--- :alarm_clock: Determine if we should kick-off some steps early"
 
-# Fix: path to ray repo
-export $(python3 ci/pipeline/determine_tests_to_run.py)
-
-
 # On pull requests, allow to run on latest available image if wheels are not affected
 if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ] && [ "$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED" != "1" ] && [ "$RAY_CI_COMPILED_PYTHON_AFFECTED" != "1" ]; then
   export KICK_OFF_EARLY=1

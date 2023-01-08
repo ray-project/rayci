@@ -58,6 +58,10 @@ export EARLY_IMAGE_GPU=$ECR_BASE_REPO:oss-ci-gpu_latest_$BUILDKITE_BRANCH_CLEAN
 
 python3 -m pip install -U click pyyaml
 
+# Fix: path to ray repo
+export $(python3 ci/pipeline/determine_tests_to_run.py)
+env
+
 if [ "$HOSTTYPE" = "aarch64" ]; then
   echo "Running ARM64 pipeline"
   bash "${PIPELINE_REPO_DIR}/ray_ci/bootstrap_linux_arm64.sh"
