@@ -3,7 +3,7 @@ import json
 import os
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 import click
 import yaml
@@ -67,12 +67,14 @@ def filter_pipeline_conditions(
     return new_steps
 
 
-def deep_update(d, u) -> Dict:
+def deep_update(d, u, ignore: Optional[Set[str]] = None) -> Dict:
+    ignore = ignore or set()
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):
-            d[k] = deep_update(d.get(k, {}), v)
+            d[k] = deep_update(d.get(k, {}), v, ignore=ignore)
         else:
-            d[k] = v
+            if k not in d or k not in ignore:
+                d[k] = v
     return d
 
 
@@ -229,7 +231,10 @@ def main(
         )
 
     # Merge with base step
-    pipeline_steps = update_steps(pipeline_steps, partial(deep_update, u=base_step))
+    pipeline_steps = update_steps(
+        pipeline_steps,
+        partial(deep_update, u=base_step, ignore={"timeout_in_minutes", "depends_on"}),
+    )
 
     # Merge pipeline/queue-specific settings
     pipeline_steps = update_steps(
