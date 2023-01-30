@@ -1,60 +1,55 @@
 {
-  "plugins": [
-    {
-      "ray-project/dind#v1.0.10": {
-        "network-name": "dind-network",
-        "certs-volume-name": "ray-docker-certs-client",
-        "additional-volume-mount":  "ray-volume:/ray"
-      }
-    },
-    {
-      "docker#v5.3.0": {
-        "image": "!!REPLACE!!",
-        "shell": ["/bin/bash", "-e", "-c", "-i", "-l"],
-        "shm-size": "2.5gb",
-        "propagate-environment": false,
-        "mount-checkout": false,
-        "mount-buildkite-agent": false,
-        "workdir": "/ray",
-        "add-caps": ["SYS_PTRACE"],
-        "network": "dind-network",
-        "volumes": [
-          "ray-docker-certs-client:/certs/client:ro",
-          "ray-volume:/ray-mount",
-          "/tmp/artifacts:/artifact-mount"
+    "plugins": [
+        {
+            "ray-project/dind#v1.0.10": {
+                "network-name": "dind-network",
+                "certs-volume-name": "ray-docker-certs-client",
+                "additional-volume-mount": "ray-volume:/ray",
+            }
+        },
+        {
+            "docker#v5.3.0": {
+                "image": "!!REPLACE!!",
+                "shell": ["/bin/bash", "-e", "-c", "-i", "-l"],
+                "shm-size": "2.5gb",
+                "propagate-environment": false,
+                "mount-checkout": false,
+                "mount-buildkite-agent": false,
+                "workdir": "/ray",
+                "add-caps": ["SYS_PTRACE"],
+                "network": "dind-network",
+                "volumes": [
+                    "ray-docker-certs-client:/certs/client:ro",
+                    "ray-volume:/ray-mount",
+                    "/tmp/artifacts:/artifact-mount",
+                ],
+                "environment": [
+                    "BUILDKITE_JOB_ID",
+                    "BUILDKITE_COMMIT",
+                    "BUILDKITE_LABEL",
+                    "BUILDKITE_BRANCH",
+                    "BUILDKITE_BUILD_URL",
+                    "BUILDKITE_BUILD_ID",
+                    "BUILDKITE_PARALLEL_JOB",
+                    "BUILDKITE_PARALLEL_JOB_COUNT",
+                    "BUILDKITE_MESSAGE",
+                    "BUILDKITE_BUILD_NUMBER",
+                    "PS4",
+                ],
+            }
+        },
+    ],
+    "agents": {"queue": "!!REPLACE!!"},
+    "timeout_in_minutes": 180,
+    "retry": {
+        "manual": {"permit_on_passed": true},
+        "automatic": [
+            {"exit_status": -1, "limit": 3},
+            {"exit_status": 255, "limit": 3},
         ],
-        "environment": [
-          "BUILDKITE_JOB_ID",
-          "BUILDKITE_COMMIT",
-          "BUILDKITE_LABEL",
-          "BUILDKITE_BRANCH",
-          "BUILDKITE_BUILD_URL",
-          "BUILDKITE_BUILD_ID",
-          "BUILDKITE_PARALLEL_JOB",
-          "BUILDKITE_PARALLEL_JOB_COUNT",
-          "BUILDKITE_MESSAGE",
-          "BUILDKITE_BUILD_NUMBER",
-          "PS4"
-        ]
-      }
-    }
-  ],
-  "agents": {
-    "queue": "!!REPLACE!!"
-  },
-  "timeout_in_minutes": 180,
-  "retry": {
-    "manual": {"permit_on_passed": true},
-    "automatic": [
-      {"exit_status": -1, "limit":  3},
-      {"exit_status": 255, "limit":  3}
-    ]
-  },
-  "artifact_paths": "/tmp/artifacts/.*/**",
-  "env": {
-    "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!",
-    "PS4": "> "
-  },
-  "notify": ["github_commit_status"],
-  "depends_on": null
+    },
+    "artifact_paths": "/tmp/artifacts/.*/**",
+    "env": {"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!", "PS4": "> "},
+    "notify": ["github_commit_status"],
+    "depends_on": null,
 }

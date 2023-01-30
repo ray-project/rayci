@@ -24,6 +24,11 @@ if [[ "$BUILDKITE_MESSAGE" =~ "[all_tests]" ]]; then
    export ALL_TESTS="1"
 fi
 
+if [[ "$BUILDKITE_MESSAGE" =~ "[no_early_kickoff]" ]]; then
+   echo "Got no early kickoff trigger - preventing early kickoff!"
+   export KICK_OFF_EARLY="0"
+fi
+
 # Convert / into _
 if [ -z "${BUILDKITE_PULL_REQUEST_BASE_BRANCH-}" ]; then
   # In branches, use the BUILDKITE_BRANCH
