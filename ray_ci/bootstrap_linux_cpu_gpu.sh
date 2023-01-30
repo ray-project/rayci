@@ -5,8 +5,13 @@ echo "--- :alarm_clock: Determine if we should kick-off some steps early"
 
 # On pull requests, allow to run on latest available image if wheels are not affected
 if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ] && [ "$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED" != "1" ] && [ "$RAY_CI_COMPILED_PYTHON_AFFECTED" != "1" ]; then
-  export KICK_OFF_EARLY=1
-  echo "Kicking off some tests early, as this is a PR, and the core C++ is not affected, and requirements are not affected. "
+  export KICK_OFF_EARLY=${KICK_OFF_EARLY:-1}
+
+  if [ "${KICK_OFF_EARLY}" = "1" ]; then
+    echo "Kicking off some tests early, as this is a PR, and the core C++ is not affected, and requirements are not affected. "
+  else
+    echo "We could kick off tests early, but we were asked not to (KICK_OFF_EARLY=${KICK_OFF_EARLY}), so we don't."
+  fi
 else
   export KICK_OFF_EARLY=0
   echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED), or requirements are affected (affected=$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED). "

@@ -123,10 +123,13 @@ def test_create_setup_commands():
     )
     cmds_before_git = 4
 
-    assert commands[-cmds_before_git - 3] == "git remote add pr_repo SOME_URL"
-    assert commands[-cmds_before_git - 2] == "git fetch pr_repo SOME_BRANCH"
-    assert commands[-cmds_before_git - 1] == "git checkout pr_repo/SOME_BRANCH"
-    assert "abcd1234" in commands[-cmds_before_git]
+    assert commands[-cmds_before_git - 4] == "git remote add pr_repo SOME_URL"
+    assert commands[-cmds_before_git - 3] == "git fetch pr_repo SOME_BRANCH"
+    assert commands[-cmds_before_git - 2] == "git checkout pr_repo/SOME_BRANCH"
+    assert "abcd1234" in commands[-cmds_before_git - 1]
+    assert commands[-cmds_before_git].startswith(
+        "git checkout master python/ray/_raylet.pxd python/ray/_raylet.pyi"
+    )
 
 
 def test_pipeline_map_steps():
