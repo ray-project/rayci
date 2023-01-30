@@ -4,7 +4,7 @@
             "ray-project/dind#v1.0.10": {
                 "network-name": "dind-network",
                 "certs-volume-name": "ray-docker-certs-client",
-                "additional-volume-mount": "ray-volume:/ray",
+                "additional-volume-mount": "ray-volume:/ray"
             }
         },
         {
@@ -21,7 +21,7 @@
                 "volumes": [
                     "ray-docker-certs-client:/certs/client:ro",
                     "ray-volume:/ray-mount",
-                    "/tmp/artifacts:/artifact-mount",
+                    "/tmp/artifacts:/artifact-mount"
                 ],
                 "environment": [
                     "BUILDKITE_JOB_ID",
@@ -34,10 +34,10 @@
                     "BUILDKITE_PARALLEL_JOB_COUNT",
                     "BUILDKITE_MESSAGE",
                     "BUILDKITE_BUILD_NUMBER",
-                    "PS4",
-                ],
+                    "PS4"
+                ]
             }
-        },
+        }
     ],
     "agents": {"queue": "!!REPLACE!!"},
     "timeout_in_minutes": 180,
@@ -45,11 +45,11 @@
         "manual": {"permit_on_passed": true},
         "automatic": [
             {"exit_status": -1, "limit": 3},
-            {"exit_status": 255, "limit": 3},
-        ],
+            {"exit_status": 255, "limit": 3}
+        ]
     },
     "artifact_paths": "/tmp/artifacts/.*/**",
     "env": {"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!", "PS4": "> "},
     "notify": ["github_commit_status"],
-    "depends_on": null,
+    "depends_on": null
 }
