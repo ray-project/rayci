@@ -17,6 +17,7 @@ if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
    export BUILD_OWN_BASE="1"
    export BUILD_OWN_GPU="1"
    export NO_PUSH="1"
+   export KICK_OFF_EARLY="0"
 fi
 
 if [[ "$BUILDKITE_MESSAGE" =~ "[all_tests]" ]]; then
