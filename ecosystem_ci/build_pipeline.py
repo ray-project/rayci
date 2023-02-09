@@ -2,6 +2,7 @@ import copy
 import glob
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -80,6 +81,7 @@ def main(
 
     # Print to stdout
     steps_str = json.dumps(all_steps)
+    print(steps_str, file=sys.stderr)
     print(steps_str)
 
 
