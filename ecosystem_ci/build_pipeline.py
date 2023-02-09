@@ -19,10 +19,10 @@ SPECIAL_FIELD_INSTANCE_SIZE = "instance_size"
 DEFAULT_INSTANCE_SIZE = "large"
 
 INSTANCE_SIZE_TO_QUEUE = {
-    "small": os.environ.get("RUNNER_QUEUE_SMALL", "__runner_queue_small"),
-    "medium": os.environ.get("RUNNER_QUEUE_MEDIUM", "__runner_queue_medium"),
-    "large": os.environ.get("RUNNER_QUEUE_LARGE", "__runner_queue_large"),
-    "gpu": os.environ.get("RUNNER_QUEUE_GPU", "__runner_queue_gpu"),
+    "small": os.environ.get("ECOSYSTEM_QUEUE_SMALL", "__ecosystem_queue_small"),
+    "medium": os.environ.get("ECOSYSTEM_QUEUE_MEDIUM", "__ecosystem_queue_medium"),
+    "large": os.environ.get("ECOSYSTEM_QUEUE_LARGE", "__ecosystem_queue_large"),
+    "gpu": os.environ.get("ECOSYSTEM_QUEUE_GPU", "__ecosystem_queue_gpu"),
 }
 
 
