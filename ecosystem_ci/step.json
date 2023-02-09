@@ -36,5 +36,6 @@
 	},
 	"commands": [
 		"ls -alp /workdir"
-	]
+	],
+	"notify": ["github_commit_status"]
 }
