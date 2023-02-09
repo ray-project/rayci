@@ -1,4 +1,5 @@
 import copy
+import glob
 import json
 import os
 from pathlib import Path
@@ -65,16 +66,16 @@ def job_to_step(base_step: Dict, job: Dict) -> Dict:
 
 
 @click.command()
-@click.argument("pipelines", required=True, type=str, nargs=-1)
+@click.argument("pipelines", required=True, type=str)
 def main(
-    pipelines: List[str],
+    pipelines: str
 ):
     with open(BASE_STEPS_JSON, "r") as f:
         base_step = json.load(f)
 
     all_steps = []
 
-    for pipeline in pipelines:
+    for pipeline in glob.glob(pipelines):
         all_steps += load_pipeline_steps(base_step, pipeline)
 
     # Print to stdout
