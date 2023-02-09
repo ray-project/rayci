@@ -1,0 +1,40 @@
+{
+	"plugins": [{
+		"docker#v5.3.0": {
+			"image": "ubuntu:latest",
+			"shell": [
+				"/bin/bash",
+				"-e",
+				"-c",
+				"-i",
+				"-l"
+			],
+			"shm-size": "2.5gb",
+			"propagate-environment": false,
+			"mount-checkout": true,
+			"mount-buildkite-agent": false,
+			"add-caps": [
+				"SYS_PTRACE"
+			],
+			"environment": [
+				"BUILDKITE_JOB_ID",
+				"BUILDKITE_COMMIT",
+				"BUILDKITE_LABEL",
+				"BUILDKITE_BRANCH",
+				"BUILDKITE_BUILD_URL",
+				"BUILDKITE_BUILD_ID",
+				"BUILDKITE_PARALLEL_JOB",
+				"BUILDKITE_PARALLEL_JOB_COUNT",
+				"BUILDKITE_MESSAGE",
+				"BUILDKITE_BUILD_NUMBER",
+				"PS4"
+			]
+		}
+	}],
+	"agents": {
+		"queue": "runner_queue_pr"
+	},
+	"commands": [
+		"ls -alp /workdir"
+	]
+}

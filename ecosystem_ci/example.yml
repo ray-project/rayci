@@ -1,0 +1,6 @@
+- label: Some test
+  commands:
+    - echo One
+    - echo Two
+  instance_size: medium
+  image: ubuntu:focal
