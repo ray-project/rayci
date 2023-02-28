@@ -1,6 +1,6 @@
 - label: Some test
+  instance_size: large
+  image: ubuntu:focal
   commands:
     - echo One
     - echo Two
-  instance_size: medium
-  image: ubuntu:focal
