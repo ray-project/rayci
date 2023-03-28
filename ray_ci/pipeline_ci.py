@@ -36,7 +36,7 @@ EARLY_SETUP_COMMANDS = [
     "echo 'export PS4=\"> \"' >> ~/.bashrc",
 ]
 
-BASE_STEPS_JSON = Path(__file__).parent / "step.json"
+DEFAULT_BASE_STEPS_JSON = Path(__file__).parent / "step_linux.json"
 
 
 def get_specific_queues():
@@ -58,6 +58,11 @@ def read_pipeline(pipeline_path: Path):
 
     with open(pipeline_path, "r") as f:
         steps = yaml.safe_load(f)
+
+    # E.g. the MacOS pipeline is a "full" yaml
+    if "steps" in steps:
+        steps = steps["steps"]
+
     return steps
 
 
@@ -167,7 +172,8 @@ def map_commands(
 def _update_step(
     step: Dict[str, Any], queue: str, image: str, artifact_destination: str
 ):
-    step["plugins"][1]["docker#v5.3.0"]["image"] = image
+    if image:
+        step["plugins"][1]["docker#v5.3.0"]["image"] = image
 
     queue_to_use = queue
 
@@ -188,18 +194,17 @@ def _update_step(
 @click.argument("pipeline", required=True, type=str)
 @click.option("--image", type=str, default=None)
 @click.option("--queue", type=str, default=None)
+@click.option("--base-step-file", type=str, default=None)
 @click.option("--early-only", is_flag=True, default=False)
 @click.option("--not-early-only", is_flag=True, default=False)
 def main(
     pipeline: str,
     image: Optional[str] = None,
     queue: Optional[str] = None,
+    base_step_file: Optional[str] = None,
     early_only: bool = False,
     not_early_only: bool = False,
 ):
-    if not image:
-        raise ValueError("Please specify a docker image using --image")
-
     if not queue:
         raise ValueError("Please specify a runner queue using --queue")
 
@@ -210,7 +215,8 @@ def main(
     if not pipeline_path.exists():
         raise ValueError(f"Pipeline file does not exist: {pipeline}")
 
-    with open(BASE_STEPS_JSON, "r") as f:
+    base_step_file = base_step_file or DEFAULT_BASE_STEPS_JSON
+    with open(base_step_file, "r") as f:
         base_step = json.load(f)
 
     artifact_destination = (
@@ -218,7 +224,6 @@ def main(
     )
 
     assert pipeline
-    assert image
     assert queue
     assert not (early_only and not_early_only)
 

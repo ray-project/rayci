@@ -12,7 +12,7 @@ from pipeline_ci import (
     clean_repo_branch,
     create_setup_commands,
     map_commands,
-    BASE_STEPS_JSON,
+    DEFAULT_BASE_STEPS_JSON,
     _update_step,
 )
 
@@ -153,7 +153,7 @@ def test_pipeline_update_queue():
     queue = "queue_default"
     small_queue = "queue_small"
 
-    with open(BASE_STEPS_JSON, "r") as f:
+    with open(DEFAULT_BASE_STEPS_JSON, "r") as f:
         base_step = json.load(f)
 
     # Changes to env
