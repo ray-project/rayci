@@ -1,4 +1,5 @@
 import collections
+import collections.abc
 import json
 import os
 from functools import partial
@@ -39,17 +40,15 @@ EARLY_SETUP_COMMANDS = [
 DEFAULT_BASE_STEPS_JSON = Path(__file__).parent / "step_linux.json"
 
 
-def get_specific_queues():
-    return {
-        os.environ.get("RUNNER_QUEUE_DEFAULT", "__runner_queue_default"): {
-            "small": os.environ.get("RUNNER_QUEUE_SMALL", "__runner_queue_small"),
-            "medium": os.environ.get("RUNNER_QUEUE_MEDIUM", "__runner_queue_medium"),
-            "large": os.environ.get("RUNNER_QUEUE_LARGE", "__runner_queue_large"),
-            "arm64-medium": os.environ.get(
-                "RUNNER_QUEUE_ARM64_MEDIUM", "__runner_queue_arm64_medium"
-            ),
-        }
-    }
+def get_specific_queue(queue_name: str):
+    """Get specific queue from env variable.
+
+    Example:
+        get_specific_queue("some-queue")
+        # Will look up RUNNER_QUEUE_SOME_QUEUE
+    """
+    env_var = f"RUNNER_QUEUE_{queue_name.upper().replace('-', '_')}"
+    return os.environ.get(env_var, f"__runner_queue_{queue_name.replace('-', '_')}")
 
 
 def read_pipeline(pipeline_path: Path):
@@ -177,12 +176,10 @@ def _update_step(
 
     queue_to_use = queue
 
-    specific_queues = get_specific_queues()
-
     # Potentially overwrite with specific queue
     specific_queue_name = step.get("instance_size", None)
     if specific_queue_name:
-        new_queue = specific_queues.get(queue, {}).get(specific_queue_name)
+        new_queue = get_specific_queue(specific_queue_name)
         if new_queue and not new_queue.startswith("__"):
             queue_to_use = new_queue
 
