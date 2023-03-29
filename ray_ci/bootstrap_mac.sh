@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
+cd "$RAY_REPO_DIR" || true
+
 python3 -m pip install -U click pyyaml
 
-# Fix: path to ray repo
 export $(python3 ci/pipeline/determine_tests_to_run.py)
 env
 
