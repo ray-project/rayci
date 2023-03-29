@@ -38,7 +38,7 @@
 					"DOCKER_TLS_CERTDIR=/certs",
 					"DOCKER_HOST=tcp://docker:2376",
 					"DOCKER_TLS_VERIFY=1",
-					"DOCKER_CERT_PATH=/certs/client",
+					"DOCKER_CERT_PATH=/certs/client"
 				],
 				"volumes": [
                     "ray-docker-certs-client:/certs/client:ro",
