@@ -18,4 +18,4 @@ python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --queue "$RUNNER_QUEUE_DEFA
   "./.buildkite/pipeline.macos.yml" > pipeline.txt
 
 cat pipeline.txt
-cat pipeline.txt | buildkite-agent upload --no-interpolation
+cat pipeline.txt | buildkite-agent pipeline upload --no-interpolation
