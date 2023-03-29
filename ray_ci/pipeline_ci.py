@@ -182,6 +182,11 @@ def _update_step(
         new_queue = get_specific_queue(specific_queue_name)
         if new_queue and not new_queue.startswith("__"):
             queue_to_use = new_queue
+        else:
+            raise RuntimeError(
+                f"Tried to use specific queue {specific_queue_name}, but it is not "
+                f"defined in environment: {os.environ}"
+            )
 
     step["agents"]["queue"] = queue_to_use
     step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
