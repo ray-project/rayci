@@ -23,6 +23,7 @@
 				"add-caps": [
 					"SYS_PTRACE"
 				],
+				"network": "dind-network",
 				"environment": [
 					"BUILDKITE_JOB_ID",
 					"BUILDKITE_COMMIT",
