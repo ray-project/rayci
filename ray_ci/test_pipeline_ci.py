@@ -175,21 +175,18 @@ def test_pipeline_update_queue():
 
     assert step["agents"]["queue"] == small_queue
 
-    # medium instance size (not set, so should be ignored)
     step = base_step.copy()
     step["instance_size"] = "medium"
 
-    _update_step(step, queue=queue, image="", artifact_destination="")
-
-    assert step["agents"]["queue"] == queue
+    with pytest.raises(ValueError):
+        _update_step(step, queue=queue, image="", artifact_destination="")
 
     # invalid instance size
     step = base_step.copy()
     step["instance_size"] = "invalid"
 
-    _update_step(step, queue=queue, image="", artifact_destination="")
-
-    assert step["agents"]["queue"] == queue
+    with pytest.raises(ValueError):
+        _update_step(step, queue=queue, image="", artifact_destination="")
 
     # Cleanup
     os.environ.pop("RUNNER_QUEUE_DEFAULT", None)

@@ -183,7 +183,7 @@ def _update_step(
         if new_queue and not new_queue.startswith("__"):
             queue_to_use = new_queue
         else:
-            raise RuntimeError(
+            raise ValueError(
                 f"Tried to use specific queue {specific_queue_name}, but it is not "
                 f"defined in environment: {os.environ}"
             )
