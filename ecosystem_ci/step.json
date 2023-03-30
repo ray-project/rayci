@@ -1,36 +1,54 @@
 {
 	"plugins": [{
-		"docker#v5.3.0": {
-			"image": "ubuntu:latest",
-			"shell": [
-				"/bin/bash",
-				"-e",
-				"-c",
-				"-i",
-				"-l"
-			],
-			"shm-size": "2.5gb",
-			"propagate-environment": false,
-			"mount-checkout": true,
-			"mount-buildkite-agent": false,
-			"add-caps": [
-				"SYS_PTRACE"
-			],
-			"environment": [
-				"BUILDKITE_JOB_ID",
-				"BUILDKITE_COMMIT",
-				"BUILDKITE_LABEL",
-				"BUILDKITE_BRANCH",
-				"BUILDKITE_BUILD_URL",
-				"BUILDKITE_BUILD_ID",
-				"BUILDKITE_PARALLEL_JOB",
-				"BUILDKITE_PARALLEL_JOB_COUNT",
-				"BUILDKITE_MESSAGE",
-				"BUILDKITE_BUILD_NUMBER",
-				"PS4"
-			]
+			"ray-project/dind#v1.0.10": {
+				"network-name": "dind-network",
+				"certs-volume-name": "ray-docker-certs-client",
+				"additional-volume-mount": "shared-ci-volume:/shared"
+			}
+		},
+		{
+			"docker#v5.3.0": {
+				"image": "ubuntu:latest",
+				"shell": [
+					"/bin/bash",
+					"-e",
+					"-c",
+					"-i",
+					"-l"
+				],
+				"shm-size": "2.5gb",
+				"propagate-environment": false,
+				"mount-checkout": true,
+				"mount-buildkite-agent": false,
+				"add-caps": [
+					"SYS_PTRACE"
+				],
+				"network": "dind-network",
+				"environment": [
+					"BUILDKITE_JOB_ID",
+					"BUILDKITE_COMMIT",
+					"BUILDKITE_LABEL",
+					"BUILDKITE_BRANCH",
+					"BUILDKITE_BUILD_URL",
+					"BUILDKITE_BUILD_ID",
+					"BUILDKITE_PARALLEL_JOB",
+					"BUILDKITE_PARALLEL_JOB_COUNT",
+					"BUILDKITE_MESSAGE",
+					"BUILDKITE_BUILD_NUMBER",
+					"PS4",
+					"DOCKER_TLS_CERTDIR=/certs",
+					"DOCKER_HOST=tcp://docker:2376",
+					"DOCKER_TLS_VERIFY=1",
+					"DOCKER_CERT_PATH=/certs/client"
+				],
+				"volumes": [
+					"ray-docker-certs-client:/certs/client:ro",
+					"shared-ci-volume:/shared",
+					"/tmp/artifacts:/artifact-mount"
+				]
+			}
 		}
-	}],
+	],
 	"agents": {
 		"queue": "runner_queue_pr"
 	},
