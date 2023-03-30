@@ -42,10 +42,10 @@
 					"DOCKER_CERT_PATH=/certs/client"
 				],
 				"volumes": [
-                    "ray-docker-certs-client:/certs/client:ro",
-                    "shared-ci-volume:/shared",
-                    "/tmp/artifacts:/artifact-mount"
-                ]
+					"ray-docker-certs-client:/certs/client:ro",
+					"shared-ci-volume:/shared",
+					"/tmp/artifacts:/artifact-mount"
+				]
 			}
 		}
 	],
