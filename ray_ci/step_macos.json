@@ -9,7 +9,7 @@
 	},
 	"timeout_in_minutes": 180,
 	"artifact_paths": "/tmp/artifacts/.*/**",
-    "env": {"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "!!REPLACE!!", "PS4": "> "},
+    "env": {"PS4": "> "},
 	"retry": {
 		"manual": {
 			"permit_on_passed": true

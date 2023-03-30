@@ -11,6 +11,9 @@ env
 echo "--- :rocket: Launching Mac OS tests :gear:"
 echo "Kicking off the full Mac OS pipeline"
 
+# Fix: pr runners currently don't have access to the artifact bucket
+unset BUCKET_PATH || true
+
 python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --queue "$RUNNER_QUEUE_DEFAULT" \
   --base-step-file "${PIPELINE_REPO_DIR}/ray_ci/step_macos.json" \
   "./.buildkite/pipeline.macos.yml" > pipeline.txt

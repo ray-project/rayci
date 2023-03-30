@@ -169,7 +169,10 @@ def map_commands(
 
 
 def _update_step(
-    step: Dict[str, Any], queue: str, image: str, artifact_destination: str
+    step: Dict[str, Any],
+    queue: str,
+    image: Optional[str],
+    artifact_destination: Optional[str],
 ):
     if image:
         step["plugins"][1]["docker#v5.3.0"]["image"] = image
@@ -189,7 +192,9 @@ def _update_step(
             )
 
     step["agents"]["queue"] = queue_to_use
-    step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
+
+    if artifact_destination:
+        step["env"]["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = artifact_destination
 
 
 @click.command()
@@ -221,9 +226,11 @@ def main(
     with open(base_step_file, "r") as f:
         base_step = json.load(f)
 
-    artifact_destination = (
-        os.environ["BUCKET_PATH"] + "/" + os.environ["BUILDKITE_COMMIT"]
-    )
+    artifact_destination = None
+    if os.environ.get("BUCKET_PATH"):
+        artifact_destination = (
+            os.environ["BUCKET_PATH"] + "/" + os.environ["BUILDKITE_COMMIT"]
+        )
 
     assert pipeline
     assert queue
