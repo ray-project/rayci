@@ -45,8 +45,8 @@ def job_to_step(base_step: Dict, job: Dict) -> Dict:
 
     image = job.pop(SPECIAL_FIELD_IMAGE, None)
     if image:
-        docker_key = list(base_step["plugins"][0].keys())[0]
-        step["plugins"][0][docker_key]["image"] = image
+        docker_key = list(base_step["plugins"][1].keys())[0]
+        step["plugins"][1][docker_key]["image"] = image
 
     instance_size = job.pop(SPECIAL_FIELD_INSTANCE_SIZE, DEFAULT_INSTANCE_SIZE)
     try:
