@@ -16,7 +16,8 @@
                 "mount-checkout": false,
                 "mount-buildkite-agent": false,
                 "workdir": "/ray",
-                "add-caps": ["SYS_PTRACE", "CAP_SYS_ADMIN", "NET_ADMIN"],
+                "add-caps": ["SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"],
+                "security-opt": ["apparmor=unconfined"],
                 "network": "dind-network",
                 "volumes": [
                     "ray-docker-certs-client:/certs/client:ro",
