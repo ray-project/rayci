@@ -41,7 +41,7 @@
         }
     ],
     "agents": {"queue": "!!REPLACE!!"},
-    "timeout_in_minutes": 180,
+    "timeout_in_minutes": 300,
     "retry": {
         "manual": {"permit_on_passed": true},
         "automatic": [
