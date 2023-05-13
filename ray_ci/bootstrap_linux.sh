@@ -30,6 +30,9 @@ if [[ "$BUILDKITE_MESSAGE" =~ "[no_early_kickoff]" ]]; then
    export KICK_OFF_EARLY="0"
 fi
 
+echo "Early kickoff is not working; disable it for now."
+export KICK_OFF_EARLY="0"
+
 # Convert / into _
 if [ -z "${BUILDKITE_PULL_REQUEST_BASE_BRANCH-}" ]; then
   # In branches, use the BUILDKITE_BRANCH
