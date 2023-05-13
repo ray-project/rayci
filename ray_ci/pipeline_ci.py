@@ -9,17 +9,6 @@ from typing import Any, Callable, Dict, List, Optional, Set
 import click
 import yaml
 
-# On early kick off, restore these files to their original state for compatibility
-EARLY_KICKOFF_KEEP_ORIG = [
-    "python/ray/_raylet.pxd",
-    "python/ray/_raylet.pyi",
-    "python/ray/_raylet.pyx",
-    "python/ray/_private/",
-    "python/ray/actor.py",
-    "python/ray/runtime_context.py",
-    "python/ray/remote_function.py",
-]
-
 
 EARLY_SETUP_COMMANDS = [
     "echo '--- :running: Early kick-off: Checking out PR code revision'",
@@ -30,8 +19,6 @@ EARLY_SETUP_COMMANDS = [
         '[[ "$(git log -1 --format="%H")" == "{git_hash}" ]] || '
         '(echo "Quick start failed: Wrong commit hash!" && exit 1)'
     ),
-    # Keep _raylet files from original image
-    "git checkout master " + " ".join(EARLY_KICKOFF_KEEP_ORIG),
     "BAZEL_CONFIG_ONLY=1 ./ci/env/install-bazel.sh",
     'echo "build --remote_upload_local_results=false" >> /root/.bazelrc',
     "echo 'export PS4=\"> \"' >> ~/.bashrc",
