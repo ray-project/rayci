@@ -28,11 +28,20 @@ let commentToUpdate = existingComments.data.find(comment =>
 let externCodeFileContent = fs.readFileSync(externalCodeFile, "utf8");
 let trackedFilesToURIs = parseTrackedFilesToURIs(externCodeFileContent);
 
+console.log("trackedFileToURIs")
+console.log(trackedFilesToURIs)
+
 // Get changed files from environment variable
 let changedFiles = await deserializeIntoArray(process.env.GIT_DIFF_SERIALIZED)
 
+console.log("changedFiles")
+console.log(changedFiles)
+
 // Filter associative array
 let changedFileToURIs = filterFilesByNames(trackedFilesToURIs, changedFiles);
+
+console.log("changedFileToURIs")
+console.log(changedFileToURIs)
 
 if (!changedFileToURIs) {
   if (commentToUpdate) {

@@ -11,8 +11,8 @@ const {
 
 // Testing deserializeIntoArray function
 assert.deepStrictEqual(deserializeIntoArray("1||2||3"), ["1", "2", "3"]);
-assert.deepStrictEqual(deserializeIntoArray("1||2||3||", "||"), ["1", "2", "3"]);
-assert.deepStrictEqual(deserializeIntoArray("||1||2||3||", "||"), ["1", "2", "3"]);
+assert.deepStrictEqual(deserializeIntoArray("1||2||3||", "|"), ["1", "2", "3"]);
+assert.deepStrictEqual(deserializeIntoArray("||1||2||3||", "|"), ["1", "2", "3"]);
 
 // Testing parseTrackedFilesToURIs function
 const sampleContent = `

@@ -2,7 +2,7 @@
 const filePattern = /^[a-zA-Z0-9_/.-]+$/;
 const uriPattern = /^https?:\/\/[a-zA-Z0-9._:/&#-]+$/;
 
-function deserializeIntoArray(string, delimiter="||") {
+function deserializeIntoArray(string, delimiter="|") {
   return string.split(delimiter).filter(item => item.trim() !== "");
 }
 
