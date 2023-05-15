@@ -1,17 +1,9 @@
-const fs = require("fs");
-const path = require("path");
-
 // Define patterns
 const filePattern = /^[a-zA-Z0-9_/.-]+$/;
 const uriPattern = /^https?:\/\/[a-zA-Z0-9._:/&#-]+$/;
 
 function deserializeIntoArray(string, delimiter="||") {
   return string.split(delimiter).filter(item => item.trim() !== "");
-}
-
-function readFileContent(filename) {
-  const filePath = path.resolve(__dirname, filename);
-  return fs.readFileSync(filePath, "utf8");
 }
 
 function parseTrackedFilesToURIs(content) {
@@ -73,6 +65,5 @@ module.exports = {
   filterFilesByNames,
   getCommentContentChanged,
   getCommentContentNotChanged,
-  parseTrackedFilesToURIs,
-  readFileContent
+  parseTrackedFilesToURIs
 };

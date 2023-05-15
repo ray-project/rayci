@@ -7,6 +7,7 @@ const {
   readFileContent
 } = require('./track_code');
 
+const fs = require("fs");
 
 const commentHeader = `## Attention: External code changed`
 
@@ -23,7 +24,7 @@ let commentToUpdate = existingComments.data.find(comment =>
 );
 
 // Read and parse external_code.txt file
-let externCodeFileContent = readFileContent("doc/external/external_code.txt");
+let externCodeFileContent = fs.readFileSync("doc/external/external_code.txt", "utf8");
 let trackedFilesToURIs = parseTrackedFilesToURIs(externCodeFileContent);
 
 // Get changed files from environment variable

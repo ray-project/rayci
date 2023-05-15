@@ -6,20 +6,13 @@ const {
   filterFilesByNames,
   getCommentContentChanged,
   getCommentContentNotChanged,
-  parseTrackedFilesToURIs,
-  readFileContent
+  parseTrackedFilesToURIs
 } = require("./track_code");
 
 // Testing deserializeIntoArray function
 assert.deepStrictEqual(deserializeIntoArray("1||2||3"), ["1", "2", "3"]);
 assert.deepStrictEqual(deserializeIntoArray("1||2||3||", "||"), ["1", "2", "3"]);
 assert.deepStrictEqual(deserializeIntoArray("||1||2||3||", "||"), ["1", "2", "3"]);
-
-// Testing readFileContent function
-// Create a dummy file and use it for the test
-fs.writeFileSync("test.txt", "Hello, World!", "utf8");
-assert.strictEqual(readFileContent("test.txt"), "Hello, World!");
-fs.unlinkSync("test.txt"); // clean up after test
 
 // Testing parseTrackedFilesToURIs function
 const sampleContent = `
