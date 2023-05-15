@@ -43,7 +43,7 @@ let changedFileToURIs = filterFilesByNames(trackedFilesToURIs, changedFiles);
 console.log("changedFileToURIs")
 console.log(changedFileToURIs)
 
-if (!changedFileToURIs) {
+if (changedFileToURIs.length === 0) {
   if (commentToUpdate) {
       commentBody = getCommentContentNotChanged(commentHeader);
       await github.rest.issues.updateComment({
