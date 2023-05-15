@@ -10,6 +10,7 @@ const {
 const fs = require("fs");
 
 const commentHeader = `## Attention: External code changed`
+const externalCodeFile = "doc/external/external_code.txt"
 
 // Get existing comments
 const existingComments = await github.rest.issues.listComments({
@@ -24,7 +25,7 @@ let commentToUpdate = existingComments.data.find(comment =>
 );
 
 // Read and parse external_code.txt file
-let externCodeFileContent = fs.readFileSync("doc/external/external_code.txt", "utf8");
+let externCodeFileContent = fs.readFileSync(externalCodeFile, "utf8");
 let trackedFilesToURIs = parseTrackedFilesToURIs(externCodeFileContent);
 
 // Get changed files from environment variable
@@ -35,7 +36,7 @@ let changedFileToURIs = filterFilesByNames(trackedFilesToURIs, changedFiles);
 
 if (!changedFileToURIs) {
   if (commentToUpdate) {
-      commentContent = getCommentContentNotChanged(commentHeader);
+      commentBody = getCommentContentNotChanged(commentHeader);
       await github.rest.issues.updateComment({
         owner: context.repo.owner,
         repo: context.repo.repo,
@@ -45,7 +46,7 @@ if (!changedFileToURIs) {
   }
 
 } else {
-    commentContent = getCommentContentChanged(commentHeader, changedFileToURIs);
+    commentBody = getCommentContentChanged(commentHeader, changedFileToURIs);
 
     if (commentToUpdate) {
     // Only update if content changed
