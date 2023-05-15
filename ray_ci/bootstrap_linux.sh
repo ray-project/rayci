@@ -12,6 +12,11 @@ fi
 
 # Commit message instructions
 
+if [[ "$BUILDKITE_MESSAGE" =~ "[early_kickoff]" ]]; then
+   echo "Got early kickoff trigger - enabling early kickoff (if possible)!"
+   export KICK_OFF_EARLY="1"
+fi
+
 if [[ "$BUILDKITE_MESSAGE" =~ "[build_base]" ]]; then
    echo "Got build base trigger - rebuilding base images!"
    export BUILD_OWN_BASE="1"
@@ -23,11 +28,6 @@ fi
 if [[ "$BUILDKITE_MESSAGE" =~ "[all_tests]" ]]; then
    echo "Got all tests trigger - running all tests!"
    export ALL_TESTS="1"
-fi
-
-if [[ "$BUILDKITE_MESSAGE" =~ "[no_early_kickoff]" ]]; then
-   echo "Got no early kickoff trigger - preventing early kickoff!"
-   export KICK_OFF_EARLY="0"
 fi
 
 # Convert / into _
