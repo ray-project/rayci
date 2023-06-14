@@ -56,13 +56,22 @@ def read_pipeline(pipeline_path: Path):
         return []
 
     with open(pipeline_path, "r") as f:
-        steps = yaml.safe_load(f)
+        content = f.read()
+
+    group_name = None
+    if content.startswith("#ci:group="):
+        first_line = content.splitlines()[0]
+        group_name = first_line[len("#ci:group="):].strip()
+
+    steps = yaml.safe_load(content)
+    if not steps:
+        steps = []
 
     # E.g. the MacOS pipeline is a "full" yaml
-    if "steps" in steps:
+    if isinstance(steps, dict) and "steps" in steps:
         steps = steps["steps"]
 
-    return steps
+    return steps, group_name
 
 
 def filter_pipeline_conditions(
@@ -236,7 +245,7 @@ def main(
     assert queue
     assert not (early_only and not_early_only)
 
-    pipeline_steps = read_pipeline(pipeline_path)
+    pipeline_steps, group_name = read_pipeline(pipeline_path)
 
     # Filter early kick-off
     if early_only:
@@ -294,7 +303,13 @@ def main(
         pipeline_steps = inject_commands(pipeline_steps, before=setup_commands)
 
     # Print to stdout
-    steps_str = json.dumps(pipeline_steps)
+    if group_name:
+        pipeline_steps = {
+            "group": group_name,
+            "steps": pipeline_steps,
+        }
+
+    steps_str = json.dumps({"steps:": pipeline_steps})
     print(steps_str)
 
 

@@ -1,0 +1,610 @@
+{
+  "steps:": {
+    "group": "build",
+    "steps": [
+      {
+        "label": ":book: Lint",
+        "commands": [
+          "echo '--- :arrow_forward: export LINT=1'",
+          "export LINT=1",
+          "echo '--- :arrow_forward: ./ci/env/install-dependencies.sh'",
+          "./ci/env/install-dependencies.sh",
+          "echo '--- :arrow_forward: ./ci/ci.sh lint'",
+          "./ci/ci.sh lint"
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "q"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      },
+      {
+        "label": ":docker: Build Images: {{matrix}} - cpu/cu101/cu102/cu110",
+        "commands": [
+          "echo '--- :arrow_forward: LINUX_WHEELS=1 BUILD_ONE_PYTHON_ONLY={{matrix}} ./ci/ci.sh build'",
+          "LINUX_WHEELS=1 BUILD_ONE_PYTHON_ONLY={{matrix}} ./ci/ci.sh build",
+          "echo '--- :arrow_forward: pip install -q docker aws_requests_auth boto3'",
+          "pip install -q docker aws_requests_auth boto3",
+          "echo '--- :arrow_forward: ./ci/env/env_info.sh'",
+          "./ci/env/env_info.sh",
+          "echo '--- :arrow_forward: if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then python .buildkite/copy_files.py --destination docker_login; fi'",
+          "if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then python .buildkite/copy_files.py --destination docker_login; fi",
+          "echo '--- :arrow_forward: python ./ci/build/build-docker-images.py --py-versions {{matrix}} -T cpu -T cu101 -T cu102 -T cu110 --build-type BUILDKITE --build-base'",
+          "python ./ci/build/build-docker-images.py --py-versions {{matrix}} -T cpu -T cu101 -T cu102 -T cu110 --build-type BUILDKITE --build-base"
+        ],
+        "matrix": [
+          "py37",
+          "py38",
+          "py39",
+          "py310"
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "medium"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      },
+      {
+        "label": ":docker: Build Images: {{matrix}} - cu111/cu112/cu113/cu116/cu118",
+        "commands": [
+          "echo '--- :arrow_forward: LINUX_WHEELS=1 BUILD_ONE_PYTHON_ONLY={{matrix}} ./ci/ci.sh build'",
+          "LINUX_WHEELS=1 BUILD_ONE_PYTHON_ONLY={{matrix}} ./ci/ci.sh build",
+          "echo '--- :arrow_forward: pip install -q docker aws_requests_auth boto3'",
+          "pip install -q docker aws_requests_auth boto3",
+          "echo '--- :arrow_forward: if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then python .buildkite/copy_files.py --destination docker_login; fi'",
+          "if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then python .buildkite/copy_files.py --destination docker_login; fi",
+          "echo '--- :arrow_forward: python ./ci/build/build-docker-images.py --py-versions {{matrix}} -T cu111 -T cu112 -T cu113 -T cu116 -T cu118 --build-type BUILDKITE --build-base'",
+          "python ./ci/build/build-docker-images.py --py-versions {{matrix}} -T cu111 -T cu112 -T cu113 -T cu116 -T cu118 --build-type BUILDKITE --build-base"
+        ],
+        "matrix": [
+          "py37",
+          "py38",
+          "py39",
+          "py310"
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "medium"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      },
+      {
+        "label": ":book: Doctest (CPU)",
+        "commands": [
+          "echo '--- :arrow_forward: cleanup() { if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then ./ci/build/upload_build_info.sh; fi }; trap cleanup EXIT'",
+          "cleanup() { if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then ./ci/build/upload_build_info.sh; fi }; trap cleanup EXIT",
+          "echo '--- :arrow_forward: ./ci/env/env_info.sh'",
+          "./ci/env/env_info.sh",
+          "echo '--- :arrow_forward: DOC_TESTING=1 ./ci/env/install-dependencies.sh'",
+          "DOC_TESTING=1 ./ci/env/install-dependencies.sh",
+          "echo '--- :arrow_forward: ./ci/env/install-horovod.sh'",
+          "./ci/env/install-horovod.sh",
+          "echo '--- :arrow_forward: bazel test --config=ci $(./scripts/bazel_export_options) --test_tag_filters=doctest,-gpu python/ray/... doc/...'",
+          "bazel test --config=ci $(./scripts/bazel_export_options) --test_tag_filters=doctest,-gpu python/ray/... doc/..."
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "large"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      },
+      {
+        "label": ":book: Documentation",
+        "commands": [
+          "echo '--- :arrow_forward: export LINT=1'",
+          "export LINT=1",
+          "echo '--- :arrow_forward: echo \"--- Setting up Python 3.7 environment.\"'",
+          "echo \"--- Setting up Python 3.7 environment.\"",
+          "echo '--- :arrow_forward: ./ci/env/install-dependencies.sh'",
+          "./ci/env/install-dependencies.sh",
+          "echo '--- :arrow_forward: pip uninstall -y ray && rm -rf /ray/python/ray/thirdparty_files'",
+          "pip uninstall -y ray && rm -rf /ray/python/ray/thirdparty_files",
+          "echo '--- :arrow_forward: pushd /ray && git clean -f -f -x -d -e .whl -e python/ray/dashboard/client && popd'",
+          "pushd /ray && git clean -f -f -x -d -e .whl -e python/ray/dashboard/client && popd",
+          "echo '--- :arrow_forward: bazel clean --expunge'",
+          "bazel clean --expunge",
+          "echo '--- :arrow_forward: export WANDB_MODE=offline'",
+          "export WANDB_MODE=offline",
+          "echo '--- :arrow_forward: ./ci/env/install-horovod.sh'",
+          "./ci/env/install-horovod.sh",
+          "echo '--- :arrow_forward: pip install \"mosaicml==0.12.1\" \"urllib3<1.27\" --ignore-installed'",
+          "pip install \"mosaicml==0.12.1\" \"urllib3<1.27\" --ignore-installed",
+          "echo '--- :arrow_forward: ./ci/ci.sh build'",
+          "./ci/ci.sh build"
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "q"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      },
+      {
+        "label": ":cold_face: :python: Ray Python legacy dependency ML compatibility tests",
+        "parallelism": 2,
+        "commands": [
+          "echo '--- :arrow_forward: cleanup() { if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then ./ci/build/upload_build_info.sh; fi }; trap cleanup EXIT'",
+          "cleanup() { if [ \"${BUILDKITE_PULL_REQUEST}\" = \"false\" ]; then ./ci/build/upload_build_info.sh; fi }; trap cleanup EXIT",
+          "echo '--- :arrow_forward: ./ci/env/install-minimal.sh 3.7'",
+          "./ci/env/install-minimal.sh 3.7",
+          "echo '--- :arrow_forward: DATA_PROCESSING_TESTING=1 TUNE_TESTING=1 TRAIN_TESTING=1 INSTALL_HDFS=1 ./ci/env/install-dependencies.sh'",
+          "DATA_PROCESSING_TESTING=1 TUNE_TESTING=1 TRAIN_TESTING=1 INSTALL_HDFS=1 ./ci/env/install-dependencies.sh",
+          "echo '--- :arrow_forward: pip install -r python/requirements/compat/requirements_legacy_compat.txt'",
+          "pip install -r python/requirements/compat/requirements_legacy_compat.txt",
+          "echo '--- :arrow_forward: pip install -U typing-extensions'",
+          "pip install -U typing-extensions",
+          "echo '--- :arrow_forward: HOROVOD_WITH_GLOO=1 HOROVOD_WITHOUT_MPI=1 HOROVOD_WITHOUT_MXNET=1 HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_PYTORCH=1 pip install horovod'",
+          "HOROVOD_WITH_GLOO=1 HOROVOD_WITHOUT_MPI=1 HOROVOD_WITHOUT_MXNET=1 HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_PYTORCH=1 pip install horovod",
+          "echo '--- :arrow_forward: ./ci/env/env_info.sh'",
+          "./ci/env/env_info.sh",
+          "echo '--- :arrow_forward: set -x; {\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=compat python/ray/tests/horovod/... python/ray/tests/lightgbm/... python/ray/tests/ml_py36_compat/... python/ray/tests/xgboost/... python/ray/tests/ray_lightning/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=-gpu,-needs_credentials,-hdfs python/ray/air/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=ray_air,-torch_1_11,-gpu_only,-gpu,-needs_credentials,-hdfs python/ray/train/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=ray_air python/ray/data/...;\n} > test_shard.txt'",
+          "set -x; {\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=compat python/ray/tests/horovod/... python/ray/tests/lightgbm/... python/ray/tests/ml_py36_compat/... python/ray/tests/xgboost/... python/ray/tests/ray_lightning/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=-gpu,-needs_credentials,-hdfs python/ray/air/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=ray_air,-torch_1_11,-gpu_only,-gpu,-needs_credentials,-hdfs python/ray/train/... &&\n  python ./ci/run/bazel_sharding/bazel_sharding.py --exclude_manual --index \"\\${BUILDKITE_PARALLEL_JOB}\" --count \"\\${BUILDKITE_PARALLEL_JOB_COUNT}\" --tag_filters=ray_air python/ray/data/...;\n} > test_shard.txt",
+          "echo '--- :arrow_forward: cat test_shard.txt'",
+          "cat test_shard.txt",
+          "echo '--- :arrow_forward: bazel test --config=ci $(./ci/run/bazel_export_options) $(cat test_shard.txt)'",
+          "bazel test --config=ci $(./ci/run/bazel_export_options) $(cat test_shard.txt)"
+        ],
+        "plugins": [
+          {
+            "ray-project/dind#v1.0.10": {
+              "network-name": "dind-network",
+              "certs-volume-name": "ray-docker-certs-client",
+              "additional-volume-mount": "ray-volume:/ray"
+            }
+          },
+          {
+            "docker#v5.3.0": {
+              "image": "base_img",
+              "shell": [
+                "/bin/bash",
+                "-e",
+                "-c",
+                "-i",
+                "-l"
+              ],
+              "shm-size": "2.5gb",
+              "propagate-environment": false,
+              "mount-checkout": false,
+              "mount-buildkite-agent": false,
+              "workdir": "/ray",
+              "add-caps": [
+                "SYS_PTRACE",
+                "SYS_ADMIN",
+                "NET_ADMIN"
+              ],
+              "security-opts": [
+                "apparmor=unconfined"
+              ],
+              "network": "dind-network",
+              "volumes": [
+                "ray-docker-certs-client:/certs/client:ro",
+                "ray-volume:/ray-mount",
+                "/tmp/artifacts:/artifact-mount"
+              ],
+              "environment": [
+                "BUILDKITE_JOB_ID",
+                "BUILDKITE_COMMIT",
+                "BUILDKITE_LABEL",
+                "BUILDKITE_BRANCH",
+                "BUILDKITE_BUILD_URL",
+                "BUILDKITE_BUILD_ID",
+                "BUILDKITE_PARALLEL_JOB",
+                "BUILDKITE_PARALLEL_JOB_COUNT",
+                "BUILDKITE_MESSAGE",
+                "BUILDKITE_BUILD_NUMBER",
+                "PS4"
+              ]
+            }
+          }
+        ],
+        "agents": {
+          "queue": "large"
+        },
+        "timeout_in_minutes": 300,
+        "retry": {
+          "manual": {
+            "permit_on_passed": true
+          },
+          "automatic": [
+            {
+              "exit_status": -1,
+              "limit": 3
+            },
+            {
+              "exit_status": 255,
+              "limit": 3
+            }
+          ]
+        },
+        "artifact_paths": "/tmp/artifacts/.*/**",
+        "env": {
+          "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://bucket/abc123",
+          "PS4": "> "
+        },
+        "notify": [
+          "github_commit_status"
+        ],
+        "depends_on": null
+      }
+    ]
+  }
+}
