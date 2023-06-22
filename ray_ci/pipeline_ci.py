@@ -304,12 +304,12 @@ def main(
 
     # Print to stdout
     if group_name:
-        pipeline_steps = {
+        pipeline_steps = [{
             "group": group_name,
             "steps": pipeline_steps,
-        }
+        }]
 
-    steps_str = json.dumps({"steps:": pipeline_steps})
+    steps_str = json.dumps(pipeline_steps)
     print(steps_str)
 
 
