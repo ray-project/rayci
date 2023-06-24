@@ -1,8 +1,10 @@
 import json
 import os
 
+from pathlib import Path
 import pytest
 import sys
+import tempfile
 
 from typing import List
 
@@ -14,6 +16,7 @@ from pipeline_ci import (
     map_commands,
     DEFAULT_BASE_STEPS_JSON,
     _update_step,
+    read_pipeline,
 )
 
 
@@ -191,6 +194,40 @@ def test_pipeline_update_queue():
     # Cleanup
     os.environ.pop("RUNNER_QUEUE_DEFAULT", None)
     os.environ.pop("RUNNER_QUEUE_SMALL", None)
+
+
+def test_read_lineline():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("#ci:group=foo")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name == "foo"
+        assert steps == []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("- name: foo")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name is None
+        assert steps == [{"name": "foo"}]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("steps:\n  - name: foo\n")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name is None
+        assert steps == [{"name": "foo"}]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("#ci:group=foo\nsteps:\n  - name: foo\n")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name == "foo"
+        assert steps == [{"name": "foo"}]
 
 
 if __name__ == "__main__":
