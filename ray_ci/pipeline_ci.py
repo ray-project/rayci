@@ -302,13 +302,13 @@ def main(
         )
         pipeline_steps = inject_commands(pipeline_steps, before=setup_commands)
 
-    # Print to stdout
-    if group_name:
+    if group_name and len(pipeline_steps) > 0:
         pipeline_steps = [{
             "group": group_name,
             "steps": pipeline_steps,
         }]
 
+    # Print to stdout
     steps_str = json.dumps(pipeline_steps)
     print(steps_str)
 
