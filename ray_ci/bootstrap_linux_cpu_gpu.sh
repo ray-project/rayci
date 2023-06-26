@@ -94,7 +94,8 @@ fi
 echo "--- :rocket: Launching BUILD tests :gear:"
 echo "Kicking off the full BUILD pipeline"
 
-for FILE in ".buildkite/pipeline.build*.yml" ; do
+BUILD_YAMLS=(.buildkite/pipeline.build*.yml)
+for FILE in "${BUILD_YAMLS[@])"; do
   python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" \
     --image "$DOCKER_IMAGE_BUILD" --queue "$RUNNER_QUEUE_DEFAULT" \
     "$FILE" | buildkite-agent pipeline upload
