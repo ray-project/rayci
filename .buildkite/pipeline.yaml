@@ -1,4 +1,5 @@
-- steps:
-  - commands: 'echo hello'
+steps:
+  - label: "hello"
+    commands: 'echo hello'
     agents:
       queue: "runner_queue_branch"
