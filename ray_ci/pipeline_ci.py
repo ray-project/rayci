@@ -71,10 +71,7 @@ def read_pipeline(pipeline_path: Path):
     if isinstance(steps, dict) and "steps" in steps:
         steps = steps["steps"]
 
-    command_steps = [step for step in steps if "commands" in step]
-    non_command_steps = [step for step in steps if "commands" not in step]
-
-    return command_steps, non_command_steps, group_name
+    return steps, group_name
 
 
 def filter_pipeline_conditions(
@@ -172,8 +169,6 @@ def map_commands(
 ):
     steps = steps.copy()
     for step in steps:
-        if key not in step:
-            continue
         new_vals = []
         for val in step[key]:
             new_vals += map_fn(val)
@@ -250,7 +245,7 @@ def main(
     assert queue
     assert not (early_only and not_early_only)
 
-    pipeline_steps, other_pipeline_steps, group_name = read_pipeline(pipeline_path)
+    pipeline_steps, group_name = read_pipeline(pipeline_path)
 
     # Filter early kick-off
     if early_only:
@@ -310,7 +305,7 @@ def main(
     if group_name and len(pipeline_steps) > 0:
         pipeline_steps = [{
             "group": group_name,
-            "steps": pipeline_steps + other_pipeline_steps,
+            "steps": pipeline_steps,
         }]
 
     # Print to stdout
