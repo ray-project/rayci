@@ -302,6 +302,12 @@ def main(
         )
         pipeline_steps = inject_commands(pipeline_steps, before=setup_commands)
 
+    if group_name and len(pipeline_steps) > 0:
+        pipeline_steps = [{
+            "group": group_name,
+            "steps": pipeline_steps,
+        }]
+
     # Print to stdout
     if group_name:
         pipeline_steps = [{

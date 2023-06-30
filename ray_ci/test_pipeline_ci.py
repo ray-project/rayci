@@ -213,6 +213,21 @@ def test_read_lineline():
         assert group_name is None
         assert steps == [{"name": "foo"}]
 
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("steps:\n  - name: foo\n")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name is None
+        assert steps == [{"name": "foo"}]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pipeline_path = Path(os.path.join(tmpdir, "pipeline.yml"))
+        with open(pipeline_path, "w") as f:
+            f.write("#ci:group=foo\nsteps:\n  - name: foo\n")
+        steps, group_name = read_pipeline(pipeline_path)
+        assert group_name == "foo"
+        assert steps == [{"name": "foo"}]
 
 
 if __name__ == "__main__":
