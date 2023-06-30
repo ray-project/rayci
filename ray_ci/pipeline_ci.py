@@ -169,6 +169,8 @@ def map_commands(
 ):
     steps = steps.copy()
     for step in steps:
+        if key not in step:
+            continue
         new_vals = []
         for val in step[key]:
             new_vals += map_fn(val)
