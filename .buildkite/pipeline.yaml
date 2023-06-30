@@ -3,7 +3,7 @@ steps:
     commands:
       - yum install -y pip
       - pip install pytest click pyyaml
-      - (cd ray_ci; pytest -v .)
+      - (cd ray_ci; python3 -m pytest -v .)
     plugins:
       - docker#v5.7.0:
           image: amazonlinux:2
