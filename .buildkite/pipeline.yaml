@@ -1,6 +1,7 @@
 steps:
   - label: "ray_ci test"
     commands:
+      - yum install -y pip
       - pip install pytest click pyyaml
       - (cd ray_ci; pytest -v .)
     plugins:
