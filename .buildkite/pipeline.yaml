@@ -6,7 +6,7 @@ steps:
       - (cd ray_ci; pytest -v .)
     plugins:
       - docker#v5.7.0:
-          image: amazonlinux:2023
+          image: amazonlinux:2
           shell: ["/bin/bash", "-elic"]
     agents:
       queue: "runner_queue_branch"
