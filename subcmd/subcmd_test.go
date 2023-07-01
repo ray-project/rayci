@@ -7,22 +7,20 @@ import (
 	"fmt"
 )
 
-type testEnv struct {
-	skyColor string
-}
-
 var (
 	errRaining        = errors.New("it seems rainging")
 	errShouldFeelSad  = errors.New("it should be raining")
 	errWrongGreetings = errors.New("wrong greetings")
 )
 
-func testHello(name string, args []string, env *testEnv) error {
+const keySkyColor = "SKY_COLOR"
+
+func testHello(name string, args []string, env *Env) error {
 	if name != "hello" {
 		return fmt.Errorf("you say %q?", name)
 	}
 
-	if env.skyColor != "blue" {
+	if env.Get(keySkyColor) != "blue" {
 		return errRaining
 	}
 
@@ -32,8 +30,8 @@ func testHello(name string, args []string, env *testEnv) error {
 	return nil
 }
 
-func testBye(name string, args []string, env *testEnv) error {
-	if env.skyColor == "blue" {
+func testBye(name string, args []string, env *Env) error {
+	if env.Get(keySkyColor) == "blue" {
 		return errShouldFeelSad
 	}
 	if len(args) != 1 || args[0] != "databricks" {
@@ -43,21 +41,19 @@ func testBye(name string, args []string, env *testEnv) error {
 }
 
 func TestRunMain(t *testing.T) {
-	type subCommand = Subcmd[*testEnv]
-
-	cmdHello := &subCommand{
+	cmdHello := &Subcmd{
 		Name: "hello",
 		Help: "say hello",
 		Run:  testHello,
 	}
 
-	cmdBye := &subCommand{
+	cmdBye := &Subcmd{
 		Name: "bye",
 		Help: "say good bye",
 		Run:  testBye,
 	}
 
-	cmds := []*subCommand{cmdHello, cmdBye}
+	cmds := []*Subcmd{cmdHello, cmdBye}
 
 	const bin = "t" // Program binary path; it is always ignored.
 
@@ -95,7 +91,7 @@ func TestRunMain(t *testing.T) {
 		args:    []string{bin, "wada"},
 		errWant: ErrUknownCommand,
 	}} {
-		env := &testEnv{skyColor: test.skyColor}
+		env := &Env{Env: map[string]string{keySkyColor: test.skyColor}}
 		errGot := RunMain(env, cmds, test.args)
 		if test.errWant == nil && errGot != nil {
 			t.Errorf("run %q got error %s, env=%+v", test.args, errGot, env)

@@ -5,21 +5,40 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/ray-project/rayci/errutil"
 )
 
+// Env contains the environment variables that the command runs.
+// We use this instead of os.Environ() so that we can capture the environment
+// variables, and makes it easier to test.
+type Env struct {
+	Env map[string]string
+}
+
+// Get gets the value of the environment variable. Return empty string if the
+// variable is not set.
+func (e *Env) Get(key string) string { return e.Env[key] }
+
+// Lookup gets the value of the environment variable. Returns false if the
+// variable is not set.
+func (e *Env) Lookup(key string) (string, bool) {
+	v, ok := e.Env[key]
+	return v, ok
+}
+
 // Subcmd is a generic subcommand entry.
-type Subcmd[E any] struct {
+type Subcmd struct {
 	Name string // Name of the sub command.
 	Help string // Single line help string.
 
 	// Run is the function that runs the command.
-	Run func(name string, args []string, env E) error
+	Run func(name string, args []string, env *Env) error
 }
 
-func printHelp[E any](subs []*Subcmd[E]) {
+func printHelp(subs []*Subcmd) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, s := range subs {
 		fmt.Fprintf(w, "%s\t%s\n", s.Name, s.Help)
@@ -34,9 +53,21 @@ var (
 
 // RunMain runs the list of subcommands with the given environment and args.
 // if args is nil, then os.Args is used.
-func RunMain[E any](env E, subs []*Subcmd[E], args []string) error {
+func RunMain(env *Env, subs []*Subcmd, args []string) error {
 	if args == nil {
 		args = os.Args
+	}
+
+	if env == nil {
+		m := make(map[string]string)
+		for _, e := range os.Environ() {
+			k, v, ok := strings.Cut(e, "=")
+			if !ok {
+				m[k] = ""
+			}
+			m[k] = v
+		}
+		env = &Env{Env: m}
 	}
 
 	if len(args) == 0 {
