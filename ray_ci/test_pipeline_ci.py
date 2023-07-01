@@ -3,12 +3,15 @@ import os
 
 from pathlib import Path
 import pytest
+import os
+import subprocess
 import sys
 import tempfile
 
 from typing import List
 
 from pipeline_ci import (
+    __file__ as pipeline_ci_file,
     filter_pipeline_conditions,
     inject_commands,
     clean_repo_branch,
@@ -228,6 +231,51 @@ def test_read_lineline():
         steps, group_name = read_pipeline(pipeline_path)
         assert group_name == "foo"
         assert steps == [{"name": "foo"}]
+
+
+def test_pipeline_ci():
+    env = os.environ.copy()
+    env.update({
+        "REMOTE_CACHE_URL": "https://remote-cache",
+        "ECR_REPO": "ecr_repo",
+        "ECR_BASE_REPO": "ecr_base_repo",
+        "RUNNER_QUEUE_DEFAULT": "default",
+        "RUNNER_QUEUE_SMALL": "small",
+        "RUNNER_QUEUE_MEDIUM": "medium",
+        "RUNNER_QUEUE_LARGE": "large",
+        "RUNNER_QUEUE_GPU_NORM": "gpu",
+        "RUNNER_QUEUE_GPU_LARGE": "gpularge",
+        "BUCKET_PATH": "s3://bucket",
+        "RAY_REPO_DIR": "/ray",
+        "PIPELINE_REPO_DIR": "/pipeline",
+
+        "RAY_CI_PYTHON_DEPENDENCIES_AFFECTED": "1",
+        "BUILDKITE_PULL_REQUEST_REPO": "ray",
+        "BUILDKITE_BRANCH": "master",
+        "BUILDKITE_COMMIT": "abcd1234",
+
+        "RAY_CI_JAVA_AFFECTED": "1",
+        "RAY_CI_TRAIN_AFFECTED": "1",
+    })
+
+    dir = os.path.dirname(__file__)
+    pipeline_path = os.path.join(dir, "testdata/pipeline.yml")
+    upload = subprocess.check_output(
+        [
+            sys.executable, pipeline_ci_file,
+            "--image", "base_img",
+            "--queue", "q",
+            pipeline_path,
+        ],
+        env=env,
+    )
+
+    parsed = json.loads(upload)
+    assert len(parsed) == 1
+    group = parsed[0]
+    assert group["group"] == "build"
+    assert len(list(group["steps"])) == 3
+    
 
 
 if __name__ == "__main__":
