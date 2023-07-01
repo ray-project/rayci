@@ -275,7 +275,6 @@ def test_pipeline_ci():
     group = parsed[0]
     assert group["group"] == "build"
     assert len(list(group["steps"])) == 3
-    
 
 
 if __name__ == "__main__":
