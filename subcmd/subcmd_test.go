@@ -1,0 +1,116 @@
+package subcmd
+
+import (
+	"testing"
+
+	"errors"
+	"fmt"
+)
+
+type testEnv struct {
+	skyColor string
+}
+
+var (
+	errRaining        = errors.New("it seems rainging")
+	errShouldFeelSad  = errors.New("it should be raining")
+	errWrongGreetings = errors.New("wrong greetings")
+)
+
+func testHello(name string, args []string, env *testEnv) error {
+	if name != "hello" {
+		return fmt.Errorf("you say %q?", name)
+	}
+
+	if env.skyColor != "blue" {
+		return errRaining
+	}
+
+	if len(args) != 1 || args[0] != "anyscale" {
+		return errWrongGreetings
+	}
+	return nil
+}
+
+func testBye(name string, args []string, env *testEnv) error {
+	if env.skyColor == "blue" {
+		return errShouldFeelSad
+	}
+	if len(args) != 1 || args[0] != "databricks" {
+		return errWrongGreetings
+	}
+	return nil
+}
+
+func TestRunMain(t *testing.T) {
+	type subCommand = Subcmd[*testEnv]
+
+	cmdHello := &subCommand{
+		Name: "hello",
+		Help: "say hello",
+		Run:  testHello,
+	}
+
+	cmdBye := &subCommand{
+		Name: "bye",
+		Help: "say good bye",
+		Run:  testBye,
+	}
+
+	cmds := []*subCommand{cmdHello, cmdBye}
+
+	const bin = "t" // Program binary path; it is always ignored.
+
+	for _, test := range []struct {
+		skyColor string
+		args     []string
+		errWant  error
+	}{{
+		skyColor: "blue",
+		args:     []string{bin, "hello", "anyscale"},
+	}, {
+		skyColor: "gray",
+		args:     []string{bin, "bye", "databricks"},
+	}, {
+		skyColor: "blue",
+		args:     []string{bin, "hello"},
+		errWant:  errWrongGreetings,
+	}, {
+		skyColor: "blue",
+		args:     []string{bin, "hello", "databricks"},
+		errWant:  errWrongGreetings,
+	}, {
+		skyColor: "blue",
+		args:     []string{bin, "bye", "databricks"},
+		errWant:  errShouldFeelSad,
+	}, {
+		args:    []string{},
+		errWant: ErrInvalidFormat,
+	}, {
+		args:    []string{bin},
+		errWant: ErrInvalidFormat,
+	}, {
+		args: []string{bin, "help"},
+	}, {
+		args:    []string{bin, "wada"},
+		errWant: ErrUknownCommand,
+	}} {
+		env := &testEnv{skyColor: test.skyColor}
+		errGot := RunMain(env, cmds, test.args)
+		if test.errWant == nil && errGot != nil {
+			t.Errorf("run %q got error %s, env=%+v", test.args, errGot, env)
+		} else if test.errWant != nil {
+			if errGot == nil {
+				t.Errorf(
+					"run %q got no error, want %q, env=%+v",
+					test.args, errGot, env,
+				)
+			} else if !errors.Is(errGot, test.errWant) {
+				t.Errorf(
+					"run %q got %q, want %q, env=%+v",
+					test.args, errGot, test.errWant, env,
+				)
+			}
+		}
+	}
+}
