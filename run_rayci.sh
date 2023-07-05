@@ -10,9 +10,9 @@ echo "--- Install rayci"
 
 curl -sL 'https://go.dev/dl/go1.20.5.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
-export GOHOME="$TMP_DIR/gohome"
+export GOPATH="$TMP_DIR/gopath"
 "$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci@'"${RAYCI_BRANCH}"
 
 echo "--- Run rayci"
 
-exec "$GOHOME/bin/rayci" "$@"
+exec "$GOPATH/bin/rayci" "$@"
