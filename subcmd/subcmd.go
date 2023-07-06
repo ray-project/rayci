@@ -7,8 +7,6 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-
-	"github.com/ray-project/rayci/errutil"
 )
 
 // Env contains the environment variables that the command runs.
@@ -71,11 +69,11 @@ func RunMain(env *Env, subs []*Subcmd, args []string) error {
 	}
 
 	if len(args) == 0 {
-		return errutil.Wrap(ErrInvalidFormat, "no args found")
+		return fmt.Errorf("no args found: %w", ErrInvalidFormat)
 	}
 	if len(args) <= 1 {
 		printHelp(subs)
-		return errutil.Wrap(ErrInvalidFormat, "need a subcommand")
+		return fmt.Errorf("need a subcommand: %w", ErrInvalidFormat)
 	}
 
 	sub := args[1]
