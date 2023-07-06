@@ -10,3 +10,6 @@ steps:
           shell: ["/bin/bash", "-elic"]
     agents:
       queue: "runner_queue_branch"
+  - label: "self-test rayci"
+    commands:
+      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh
