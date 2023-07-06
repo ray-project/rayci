@@ -45,7 +45,10 @@ func printHelp(subs []*Subcmd) {
 }
 
 var (
+	// ErrInvalidFormat is returned when sub command format is invalid.
 	ErrInvalidFormat = errors.New("invalid format")
+
+	// ErrUknownCommand is returned when the sub command is not defined.
 	ErrUknownCommand = errors.New("unknown subcommand")
 )
 
