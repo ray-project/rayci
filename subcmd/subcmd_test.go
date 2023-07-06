@@ -24,7 +24,7 @@ func testHello(name string, args []string, env *Env) error {
 		return errRaining
 	}
 
-	if len(args) != 1 || args[0] != "anyscale" {
+	if len(args) != 1 || args[0] != "foo" {
 		return errWrongGreetings
 	}
 	return nil
@@ -34,7 +34,7 @@ func testBye(name string, args []string, env *Env) error {
 	if env.Get(keySkyColor) == "blue" {
 		return errShouldFeelSad
 	}
-	if len(args) != 1 || args[0] != "databricks" {
+	if len(args) != 1 || args[0] != "bar" {
 		return errWrongGreetings
 	}
 	return nil
@@ -63,21 +63,21 @@ func TestRunMain(t *testing.T) {
 		errWant  error
 	}{{
 		skyColor: "blue",
-		args:     []string{bin, "hello", "anyscale"},
+		args:     []string{bin, "hello", "foo"},
 	}, {
 		skyColor: "gray",
-		args:     []string{bin, "bye", "databricks"},
+		args:     []string{bin, "bye", "bar"},
 	}, {
 		skyColor: "blue",
 		args:     []string{bin, "hello"},
 		errWant:  errWrongGreetings,
 	}, {
 		skyColor: "blue",
-		args:     []string{bin, "hello", "databricks"},
+		args:     []string{bin, "hello", "bar"},
 		errWant:  errWrongGreetings,
 	}, {
 		skyColor: "blue",
-		args:     []string{bin, "bye", "databricks"},
+		args:     []string{bin, "bye", "bar"},
 		errWant:  errShouldFeelSad,
 	}, {
 		args:    []string{},
