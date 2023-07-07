@@ -18,7 +18,6 @@ steps:
     plugins:
       - docker#v5.7.0:
           image: "golang:1.20.5-bookworm"
-          shell: ["/bin/bash", "-elic"]
   - label: "test rayci with rayci"
     commands:
       - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh -upload
