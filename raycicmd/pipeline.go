@@ -42,8 +42,8 @@ var noopPipeline = &bkPipeline{
 	Steps: []*bkPipelineGroup{{
 		Group: "noop",
 		Steps: []any{&bkCommandStep{
-			Label:    "no steps",
-			Commands: []string{"echo no steps"},
+			Label:    "noop",
+			Commands: []string{"echo 'no steps found in repo'"},
 		}},
 	}},
 }
