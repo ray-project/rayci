@@ -1,4 +1,9 @@
+# TODO(aslonnie): use rayci to launch and run all the tests.
 steps:
+  - label: "test rayci with rayci"
+    commands:
+      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh -upload
+
   - label: "legacy ray_ci python test"
     commands:
       - yum install -y python3
@@ -18,6 +23,3 @@ steps:
     plugins:
       - docker#v5.7.0:
           image: "golang:1.20.5-bookworm"
-  - label: "test rayci with rayci"
-    commands:
-      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh -upload
