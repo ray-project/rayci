@@ -17,6 +17,10 @@ func main() {
 		&flags.ConfigFile, "config", "",
 		"Path to the config file; empty means default config for ray repo.",
 	)
+	flag.BoolVar(
+		&flags.UploadPipeline, "upload", false,
+		"Upload the pipeline using buildkite-agent.",
+	)
 	flag.Parse()
 
 	if err := raycicmd.Main(flags, nil); err != nil {

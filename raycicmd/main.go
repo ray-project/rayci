@@ -4,16 +4,19 @@
 package raycicmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 
 	yaml "gopkg.in/yaml.v3"
 )
 
 // Flags is the structure for all the command the flags of rayci.
 type Flags struct {
-	RepoDir    string // flag -repo
-	ConfigFile string // flag -config
+	RepoDir        string // flag -repo
+	ConfigFile     string // flag -config
+	UploadPipeline bool   // flag -upload
 }
 
 // Main runs tha main function of rayci command.
@@ -32,9 +35,28 @@ func Main(flags *Flags, envs Envs) error {
 		return fmt.Errorf("make pipeline: %w", err)
 	}
 
-	enc := yaml.NewEncoder(os.Stdout)
-	if err := enc.Encode(pipeline); err != nil {
-		return fmt.Errorf("output pipeline: %w", err)
+	if !flags.UploadPipeline {
+		enc := yaml.NewEncoder(os.Stdout)
+		if err := enc.Encode(pipeline); err != nil {
+			return fmt.Errorf("output pipeline: %w", err)
+		}
+		return nil
+	}
+
+	// Upload pipeline to buildkite.
+	bs, err := yaml.Marshal(pipeline)
+	if err != nil {
+		return fmt.Errorf("marshal pipeline: %w", err)
+	}
+
+	r := bytes.NewReader(bs)
+
+	cmd := exec.Command("buildkite-agent", "pipeline", "upload")
+	cmd.Stdin = r
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("upload pipeline: %w", err)
 	}
 
 	return nil
