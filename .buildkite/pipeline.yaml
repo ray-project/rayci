@@ -1,5 +1,5 @@
 steps:
-  - label: "ray_ci test"
+  - label: "Legacy ray_ci python test"
     commands:
       - yum install -y python3
       - pip3 install pytest click pyyaml
@@ -10,6 +10,6 @@ steps:
           shell: ["/bin/bash", "-elic"]
     agents:
       queue: "runner_queue_branch"
-  - label: "self-test rayci"
+  - label: "Test rayci with rayci"
     commands:
       - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh -upload
