@@ -21,6 +21,10 @@ func main() {
 		&flags.UploadPipeline, "upload", false,
 		"Upload the pipeline using buildkite-agent.",
 	)
+	flag.StringVar(
+		&flags.BuildkiteAgent, "bkagent", "buildkite-agent",
+		"Path to the buildkite-agent binary.",
+	)
 	flag.Parse()
 
 	if err := raycicmd.Main(flags, nil); err != nil {

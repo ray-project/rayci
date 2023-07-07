@@ -17,6 +17,7 @@ type Flags struct {
 	RepoDir        string // flag -repo
 	ConfigFile     string // flag -config
 	UploadPipeline bool   // flag -upload
+	BuildkiteAgent string // flag -bkagent
 }
 
 // Main runs tha main function of rayci command.
@@ -51,7 +52,7 @@ func Main(flags *Flags, envs Envs) error {
 
 	r := bytes.NewReader(bs)
 
-	cmd := exec.Command("buildkite-agent", "pipeline", "upload")
+	cmd := exec.Command(flags.BuildkiteAgent, "pipeline", "upload")
 	cmd.Stdin = r
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
