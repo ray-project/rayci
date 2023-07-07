@@ -1,6 +1,6 @@
-// Command rayci generates buildkite pipeline definitions from yaml files
-// under the .buildkite/ directory. It scans for .buildkite/*.rayci.yml files
-// and forms the pipeline definition from them.
+// Package raycicmd implements a command that generates buildkite pipeline
+// definitions from yaml files under the .buildkite/ directory. It scans
+// for .buildkite/*.rayci.yml files and forms the pipeline definition from them.
 package raycicmd
 
 import (

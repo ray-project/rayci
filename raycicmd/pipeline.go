@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,8 +11,8 @@ import (
 )
 
 const (
+	stepTypeCommand = "command" // Default and most common step type.
 	stepTypeWait    = "wait"
-	stepTypeCommand = "command"
 )
 
 type pipelineGroup struct {
@@ -97,7 +98,9 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	}
 
 	g := new(pipelineGroup)
-	if err := yaml.Unmarshal(bs, g); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(bs))
+	dec.KnownFields(true)
+	if err := dec.Decode(g); err != nil {
 		return nil, fmt.Errorf("unmarshal pipeline file: %w", err)
 	}
 

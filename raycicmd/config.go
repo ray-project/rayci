@@ -9,6 +9,8 @@ import (
 )
 
 type config struct {
+	name string
+
 	CITemp string `yaml:"ci_temp"`
 }
 
@@ -18,19 +20,23 @@ func localDefaultConfig(envs Envs) *config {
 	}
 }
 
+// builtin ray buildkite pipeline IDs.
 const (
 	rayBranchPipeline = "0183465b-c6fb-479b-8577-4cfd743b545d"
+	rayPRPipeline     = "0183465f-a222-467a-b122-3b9ea3e68094"
 )
 
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
 	if pipelineID == rayBranchPipeline {
 		return &config{
+			name:   "ray-branch",
 			CITemp: "s3://ray-ci-artifact-branch-public/ci-temp/",
 		}
 	}
 
 	return &config{
+		name:   "ray-pr",
 		CITemp: "s3://ray-ci-artifact-pr-public/ci-temp/",
 	}
 }
