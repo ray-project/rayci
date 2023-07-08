@@ -17,42 +17,42 @@ func TestConvertPipelineStep(t *testing.T) {
 	})
 
 	for _, test := range []struct {
-		in  *pipelineStep
-		out any // buildkite pipeline step
+		in  map[string]any
+		out map[string]any // buildkite pipeline step
 	}{{
-		in: &pipelineStep{Commands: []string{"echo 1", "echo 2"}},
-		out: &bkCommandStep{
-			Commands:         []string{"echo 1", "echo 2"},
-			Agents:           newBkAgents("runner"),
-			TimeoutInMinutes: defaultTimeoutInMinutes,
-			AritfactPaths:    defaultArtifactsPaths,
-			Retry:            defaultRayRetry,
+		in: map[string]any{"commands": []string{"echo 1", "echo 2"}},
+		out: map[string]any{
+			"commands":           []string{"echo 1", "echo 2"},
+			"agents":             newBkAgents("runner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifacts_paths":    defaultArtifactsPaths,
+			"retry":              defaultRayRetry,
 		},
 	}, {
-		in: &pipelineStep{
-			Label:     "say hello",
-			Key:       "key",
-			Commands:  []string{"echo hello"},
-			DependsOn: []string{"dep"},
+		in: map[string]any{
+			"label":      "say hello",
+			"key":        "key",
+			"command":    "echo hello",
+			"depends_on": "dep",
 		},
-		out: &bkCommandStep{
-			Label:     "say hello",
-			Key:       "key",
-			Commands:  []string{"echo hello"},
-			DependsOn: []string{"dep"},
+		out: map[string]any{
+			"label":      "say hello",
+			"key":        "key",
+			"command":    "echo hello",
+			"depends_on": "dep",
 
-			Agents: newBkAgents("runner"),
+			"agents": newBkAgents("runner"),
 
-			TimeoutInMinutes: defaultTimeoutInMinutes,
-			AritfactPaths:    defaultArtifactsPaths,
-			Retry:            defaultRayRetry,
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifacts_paths":    defaultArtifactsPaths,
+			"retry":              defaultRayRetry,
 		},
 	}, {
-		in:  &pipelineStep{Type: stepTypeWait},
-		out: &bkWaitStep{},
+		in:  map[string]any{"wait": nil},
+		out: map[string]any{"wait": nil},
 	}, {
-		in:  &pipelineStep{Type: stepTypeWait, If: "false"},
-		out: &bkWaitStep{If: "false"},
+		in:  map[string]any{"wait": nil, "continue_on_failure": true},
+		out: map[string]any{"wait": nil, "continue_on_failure": true},
 	}} {
 		got, err := c.convertPipelineStep(test.in)
 		if err != nil {

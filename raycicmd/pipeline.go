@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,44 +12,19 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-const (
-	stepTypeCommand = "command" // Default and most common step type.
-	stepTypeWait    = "wait"
-)
-
 type pipelineGroup struct {
-	Group string          `yaml:"group"`
-	Key   string          `yaml:"key"`
-	Steps []*pipelineStep `yaml:"steps"`
-}
+	Group string `yaml:"group"`
+	Key   string `yaml:"key"`
 
-type pipelineStep struct {
-	// Marks the step's type, default is a command step.
-	Type string `yaml:"type"`
-
-	Label     string   `yaml:"label"`
-	Key       string   `yaml:"key"`
-	Commands  []string `yaml:"commands"`
-	DependsOn []string `yaml:"depends_on"`
-	If        string   `yaml:"if"`
-	SoftFail  bool     `yaml:"soft_fail"`
-
-	InstanceType string `yaml:"instance_type"`
-	Queue        string `yaml:"queue"`
-
-	JobEnv string `yaml:"job_env"` // Container to run in.
-
-	// For wait step only
-	// wait step also has an `if` and `depends_on` field.
-	ContinueOnFailure bool `yaml:"continue_on_failure"`
+	Steps []map[string]any `yaml:"steps"`
 }
 
 var noopPipeline = &bkPipeline{
 	Steps: []*bkPipelineGroup{{
 		Group: "noop",
-		Steps: []any{&bkCommandStep{
-			Label:    "noop",
-			Commands: []string{"echo 'no steps found in repo'"},
+		Steps: []any{map[string]any{
+			"label":   "noop",
+			"command": "echo 'no steps found in repo'",
 		}},
 	}},
 }
@@ -78,7 +54,8 @@ func makePipeline(repoDir string, config *config) (*bkPipeline, error) {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".rayci.yml") {
+		if strings.HasSuffix(name, ".rayci.yaml") ||
+			strings.HasSuffix(name, ".rayci.yml") {
 			files = append(files, filepath.Join(pipelineDir, name))
 		}
 	}
@@ -140,18 +117,10 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup) (
 	return bkGroup, nil
 }
 
-func copyStrings(ss []string) []string {
-	if ss == nil {
-		return nil
-	}
-	res := make([]string, len(ss))
-	copy(res, ss)
-	return res
-}
-
-var defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
-
-var defaultArtifactsPaths = []string{"tmp/artifacts/**/*"}
+var (
+	defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
+	defaultArtifactsPaths   = []string{"tmp/artifacts/**/*"}
+)
 
 func (c *converter) mapAgent(instanceType string) (string, error) {
 	if instanceType == "" {
@@ -163,50 +132,107 @@ func (c *converter) mapAgent(instanceType string) (string, error) {
 	return "", fmt.Errorf("unknown instance type %q", instanceType)
 }
 
-func (c *converter) convertPipelineStep(step *pipelineStep) (any, error) {
-	switch step.Type {
-	default:
-		return nil, fmt.Errorf("unknown step type %q", step.Type)
-	case stepTypeWait:
-		return &bkWaitStep{
-			If:                step.If,
-			ContinueOnFailure: step.ContinueOnFailure,
-		}, nil
-	case "", stepTypeCommand:
-		queue := step.Queue
-		if queue == "" && step.InstanceType != "" {
-			queue = step.InstanceType
-		}
-
-		q, err := c.mapAgent(queue)
-		if err != nil {
-			return nil, fmt.Errorf("map agent: %w", err)
-		}
-
-		jobEnv := "forge"
-		if step.JobEnv != "" {
-			jobEnv = step.JobEnv
-		}
-
-		cmd := &bkCommandStep{
-			Key:       step.Key,
-			Label:     step.Label,
-			Commands:  copyStrings(step.Commands),
-			DependsOn: copyStrings(step.DependsOn),
-			SoftFail:  step.SoftFail,
-
-			AritfactPaths:    defaultArtifactsPaths,
-			TimeoutInMinutes: defaultTimeoutInMinutes,
-
-			Agents: newBkAgents(q),
-
-			Retry: defaultRayRetry,
-		}
-
-		if !c.config.Dockerless {
-			cmd.Plugins = append(cmd.Plugins, makeRayDockerPlugin(jobEnv))
-		}
-
-		return cmd, nil
+func checkStepKeys(m map[string]any, allowed []string) error {
+	allowedMap := make(map[string]bool, len(allowed))
+	for _, k := range allowed {
+		allowedMap[k] = true
 	}
+
+	for k := range m {
+		if !allowedMap[k] {
+			return fmt.Errorf("unsupported step key %q", k)
+		}
+	}
+	return nil
+}
+
+var (
+	waitStepAllowedKeys    = []string{"wait", "continue_on_failure"}
+	commandStepAllowedKeys = []string{
+		"command", "commands",
+		"label", "name", "key",
+		"depends_on", "instance_type", "queue", "soft_fail",
+		"matrix",
+		"job_env",
+	}
+)
+
+func stringInMap(m map[string]any, key string) (string, bool) {
+	v, ok := m[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+func cloneMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	res := make(map[string]any)
+	for k, v := range m {
+		res[k] = v
+	}
+	return res
+}
+
+func (c *converter) convertPipelineStep(step map[string]any) (
+	map[string]any, error,
+) {
+	if _, ok := step["wait"]; ok {
+		// a wait step
+		if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
+			return nil, fmt.Errorf("check wait step keys: %w", err)
+		}
+		return cloneMap(step), nil
+	}
+
+	// a normal command step
+	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {
+		return nil, fmt.Errorf("check command step keys: %w", err)
+	}
+
+	queue, ok := stringInMap(step, "queue")
+	if !ok {
+		instanceType, ok := stringInMap(step, "instance_type")
+		if ok {
+			queue = instanceType
+		}
+	}
+
+	q, err := c.mapAgent(queue)
+	if err != nil {
+		return nil, fmt.Errorf("map agent: %w", err)
+	}
+
+	result := cloneMap(step)
+
+	jobEnv := "forge" // default job env
+
+	if v, ok := stringInMap(result, "job_env"); ok {
+		delete(result, "job_env")
+		jobEnv = v
+	}
+
+	switch jobEnv {
+	case "ubuntu-focal": // builtin support
+		jobEnv = "ubuntu:20.04"
+	default:
+		log.Printf("fake job env %q with ubuntu", jobEnv)
+		jobEnv = "ubuntu:20.04" // TODO(aslonnie): map to ECR
+	}
+
+	result["agents"] = newBkAgents(q)
+	result["retry"] = defaultRayRetry
+	result["timeout_in_minutes"] = defaultTimeoutInMinutes
+	result["artifacts_paths"] = defaultArtifactsPaths
+
+	if !c.config.Dockerless {
+		result["plugins"] = []any{
+			makeRayDockerPlugin(jobEnv),
+		}
+	}
+
+	return result, nil
 }

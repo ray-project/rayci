@@ -1,63 +1,15 @@
 package raycicmd
 
-type bkCommandStep struct {
-	Label     string   `yaml:"label,omitempty"`
-	Key       string   `yaml:"key,omitempty"`
-	If        string   `yaml:"if,omitempty"`
-	Commands  []string `yaml:"commands"`
-	Env       []string `yaml:"env,omitempty"`
-	DependsOn []string `yaml:"depends_on,omitempty"`
-
-	SoftFail bool     `yaml:"soft_fail,omitempty"`
-	Retry    *bkRetry `yaml:"retry,omitempty"`
-
-	Parallelism int `yaml:"parallelism,omitempty"`
-
-	// Inserted by rayci.
-	Plugins          []any     `yaml:"plugins,omitempty"`
-	Agents           *bkAgents `yaml:"agents,omitempty"`
-	TimeoutInMinutes int       `yaml:"timeout_in_minutes,omitempty"`
-	AritfactPaths    []string  `yaml:"artifact_paths,omitempty"`
+func newBkAgents(queue string) map[string]any {
+	return map[string]any{"queue": queue}
 }
 
-type bkAgents struct {
-	Queue string `yaml:"queue,omitempty"`
-}
-
-func newBkAgents(queue string) *bkAgents { return &bkAgents{Queue: queue} }
-
-type bkRetry struct {
-	Manual    *bkRetryManual      `yaml:"manual,omitempty"`
-	Automatic []*bkRetryAutomatic `yaml:"automatic,omitempty"`
-}
-
-type bkRetryManual struct {
-	PermitOnPassed bool `yaml:"permit_on_passed,omitempty"`
-}
-
-type bkRetryAutomatic struct {
-	ExitStatus int `yaml:"exit_status,omitempty"`
-	Limit      int `yaml:"limit,omitempty"`
-}
-
-var defaultRayRetry = &bkRetry{
-	Manual: &bkRetryManual{PermitOnPassed: true},
-	Automatic: []*bkRetryAutomatic{
-		{ExitStatus: -1, Limit: 3},
-		{ExitStatus: 255, Limit: 3},
+var defaultRayRetry = map[string]any{
+	"manual": map[string]any{"permit_on_passed": true},
+	"automatic": []any{
+		map[string]any{"exit_status": -1, "limit": 3},
+		map[string]any{"exit_status": 255, "limit": 3},
 	},
-}
-
-type bkWaitStep struct {
-	// Always leave this as nil is fine, which will generate
-	// `wait: ~` in the yaml file.
-	Wait *struct{} `yaml:"wait"`
-
-	If string `yaml:"if,omitempty"`
-
-	// For wait step only
-	// wait step also has an `if` and `depends_on` field.
-	ContinueOnFailure bool `yaml:"continue_on_failure,omitempty"`
 }
 
 type bkPipelineGroup struct {
@@ -70,23 +22,17 @@ type bkPipeline struct {
 	Steps []*bkPipelineGroup `yaml:"steps,omitempty"`
 }
 
-type bkDockerPlugin struct {
-	Image        string   `yaml:"image"`
-	Shell        []string `yaml:"shell,omitempty"`
-	WorkDir      string   `yaml:"workdir,omitempty"`
-	AddCaps      []string `yaml:"add-caps,omitempty"`
-	SecurityOpts []string `yaml:"security-opts,omitempty"`
-	Environment  []string `yaml:"environment,omitempty"`
-}
+func makeRayDockerPlugin(image string) map[string]any {
+	return map[string]any{
+		"image":         image,
+		"shell":         []string{"/bin/bash", "-elic"},
+		"workdir":       "/ray",
+		"add-caps":      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
+		"security-opts": []string{"apparmor=unconfined"},
 
-func makeRayDockerPlugin(image string) *bkDockerPlugin {
-	return &bkDockerPlugin{
-		Image:        image,
-		Shell:        []string{"/bin/bash", "-elic"},
-		WorkDir:      "/ray",
-		AddCaps:      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
-		SecurityOpts: []string{"apparmor=unconfined"},
-		Environment: []string{
+		"volume": []string{"/var/run/docker.sock:/var/run/docker.sock"},
+
+		"environment": []string{
 			"CI",
 			"BUILDKITE",
 			"BUILDKITE_BRANCH",
