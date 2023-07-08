@@ -11,7 +11,13 @@ import (
 type config struct {
 	name string
 
+	ArtifactsBucket string `yaml:"artifacts_bucket"`
+
 	CITemp string `yaml:"ci_temp"`
+
+	AgentQueueMap map[string]string `yaml:"agent_queue_map"`
+
+	Dockerless bool `yaml:"dockerless"`
 }
 
 func localDefaultConfig(envs Envs) *config {
@@ -30,14 +36,35 @@ func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
 	if pipelineID == rayBranchPipeline {
 		return &config{
-			name:   "ray-branch",
-			CITemp: "s3://ray-ci-artifact-branch-public/ci-temp/",
+			name: "ray-branch",
+
+			ArtifactsBucket: "ray-ci-artifact-branch-public",
+			CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
+
+			AgentQueueMap: map[string]string{
+				"default":   "runner_queue_branch",
+				"small":     "runner_queue_small_branch",
+				"medium":    "runner_queue_medium_branch",
+				"large":     "runner_queue_branch",
+				"gpu":       "gpu_runner_queue_branch",
+				"gpu-large": "gpu_large_runner_queue_branch",
+			},
 		}
 	}
 
 	return &config{
-		name:   "ray-pr",
-		CITemp: "s3://ray-ci-artifact-pr-public/ci-temp/",
+		name:            "ray-pr",
+		ArtifactsBucket: "ray-ci-artifact-pr-public",
+		CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
+
+		AgentQueueMap: map[string]string{
+			"default":   "runner_queue_pr",
+			"small":     "runner_queue_small_pr",
+			"medium":    "runner_queue_medium_pr",
+			"large":     "runner_queue_pr",
+			"gpu":       "gpu_runner_queue_pr",
+			"gpu-large": "gpu_large_runner_queue_pr",
+		},
 	}
 }
 

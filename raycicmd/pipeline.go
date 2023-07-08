@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -30,6 +31,10 @@ type pipelineStep struct {
 	Commands  []string `yaml:"commands"`
 	DependsOn []string `yaml:"depends_on"`
 	If        string   `yaml:"if"`
+	SoftFail  bool     `yaml:"soft_fail"`
+
+	InstanceType string `yaml:"instance_type"`
+	Queue        string `yaml:"queue"`
 
 	JobEnv string `yaml:"job_env"` // Container to run in.
 
@@ -46,6 +51,14 @@ var noopPipeline = &bkPipeline{
 			Commands: []string{"echo 'no steps found in repo'"},
 		}},
 	}},
+}
+
+type converter struct {
+	config *config
+}
+
+func newConverter(config *config) *converter {
+	return &converter{config: config}
 }
 
 func makePipeline(repoDir string, config *config) (*bkPipeline, error) {
@@ -75,13 +88,14 @@ func makePipeline(repoDir string, config *config) (*bkPipeline, error) {
 	}
 
 	pl := new(bkPipeline)
+	c := newConverter(config)
 	for _, file := range files {
 		g, err := parsePipelineFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 		}
 
-		bkGroup, err := convertPipelineGroup(g)
+		bkGroup, err := c.convertPipelineGroup(g)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline group %s: %w", file, err)
 		}
@@ -107,14 +121,16 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	return g, nil
 }
 
-func convertPipelineGroup(g *pipelineGroup) (*bkPipelineGroup, error) {
+func (c *converter) convertPipelineGroup(g *pipelineGroup) (
+	*bkPipelineGroup, error,
+) {
 	bkGroup := &bkPipelineGroup{
 		Group: g.Group,
 		Key:   g.Key,
 	}
 
 	for _, step := range g.Steps {
-		bkStep, err := convertPipelineStep(step)
+		bkStep, err := c.convertPipelineStep(step)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
@@ -133,7 +149,21 @@ func copyStrings(ss []string) []string {
 	return res
 }
 
-func convertPipelineStep(step *pipelineStep) (any, error) {
+var defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
+
+var defaultArtifactsPaths = []string{"tmp/artifacts/**/*"}
+
+func (c *converter) mapAgent(instanceType string) (string, error) {
+	if instanceType == "" {
+		instanceType = "default"
+	}
+	if q, ok := c.config.AgentQueueMap[instanceType]; ok {
+		return q, nil
+	}
+	return "", fmt.Errorf("unknown instance type %q", instanceType)
+}
+
+func (c *converter) convertPipelineStep(step *pipelineStep) (any, error) {
 	switch step.Type {
 	default:
 		return nil, fmt.Errorf("unknown step type %q", step.Type)
@@ -143,11 +173,38 @@ func convertPipelineStep(step *pipelineStep) (any, error) {
 			ContinueOnFailure: step.ContinueOnFailure,
 		}, nil
 	case "", stepTypeCommand:
+		queue := step.Queue
+		if queue == "" && step.InstanceType != "" {
+			queue = step.InstanceType
+		}
+
+		q, err := c.mapAgent(queue)
+		if err != nil {
+			return nil, fmt.Errorf("map agent: %w", err)
+		}
+
+		jobEnv := "forge"
+		if step.JobEnv != "" {
+			jobEnv = step.JobEnv
+		}
+
 		cmd := &bkCommandStep{
 			Key:       step.Key,
 			Label:     step.Label,
 			Commands:  copyStrings(step.Commands),
 			DependsOn: copyStrings(step.DependsOn),
+			SoftFail:  step.SoftFail,
+
+			AritfactPaths:    defaultArtifactsPaths,
+			TimeoutInMinutes: defaultTimeoutInMinutes,
+
+			Agents: newBkAgents(q),
+
+			Retry: defaultRayRetry,
+		}
+
+		if !c.config.Dockerless {
+			cmd.Plugins = append(cmd.Plugins, makeRayDockerPlugin(jobEnv))
 		}
 
 		return cmd, nil
