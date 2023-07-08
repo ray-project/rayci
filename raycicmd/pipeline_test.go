@@ -25,7 +25,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"commands":           []string{"echo 1", "echo 2"},
 			"agents":             newBkAgents("runner"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
-			"artifacts_paths":    defaultArtifactsPaths,
+			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
 		},
 	}, {
@@ -44,7 +44,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"agents": newBkAgents("runner"),
 
 			"timeout_in_minutes": defaultTimeoutInMinutes,
-			"artifacts_paths":    defaultArtifactsPaths,
+			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
 		},
 	}, {

@@ -119,7 +119,7 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup) (
 
 var (
 	defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
-	defaultArtifactsPaths   = []string{"tmp/artifacts/**/*"}
+	defaultArtifactPaths    = []string{"tmp/artifacts/**/*"}
 )
 
 func (c *converter) mapAgent(instanceType string) (string, error) {
@@ -226,7 +226,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	result["agents"] = newBkAgents(q)
 	result["retry"] = defaultRayRetry
 	result["timeout_in_minutes"] = defaultTimeoutInMinutes
-	result["artifacts_paths"] = defaultArtifactsPaths
+	result["artifact_paths"] = defaultArtifactPaths
 
 	if !c.config.Dockerless {
 		result["plugins"] = []any{
