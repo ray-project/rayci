@@ -6,6 +6,7 @@ package raycicmd
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 
@@ -49,6 +50,9 @@ func Main(flags *Flags, envs Envs) error {
 	if err != nil {
 		return fmt.Errorf("marshal pipeline: %w", err)
 	}
+
+	// Prints out the pipeline content to logs.
+	log.Printf("%s", bs)
 
 	r := bytes.NewReader(bs)
 
