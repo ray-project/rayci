@@ -230,7 +230,9 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 
 	if !c.config.Dockerless {
 		result["plugins"] = []any{
-			makeRayDockerPlugin(jobEnv),
+			map[string]any{
+				"docker#v5.8.0": makeRayDockerPlugin(jobEnv),
+			},
 		}
 	}
 

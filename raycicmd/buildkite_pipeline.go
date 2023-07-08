@@ -30,7 +30,7 @@ func makeRayDockerPlugin(image string) map[string]any {
 		"add-caps":      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
 		"security-opts": []string{"apparmor=unconfined"},
 
-		"volume": []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		"volumes": []string{"/var/run/docker.sock:/var/run/docker.sock"},
 
 		"environment": []string{
 			"CI",
