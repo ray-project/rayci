@@ -5,6 +5,8 @@ package raycicmd
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -21,6 +23,27 @@ type Flags struct {
 	BuildkiteAgent string // flag -bkagent
 }
 
+func makeBuildID(envs Envs) (string, error) {
+	buildID := getEnv(envs, "RAYCI_BUILD_ID")
+	if buildID != "" {
+		return buildID, nil
+	}
+
+	buildID = getEnv(envs, "BUILDKITE_BUILD_ID")
+	if buildID != "" {
+		h := sha256.Sum256([]byte(buildID))
+		prefix := hex.EncodeToString(h[:])[:8]
+		return prefix, nil
+	}
+
+	user := getEnv(envs, "USER")
+	if user != "" {
+		return user, nil
+	}
+
+	return "", fmt.Errorf("no build id found")
+}
+
 // Main runs tha main function of rayci command.
 func Main(flags *Flags, envs Envs) error {
 	if envs == nil {
@@ -32,7 +55,12 @@ func Main(flags *Flags, envs Envs) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	pipeline, err := makePipeline(flags.RepoDir, config)
+	buildID, err := makeBuildID(envs)
+	if err != nil {
+		return fmt.Errorf("make build id: %w", err)
+	}
+
+	pipeline, err := makePipeline(flags.RepoDir, config, buildID)
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)
 	}

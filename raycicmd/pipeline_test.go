@@ -14,7 +14,7 @@ func TestConvertPipelineStep(t *testing.T) {
 
 		AgentQueueMap: map[string]string{"default": "runner"},
 		Dockerless:    true,
-	})
+	}, "buildid")
 
 	for _, test := range []struct {
 		in  map[string]any

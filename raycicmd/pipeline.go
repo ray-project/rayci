@@ -30,14 +30,17 @@ var noopPipeline = &bkPipeline{
 }
 
 type converter struct {
-	config *config
+	config  *config
+	buildID string
 }
 
-func newConverter(config *config) *converter {
-	return &converter{config: config}
+func newConverter(config *config, buildID string) *converter {
+	return &converter{config: config, buildID: buildID}
 }
 
-func makePipeline(repoDir string, config *config) (*bkPipeline, error) {
+func makePipeline(repoDir string, config *config, buildID string) (
+	*bkPipeline, error,
+) {
 	pipelineDir := filepath.Join(repoDir, ".buildkite")
 
 	entries, err := os.ReadDir(pipelineDir)
@@ -65,7 +68,7 @@ func makePipeline(repoDir string, config *config) (*bkPipeline, error) {
 	}
 
 	pl := new(bkPipeline)
-	c := newConverter(config)
+	c := newConverter(config, buildID)
 	for _, file := range files {
 		g, err := parsePipelineFile(file)
 		if err != nil {
@@ -231,7 +234,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	if !c.config.Dockerless {
 		result["plugins"] = []any{
 			map[string]any{
-				"docker#v5.8.0": makeRayDockerPlugin(jobEnv),
+				"docker#v5.8.0": makeRayDockerPlugin(jobEnv, c.buildID),
 			},
 		}
 	}
