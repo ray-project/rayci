@@ -31,7 +31,9 @@ func localDefaultConfig(envs Envs) *config {
 // builtin ray buildkite pipeline IDs.
 const (
 	rayBranchPipeline = "0183465b-c6fb-479b-8577-4cfd743b545d"
-	rayPRPipeline     = "0183465f-a222-467a-b122-3b9ea3e68094"
+
+	rayPRPipeline  = "0183465f-a222-467a-b122-3b9ea3e68094"
+	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
 
 func ciDefaultConfig(envs Envs) *config {
@@ -59,7 +61,7 @@ func ciDefaultConfig(envs Envs) *config {
 	return &config{
 		name:            "ray-pr",
 		ArtifactsBucket: "ray-ci-artifact-pr-public",
-		CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
+		CITemp:          "s3://ray-ci-artifact-pr-public/ci-temp/",
 		CITempECR:       "029272617770.dkr.ecr.us-west-2.amazonaws.com",
 		CITempCRRepo:    "029272617770.dkr.ecr.us-west-2.amazonaws.com/rayci_temp_pr",
 
