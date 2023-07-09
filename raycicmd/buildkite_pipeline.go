@@ -22,7 +22,7 @@ type bkPipeline struct {
 	Steps []*bkPipelineGroup `yaml:"steps,omitempty"`
 }
 
-func makeRayDockerPlugin(image, buildID string) map[string]any {
+func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 	return map[string]any{
 		"image":         image,
 		"shell":         []string{"/bin/bash", "-elic"},
@@ -32,8 +32,7 @@ func makeRayDockerPlugin(image, buildID string) map[string]any {
 
 		"volumes": []string{"/var/run/docker.sock:/var/run/docker.sock"},
 
-		"environment": []string{
-			"RAYCI_BUILD_ID=" + buildID,
+		"environment": append([]string{
 			"CI",
 			"BUILDKITE",
 			"BUILDKITE_BRANCH",
@@ -48,6 +47,6 @@ func makeRayDockerPlugin(image, buildID string) map[string]any {
 			"BUILDKITE_PARALLEL_JOB",
 			"BUILDKITE_PARALLEL_JOB_COUNT",
 			"BUILDKITE_MESSAGE",
-		},
+		}, extraEnvs...),
 	}
 }

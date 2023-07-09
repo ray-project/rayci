@@ -232,9 +232,15 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	result["artifact_paths"] = defaultArtifactPaths
 
 	if !c.config.Dockerless {
+		envs := []string{
+			"RAYCI_BUILD_ID=" + c.buildID,
+			"RAYCI_TEMP=" + c.config.CITemp,
+			"RAYCI_TEMP_ECR=" + c.config.CITempECR,
+			"RAYCI_TEMP_CR_REPO=" + c.config.CITempCRRepo,
+		}
 		result["plugins"] = []any{
 			map[string]any{
-				"docker#v5.8.0": makeRayDockerPlugin(jobEnv, c.buildID),
+				"docker#v5.8.0": makeRayDockerPlugin(jobEnv, envs),
 			},
 		}
 	}
