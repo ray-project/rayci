@@ -3,7 +3,6 @@ package raycicmd
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -222,8 +221,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	case "ubuntu-focal": // builtin support
 		jobEnv = "ubuntu:20.04"
 	default:
-		log.Printf("fake job env %q with ubuntu", jobEnv)
-		jobEnv = "ubuntu:20.04" // TODO(aslonnie): map to ECR
+		jobEnv = fmt.Sprintf("%s:%s-%s", c.config.CITempCRRepo, c.buildID, jobEnv)
 	}
 
 	result["agents"] = newBkAgents(q)
