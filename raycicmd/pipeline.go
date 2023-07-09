@@ -221,7 +221,8 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	case "ubuntu-focal": // builtin support
 		jobEnv = "ubuntu:20.04"
 	default:
-		jobEnv = fmt.Sprintf("%s:%s-%s", c.config.CITempCRRepo, c.buildID, jobEnv)
+		const tempCRRepo = "localhost:5000/raycitemp"
+		jobEnv = fmt.Sprintf("%s:%s-%s", tempCRRepo, c.buildID, jobEnv)
 	}
 
 	result["agents"] = newBkAgents(q)
@@ -232,9 +233,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	if !c.config.Dockerless {
 		envs := []string{
 			"RAYCI_BUILD_ID=" + c.buildID,
-			"RAYCI_TEMP=" + c.config.CITemp,
-			"RAYCI_TEMP_ECR=" + c.config.CITempECR,
-			"RAYCI_TEMP_CR_REPO=" + c.config.CITempCRRepo,
+			"RAYCI_TEMP=" + c.config.CITemp + c.buildID,
 		}
 		result["plugins"] = []any{
 			map[string]any{

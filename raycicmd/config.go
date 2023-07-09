@@ -13,9 +13,7 @@ type config struct {
 
 	ArtifactsBucket string `yaml:"artifacts_bucket"`
 
-	CITemp       string `yaml:"ci_temp"`
-	CITempECR    string `yaml:"ci_temp_ecr"`
-	CITempCRRepo string `yaml:"ci_temp_cr_repo"`
+	CITemp string `yaml:"ci_temp"`
 
 	AgentQueueMap map[string]string `yaml:"agent_queue_map"`
 
@@ -44,8 +42,6 @@ func ciDefaultConfig(envs Envs) *config {
 
 			ArtifactsBucket: "ray-ci-artifact-branch-public",
 			CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
-			CITempECR:       "029272617770.dkr.ecr.us-west-2.amazonaws.com",
-			CITempCRRepo:    "029272617770.dkr.ecr.us-west-2.amazonaws.com/rayci_temp_branch",
 
 			AgentQueueMap: map[string]string{
 				"default":   "runner_queue_branch",
@@ -62,8 +58,6 @@ func ciDefaultConfig(envs Envs) *config {
 		name:            "ray-pr",
 		ArtifactsBucket: "ray-ci-artifact-pr-public",
 		CITemp:          "s3://ray-ci-artifact-pr-public/ci-temp/",
-		CITempECR:       "029272617770.dkr.ecr.us-west-2.amazonaws.com",
-		CITempCRRepo:    "029272617770.dkr.ecr.us-west-2.amazonaws.com/rayci_temp_pr",
 
 		AgentQueueMap: map[string]string{
 			"default":   "runner_queue_pr",
