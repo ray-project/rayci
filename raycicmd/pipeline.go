@@ -31,10 +31,17 @@ var noopPipeline = &bkPipeline{
 type converter struct {
 	config  *config
 	buildID string
+
+	ciTempForBuild string
 }
 
 func newConverter(config *config, buildID string) *converter {
-	return &converter{config: config, buildID: buildID}
+	return &converter{
+		config:  config,
+		buildID: buildID,
+
+		ciTempForBuild: config.CITemp + buildID + "/",
+	}
 }
 
 func makePipeline(repoDir string, config *config, buildID string) (
@@ -233,7 +240,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	if !c.config.Dockerless {
 		envs := []string{
 			"RAYCI_BUILD_ID=" + c.buildID,
-			"RAYCI_TEMP=" + c.config.CITemp + c.buildID,
+			"RAYCI_TEMP=" + c.ciTempForBuild,
 		}
 		result["plugins"] = []any{
 			map[string]any{
