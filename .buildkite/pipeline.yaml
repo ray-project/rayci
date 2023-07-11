@@ -1,5 +1,10 @@
+# TODO(aslonnie): use rayci to launch and run all the tests.
 steps:
-  - label: "ray_ci test"
+  - label: "test rayci with rayci"
+    commands:
+      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" /bin/bash run_rayci.sh -upload
+
+  - label: "legacy ray_ci python test"
     commands:
       - yum install -y python3
       - pip3 install pytest click pyyaml
@@ -9,4 +14,12 @@ steps:
           image: amazonlinux:2
           shell: ["/bin/bash", "-elic"]
     agents:
-      queue: "runner_queue_branch"
+      queue: "runner_queue_pr"
+  - label: "rayci go tests"
+    commands:
+      - go test -v ./...
+    agents:
+      queue: "runner_queue_pr"
+    plugins:
+      - docker#v5.7.0:
+          image: "golang:1.20.5-bookworm"
