@@ -45,14 +45,12 @@ func newConverter(config *config, buildID string) *converter {
 }
 
 // builtin builder command to build a forge container image.
-const forgeBuilderCommand = `
-/bin/bash -euo pipefail -c '
-export DOCKER_BUILDKIT=1
-DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}}"
-tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |
-  docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - \
-  "$${RAYCI_FORGE_DOCKERFILE}"
-'`
+const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
+	`'export DOCKER_BUILDKIT=1; ` +
+	`DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}}"; ` +
+	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
+	` docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - ` +
+	`"$${RAYCI_FORGE_DOCKERFILE}" '`
 
 func forgeNameFromDockerfile(name string) (string, bool) {
 	const prefix = "Dockerfile."
