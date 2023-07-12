@@ -52,7 +52,7 @@ DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}}"
 tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |
   docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - \
   "$${RAYCI_FORGE_DOCKERFILE}"
-`
+'`
 
 func forgeNameFromDockerfile(name string) (string, bool) {
 	const prefix = "Dockerfile."
@@ -75,7 +75,7 @@ func makePipeline(repoDir string, config *config, buildID string) (
 	// Build steps that build the forge images.
 	forgeGroup := &bkPipelineGroup{
 		Group: "forge",
-		Key:   "forge",
+		Key:   "all-forges",
 	}
 
 	// add forge container building steps
@@ -107,9 +107,9 @@ func makePipeline(repoDir string, config *config, buildID string) (
 			}
 
 			bkStep := map[string]any{
-				"label":   forgeName,
-				"key":     forgeName,
-				"command": forgeBuilderCommand,
+				"label":    forgeName,
+				"key":      forgeName,
+				"commands": []string{forgeBuilderCommand},
 				"env": map[string]string{
 					"RAYCI_BUILD_ID":         buildID,
 					"RAYCI_TMP_REPO":         config.CITempRepo,
