@@ -12,8 +12,8 @@ func TestConvertPipelineStep(t *testing.T) {
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
 
-		AgentQueueMap: map[string]string{"default": "runner"},
-		Dockerless:    true,
+		AgentQueues: map[string]string{"default": "runner"},
+		Dockerless:  true,
 	}, "buildid")
 
 	for _, test := range []struct {

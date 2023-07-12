@@ -15,7 +15,9 @@ type config struct {
 
 	CITemp string `yaml:"ci_temp"`
 
-	AgentQueueMap map[string]string `yaml:"agent_queue_map"`
+	BuilderAgentQueues map[string]string `yaml:"builder_agent_queue_map"`
+
+	AgentQueues map[string]string `yaml:"agent_queue_map"`
 
 	Dockerless bool `yaml:"dockerless"`
 }
@@ -43,29 +45,45 @@ func ciDefaultConfig(envs Envs) *config {
 			ArtifactsBucket: "ray-ci-artifact-branch-public",
 			CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
 
-			AgentQueueMap: map[string]string{
+			BuilderAgentQueues: map[string]string{
+				"builder":       "builder_queue_branch",
+				"builder-arm64": "builder_queue_arm64_branch",
+			},
+
+			AgentQueues: map[string]string{
+				"builder":   "builder_queue_branch",
 				"default":   "runner_queue_branch",
 				"small":     "runner_queue_small_branch",
 				"medium":    "runner_queue_medium_branch",
 				"large":     "runner_queue_branch",
 				"gpu":       "gpu_runner_queue_branch",
 				"gpu-large": "gpu_large_runner_queue_branch",
+
+				"medium-arm64": "runner_queue_arm64_medium_branch",
 			},
 		}
 	}
 
 	return &config{
-		name:            "ray-pr",
+		name: "ray-pr",
+
 		ArtifactsBucket: "ray-ci-artifact-pr-public",
 		CITemp:          "s3://ray-ci-artifact-pr-public/ci-temp/",
 
-		AgentQueueMap: map[string]string{
+		BuilderAgentQueues: map[string]string{
+			"builder":       "builder_queue_pr",
+			"builder-arm64": "builder_queue_arm64_pr",
+		},
+
+		AgentQueues: map[string]string{
 			"default":   "runner_queue_pr",
 			"small":     "runner_queue_small_pr",
 			"medium":    "runner_queue_medium_pr",
 			"large":     "runner_queue_pr",
 			"gpu":       "gpu_runner_queue_pr",
 			"gpu-large": "gpu_large_runner_queue_pr",
+
+			"medium-arm64": "runner_queue_arm64_medium_pr",
 		},
 	}
 }

@@ -135,7 +135,7 @@ func (c *converter) mapAgent(instanceType string) (string, error) {
 	if instanceType == "" {
 		instanceType = "default"
 	}
-	if q, ok := c.config.AgentQueueMap[instanceType]; ok {
+	if q, ok := c.config.AgentQueues[instanceType]; ok {
 		return q, nil
 	}
 	return "", fmt.Errorf("unknown instance type %q", instanceType)
