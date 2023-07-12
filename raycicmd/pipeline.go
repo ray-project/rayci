@@ -44,38 +44,121 @@ func newConverter(config *config, buildID string) *converter {
 	}
 }
 
+// builtin builder command to build a forge container image.
+const forgeBuilderCommand = `
+/bin/bash -euo pipefail -c '
+export DOCKER_BUILDKIT=1
+DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}}"
+tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |
+  docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - \
+  "$${RAYCI_FORGE_DOCKERFILE}"
+`
+
+func forgeNameFromDockerfile(name string) (string, bool) {
+	const prefix = "Dockerfile."
+
+	if !strings.HasPrefix(name, prefix) {
+		return "", false
+	}
+	name = strings.TrimPrefix(name, prefix)
+	if name == "" {
+		return "", false
+	}
+	return name, true
+}
+
 func makePipeline(repoDir string, config *config, buildID string) (
 	*bkPipeline, error,
 ) {
-	pipelineDir := filepath.Join(repoDir, ".buildkite")
+	pl := new(bkPipeline)
 
-	entries, err := os.ReadDir(pipelineDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return noopPipeline, nil
-		}
-		return nil, fmt.Errorf("read pipeline dir: %w", err)
+	// Build steps that build the forge images.
+	forgeGroup := &bkPipelineGroup{
+		Group: "forge",
+		Key:   "forge",
 	}
 
-	var files []string
+	// add forge container building steps
+	for _, dir := range config.ForgeDirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("read forge dir %s: %w", dir, err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			filePath := filepath.Join(dir, name)
+			forgeName, ok := forgeNameFromDockerfile(name)
+			if !ok {
+				continue
+			}
+
+			agent := ""
+			if config.BuilderQueues != nil {
+				if q, ok := config.BuilderQueues["builder"]; ok {
+					agent = q
+				}
+			}
+
+			bkStep := map[string]any{
+				"label":   forgeName,
+				"key":     forgeName,
+				"command": forgeBuilderCommand,
+				"env": map[string]string{
+					"RAYCI_BUILD_ID":         buildID,
+					"RAYCI_TMP_REPO":         config.CITempRepo,
+					"RAYCI_FORGE_DOCKERFILE": filePath,
+					"RAYCI_FORGE_NAME":       forgeName,
+				},
+			}
+			if agent != "" {
+				bkStep["agents"] = newBkAgents(agent)
+			}
+
+			forgeGroup.Steps = append(forgeGroup.Steps, bkStep)
+		}
+	}
+
+	if len(forgeGroup.Steps) > 0 {
+		pl.Steps = append(pl.Steps, forgeGroup)
+	}
+
+	// Build steps for CI.
+
+	bkDir := config.BuildkiteDir
+	if bkDir == "" {
+		bkDir = ".buildkite"
+	}
+	bkDir = filepath.Join(repoDir, bkDir)
+
+	entries, err := os.ReadDir(bkDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			entries = nil
+		} else {
+			return nil, fmt.Errorf("read pipeline dir: %w", err)
+		}
+	}
+
+	c := newConverter(config, buildID)
+
+	// add rayci buildkite pipelines
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".rayci.yaml") ||
-			strings.HasSuffix(name, ".rayci.yml") {
-			files = append(files, filepath.Join(pipelineDir, name))
+		if !strings.HasSuffix(name, ".rayci.yaml") {
+			continue
 		}
-	}
+		file := filepath.Join(bkDir, name)
 
-	if len(files) == 0 {
-		return noopPipeline, nil
-	}
-
-	pl := new(bkPipeline)
-	c := newConverter(config, buildID)
-	for _, file := range files {
 		g, err := parsePipelineFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
@@ -135,7 +218,7 @@ func (c *converter) mapAgent(instanceType string) (string, error) {
 	if instanceType == "" {
 		instanceType = "default"
 	}
-	if q, ok := c.config.AgentQueues[instanceType]; ok {
+	if q, ok := c.config.RunnerQueues[instanceType]; ok {
 		return q, nil
 	}
 	return "", fmt.Errorf("unknown instance type %q", instanceType)

@@ -13,15 +13,19 @@ type config struct {
 
 	ArtifactsBucket string `yaml:"artifacts_bucket"`
 
-	CITemp string `yaml:"ci_temp"`
+	CITemp     string `yaml:"ci_temp"`
+	CITempRepo string `yaml:"ci_temp_repo"`
 
-	BuilderAgentQueues map[string]string `yaml:"builder_agent_queue_map"`
-
-	AgentQueues map[string]string `yaml:"agent_queue_map"`
+	BuilderQueues map[string]string `yaml:"builder_agent_queues"`
+	RunnerQueues  map[string]string `yaml:"agent_queues"`
 
 	Dockerless bool `yaml:"dockerless"`
 
-	ForgeDir string `yaml:"builder_dir"`
+	// BuildkiteDir is the directory of buildkite pipeline files.
+	BuildkiteDir string `yaml:"buildkite_dir"`
+
+	// ForgeDir is the directory of forge Dockerfile files.
+	ForgeDirs []string `yaml:"forge_dir"`
 }
 
 func localDefaultConfig(envs Envs) *config {
@@ -38,70 +42,69 @@ const (
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
 
-// builtin builder command to build a builder container image.
-const builtinBuilderCommand = `
-/bin/bash -euo pipefail -c '
-export DOCKER_BUILDKIT=1
-DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_BUILDER_NAME}}"
-DOCKERFILE=$${RAYCI_BUILDER_DIR}/$${RAYCI_BUILDER_NAME}}/Dockerfile
-tar --mtime="UTC 2020-01-01" -c -f - "$${DOCKERFILE}" |
-  docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - "$${DOCKERFILE}"
-`
+const rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
+
+var branchPipelineConfig = &config{
+	name: "ray-branch",
+
+	ArtifactsBucket: "ray-ci-artifact-branch-public",
+
+	CITemp:     "s3://ray-ci-artifact-branch-public/ci-temp/",
+	CITempRepo: rayCIECR + "/rayci_temp_branch",
+
+	BuilderQueues: map[string]string{
+		"builder":       "builder_queue_branch",
+		"builder-arm64": "builder_queue_arm64_branch",
+	},
+
+	RunnerQueues: map[string]string{
+		"builder":   "builder_queue_branch",
+		"default":   "runner_queue_branch",
+		"small":     "runner_queue_small_branch",
+		"medium":    "runner_queue_medium_branch",
+		"large":     "runner_queue_branch",
+		"gpu":       "gpu_runner_queue_branch",
+		"gpu-large": "gpu_large_runner_queue_branch",
+
+		"medium-arm64": "runner_queue_arm64_medium_branch",
+	},
+
+	ForgeDirs: []string{"ci/v2/forge"},
+}
+
+var prPipelineConfig = &config{
+	name: "ray-pr",
+
+	ArtifactsBucket: "ray-ci-artifact-pr-public",
+
+	CITemp:     "s3://ray-ci-artifact-pr-public/ci-temp/",
+	CITempRepo: rayCIECR + "/rayci_temp_pr",
+
+	BuilderQueues: map[string]string{
+		"builder":       "builder_queue_pr",
+		"builder-arm64": "builder_queue_arm64_pr",
+	},
+
+	RunnerQueues: map[string]string{
+		"default":   "runner_queue_pr",
+		"small":     "runner_queue_small_pr",
+		"medium":    "runner_queue_medium_pr",
+		"large":     "runner_queue_pr",
+		"gpu":       "gpu_runner_queue_pr",
+		"gpu-large": "gpu_large_runner_queue_pr",
+
+		"medium-arm64": "runner_queue_arm64_medium_pr",
+	},
+
+	ForgeDirs: []string{"ci/v2/forge"},
+}
 
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
 	if pipelineID == rayBranchPipeline {
-		return &config{
-			name: "ray-branch",
-
-			ArtifactsBucket: "ray-ci-artifact-branch-public",
-			CITemp:          "s3://ray-ci-artifact-branch-public/ci-temp/",
-
-			BuilderAgentQueues: map[string]string{
-				"builder":       "builder_queue_branch",
-				"builder-arm64": "builder_queue_arm64_branch",
-			},
-
-			AgentQueues: map[string]string{
-				"builder":   "builder_queue_branch",
-				"default":   "runner_queue_branch",
-				"small":     "runner_queue_small_branch",
-				"medium":    "runner_queue_medium_branch",
-				"large":     "runner_queue_branch",
-				"gpu":       "gpu_runner_queue_branch",
-				"gpu-large": "gpu_large_runner_queue_branch",
-
-				"medium-arm64": "runner_queue_arm64_medium_branch",
-			},
-
-			ForgeDir: "ci/v2/forge",
-		}
+		return branchPipelineConfig
 	}
-
-	return &config{
-		name: "ray-pr",
-
-		ArtifactsBucket: "ray-ci-artifact-pr-public",
-		CITemp:          "s3://ray-ci-artifact-pr-public/ci-temp/",
-
-		BuilderAgentQueues: map[string]string{
-			"builder":       "builder_queue_pr",
-			"builder-arm64": "builder_queue_arm64_pr",
-		},
-
-		AgentQueues: map[string]string{
-			"default":   "runner_queue_pr",
-			"small":     "runner_queue_small_pr",
-			"medium":    "runner_queue_medium_pr",
-			"large":     "runner_queue_pr",
-			"gpu":       "gpu_runner_queue_pr",
-			"gpu-large": "gpu_large_runner_queue_pr",
-
-			"medium-arm64": "runner_queue_arm64_medium_pr",
-		},
-
-		ForgeDir: "ci/v2/forge",
-	}
+	return prPipelineConfig
 }
 
 func defaultConfig(envs Envs) *config {
