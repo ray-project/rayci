@@ -20,6 +20,8 @@ type config struct {
 	AgentQueues map[string]string `yaml:"agent_queue_map"`
 
 	Dockerless bool `yaml:"dockerless"`
+
+	ForgeDir string `yaml:"builder_dir"`
 }
 
 func localDefaultConfig(envs Envs) *config {
@@ -35,6 +37,16 @@ const (
 	rayPRPipeline  = "0183465f-a222-467a-b122-3b9ea3e68094"
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
+
+// builtin builder command to build a builder container image.
+const builtinBuilderCommand = `
+/bin/bash -euo pipefail -c '
+export DOCKER_BUILDKIT=1
+DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_BUILDER_NAME}}"
+DOCKERFILE=$${RAYCI_BUILDER_DIR}/$${RAYCI_BUILDER_NAME}}/Dockerfile
+tar --mtime="UTC 2020-01-01" -c -f - "$${DOCKERFILE}" |
+  docker build --progress=plain -t "$${DEST_IMAGE}" --push -f - "$${DOCKERFILE}"
+`
 
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
@@ -61,6 +73,8 @@ func ciDefaultConfig(envs Envs) *config {
 
 				"medium-arm64": "runner_queue_arm64_medium_branch",
 			},
+
+			ForgeDir: "ci/v2/forge",
 		}
 	}
 
@@ -85,6 +99,8 @@ func ciDefaultConfig(envs Envs) *config {
 
 			"medium-arm64": "runner_queue_arm64_medium_pr",
 		},
+
+		ForgeDir: "ci/v2/forge",
 	}
 }
 
