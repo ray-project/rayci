@@ -310,19 +310,11 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	result := cloneMap(step)
 
 	jobEnv := "forge" // default job env
-
 	if v, ok := stringInMap(result, "job_env"); ok {
 		delete(result, "job_env")
 		jobEnv = v
 	}
-
-	switch jobEnv {
-	case "ubuntu-focal": // builtin support
-		jobEnv = "ubuntu:20.04"
-	default:
-		const tempCRRepo = "localhost:5000/raycitemp"
-		jobEnv = fmt.Sprintf("%s:%s-%s", tempCRRepo, c.buildID, jobEnv)
-	}
+	jobEnv = fmt.Sprintf("%s:%s-%s", c.config.CITempRepo, c.buildID, jobEnv)
 
 	result["agents"] = newBkAgents(q)
 	result["retry"] = defaultRayRetry
