@@ -278,6 +278,22 @@ func cloneMap(m map[string]any) map[string]any {
 	return res
 }
 
+func dependsOnList(step map[string]any) []string {
+	dependsOn, ok := step["depends_on"]
+	if !ok {
+		return nil
+	}
+
+	switch dependsOn := dependsOn.(type) {
+	case []string:
+		return dependsOn
+	case string:
+		return []string{dependsOn}
+	default:
+		return nil
+	}
+}
+
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
