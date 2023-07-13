@@ -66,6 +66,16 @@ func forgeNameFromDockerfile(name string) (string, bool) {
 	return name, true
 }
 
+func isRayCIYaml(p string) bool {
+	if strings.HasSuffix(p, ".rayci.yaml") {
+		return true
+	}
+	if strings.HasSuffix(p, ".rayci.yml") {
+		return true
+	}
+	return false
+}
+
 func makePipeline(repoDir string, config *config, buildID string) (
 	*bkPipeline, error,
 ) {
@@ -153,7 +163,7 @@ func makePipeline(repoDir string, config *config, buildID string) (
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".rayci.yaml") {
+		if !isRayCIYaml(name) {
 			continue
 		}
 		file := filepath.Join(bkDir, name)
