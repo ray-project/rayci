@@ -51,7 +51,7 @@ const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
 	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
 	` docker build --progress=plain -t "$${DEST_IMAGE}" -f - ` +
 	`"$${RAYCI_FORGE_DOCKERFILE}" ; ` +
-	`docker push "$${DEST_IMAGE} '`
+	`docker push "$${DEST_IMAGE}" '`
 
 func forgeNameFromDockerfile(name string) (string, bool) {
 	const prefix = "Dockerfile."
