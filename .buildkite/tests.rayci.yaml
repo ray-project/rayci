@@ -2,11 +2,11 @@ group: go tests
 steps:
 - label: Go tests
   command: go test ./...
-  instance_type: small
+  queue: small
   depends_on: forge
 - label: Go fmt
   command:
     - go fmt ./...
     - git diff --exit-code
-  instance_type: small
+  queue: small
   depends_on: forge
