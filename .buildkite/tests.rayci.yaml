@@ -2,3 +2,7 @@ group: go tests
 steps:
 - label: Go tests
   command: go test ./...
+- label: Go fmt
+  command:
+    - go fmt ./...
+    - git diff --exit-code
