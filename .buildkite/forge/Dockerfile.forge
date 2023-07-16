@@ -10,8 +10,8 @@ RUN <<EOF
 set -euo pipefail
 
 apt-get update
-apt-get upgrade
-apt-get install -y curl zip unzip awscli ca-certificates
+apt-get upgrade -y
+apt-get install -y curl zip unzip awscli ca-certificates git
 
 curl -sSL "https://golang.org/dl/go1.20.5.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
