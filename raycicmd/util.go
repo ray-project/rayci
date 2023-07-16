@@ -13,6 +13,15 @@ func stringInMap(m map[string]any, key string) (string, bool) {
 	return s, ok
 }
 
+func stringInMapAnyKey(m map[string]any, keys ...string) (string, bool) {
+	for _, k := range keys {
+		if s, ok := stringInMap(m, k); ok {
+			return s, true
+		}
+	}
+	return "", false
+}
+
 func cloneMap(m map[string]any) map[string]any {
 	if m == nil {
 		return nil
@@ -20,6 +29,24 @@ func cloneMap(m map[string]any) map[string]any {
 	res := make(map[string]any)
 	for k, v := range m {
 		res[k] = v
+	}
+	return res
+}
+
+func cloneMapExcept(m map[string]any, except []string) map[string]any {
+	if m == nil {
+		return nil
+	}
+	exceptMap := make(map[string]bool, len(except))
+	for _, k := range except {
+		exceptMap[k] = true
+	}
+
+	res := make(map[string]any)
+	for k, v := range m {
+		if !exceptMap[k] {
+			res[k] = v
+		}
 	}
 	return res
 }

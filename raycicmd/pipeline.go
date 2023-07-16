@@ -208,7 +208,19 @@ var (
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"instance_type", "queue", "job_env",
 	}
+
+	commandStepDropKeys = []string{
+		"instance_type", "queue", "job_env",
+	}
 )
+
+func (c *converter) jobEnvImage(name string) string {
+	if name == "" {
+		name = "forge"
+	}
+
+	return fmt.Sprintf("%s:%s-%s", c.config.CITempRepo, c.buildID, name)
+}
 
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
@@ -226,32 +238,18 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		return nil, fmt.Errorf("check command step keys: %w", err)
 	}
 
-	queue, ok := stringInMap(step, "queue")
-	if !ok {
-		instanceType, ok := stringInMap(step, "instance_type")
-		if ok {
-			queue = instanceType
-		}
-	}
-
-	q, err := c.mapAgent(queue)
+	queue, _ := stringInMapAnyKey(step, "queue", "instance_type")
+	agentQueue, err := c.mapAgent(queue)
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
 
-	result := cloneMap(step)
-	for _, k := range []string{"instance_type", "queue"} {
-		delete(result, k)
-	}
+	jobEnv, _ := stringInMap(step, "job_env")
+	jobEnvImage := c.jobEnvImage(jobEnv)
 
-	jobEnv := "forge" // default job env
-	if v, ok := stringInMap(result, "job_env"); ok {
-		delete(result, "job_env")
-		jobEnv = v
-	}
-	jobEnv = fmt.Sprintf("%s:%s-%s", c.config.CITempRepo, c.buildID, jobEnv)
+	result := cloneMapExcept(step, commandStepDropKeys)
 
-	result["agents"] = newBkAgents(q)
+	result["agents"] = newBkAgents(agentQueue)
 	result["retry"] = defaultRayRetry
 	result["timeout_in_minutes"] = defaultTimeoutInMinutes
 	result["artifact_paths"] = defaultArtifactPaths
@@ -263,7 +261,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		}
 		result["plugins"] = []any{
 			map[string]any{
-				"docker#v5.8.0": makeRayDockerPlugin(jobEnv, envs),
+				"docker#v5.8.0": makeRayDockerPlugin(jobEnvImage, envs),
 			},
 		}
 	}
