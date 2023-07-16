@@ -240,6 +240,9 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	}
 
 	result := cloneMap(step)
+	for _, k := range []string{"instance_type", "queue"} {
+		delete(result, k)
+	}
 
 	jobEnv := "forge" // default job env
 	if v, ok := stringInMap(result, "job_env"); ok {
