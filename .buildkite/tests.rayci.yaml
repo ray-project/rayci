@@ -1,4 +1,4 @@
-- group: go tests
-  steps:
-  - label: "Go tests"
-    command: go test -v ./...
+group: go tests
+steps:
+- label: Go tests
+  command: go test -v ./...
