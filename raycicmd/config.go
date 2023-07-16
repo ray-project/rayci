@@ -44,6 +44,8 @@ const (
 
 const rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
 
+var defaultForgeDirs = []string{".buildkite/forge", "ci/forge", "ci/v2/forge"}
+
 var branchPipelineConfig = &config{
 	name: "ray-branch",
 
@@ -58,7 +60,6 @@ var branchPipelineConfig = &config{
 	},
 
 	RunnerQueues: map[string]string{
-		"builder":   "builder_queue_branch",
 		"default":   "runner_queue_branch",
 		"small":     "runner_queue_small_branch",
 		"medium":    "runner_queue_medium_branch",
@@ -69,7 +70,7 @@ var branchPipelineConfig = &config{
 		"medium-arm64": "runner_queue_arm64_medium_branch",
 	},
 
-	ForgeDirs: []string{"ci/v2/forge"},
+	ForgeDirs: defaultForgeDirs,
 }
 
 var prPipelineConfig = &config{
@@ -96,7 +97,7 @@ var prPipelineConfig = &config{
 		"medium-arm64": "runner_queue_arm64_medium_pr",
 	},
 
-	ForgeDirs: []string{"ci/v2/forge"},
+	ForgeDirs: defaultForgeDirs,
 }
 
 func ciDefaultConfig(envs Envs) *config {

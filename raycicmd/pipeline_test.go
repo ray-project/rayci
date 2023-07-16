@@ -61,8 +61,14 @@ func TestConvertPipelineStep(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(got, test.out) {
-			gotJSON, _ := json.MarshalIndent(got, "", "  ")
-			wantJSON, _ := json.MarshalIndent(test.out, "", "  ")
+			gotJSON, err := json.MarshalIndent(got, "", "  ")
+			if err != nil {
+				t.Fatalf("marshal got: +%v: %s", got, err)
+			}
+			wantJSON, err := json.MarshalIndent(test.out, "", "  ")
+			if err != nil {
+				t.Fatalf("marshal want: +%v: %s", test.out, err)
+			}
 
 			t.Errorf(
 				"convertPipelineStep %+v: got:\n %s\nwant:\n %s",
