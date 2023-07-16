@@ -2,7 +2,9 @@ group: go tests
 steps:
 - label: Go tests
   command: go test ./...
+  depends_on: forge
 - label: Go fmt
   command:
     - go fmt ./...
     - git diff --exit-code
+  depends_on: forge

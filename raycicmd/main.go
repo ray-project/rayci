@@ -6,8 +6,6 @@ package raycicmd
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -22,27 +20,6 @@ type Flags struct {
 	ConfigFile     string // flag -config
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
-}
-
-func makeBuildID(envs Envs) (string, error) {
-	buildID := getEnv(envs, "RAYCI_BUILD_ID")
-	if buildID != "" {
-		return buildID, nil
-	}
-
-	buildID = getEnv(envs, "BUILDKITE_BUILD_ID")
-	if buildID != "" {
-		h := sha256.Sum256([]byte(buildID))
-		prefix := hex.EncodeToString(h[:])[:8]
-		return prefix, nil
-	}
-
-	user := getEnv(envs, "USER")
-	if user != "" {
-		return user, nil
-	}
-
-	return "", fmt.Errorf("no build id found")
 }
 
 // Main runs tha main function of rayci command.
@@ -66,25 +43,23 @@ func Main(flags *Flags, envs Envs) error {
 		return fmt.Errorf("make pipeline: %w", err)
 	}
 
-	if !flags.UploadPipeline {
-		enc := yaml.NewEncoder(os.Stdout)
-		if err := enc.Encode(pipeline); err != nil {
-			return fmt.Errorf("output pipeline: %w", err)
-		}
-		return nil
-	}
-
 	// Upload pipeline to buildkite.
 	bs, err := yaml.Marshal(pipeline)
 	if err != nil {
 		return fmt.Errorf("marshal pipeline: %w", err)
 	}
 
+	if !flags.UploadPipeline {
+		if _, err := os.Stdout.Write(bs); err != nil {
+			return fmt.Errorf("write pipeline: %w", err)
+		}
+		return nil
+	}
+
 	// Prints out the pipeline content to logs.
 	log.Printf("%s", bs)
 
 	r := bytes.NewReader(bs)
-
 	cmd := exec.Command(flags.BuildkiteAgent, "pipeline", "upload")
 	cmd.Stdin = r
 	cmd.Stderr = os.Stderr
