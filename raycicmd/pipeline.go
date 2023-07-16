@@ -18,16 +18,6 @@ type pipelineGroup struct {
 	Steps []map[string]any `yaml:"steps"`
 }
 
-var noopPipeline = &bkPipeline{
-	Steps: []*bkPipelineGroup{{
-		Group: "noop",
-		Steps: []any{map[string]any{
-			"label":   "noop",
-			"command": "echo 'no steps found in repo'",
-		}},
-	}},
-}
-
 type converter struct {
 	config  *config
 	buildID string
@@ -42,28 +32,6 @@ func newConverter(config *config, buildID string) *converter {
 
 		ciTempForBuild: config.CITemp + buildID + "/",
 	}
-}
-
-// builtin builder command to build a forge container image.
-const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
-	`'export DOCKER_BUILDKIT=1 ; ` +
-	`DEST_IMAGE="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
-	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
-	` docker build --progress=plain -t "$${DEST_IMAGE}" ` +
-	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +
-	`docker push "$${DEST_IMAGE}" '`
-
-func forgeNameFromDockerfile(name string) (string, bool) {
-	const prefix = "Dockerfile."
-
-	if !strings.HasPrefix(name, prefix) {
-		return "", false
-	}
-	name = strings.TrimPrefix(name, prefix)
-	if name == "" {
-		return "", false
-	}
-	return name, true
 }
 
 func isRayCIYaml(p string) bool {
@@ -233,50 +201,14 @@ func (c *converter) mapAgent(instanceType string) (string, error) {
 	return "", fmt.Errorf("unknown instance type %q", instanceType)
 }
 
-func checkStepKeys(m map[string]any, allowed []string) error {
-	allowedMap := make(map[string]bool, len(allowed))
-	for _, k := range allowed {
-		allowedMap[k] = true
-	}
-
-	for k := range m {
-		if !allowedMap[k] {
-			return fmt.Errorf("unsupported step key %q", k)
-		}
-	}
-	return nil
-}
-
 var (
 	waitStepAllowedKeys    = []string{"wait", "continue_on_failure"}
 	commandStepAllowedKeys = []string{
 		"command", "commands",
-		"label", "name", "key",
-		"depends_on", "instance_type", "queue", "soft_fail",
-		"matrix",
-		"job_env",
+		"label", "name", "key", "depends_on", "soft_fail", "matrix",
+		"instance_type", "queue", "job_env",
 	}
 )
-
-func stringInMap(m map[string]any, key string) (string, bool) {
-	v, ok := m[key]
-	if !ok {
-		return "", false
-	}
-	s, ok := v.(string)
-	return s, ok
-}
-
-func cloneMap(m map[string]any) map[string]any {
-	if m == nil {
-		return nil
-	}
-	res := make(map[string]any)
-	for k, v := range m {
-		res[k] = v
-	}
-	return res
-}
 
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,

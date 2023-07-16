@@ -16,7 +16,7 @@ type config struct {
 	CITemp     string `yaml:"ci_temp"`
 	CITempRepo string `yaml:"ci_temp_repo"`
 
-	BuilderQueues map[string]string `yaml:"builder_agent_queues"`
+	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"agent_queues"`
 
 	Dockerless bool `yaml:"dockerless"`
