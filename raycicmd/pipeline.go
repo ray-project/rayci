@@ -76,29 +76,8 @@ func makePipeline(repoDir string, config *config, buildID string) (
 				continue
 			}
 
-			agent := ""
-			if config.BuilderQueues != nil {
-				if q, ok := config.BuilderQueues["builder"]; ok {
-					agent = q
-				}
-			}
-
-			bkStep := map[string]any{
-				"label":    forgeName,
-				"key":      forgeName,
-				"commands": []string{forgeBuilderCommand},
-				"env": map[string]string{
-					"RAYCI_BUILD_ID":         buildID,
-					"RAYCI_TMP_REPO":         config.CITempRepo,
-					"RAYCI_FORGE_DOCKERFILE": filePath,
-					"RAYCI_FORGE_NAME":       forgeName,
-				},
-			}
-			if agent != "" {
-				bkStep["agents"] = newBkAgents(agent)
-			}
-
-			forgeGroup.Steps = append(forgeGroup.Steps, bkStep)
+			step := makeForgeStep(buildID, forgeName, filePath, config)
+			forgeGroup.Steps = append(forgeGroup.Steps, step)
 		}
 	}
 

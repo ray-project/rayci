@@ -25,3 +25,29 @@ func forgeNameFromDockerfile(name string) (string, bool) {
 	}
 	return name, true
 }
+
+func makeForgeStep(buildID, name, file string, config *config) map[string]any {
+	agent := ""
+	if config.BuilderQueues != nil {
+		if q, ok := config.BuilderQueues["builder"]; ok {
+			agent = q
+		}
+	}
+
+	bkStep := map[string]any{
+		"label":    name,
+		"key":      name,
+		"commands": []string{forgeBuilderCommand},
+		"env": map[string]string{
+			"RAYCI_BUILD_ID":         buildID,
+			"RAYCI_TMP_REPO":         config.CITempRepo,
+			"RAYCI_FORGE_DOCKERFILE": file,
+			"RAYCI_FORGE_NAME":       name,
+		},
+	}
+	if agent != "" {
+		bkStep["agents"] = newBkAgents(agent)
+	}
+
+	return bkStep
+}
