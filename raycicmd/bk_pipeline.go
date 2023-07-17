@@ -50,3 +50,12 @@ func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 		}, extraEnvs...),
 	}
 }
+
+var emptyBkPipeline = &bkPipeline{
+	Steps: []*bkPipelineGroup{{
+		Group: "noop",
+		Steps: []any{
+			map[string]any{"command": "echo no pipeline steps"},
+		},
+	}},
+}
