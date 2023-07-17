@@ -1,16 +1,20 @@
 package raycicmd
 
-func newBkAgents(queue string) map[string]any {
-	return map[string]any{"queue": queue}
-}
+import "time"
 
-var defaultRayRetry = map[string]any{
-	"manual": map[string]any{"permit_on_passed": true},
-	"automatic": []any{
-		map[string]any{"exit_status": -1, "limit": 3},
-		map[string]any{"exit_status": 255, "limit": 3},
-	},
-}
+var (
+	defaultRayRetry = map[string]any{
+		"manual": map[string]any{"permit_on_passed": true},
+		"automatic": []any{
+			map[string]any{"exit_status": -1, "limit": 3},
+			map[string]any{"exit_status": 255, "limit": 3},
+		},
+	}
+
+	defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
+
+	defaultArtifactPaths = []string{"tmp/artifacts/**/*"}
+)
 
 type bkPipelineGroup struct {
 	Group string `yaml:"group,omitempty"`
@@ -51,11 +55,20 @@ func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 	}
 }
 
-var emptyBkPipeline = &bkPipeline{
-	Steps: []*bkPipelineGroup{{
-		Group: "noop",
-		Steps: []any{
-			map[string]any{"command": "echo no pipeline steps"},
-		},
-	}},
+func newBkAgents(queue string) map[string]any {
+	return map[string]any{"queue": queue}
+}
+
+func makeNoopBkPipeline(q string) *bkPipeline {
+	return &bkPipeline{
+		Steps: []*bkPipelineGroup{{
+			Group: "noop",
+			Steps: []any{
+				map[string]any{
+					"command": "echo no pipeline steps",
+					"agents":  newBkAgents(q),
+				},
+			},
+		}},
+	}
 }
