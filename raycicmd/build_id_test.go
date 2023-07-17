@@ -32,15 +32,4 @@ func TestBuildID(t *testing.T) {
 			t.Errorf("got same build ID %q, want different build IDs", got1)
 		}
 	})
-
-	t.Run("user build ID", func(t *testing.T) {
-		env := newEnvsMap(map[string]string{"USER": "adam"})
-		got, err := makeBuildID(env)
-		if err != nil {
-			t.Fatalf("makeBuildID: %v", err)
-		}
-		if want := "adam"; got != want {
-			t.Errorf("makeBuildID: got %q, want %q", got, want)
-		}
-	})
 }

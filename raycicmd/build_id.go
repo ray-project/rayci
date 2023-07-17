@@ -19,10 +19,5 @@ func makeBuildID(envs Envs) (string, error) {
 		return prefix, nil
 	}
 
-	user := getEnv(envs, "USER")
-	if user != "" {
-		return user, nil
-	}
-
 	return "", fmt.Errorf("no build id found")
 }
