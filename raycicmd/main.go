@@ -6,6 +6,7 @@ package raycicmd
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -18,12 +19,62 @@ import (
 type Flags struct {
 	RepoDir        string // flag -repo
 	ConfigFile     string // flag -config
+	OutputFile     string // flag -output
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
 }
 
+func parseFlags(args []string) (*Flags, []string) {
+	set := flag.NewFlagSet("rayci", flag.ExitOnError)
+	flags := new(Flags)
+	set.StringVar(
+		&flags.RepoDir, "repo", ".",
+		"Path to the root of the repository.",
+	)
+	set.StringVar(
+		&flags.ConfigFile, "config", "",
+		"Path to the config file; empty means default config for ray repo.",
+	)
+	set.StringVar(
+		&flags.OutputFile, "output", "pipeline.yaml",
+		"Path to the output file; `-` means stdout.",
+	)
+	set.BoolVar(
+		&flags.UploadPipeline, "upload", false,
+		"Upload the pipeline using buildkite-agent.",
+	)
+	set.StringVar(
+		&flags.BuildkiteAgent, "bkagent", "buildkite-agent",
+		"Path to the buildkite-agent binary.",
+	)
+
+	if len(args) == 0 {
+		set.Parse(nil)
+	} else {
+		set.Parse(args[1:])
+	}
+
+	return flags, set.Args()
+}
+
+func execWithInput(bin string, args []string, pipeline []byte) error {
+	r := bytes.NewReader(pipeline)
+
+	cmd := exec.Command(bin, args...)
+	cmd.Stdin = r
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	return cmd.Run()
+}
+
 // Main runs tha main function of rayci command.
-func Main(flags *Flags, envs Envs) error {
+func Main(args []string, envs Envs) error {
+	flags, args := parseFlags(args)
+	if len(args) != 0 {
+		return fmt.Errorf("unexpected arguments: %v", args)
+	}
+
 	if envs == nil {
 		envs = &osEnvs{}
 	}
@@ -50,22 +101,23 @@ func Main(flags *Flags, envs Envs) error {
 	}
 
 	if !flags.UploadPipeline {
-		if _, err := os.Stdout.Write(bs); err != nil {
-			return fmt.Errorf("write pipeline: %w", err)
+		if flags.OutputFile == "-" {
+			if _, err := os.Stdout.Write(bs); err != nil {
+				return fmt.Errorf("print pipeline: %w", err)
+			}
+		} else {
+			if err := os.WriteFile(flags.OutputFile, bs, 0644); err != nil {
+				return fmt.Errorf("write pipeline: %w", err)
+			}
 		}
-		return nil
-	}
+	} else {
+		// Prints out the pipeline content to logs.
+		log.Printf("%s", bs)
 
-	// Prints out the pipeline content to logs.
-	log.Printf("%s", bs)
-
-	r := bytes.NewReader(bs)
-	cmd := exec.Command(flags.BuildkiteAgent, "pipeline", "upload")
-	cmd.Stdin = r
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("upload pipeline: %w", err)
+		args := []string{"pipeline", "upload"}
+		if err := execWithInput(flags.BuildkiteAgent, args, bs); err != nil {
+			return fmt.Errorf("upload pipeline: %w", err)
+		}
 	}
 
 	return nil

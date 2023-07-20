@@ -123,7 +123,7 @@ func makePipeline(repoDir string, config *config, buildID string) (
 	if totalSteps == 0 {
 		q, ok := config.RunnerQueues["default"]
 		if !ok {
-			return nil, fmt.Errorf("no default queue found in config")
+			q = ""
 		}
 		return makeNoopBkPipeline(q), nil
 	}
