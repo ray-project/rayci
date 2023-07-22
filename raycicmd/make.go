@@ -117,8 +117,8 @@ func makePipeline(repoDir string, config *config, buildID string) (
 	}
 
 	totalSteps := 0
-	for _, g := range pl.Steps {
-		totalSteps += len(g.Steps)
+	for _, group := range pl.Steps {
+		totalSteps += len(group.Steps)
 	}
 	if totalSteps == 0 {
 		q, ok := config.RunnerQueues["default"]
