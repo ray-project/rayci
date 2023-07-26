@@ -38,7 +38,9 @@ func localDefaultConfig(envs Envs) *config {
 const (
 	rayBranchPipeline = "0183465b-c6fb-479b-8577-4cfd743b545d"
 
-	rayPRPipeline  = "0183465f-a222-467a-b122-3b9ea3e68094"
+	rayPRPipeline = "0183465f-a222-467a-b122-3b9ea3e68094"
+
+	rayV2Pipeline  = "0189942e-0876-4b8f-80a4-617f988ec59b"
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
 
