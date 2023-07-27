@@ -4,15 +4,6 @@ import (
 	"strings"
 )
 
-// builtin builder command to build a forge container image.
-const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
-	`'export DOCKER_BUILDKIT=1 ; ` +
-	`DEST_IMG="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
-	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
-	` docker build --progress=plain -t "$${DEST_IMG}" ` +
-	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +
-	`docker push "$${DEST_IMG}" '`
-
 func forgeNameFromDockerfile(name string) (string, bool) {
 	const prefix = "Dockerfile."
 
@@ -25,6 +16,15 @@ func forgeNameFromDockerfile(name string) (string, bool) {
 	}
 	return name, true
 }
+
+// builtin builder command to build a forge container image.
+const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
+	`'export DOCKER_BUILDKIT=1 ; ` +
+	`DEST_IMG="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
+	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
+	` docker build --progress=plain -t "$${DEST_IMG}" ` +
+	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +
+	`docker push "$${DEST_IMG}" '`
 
 func makeForgeStep(buildID, name, file string, config *config) map[string]any {
 	agent := ""
