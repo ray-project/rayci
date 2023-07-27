@@ -77,3 +77,33 @@ func TestConvertPipelineStep(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertPipelineGroup(t *testing.T) {
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+
+		RunnerQueues: map[string]string{"default": "runner"},
+		Dockerless:   true,
+	}, "buildid")
+
+	g := &pipelineGroup{
+		Group: "fancy",
+		Steps: []map[string]any{
+			{"commands": []string{"echo 1"}},
+			{"wait": nil},
+			{"commands": []string{"echo 1"}},
+		},
+	}
+	bk, err := c.convertPipelineGroup(g)
+	if err != nil {
+		t.Fatalf("convertPipelineGroup: %v", err)
+	}
+
+	if bk.Group != "fancy" {
+		t.Errorf("convertPipelineGroup: got group %s, want fancy", bk.Group)
+	}
+	if len(bk.Steps) != 3 {
+		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+	}
+}
