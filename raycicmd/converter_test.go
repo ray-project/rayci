@@ -2,19 +2,52 @@ package raycicmd
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
 	"reflect"
 )
 
+func findDockerPlugin(plugins []any) (map[string]any, bool) {
+	for _, p := range plugins {
+		if m, ok := p.(map[string]any); ok {
+			v, ok := m[dockerPlugin]
+			if ok {
+				return v.(map[string]any), true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func lookupEnvInArray(envs []string, key string) (string, bool) {
+	for _, e := range envs {
+		k, v, ok := strings.Cut(e, "=")
+		if ok {
+			if k == key {
+				return v, true
+			}
+		} else {
+			if e == key {
+				return "", true
+			}
+		}
+	}
+	return "", false
+}
+
 func TestConvertPipelineStep(t *testing.T) {
+	const buildID = "abc123"
+
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
+		CITempRepo:      "fakeecr",
 
-		RunnerQueues: map[string]string{"default": "runner"},
-		Dockerless:   true,
-	}, "buildid")
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+	}, buildID)
 
 	for _, test := range []struct {
 		in  map[string]any
@@ -23,7 +56,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		in: map[string]any{"commands": []string{"echo 1", "echo 2"}},
 		out: map[string]any{
 			"commands":           []string{"echo 1", "echo 2"},
-			"agents":             newBkAgents("runner"),
+			"agents":             newBkAgents("fakerunner"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
@@ -41,7 +74,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"command":    "echo hello",
 			"depends_on": "dep",
 
-			"agents": newBkAgents("runner"),
+			"agents": newBkAgents("fakerunner"),
 
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
@@ -60,6 +93,14 @@ func TestConvertPipelineStep(t *testing.T) {
 			continue
 		}
 
+		_, isWait := got["wait"]
+
+		plugins, ok := got["plugins"]
+		if ok {
+			// Check non plugins only.
+			delete(got, "plugins")
+		}
+
 		if !reflect.DeepEqual(got, test.out) {
 			gotJSON, err := json.MarshalIndent(got, "", "  ")
 			if err != nil {
@@ -75,6 +116,51 @@ func TestConvertPipelineStep(t *testing.T) {
 				test.in, gotJSON, wantJSON,
 			)
 		}
+
+		if isWait {
+			continue
+		}
+
+		dockerPlugin, ok := findDockerPlugin(plugins.([]any))
+		if !ok {
+			t.Errorf("convertPipelineStep %+v: no docker plugin", test.in)
+			continue
+		}
+
+		image, ok := stringInMap(dockerPlugin, "image")
+		if !ok {
+			t.Errorf("convertPipelineStep %+v: no docker image", test.in)
+		}
+		if want := fmt.Sprintf("fakeecr:%s-forge", buildID); image != want {
+			t.Errorf(
+				"convertPipelineStep %+v: got docker image %q, want %q",
+				test.in, image, want,
+			)
+		}
+
+		envs := dockerPlugin["environment"].([]string)
+		envBuildID, ok := lookupEnvInArray(envs, "RAYCI_BUILD_ID")
+		if !ok {
+			t.Errorf("convertPipelineStep %+v: no RAYCI_BUILD_ID", test.in)
+		}
+		if envBuildID != buildID {
+			t.Errorf(
+				"convertPipelineStep %+v: got RAYCI_BUILD_ID %q, want %q",
+				test.in, envBuildID, buildID,
+			)
+		}
+
+		envTemp, ok := lookupEnvInArray(envs, "RAYCI_TEMP")
+		if !ok {
+			t.Errorf("convertPipelineStep %+v: no RAYCI_TEMP", test.in)
+		}
+		if want := "s3://ci-temp/abc123/"; envTemp != want {
+			t.Errorf(
+				"convertPipelineStep %+v: got RAYCI_TEMP %q, want %q",
+				test.in, envTemp, want,
+			)
+		}
+
 	}
 }
 

@@ -32,7 +32,27 @@ func makeNoopBkPipeline(q string) *bkPipeline {
 	}
 }
 
+var buildkiteEnvs = []string{
+	"CI",
+	"BUILDKITE",
+	"BUILDKITE_BRANCH",
+	"BUILDKITE_COMMIT",
+	"BUILDKITE_LABEL",
+	"BUILDKITE_PIPELINE_ID",
+	"BUILDKITE_PIPELINE_SLUG",
+	"BUILDKITE_BUILD_ID",
+	"BUILDKITE_BUILD_NUMBER",
+	"BUILDKITE_BUILD_URL",
+	"BUILDKITE_JOB_ID",
+	"BUILDKITE_PARALLEL_JOB",
+	"BUILDKITE_PARALLEL_JOB_COUNT",
+	"BUILDKITE_MESSAGE",
+}
+
 func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
+	envs := append([]string(nil), buildkiteEnvs...)
+	envs = append(envs, extraEnvs...)
+
 	return map[string]any{
 		"image":         image,
 		"shell":         []string{"/bin/bash", "-elic"},
@@ -42,22 +62,7 @@ func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 
 		"volumes": []string{"/var/run/docker.sock:/var/run/docker.sock"},
 
-		"environment": append([]string{
-			"CI",
-			"BUILDKITE",
-			"BUILDKITE_BRANCH",
-			"BUILDKITE_COMMIT",
-			"BUILDKITE_LABEL",
-			"BUILDKITE_PIPELINE_ID",
-			"BUILDKITE_PIPELINE_SLUG",
-			"BUILDKITE_BUILD_ID",
-			"BUILDKITE_BUILD_NUMBER",
-			"BUILDKITE_BUILD_URL",
-			"BUILDKITE_JOB_ID",
-			"BUILDKITE_PARALLEL_JOB",
-			"BUILDKITE_PARALLEL_JOB_COUNT",
-			"BUILDKITE_MESSAGE",
-		}, extraEnvs...),
+		"environment": envs,
 	}
 }
 

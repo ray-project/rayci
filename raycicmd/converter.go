@@ -38,6 +38,8 @@ func (c *converter) jobEnvImage(name string) string {
 	return fmt.Sprintf("%s:%s-%s", c.config.CITempRepo, c.buildID, name)
 }
 
+const dockerPlugin = "docker#v5.8.0"
+
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
@@ -60,9 +62,6 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
 
-	jobEnv, _ := stringInMap(step, "job_env")
-	jobEnvImage := c.jobEnvImage(jobEnv)
-
 	result := cloneMapExcept(step, commandStepDropKeys)
 
 	result["agents"] = newBkAgents(agentQueue)
@@ -71,13 +70,16 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	result["artifact_paths"] = defaultArtifactPaths
 
 	if !c.config.Dockerless {
+		jobEnv, _ := stringInMap(step, "job_env")
+		jobEnvImage := c.jobEnvImage(jobEnv)
+
 		envs := []string{
 			"RAYCI_BUILD_ID=" + c.buildID,
 			"RAYCI_TEMP=" + c.ciTempForBuild,
 		}
 		result["plugins"] = []any{
 			map[string]any{
-				"docker#v5.8.0": makeRayDockerPlugin(jobEnvImage, envs),
+				dockerPlugin: makeRayDockerPlugin(jobEnvImage, envs),
 			},
 		}
 	}
