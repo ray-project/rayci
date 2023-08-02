@@ -1,10 +1,13 @@
 package raycicmd
 
 import (
+	"testing"
+
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
-	"testing"
 )
 
 func TestIsRayCIYaml(t *testing.T) {
@@ -110,9 +113,17 @@ func TestParsePipelineFile(t *testing.T) {
 			}},
 		}
 
-		gotJSON := jsonString(g)
-		wantJSON := jsonString(want)
-		if gotJSON != wantJSON {
+		gotJSON, err := json.MarshalIndent(g, "", "  ")
+		if err != nil {
+			t.Fatalf("json marshal got : %v", err)
+		}
+
+		wantJSON, err := json.MarshalIndent(want, "", "  ")
+		if err != nil {
+			t.Fatalf("json marshal want: %v", err)
+		}
+
+		if !bytes.Equal(gotJSON, wantJSON) {
 			t.Errorf("got %s\n, want %s", gotJSON, wantJSON)
 		}
 	})
