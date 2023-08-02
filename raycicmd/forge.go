@@ -1,6 +1,10 @@
 package raycicmd
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -50,4 +54,50 @@ func makeForgeStep(buildID, name, file string, config *config) map[string]any {
 	}
 
 	return bkStep
+}
+
+func makeForgeGroup(repoDir, buildID string, config *config) (
+	*bkPipelineGroup, error,
+) {
+	g := &bkPipelineGroup{
+		Group: "forge",
+		Key:   "all-forges",
+	}
+
+	// add forge container building steps
+	for _, dir := range config.ForgeDirs {
+		entries, err := os.ReadDir(filepath.Join(repoDir, dir))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("read forge dir %s: %w", dir, err)
+		}
+
+		var names []string
+		forgeNames := make(map[string]string)
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			forgeName, ok := forgeNameFromDockerfile(name)
+			if !ok {
+				continue
+			}
+			names = append(names, name)
+			forgeNames[name] = forgeName
+		}
+
+		sort.Strings(names)
+		for _, name := range names {
+			forgeName := forgeNames[name]
+			filePath := filepath.Join(dir, name)
+			step := makeForgeStep(buildID, forgeName, filePath, config)
+			g.Steps = append(g.Steps, step)
+		}
+	}
+
+	return g, nil
 }

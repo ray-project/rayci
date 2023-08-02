@@ -20,41 +20,6 @@ func isRayCIYaml(p string) bool {
 	return false
 }
 
-func makeForgeGroup(buildID string, config *config) (*bkPipelineGroup, error) {
-	g := &bkPipelineGroup{
-		Group: "forge",
-		Key:   "all-forges",
-	}
-
-	// add forge container building steps
-	for _, dir := range config.ForgeDirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, fmt.Errorf("read forge dir %s: %w", dir, err)
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			name := entry.Name()
-			forgeName, ok := forgeNameFromDockerfile(name)
-			if !ok {
-				continue
-			}
-
-			filePath := filepath.Join(dir, name)
-			step := makeForgeStep(buildID, forgeName, filePath, config)
-			g.Steps = append(g.Steps, step)
-		}
-	}
-
-	return g, nil
-}
-
 func makePipeline(repoDir string, config *config, buildID string) (
 	*bkPipeline, error,
 ) {
@@ -62,7 +27,7 @@ func makePipeline(repoDir string, config *config, buildID string) (
 
 	// Build steps that build the forge images.
 
-	forgeGroup, err := makeForgeGroup(buildID, config)
+	forgeGroup, err := makeForgeGroup(repoDir, buildID, config)
 	if err != nil {
 		return nil, fmt.Errorf("make forge group: %w", err)
 	}
