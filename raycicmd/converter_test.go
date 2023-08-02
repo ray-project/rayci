@@ -1,12 +1,12 @@
 package raycicmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
 	"testing"
 
+	"encoding/json"
+	"fmt"
 	"reflect"
+	"strings"
 )
 
 func findDockerPlugin(plugins []any) (map[string]any, bool) {
