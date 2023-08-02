@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
@@ -42,8 +41,6 @@ func listCIYamlFiles(dir string) ([]string, error) {
 		}
 		names = append(names, name)
 	}
-
-	sort.Strings(names)
 
 	return names, nil
 }
