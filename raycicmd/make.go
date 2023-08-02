@@ -1,5 +1,19 @@
 package raycicmd
 
+import (
+	"strings"
+)
+
+func isRayCIYaml(p string) bool {
+	if strings.HasSuffix(p, ".rayci.yaml") {
+		return true
+	}
+	if strings.HasSuffix(p, ".rayci.yml") {
+		return true
+	}
+	return false
+}
+
 func makePipeline(repoDir string, config *config, buildID string) (
 	*bkPipeline, error,
 ) {
