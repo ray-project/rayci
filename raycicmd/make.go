@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
@@ -18,6 +19,33 @@ func isRayCIYaml(p string) bool {
 		return true
 	}
 	return false
+}
+
+func listCIYamlFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			entries = nil
+		} else {
+			return nil, fmt.Errorf("read pipeline dir: %w", err)
+		}
+	}
+
+	var names []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !isRayCIYaml(name) {
+			continue
+		}
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	return names, nil
 }
 
 func makePipeline(repoDir string, config *config, buildID string) (
@@ -37,48 +65,40 @@ func makePipeline(repoDir string, config *config, buildID string) (
 
 	// Build steps for CI.
 
-	bkDir := config.BuildkiteDir
-	if bkDir == "" {
-		bkDir = ".buildkite"
-	}
-	bkDir = filepath.Join(repoDir, bkDir)
-
-	entries, err := os.ReadDir(bkDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			entries = nil
-		} else {
-			return nil, fmt.Errorf("read pipeline dir: %w", err)
-		}
+	bkDirs := config.BuildkiteDirs
+	if len(bkDirs) == 0 {
+		bkDirs = []string{".buildkite"}
 	}
 
 	c := newConverter(config, buildID)
 
-	// add rayci buildkite pipelines
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !isRayCIYaml(name) {
-			continue
-		}
-		file := filepath.Join(bkDir, name)
+	for _, bkDir := range bkDirs {
+		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
 
-		g, err := parsePipelineFile(file)
+		names, err := listCIYamlFiles(bkDir)
 		if err != nil {
-			return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
+			return nil, fmt.Errorf("list pipeline files: %w", err)
 		}
 
-		bkGroup, err := c.convertPipelineGroup(g)
-		if err != nil {
-			return nil, fmt.Errorf("convert pipeline group %s: %w", file, err)
-		}
-		if len(bkGroup.Steps) == 0 {
-			continue // skip empty groups
-		}
+		// map each file into a group.
+		for _, name := range names {
+			file := filepath.Join(bkDir, name)
 
-		pl.Steps = append(pl.Steps, bkGroup)
+			g, err := parsePipelineFile(file)
+			if err != nil {
+				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
+			}
+
+			bkGroup, err := c.convertPipelineGroup(g)
+			if err != nil {
+				return nil, fmt.Errorf("convert pipeline group %s: %w", file, err)
+			}
+			if len(bkGroup.Steps) == 0 {
+				continue // skip empty groups
+			}
+
+			pl.Steps = append(pl.Steps, bkGroup)
+		}
 	}
 
 	totalSteps := 0
