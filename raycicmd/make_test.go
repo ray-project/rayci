@@ -63,3 +63,69 @@ func TestListCIYamlFiles(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+const goodTestPipeline = `
+group: g
+key: k
+steps:
+  - label: "test1"
+    key: "test1"
+    commands: [ "echo test1" ]
+  - label: "test2"
+    key: "test2"
+    commands: [ "echo test2" ]
+`
+
+const badTestPipeline = `
+name: n
+key: k
+steps:
+	- label: "test1"
+`
+
+func TestParsePipelineFile(t *testing.T) {
+	t.Run("good", func(t *testing.T) {
+		tmp := t.TempDir()
+		p := filepath.Join(tmp, "pipeline.yaml")
+		if err := os.WriteFile(p, []byte(goodTestPipeline), 0o600); err != nil {
+			t.Fatalf("write pipeline file: %v", err)
+		}
+
+		g, err := parsePipelineFile(p)
+		if err != nil {
+			t.Fatalf("parsePipelineFile: %v", err)
+		}
+
+		want := &pipelineGroup{
+			Group: "g",
+			Key:   "k",
+			Steps: []map[string]any{{
+				"label":    "test1",
+				"key":      "test1",
+				"commands": []string{"echo test1"},
+			}, {
+				"label":    "test2",
+				"key":      "test2",
+				"commands": []string{"echo test2"},
+			}},
+		}
+
+		gotJSON := jsonString(g)
+		wantJSON := jsonString(want)
+		if gotJSON != wantJSON {
+			t.Errorf("got %s\n, want %s", gotJSON, wantJSON)
+		}
+	})
+
+	t.Run("bad", func(t *testing.T) {
+		tmp := t.TempDir()
+		p := filepath.Join(tmp, "pipeline.yaml")
+		if err := os.WriteFile(p, []byte(badTestPipeline), 0o600); err != nil {
+			t.Fatalf("write pipeline file: %v", err)
+		}
+
+		if _, err := parsePipelineFile(p); err == nil {
+			t.Fatalf("parsePipelineFile: got nil, want error")
+		}
+	})
+}

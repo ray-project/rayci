@@ -45,6 +45,22 @@ func listCIYamlFiles(dir string) ([]string, error) {
 	return names, nil
 }
 
+func parsePipelineFile(file string) (*pipelineGroup, error) {
+	bs, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("read pipeline file: %w", err)
+	}
+
+	g := new(pipelineGroup)
+	dec := yaml.NewDecoder(bytes.NewReader(bs))
+	dec.KnownFields(true)
+	if err := dec.Decode(g); err != nil {
+		return nil, fmt.Errorf("unmarshal pipeline file: %w", err)
+	}
+
+	return g, nil
+}
+
 func makePipeline(repoDir string, config *config, buildID string) (
 	*bkPipeline, error,
 ) {
@@ -111,20 +127,4 @@ func makePipeline(repoDir string, config *config, buildID string) (
 	}
 
 	return pl, nil
-}
-
-func parsePipelineFile(file string) (*pipelineGroup, error) {
-	bs, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("read pipeline file: %w", err)
-	}
-
-	g := new(pipelineGroup)
-	dec := yaml.NewDecoder(bytes.NewReader(bs))
-	dec.KnownFields(true)
-	if err := dec.Decode(g); err != nil {
-		return nil, fmt.Errorf("unmarshal pipeline file: %w", err)
-	}
-
-	return g, nil
 }
