@@ -1,8 +1,9 @@
 package raycicmd
 
 import (
-	"reflect"
 	"testing"
+
+	"reflect"
 )
 
 func TestStringInMap(t *testing.T) {
