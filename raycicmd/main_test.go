@@ -1,9 +1,10 @@
 package raycicmd
 
 import (
+	"testing"
+
 	"os"
 	"path/filepath"
-	"testing"
 
 	yaml "gopkg.in/yaml.v3"
 )
