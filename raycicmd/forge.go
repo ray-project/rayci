@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -74,9 +73,6 @@ func makeForgeGroup(repoDir, buildID string, config *config) (
 			return nil, fmt.Errorf("read forge dir %s: %w", dir, err)
 		}
 
-		var names []string
-		forgeNames := make(map[string]string)
-
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
@@ -86,13 +82,7 @@ func makeForgeGroup(repoDir, buildID string, config *config) (
 			if !ok {
 				continue
 			}
-			names = append(names, name)
-			forgeNames[name] = forgeName
-		}
 
-		sort.Strings(names)
-		for _, name := range names {
-			forgeName := forgeNames[name]
 			filePath := filepath.Join(dir, name)
 			step := makeForgeStep(buildID, forgeName, filePath, config)
 			g.Steps = append(g.Steps, step)
