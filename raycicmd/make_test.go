@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"strings"
 	"testing"
 
 	"bytes"
@@ -139,4 +140,76 @@ func TestParsePipelineFile(t *testing.T) {
 			t.Fatalf("parsePipelineFile: got nil, want error")
 		}
 	})
+}
+
+func TestMakePipeline(t *testing.T) {
+	tmp := t.TempDir()
+
+	multi := func(s ...string) string {
+		return strings.Join(s, "\n")
+	}
+
+	for _, f := range []struct {
+		name    string
+		content string
+	}{{
+		name: ".buildkite/test.rayci.yaml",
+		content: multi(
+			`group: g`,
+			`steps: `,
+			`  - label: "test1"`,
+			`    key: "test1"`,
+			`    commands: [ "echo test1" ]`,
+		),
+	}, {
+		name:    ".buildkite/forge/Dockerfile.forge",
+		content: `FROM ubuntu:latest`,
+	}} {
+
+		dir := filepath.Join(tmp, filepath.Dir(f.name))
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("mkdir for %q: %v", f.name, err)
+		}
+
+		p := filepath.Join(tmp, f.name)
+		if err := os.WriteFile(p, []byte(f.content), 0o600); err != nil {
+			t.Fatalf("write file %q: %v", f.name, err)
+		}
+	}
+
+	config := &config{
+		ArtifactsBucket: "artifacts",
+		CITemp:          "s3://ci-temp",
+		CITempRepo:      "fakeecr",
+
+		BuilderQueues: map[string]string{
+			"builder": "builder_queue",
+		},
+		RunnerQueues: map[string]string{"default": "runner_x"},
+		ForgeDirs:    defaultForgeDirs,
+	}
+
+	buildID := "fakebuild"
+
+	got, err := makePipeline(tmp, config, buildID)
+	if err != nil {
+		t.Fatalf("makePipeline: %v", err)
+	}
+
+	if len(got.Steps) != 2 { // all steps are groups.
+		t.Errorf("got %d groups, want 2", len(got.Steps))
+	}
+
+	// sub funtions are already tested in their unit tests.
+	// so we only check the total number of groups here.
+	// we also have an e2e test at the repo level.
+
+	totalSteps := 0
+	for _, g := range got.Steps {
+		totalSteps += len(g.Steps)
+	}
+
+	if totalSteps != 2 {
+		t.Fatalf("got %d steps, want 2", totalSteps)
+	}
 }
