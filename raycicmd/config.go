@@ -22,7 +22,7 @@ type config struct {
 	Dockerless bool `yaml:"dockerless"`
 
 	// BuildkiteDir is the directory of buildkite pipeline files.
-	BuildkiteDir string `yaml:"buildkite_dir"`
+	BuildkiteDirs []string `yaml:"buildkite_dir"`
 
 	// ForgeDir is the directory of forge Dockerfile files.
 	ForgeDirs []string `yaml:"forge_dir"`

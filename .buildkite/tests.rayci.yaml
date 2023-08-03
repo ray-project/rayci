@@ -1,0 +1,12 @@
+group: go tests
+steps:
+- label: Go tests
+  command: go test ./...
+  queue: small
+  depends_on: forge
+- label: Go fmt
+  command:
+    - go fmt ./...
+    - git diff --exit-code
+  queue: small
+  depends_on: forge

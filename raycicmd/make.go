@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func isRayCIYaml(p string) bool {
@@ -65,7 +66,53 @@ func makePipeline(repoDir string, config *config, buildID string) (
 ) {
 	pl := new(bkPipeline)
 
-	// TODO(aslonnie): build rayci pipeline here.
+	// Build steps that build the forge images.
+
+	forgeGroup, err := makeForgeGroup(repoDir, buildID, config)
+	if err != nil {
+		return nil, fmt.Errorf("make forge group: %w", err)
+	}
+	if len(forgeGroup.Steps) > 0 {
+		pl.Steps = append(pl.Steps, forgeGroup)
+	}
+
+	// Build steps for CI.
+
+	bkDirs := config.BuildkiteDirs
+	if len(bkDirs) == 0 {
+		bkDirs = []string{".buildkite"}
+	}
+
+	c := newConverter(config, buildID)
+
+	for _, bkDir := range bkDirs {
+		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
+
+		names, err := listCIYamlFiles(bkDir)
+		if err != nil {
+			return nil, fmt.Errorf("list pipeline files: %w", err)
+		}
+
+		// map each file into a group.
+		for _, name := range names {
+			file := filepath.Join(bkDir, name)
+
+			g, err := parsePipelineFile(file)
+			if err != nil {
+				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
+			}
+
+			bkGroup, err := c.convertPipelineGroup(g)
+			if err != nil {
+				return nil, fmt.Errorf("convert pipeline group %s: %w", file, err)
+			}
+			if len(bkGroup.Steps) == 0 {
+				continue // skip empty groups
+			}
+
+			pl.Steps = append(pl.Steps, bkGroup)
+		}
+	}
 
 	totalSteps := 0
 	for _, group := range pl.Steps {
