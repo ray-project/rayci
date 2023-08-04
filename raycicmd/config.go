@@ -19,13 +19,14 @@ type config struct {
 	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"agent_queues"`
 
-	Dockerless bool `yaml:"dockerless"`
-
 	// BuildkiteDir is the directory of buildkite pipeline files.
 	BuildkiteDirs []string `yaml:"buildkite_dir"`
 
 	// ForgeDir is the directory of forge Dockerfile files.
 	ForgeDirs []string `yaml:"forge_dir"`
+
+	// Env is the environment variables to set for runner steps.
+	Env map[string]string `yaml:"env"`
 }
 
 func localDefaultConfig(envs Envs) *config {
@@ -45,6 +46,12 @@ const (
 )
 
 const rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
+
+const rayBazelBuildCache = "https://bazel-cache-dev.s3.us-west-2.amazonaws.com"
+
+var rayCIEnv = map[string]string{
+	"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
+}
 
 var defaultForgeDirs = []string{".buildkite/forge", "ci/forge", "ci/v2/forge"}
 
@@ -73,6 +80,8 @@ var branchPipelineConfig = &config{
 	},
 
 	ForgeDirs: defaultForgeDirs,
+
+	Env: rayCIEnv,
 }
 
 var prPipelineConfig = &config{
@@ -100,6 +109,8 @@ var prPipelineConfig = &config{
 	},
 
 	ForgeDirs: defaultForgeDirs,
+
+	Env: rayCIEnv,
 }
 
 func ciDefaultConfig(envs Envs) *config {

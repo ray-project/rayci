@@ -47,6 +47,10 @@ func TestConvertPipelineStep(t *testing.T) {
 		CITempRepo:      "fakeecr",
 
 		RunnerQueues: map[string]string{"default": "fakerunner"},
+
+		Env: map[string]string{
+			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+		},
 	}, buildID)
 
 	for _, test := range []struct {
@@ -161,6 +165,16 @@ func TestConvertPipelineStep(t *testing.T) {
 			)
 		}
 
+		buildCache, ok := lookupEnvInArray(envs, "BUILDKITE_BAZEL_CACHE_URL")
+		if !ok {
+			t.Errorf("convertPipelineStep %+v: no build cache", test.in)
+		}
+		if want := "https://bazel-build-cache"; buildCache != want {
+			t.Errorf(
+				"convertPipelineStep %+v: got build cache %q, want %q",
+				test.in, buildCache, want,
+			)
+		}
 	}
 }
 
@@ -170,7 +184,6 @@ func TestConvertPipelineGroup(t *testing.T) {
 		CITemp:          "s3://ci-temp/",
 
 		RunnerQueues: map[string]string{"default": "runner"},
-		Dockerless:   true,
 	}, "buildid")
 
 	g := &pipelineGroup{
