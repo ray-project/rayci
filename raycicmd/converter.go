@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"sort"
 )
 
 type converter struct {
@@ -40,6 +41,25 @@ func (c *converter) jobEnvImage(name string) string {
 
 const dockerPlugin = "docker#v5.8.0"
 
+func envList(m map[string]string) []string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var envs []string
+	for _, k := range keys {
+		v := m[k]
+		if v == "" {
+			envs = append(envs, k)
+		} else {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	return envs
+}
+
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
@@ -69,19 +89,20 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	result["timeout_in_minutes"] = defaultTimeoutInMinutes
 	result["artifact_paths"] = defaultArtifactPaths
 
-	if !c.config.Dockerless {
-		jobEnv, _ := stringInMap(step, "job_env")
-		jobEnvImage := c.jobEnvImage(jobEnv)
+	jobEnv, _ := stringInMap(step, "job_env")
+	jobEnvImage := c.jobEnvImage(jobEnv)
 
-		envs := []string{
-			"RAYCI_BUILD_ID=" + c.buildID,
-			"RAYCI_TEMP=" + c.ciTempForBuild,
-		}
-		result["plugins"] = []any{
-			map[string]any{
-				dockerPlugin: makeRayDockerPlugin(jobEnvImage, envs),
-			},
-		}
+	envMap := make(map[string]string)
+	envMap["RAYCI_BUILD_ID"] = c.buildID
+	envMap["RAYCI_TEMP"] = c.ciTempForBuild
+	for k, v := range c.config.Env {
+		envMap[k] = v
+	}
+
+	result["plugins"] = []any{
+		map[string]any{
+			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envList(envMap)),
+		},
 	}
 
 	return result, nil
