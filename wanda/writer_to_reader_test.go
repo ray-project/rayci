@@ -1,10 +1,10 @@
 package wanda
 
 import (
-	"errors"
 	"testing"
 
 	"bytes"
+	"errors"
 	"io"
 )
 
