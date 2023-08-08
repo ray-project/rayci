@@ -63,6 +63,7 @@ func TestMakeForgeGroup(t *testing.T) {
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",
 		},
+		BuilderPriority: 1,
 
 		ForgeDirs: []string{
 			"ci/forge",
@@ -132,7 +133,8 @@ func TestMakeForgeGroup(t *testing.T) {
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.forge",
 				"RAYCI_FORGE_NAME":       "forge",
 			},
-			"agents": map[string]any{"queue": "builder_queue"},
+			"agents":   map[string]any{"queue": "builder_queue"},
+			"priority": 1,
 		}
 		if !reflect.DeepEqual(step, want) {
 			t.Errorf(
@@ -153,7 +155,8 @@ func TestMakeForgeGroup(t *testing.T) {
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.wheel-forge",
 				"RAYCI_FORGE_NAME":       "wheel-forge",
 			},
-			"agents": map[string]any{"queue": "builder_queue"},
+			"agents":   map[string]any{"queue": "builder_queue"},
+			"priority": 1,
 		}
 		if !reflect.DeepEqual(step, want) {
 			t.Errorf(
@@ -214,7 +217,8 @@ func TestMakeForgeGroup(t *testing.T) {
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.forge",
 				"RAYCI_FORGE_NAME":       "forge",
 			},
-			"agents": map[string]any{"queue": "builder_queue"},
+			"agents":   map[string]any{"queue": "builder_queue"},
+			"priority": 1,
 		}
 		if !reflect.DeepEqual(step, want) {
 			t.Errorf(
@@ -235,7 +239,8 @@ func TestMakeForgeGroup(t *testing.T) {
 				"RAYCI_FORGE_DOCKERFILE": "civ2/forge/Dockerfile.forgev2",
 				"RAYCI_FORGE_NAME":       "forgev2",
 			},
-			"agents": map[string]any{"queue": "builder_queue"},
+			"agents":   map[string]any{"queue": "builder_queue"},
+			"priority": 1,
 		}
 		if !reflect.DeepEqual(step, want) {
 			t.Errorf(

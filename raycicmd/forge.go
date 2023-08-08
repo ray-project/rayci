@@ -48,8 +48,12 @@ func makeForgeStep(buildID, name, file string, config *config) map[string]any {
 			"RAYCI_FORGE_NAME":       name,
 		},
 	}
+
 	if agent != "" {
 		bkStep["agents"] = newBkAgents(agent)
+	}
+	if config.BuilderPriority != 0 {
+		bkStep["priority"] = config.BuilderPriority
 	}
 
 	return bkStep

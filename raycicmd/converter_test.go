@@ -178,6 +178,49 @@ func TestConvertPipelineStep(t *testing.T) {
 	}
 }
 
+func TestConvertPipelineStep_priority(t *testing.T) {
+	const buildID = "abc123"
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CITempRepo:      "fakeecr",
+
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+
+		Env: map[string]string{
+			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+		},
+
+		RunnerPriority: 1,
+	}, buildID)
+
+	g := &pipelineGroup{
+		Group: "fancy",
+		Steps: []map[string]any{
+			{"commands": []string{"high priority"}, "priority": 10},
+			{"wait": nil},
+			{"commands": []string{"default priority"}},
+		},
+	}
+	bk, err := c.convertPipelineGroup(g)
+	if err != nil {
+		t.Fatalf("convertPipelineGroup: %v", err)
+	}
+
+	if len(bk.Steps) != 3 {
+		t.Fatalf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+	}
+
+	steps := bk.Steps
+	if p := (steps[0].(map[string]any))["priority"]; p != 10 {
+		t.Errorf("high priority step: got priority %v, want 10", p)
+	}
+	if p := (steps[2].(map[string]any))["priority"]; p != 1 {
+		t.Errorf("low priority step: got priority %v, want 1", p)
+	}
+}
+
 func TestConvertPipelineGroup(t *testing.T) {
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
