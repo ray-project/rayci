@@ -69,7 +69,7 @@ var branchPipelineConfig = &config{
 	},
 
 	RunnerQueues: map[string]string{
-		"default":   "runner_queue_branch",
+		"default":   "runner_queue_small_branch",
 		"small":     "runner_queue_small_branch",
 		"medium":    "runner_queue_medium_branch",
 		"large":     "runner_queue_branch",
@@ -98,7 +98,7 @@ var prPipelineConfig = &config{
 	},
 
 	RunnerQueues: map[string]string{
-		"default":   "runner_queue_pr",
+		"default":   "runner_queue_small_pr",
 		"small":     "runner_queue_small_pr",
 		"medium":    "runner_queue_medium_pr",
 		"large":     "runner_queue_pr",
