@@ -1,9 +1,10 @@
 package wanda
 
 import (
+	"testing"
+
 	"bytes"
 	"io"
-	"testing"
 )
 
 func TestCountingWriter(t *testing.T) {
