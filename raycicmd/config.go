@@ -19,6 +19,12 @@ type config struct {
 	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"agent_queues"`
 
+	// Priority for builder command steps.
+	BuilderPriority int `yaml:"builder_priority"`
+
+	// Default priority for runner command steps.
+	RunnerPriority int `yaml:"runner_priority"`
+
 	// BuildkiteDir is the directory of buildkite pipeline files.
 	BuildkiteDirs []string `yaml:"buildkite_dir"`
 
@@ -107,6 +113,9 @@ var prPipelineConfig = &config{
 
 		"medium-arm64": "runner_queue_arm64_medium_pr",
 	},
+
+	BuilderPriority: 1,
+	RunnerPriority:  1,
 
 	ForgeDirs: defaultForgeDirs,
 

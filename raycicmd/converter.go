@@ -92,6 +92,14 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	jobEnv, _ := stringInMap(step, "job_env")
 	jobEnvImage := c.jobEnvImage(jobEnv)
 
+	priority, ok := step["priority"]
+	if !ok {
+		priority = c.config.RunnerPriority
+	}
+	if priority != 0 {
+		result["priority"] = priority
+	}
+
 	envMap := make(map[string]string)
 	envMap["RAYCI_BUILD_ID"] = c.buildID
 	envMap["RAYCI_TEMP"] = c.ciTempForBuild
