@@ -10,7 +10,7 @@ type pipelineGroup struct {
 var (
 	waitStepAllowedKeys    = []string{"wait", "continue_on_failure"}
 	commandStepAllowedKeys = []string{
-		"command", "commands",
+		"command", "commands", "priority",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"instance_type", "queue", "job_env",
 	}
