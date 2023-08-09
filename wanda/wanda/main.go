@@ -16,7 +16,7 @@ func main() {
 		log.Fatal("needs exactly one argument for the spec file")
 	}
 
-	if err := wanda.Make(args[0], nil); err != nil {
+	if err := wanda.Build(args[0], nil); err != nil {
 		log.Fatal(err)
 	}
 }

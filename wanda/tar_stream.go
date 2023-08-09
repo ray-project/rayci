@@ -119,9 +119,9 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 	return r, nil
 }
 
-// TarStream is a stream of files that can be output as a tar stream.
+// tarStream is a stream of files that can be output as a tar stream.
 // It implements io.WriterTo.
-type TarStream struct {
+type tarStream struct {
 	files map[string]*tarFile
 
 	// all files will use this mod time default. This makes the stream
@@ -129,9 +129,9 @@ type TarStream struct {
 	modTime time.Time
 }
 
-// NewTarStream creates a new tarball stream.
-func NewTarStream() *TarStream {
-	return &TarStream{
+// newTarStream creates a new tarball stream.
+func newTarStream() *tarStream {
+	return &tarStream{
 		files:   make(map[string]*tarFile),
 		modTime: DefaultTime,
 	}
@@ -141,10 +141,10 @@ func NewTarStream() *TarStream {
 // This makes the build deterministic and cachable.
 var DefaultTime = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-// AddFile adds a file to the tar stream. If meta is null, it will read the
+// addFile adds a file to the tar stream. If meta is null, it will read the
 // file from the file system to determin the mode, and use the root user as
 // the user and group ID.
-func (s *TarStream) AddFile(name string, meta *TarMeta, src string) {
+func (s *tarStream) addFile(name string, meta *TarMeta, src string) {
 	s.files[name] = &tarFile{
 		name:    name,
 		srcFile: src,
@@ -152,7 +152,7 @@ func (s *TarStream) AddFile(name string, meta *TarMeta, src string) {
 	}
 }
 
-func (s *TarStream) sortedNames() []string {
+func (s *tarStream) sortedNames() []string {
 	var names []string
 	for name := range s.files {
 		names = append(names, name)
@@ -161,7 +161,7 @@ func (s *TarStream) sortedNames() []string {
 	return names
 }
 
-func (s *TarStream) writeTo(tw *tar.Writer) error {
+func (s *tarStream) writeTo(tw *tar.Writer) error {
 	names := s.sortedNames()
 
 	for _, name := range names {
@@ -174,7 +174,7 @@ func (s *TarStream) writeTo(tw *tar.Writer) error {
 }
 
 // WriteTo writes the entire stream out to w, implements io.WriterTo.
-func (s *TarStream) WriteTo(w io.Writer) (int64, error) {
+func (s *tarStream) WriteTo(w io.Writer) (int64, error) {
 	cw := newCountingWriter(w)
 	tw := tar.NewWriter(cw)
 
@@ -186,8 +186,8 @@ func (s *TarStream) WriteTo(w io.Writer) (int64, error) {
 	return cw.n, closeErr
 }
 
-// Digest calculates the digest of the content of input files.
-func (s *TarStream) Digest() (string, error) {
+// digest calculates the digest of the content of input files.
+func (s *tarStream) digest() (string, error) {
 	// We have our own record format, so that the digest is controlled by
 	// ourselves, and won't be affected by changes in the archive/tar package.
 
