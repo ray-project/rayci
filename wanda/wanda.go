@@ -56,9 +56,9 @@ func Build(specFile string, config *ForgeConfig) error {
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
-	RepositoryPrefix string
+	CacheRepo string
 
-	CacheRepository string
+	ReadOnlyCache bool
 }
 
 // Forge is a forge to build container images.
@@ -173,7 +173,10 @@ func (f *Forge) Build(spec *Spec) error {
 		return fmt.Errorf("build image: %w", err)
 	}
 
-	// Push image to content-address keyed cache repository.
+	if !f.config.ReadOnlyCache {
+		// Push image to content-address keyed cache repository.
+		log.Println("TODO: push back to cr")
+	}
 
 	return nil
 }
