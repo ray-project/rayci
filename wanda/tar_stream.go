@@ -151,6 +151,8 @@ func (s *tarStream) addFile(name string, meta *tarMeta, src string) {
 	}
 }
 
+func (s *tarStream) addSrcFile(f string) { s.addFile(f, nil, f) }
+
 func (s *tarStream) sortedNames() []string {
 	var names []string
 	for name := range s.files {

@@ -1,0 +1,4 @@
+name: hello
+dockerfile: Dockerfile
+froms:
+  - ubuntu:focal

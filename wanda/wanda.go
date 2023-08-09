@@ -2,13 +2,10 @@ package wanda
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -45,6 +42,10 @@ func parseSpecFile(f string) (*Spec, error) {
 
 // Build builds a container image from the given specification file.
 func Build(specFile string, config *ForgeConfig) error {
+	if config == nil {
+		config = &ForgeConfig{}
+	}
+
 	spec, err := parseSpecFile(specFile)
 	if err != nil {
 		return fmt.Errorf("parse spec file: %w", err)
@@ -80,16 +81,11 @@ func (f *Forge) pullImage(from string) error {
 	return cmd.Run()
 }
 
-func sha256Sum(bs []byte) string {
-	h := sha256.New()
-	h.Write(bs)
-	return fmt.Sprintf("sha256:%x", h.Sum(nil))
-}
-
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare all the input.
 
+	// TODO(aslonnie): fetch and check the image digests.
 	// Pull all the from/base images.
 	for _, from := range spec.Froms {
 		if err := f.pullImage(from); err != nil {
@@ -99,8 +95,9 @@ func (f *Forge) Build(spec *Spec) error {
 
 	// Prepare the tar stream.
 	ts := newTarStream()
+	ts.addSrcFile(spec.Dockerfile)
 	for _, f := range spec.Srcs {
-		ts.addFile(f, nil, f)
+		ts.addSrcFile(f)
 	}
 
 	// Resolve build args.
@@ -109,30 +106,27 @@ func (f *Forge) Build(spec *Spec) error {
 		buildArgs[k] = v
 	}
 
-	type buildInput struct {
-		Froms        map[string]string // Map from image names to image digests.
-		BuildContext string            // Digests of the build context.
-		Dockerfile   string            // Name of the Dockerfile to use.
-		BuildArgs    map[string]string // Resolved build args.
-	}
-
 	buildContext, err := ts.digest()
 	if err != nil {
 		return fmt.Errorf("compute build context digest: %w", err)
 	}
 
-	input := &buildInput{
-		Froms:        make(map[string]string),
-		BuildContext: buildContext,
-		Dockerfile:   spec.Dockerfile,
-		BuildArgs:    buildArgs,
+	// TODO(aslonnie): fetch and check the image digests.
+	froms := make(map[string]string)
+	for _, from := range spec.Froms {
+		froms[from] = "" // TODO: resolve image digests.
 	}
 
-	inputBytes, err := json.Marshal(input)
-	if err != nil {
-		return fmt.Errorf("marshal build input: %w", err)
+	input := &buildInput{
+		Dockerfile:   spec.Dockerfile,
+		Froms:        froms,
+		BuildContext: buildContext,
+		BuildArgs:    buildArgs,
 	}
-	inputDigest := sha256Sum(inputBytes)
+	inputDigest, err := input.digest()
+	if err != nil {
+		return fmt.Errorf("compute build input digest: %w", err)
+	}
 
 	log.Println("build input digest: ", inputDigest)
 
@@ -140,37 +134,8 @@ func (f *Forge) Build(spec *Spec) error {
 	// if yes, then just retag.
 	_ = inputDigest
 
-	for _, from := range spec.Froms {
-		input.Froms[from] = "" // TODO: resolve image digests.
-	}
-
-	// Build the image.
-	var args []string
-
-	args = append(args, "build", "--progress=plain")
-	args = append(args, "-f", spec.Dockerfile)
-
-	for _, t := range spec.Tags {
-		args = append(args, "-t", t)
-	}
-
-	var buildArgKeys []string
-	for k := range buildArgs {
-		buildArgKeys = append(buildArgKeys, k)
-	}
-	sort.Strings(buildArgKeys)
-	for _, k := range buildArgKeys {
-		v := buildArgs[k]
-		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
-	}
-
-	cmd := exec.Command("docker", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = newWriterToReader(ts)
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("build image: %w", err)
+	if err := buildDocker(input, ts, spec.Tags); err != nil {
+		return fmt.Errorf("build docker: %w", err)
 	}
 
 	if !f.config.ReadOnlyCache {
