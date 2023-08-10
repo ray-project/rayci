@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
@@ -83,16 +82,6 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 	return &Forge{config: config, workDir: absWorkDir}, nil
 }
 
-func (f *Forge) pullImage(from string) error {
-	// TODO: pull with crane.
-	log.Println("pulling image: ", from)
-	cmd := exec.Command("docker", "pull", from)
-	cmd.Dir = f.workDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 func (f *Forge) addSrcFile(ts *tarStream, src string) {
 	ts.addFile(src, nil, filepath.Join(f.workDir, src))
 }
@@ -117,10 +106,12 @@ func (f *Forge) Build(spec *Spec) error {
 		return fmt.Errorf("compute build context digest: %w", err)
 	}
 
-	// TODO(aslonnie): fetch and check the image digests.
+	// TODO(aslonnie): fetch and determine the image digests.
+	// For now, we just assume that the digest does not change.
+	// we are not caching the result anyways right now, so it does not matter.
 	froms := make(map[string]string)
 	for _, from := range spec.Froms {
-		froms[from] = "" // TODO: resolve image digests.
+		froms[from] = ""
 	}
 
 	input := &buildInput{
@@ -136,9 +127,8 @@ func (f *Forge) Build(spec *Spec) error {
 
 	log.Println("build input digest: ", inputDigest)
 
-	// TODO: check if the image output already exists
-	// if yes, then just retag.
-	_ = inputDigest
+	// TODO(aslonnie): check if the image output already exists
+	// if yes, then just perform retag, rather than rebuilding.
 
 	if err := buildDocker(input, ts, spec.Tags); err != nil {
 		return fmt.Errorf("build docker: %w", err)

@@ -47,8 +47,45 @@ func builderEnvs() []string {
 	return envs
 }
 
+func dockerCmd(args ...string) *exec.Cmd {
+	cmd := exec.Command("docker", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd
+}
+
+func pullDocker(src, asTag string) error {
+	cmd := dockerCmd("pull", src)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker pull %s: %w", src, err)
+	}
+
+	if src != asTag {
+		cmd := dockerCmd("tag", src, asTag)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("docker tag %s %s: %w", src, asTag, err)
+		}
+	}
+
+	return nil
+}
+
 func buildDocker(in *buildInput, context *tarStream, tags []string) error {
-	// Pull down the required images, and tag them.
+	// Pull down the required images, and tag them properly.
+	var froms []string
+	for from := range in.Froms {
+		froms = append(froms, from)
+	}
+	sort.Strings(froms)
+	for _, ref := range froms {
+		srcRef := in.Froms[ref]
+		if srcRef == "" {
+			srcRef = ref
+		}
+		if err := pullDocker(srcRef, ref); err != nil {
+			return fmt.Errorf("pull %s(%s): %w", ref, srcRef, err)
+		}
+	}
 
 	// Build the image.
 	var args []string
@@ -74,9 +111,7 @@ func buildDocker(in *buildInput, context *tarStream, tags []string) error {
 
 	log.Printf("docker %s", strings.Join(args, " "))
 
-	cmd := exec.Command("docker", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd := dockerCmd(args...)
 	cmd.Stdin = newWriterToReader(context)
 	cmd.Env = builderEnvs()
 
