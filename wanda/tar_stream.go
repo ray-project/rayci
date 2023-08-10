@@ -32,10 +32,10 @@ type tarFile struct {
 	meta    *tarMeta // Metadata of the file.
 }
 
-func (f *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
-	src, err := os.Open(f.srcFile)
+func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
+	src, err := os.Open(t.srcFile)
 	if err != nil {
-		return fmt.Errorf("open file %q: %w", f.srcFile, err)
+		return fmt.Errorf("open file %q: %w", t.srcFile, err)
 	}
 	defer src.Close()
 
@@ -44,20 +44,20 @@ func (f *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 		return err
 	}
 
-	meta := f.meta
+	meta := t.meta
 	if meta == nil {
 		meta = tarMetaFromFileInfo(stat)
 	}
 
 	if err := tw.WriteHeader(&tar.Header{
-		Name:    f.name,
+		Name:    t.name,
 		Size:    stat.Size(),
 		Mode:    meta.Mode,
 		Gid:     meta.GroupID,
 		Uid:     meta.UserID,
 		ModTime: modTime,
 	}); err != nil {
-		return fmt.Errorf("write header %q: %w", f.name, err)
+		return fmt.Errorf("write header %q: %w", t.name, err)
 	}
 
 	if _, err := io.Copy(tw, src); err != nil {
@@ -68,17 +68,18 @@ func (f *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 }
 
 type tarFileRecord struct {
-	Name string
-	Mode int64
+	Name string `json:"name"`
+	Mode int64  `json:"mode"`
 
-	IsSymlink bool `json:",omitempty"`
-	IsDir     bool `json:",omitempty"`
+	IsSymlink bool `json:"symlink,omitempty"`
+	IsDir     bool `json:"dir,omitempty"`
 
-	Gid int `json:",omitempty"`
-	Uid int `json:",omitempty"`
+	GroupID int `json:"gid,omitempty"`
+	UserID  int `json:"uid,omitempty"`
 
-	Size    int64
-	Content string
+	Size int64 `json:"size"`
+
+	ContentDigest string `json:"content"`
 }
 
 func (t *tarFile) record() (*tarFileRecord, error) {
@@ -109,10 +110,11 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 	r := &tarFileRecord{
 		Name:    t.name,
 		Mode:    meta.Mode,
-		Gid:     meta.GroupID,
-		Uid:     meta.UserID,
+		GroupID: meta.GroupID,
+		UserID:  meta.UserID,
 		Size:    stat.Size(),
-		Content: contentDigest,
+
+		ContentDigest: contentDigest,
 	}
 
 	return r, nil
@@ -150,8 +152,6 @@ func (s *tarStream) addFile(name string, meta *tarMeta, src string) {
 		meta:    meta,
 	}
 }
-
-func (s *tarStream) addSrcFile(f string) { s.addFile(f, nil, f) }
 
 func (s *tarStream) sortedNames() []string {
 	var names []string

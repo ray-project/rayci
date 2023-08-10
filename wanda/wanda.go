@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -51,53 +52,58 @@ func Build(specFile string, config *ForgeConfig) error {
 		return fmt.Errorf("parse spec file: %w", err)
 	}
 
-	forge := NewForge(config)
+	forge, err := NewForge(config)
+	if err != nil {
+		return fmt.Errorf("make forge: %w", err)
+	}
 	return forge.Build(spec)
 }
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
-	CacheRepo string
-
+	WorkDir       string
+	CacheRepo     string
 	ReadOnlyCache bool
 }
 
 // Forge is a forge to build container images.
 type Forge struct {
 	config *ForgeConfig
+
+	workDir string
 }
 
 // NewForge creates a new forge with the given configuration.
-func NewForge(config *ForgeConfig) *Forge {
-	return &Forge{config: config}
+func NewForge(config *ForgeConfig) (*Forge, error) {
+	absWorkDir, err := filepath.Abs(config.WorkDir)
+	if err != nil {
+		return nil, fmt.Errorf("abs path for work dir: %w", err)
+	}
+
+	return &Forge{config: config, workDir: absWorkDir}, nil
 }
 
 func (f *Forge) pullImage(from string) error {
 	// TODO: pull with crane.
 	log.Println("pulling image: ", from)
 	cmd := exec.Command("docker", "pull", from)
+	cmd.Dir = f.workDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
+func (f *Forge) addSrcFile(ts *tarStream, src string) {
+	ts.addFile(src, nil, filepath.Join(f.workDir, src))
+}
+
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
-	// Prepare all the input.
-
-	// TODO(aslonnie): fetch and check the image digests.
-	// Pull all the from/base images.
-	for _, from := range spec.Froms {
-		if err := f.pullImage(from); err != nil {
-			return fmt.Errorf("pull image %q: %w", from, err)
-		}
-	}
-
 	// Prepare the tar stream.
 	ts := newTarStream()
-	ts.addSrcFile(spec.Dockerfile)
-	for _, f := range spec.Srcs {
-		ts.addSrcFile(f)
+	f.addSrcFile(ts, spec.Dockerfile)
+	for _, src := range spec.Srcs {
+		f.addSrcFile(ts, src)
 	}
 
 	// Resolve build args.
