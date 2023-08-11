@@ -1,10 +1,11 @@
 package wanda
 
 import (
+	"testing"
+
 	"fmt"
 	"os"
 	"path/filepath"
-	"testing"
 )
 
 func TestTarMetaFromFileInfo(t *testing.T) {
