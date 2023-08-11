@@ -26,10 +26,10 @@ type config struct {
 	RunnerPriority int `yaml:"runner_priority"`
 
 	// BuildkiteDir is the directory of buildkite pipeline files.
-	BuildkiteDirs []string `yaml:"buildkite_dir"`
+	BuildkiteDirs []string `yaml:"buildkite_dirs"`
 
 	// ForgeDir is the directory of forge Dockerfile files.
-	ForgeDirs []string `yaml:"forge_dir"`
+	ForgeDirs []string `yaml:"forge_dirs"`
 
 	// Env is the environment variables to set for runner steps.
 	Env map[string]string `yaml:"env"`
