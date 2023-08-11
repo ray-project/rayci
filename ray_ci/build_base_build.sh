@@ -21,14 +21,14 @@ export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
 "$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci/wanda/wanda@'"${RAYCI_BRANCH}"
-WANDA="$GOPATH/bin/wanda"
+WANDA=("$GOPATH/bin/wanda")
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
 
 export DOCKER_BUILDKIT=1
 
 if [[ -f ci/docker/base.test.wanda.yaml ]]; then
-  "$WANDA" ci/docker/base.test.wanda.yaml
+  "${WANDA[@]}" ci/docker/base.test.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
@@ -42,7 +42,7 @@ fi
 echo "--- :docker: Building base dependency image for BUILDS :gear:"
 
 if [[ -f ci/docker/base.build.wanda.yaml ]]; then
-  "$WANDA" ci/docker/base.build.wanda.yaml
+  "${WANDA[@]}" ci/docker/base.build.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
@@ -57,7 +57,7 @@ fi
 echo "--- :docker: Building base dependency image for ML :airplane:"
 
 if [[ -f ci/docker/base.ml.wanda.yaml ]]; then
-  "$WANDA" ci/docker/base.ml.wanda.yaml
+  "${WANDA[@]}" ci/docker/base.ml.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -21,7 +22,7 @@ type Spec struct {
 	Srcs       []string `yaml:"srcs,omitempty"`
 	Dockerfile string   `yaml:"dockerfile"`
 
-	BuildArgs map[string]string `yaml:"build_args,omitempty"`
+	BuildArgs []string `yaml:"build_args,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
@@ -97,8 +98,13 @@ func (f *Forge) Build(spec *Spec) error {
 
 	// Resolve build args.
 	buildArgs := make(map[string]string)
-	for k, v := range spec.BuildArgs {
-		buildArgs[k] = v
+	for _, s := range spec.BuildArgs {
+		k, v, ok := strings.Cut(s, "=")
+		if ok {
+			buildArgs[k] = v
+		} else {
+			buildArgs[s] = os.Getenv(s)
+		}
 	}
 
 	buildContext, err := ts.digest()
@@ -134,10 +140,7 @@ func (f *Forge) Build(spec *Spec) error {
 		return fmt.Errorf("build docker: %w", err)
 	}
 
-	if !f.config.ReadOnlyCache {
-		// Push image to content-address keyed cache repository.
-		log.Println("TODO: push back to cr")
-	}
+	// "TODO: push back to cr on !f.config.ReadOnlyCache
 
 	return nil
 }

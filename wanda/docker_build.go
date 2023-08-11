@@ -74,6 +74,10 @@ func buildDocker(in *buildInput, context *tarStream, tags []string) error {
 	// Pull down the required images, and tag them properly.
 	var froms []string
 	for from := range in.Froms {
+		if strings.HasPrefix(from, "@") {
+			// A local image, no need to pull.
+			continue
+		}
 		froms = append(froms, from)
 	}
 	sort.Strings(froms)
