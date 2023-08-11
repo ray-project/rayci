@@ -53,12 +53,13 @@ func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 	return nil
 }
 
+// tarFileRecord is a record for a tar file. It is meant to be encoded into
+// JSON.
 type tarFileRecord struct {
 	Name string `json:"name"`
 	Mode int64  `json:"mode"`
 
-	IsSymlink bool `json:"symlink,omitempty"`
-	IsDir     bool `json:"dir,omitempty"`
+	// TODO(aslonnie): add fields and support for dir, hard-links and symlinks.
 
 	GroupID int `json:"gid,omitempty"`
 	UserID  int `json:"uid,omitempty"`
