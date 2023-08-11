@@ -1,15 +1,15 @@
 package wanda
 
 import (
-	"encoding/json"
-	"reflect"
 	"testing"
 
 	"archive/tar"
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 )
 
