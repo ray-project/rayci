@@ -17,7 +17,7 @@ type config struct {
 	CITempRepo string `yaml:"ci_temp_repo"`
 
 	BuilderQueues map[string]string `yaml:"builder_queues"`
-	RunnerQueues  map[string]string `yaml:"agent_queues"`
+	RunnerQueues  map[string]string `yaml:"runner_queues"`
 
 	// Priority for builder command steps.
 	BuilderPriority int `yaml:"builder_priority"`
