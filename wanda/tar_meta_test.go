@@ -12,7 +12,7 @@ func TestTarMetaFromFileInfo(t *testing.T) {
 	tmp := t.TempDir()
 
 	for _, mod := range []int64{
-		0775, // bazel's sandbox does not support 777.
+		0755, // bazel's sandbox does not support 777.
 		0644,
 		0600,
 		0400,
