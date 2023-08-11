@@ -54,7 +54,7 @@ func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 }
 
 // tarFileRecord is a record for a tar file. It is meant to be encoded into
-// JSON.
+// JSON for calculating the digest of the build input.
 type tarFileRecord struct {
 	Name string `json:"name"`
 	Mode int64  `json:"mode"`
