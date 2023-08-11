@@ -1,7 +1,6 @@
 package wanda
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,12 +9,6 @@ import (
 	"sort"
 	"strings"
 )
-
-func sha256Sum(bs []byte) string {
-	h := sha256.New()
-	h.Write(bs)
-	return fmt.Sprintf("sha256:%x", h.Sum(nil))
-}
 
 type buildInput struct {
 	Dockerfile   string            // Name of the Dockerfile to use.
@@ -29,10 +22,10 @@ func (i *buildInput) digest() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshal build input: %w", err)
 	}
-	return sha256Sum(bs), nil
+	return sha256Digest(bs), nil
 }
 
-func builderEnvs() []string {
+func dockerCmdEnvs() []string {
 	var envs []string
 	for _, k := range []string{
 		"HOME",
@@ -47,30 +40,48 @@ func builderEnvs() []string {
 	return envs
 }
 
-func dockerCmd(args ...string) *exec.Cmd {
+type dockerCmd struct {
+	bin string
+
+	envs []string
+}
+
+func newDockerCmd(bin string) *dockerCmd {
+	if bin == "" {
+		bin = "docker"
+	}
+	envs := dockerCmdEnvs()
+	return &dockerCmd{bin: bin, envs: envs}
+}
+
+func (c *dockerCmd) cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command("docker", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = c.envs
 	return cmd
 }
 
-func pullDocker(src, asTag string) error {
-	cmd := dockerCmd("pull", src)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker pull %s: %w", src, err)
+func (c *dockerCmd) run(args ...string) error {
+	cmd := c.cmd(args...)
+	return cmd.Run()
+}
+
+func (c *dockerCmd) pull(src, asTag string) error {
+	if err := c.run("pull", src); err != nil {
+		return fmt.Errorf("pull %s: %w", src, err)
 	}
 
 	if src != asTag {
-		cmd := dockerCmd("tag", src, asTag)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("docker tag %s %s: %w", src, asTag, err)
+		if err := c.run("tag", src, asTag); err != nil {
+			return fmt.Errorf("tag %s %s: %w", src, asTag, err)
 		}
 	}
 
 	return nil
 }
 
-func buildDocker(in *buildInput, context *tarStream, tags []string) error {
+func (c *dockerCmd) build(in *buildInput, context *tarStream, tags []string) error {
 	// Pull down the required images, and tag them properly.
 	var froms []string
 	for from := range in.Froms {
@@ -86,7 +97,7 @@ func buildDocker(in *buildInput, context *tarStream, tags []string) error {
 		if srcRef == "" {
 			srcRef = ref
 		}
-		if err := pullDocker(srcRef, ref); err != nil {
+		if err := c.pull(srcRef, ref); err != nil {
 			return fmt.Errorf("pull %s(%s): %w", ref, srcRef, err)
 		}
 	}
@@ -115,9 +126,8 @@ func buildDocker(in *buildInput, context *tarStream, tags []string) error {
 
 	log.Printf("docker %s", strings.Join(args, " "))
 
-	cmd := dockerCmd(args...)
-	cmd.Stdin = newWriterToReader(context)
-	cmd.Env = builderEnvs()
+	buildCmd := c.cmd(args...)
+	buildCmd.Stdin = newWriterToReader(context)
 
-	return cmd.Run()
+	return buildCmd.Run()
 }
