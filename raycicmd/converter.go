@@ -70,6 +70,26 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		}
 		return cloneMap(step), nil
 	}
+	if _, ok := step["wanda"]; ok {
+		// a wanda step
+		if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
+			return nil, fmt.Errorf("check wanda step keys: %w", err)
+		}
+		name, ok := stringInMap(step, "name")
+		if !ok {
+			return nil, fmt.Errorf("wanda step missing name")
+		}
+		file, ok := stringInMap(step, "file")
+		if !ok {
+			return nil, fmt.Errorf("wanda step missing file")
+		}
+		var deps []string
+		if v, ok := stringInMap(step, "depends_on"); ok {
+			deps = []string{v}
+		}
+		return makeWandaStep(c.buildID, name, file, deps, c.config), nil
+
+	}
 
 	// a normal command step
 	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {

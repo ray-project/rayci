@@ -29,13 +29,54 @@ const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
 	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +
 	`docker push "$${DEST_IMG}" '`
 
-func makeForgeStep(buildID, name, file string, config *config) map[string]any {
-	agent := ""
+const rawGitHubURL = "https://raw.githubusercontent.com/"
+const runWandaURL = rawGitHubURL + "ray-project/rayci/master/run_wanda.sh"
+
+var wandaCommands = []string{
+	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
+	`RAYCI_BRANCH=lonnie-x /bin/bash /tmp/run_wanda.sh -rayci`,
+}
+
+func builderAgent(config *config) string {
 	if config.BuilderQueues != nil {
 		if q, ok := config.BuilderQueues["builder"]; ok {
-			agent = q
+			return q
 		}
 	}
+	return ""
+}
+
+func makeWandaStep(
+	buildID, name, file string, deps []string, config *config,
+) map[string]any {
+	agent := builderAgent(config)
+
+	bkStep := map[string]any{
+		"label":    "wanda: " + name,
+		"key":      name,
+		"commands": wandaCommands,
+		"env": map[string]string{
+			"RAYCI_BUILD_ID":   buildID,
+			"RAYCI_TMP_REPO":   config.CITempRepo,
+			"RAYCI_WANDA_NAME": name,
+			"RAYCI_WANDA_FILE": file,
+		},
+	}
+
+	if len(deps) != 0 {
+		bkStep["depends_on"] = deps
+	}
+	if agent != "" {
+		bkStep["agents"] = newBkAgents(agent)
+	}
+	if config.BuilderPriority != 0 {
+		bkStep["priority"] = config.BuilderPriority
+	}
+	return bkStep
+}
+
+func makeForgeStep(buildID, name, file string, config *config) map[string]any {
+	agent := builderAgent(config)
 
 	bkStep := map[string]any{
 		"label":    name,
@@ -44,8 +85,8 @@ func makeForgeStep(buildID, name, file string, config *config) map[string]any {
 		"env": map[string]string{
 			"RAYCI_BUILD_ID":         buildID,
 			"RAYCI_TMP_REPO":         config.CITempRepo,
-			"RAYCI_FORGE_DOCKERFILE": file,
 			"RAYCI_FORGE_NAME":       name,
+			"RAYCI_FORGE_DOCKERFILE": file,
 		},
 	}
 
