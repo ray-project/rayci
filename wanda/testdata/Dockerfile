@@ -1,3 +1,7 @@
-FROM ubuntu:focal
+FROM scratch
 
-CMD ["echo", "hello"]
+ARG MESSAGE=hello
+ENV MESSAGE=${MESSAGE}
+COPY Dockerfile /opt/Dockerfile
+
+CMD "echo ${MESSAGE}"
