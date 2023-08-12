@@ -15,13 +15,9 @@ TMP_DIR="$(mktemp -d)"
 
 echo "--- Install wanda"
 
-RAYCI_BRANCH="${RAYCI_BRANCH:-lonnie-x}"
-curl -sL 'https://go.dev/dl/go1.20.6.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
-export GOROOT="$TMP_DIR/go"
-export GOPATH="$TMP_DIR/gopath"
-export GOPRIVATE="github.com/ray-project/rayci"
-"$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci/wanda/wanda@'"${RAYCI_BRANCH}"
-WANDA=("$GOPATH/bin/wanda")
+curl -sL 'https://github.com/ray-project/rayci/releases/download/0.1/wanda-linux-amd64' -o "$TMP_DIR/wanda"
+chmod +x "$TMP_DIR/wanda"
+WANDA=("$TMP_DIR/wanda")
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
 
