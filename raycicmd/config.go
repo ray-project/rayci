@@ -43,11 +43,15 @@ func localDefaultConfig(envs Envs) *config {
 
 // builtin ray buildkite pipeline IDs.
 const (
+	// v1 pipelines
 	rayBranchPipeline = "0183465b-c6fb-479b-8577-4cfd743b545d"
+	rayPRPipeline     = "0183465f-a222-467a-b122-3b9ea3e68094"
 
-	rayPRPipeline = "0183465f-a222-467a-b122-3b9ea3e68094"
+	// v2 pipelines
+	rayV2PostmergePipeline = "0189e759-8c96-4302-b6b5-b4274406bf89"
+	rayV2PremergePipeline  = "0189942e-0876-4b8f-80a4-617f988ec59b"
 
-	rayV2Pipeline  = "0189942e-0876-4b8f-80a4-617f988ec59b"
+	// dev only
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
 
@@ -124,9 +128,14 @@ var prPipelineConfig = &config{
 
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
-	if pipelineID == rayBranchPipeline {
+	switch pipelineID {
+	case rayBranchPipeline, rayV2PostmergePipeline:
 		return branchPipelineConfig
+	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
+		return prPipelineConfig
 	}
+
+	// By default, assume it is less privileged.
 	return prPipelineConfig
 }
 
