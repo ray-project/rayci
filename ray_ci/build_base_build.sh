@@ -11,41 +11,59 @@ if [[ "${BUILDKITE_COMMIT:-HEAD}" == "HEAD" ]]; then
 fi
 echo "BUILDKITE_COMMIT=$BUILDKITE_COMMIT"
 
+TMP_DIR="$(mktemp -d)"
+
+echo "--- Install wanda"
+
+curl -sL 'https://github.com/ray-project/rayci/releases/download/0.1/wanda-linux-amd64' -o "$TMP_DIR/wanda"
+chmod +x "$TMP_DIR/wanda"
+WANDA=("$TMP_DIR/wanda")
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
 
 export DOCKER_BUILDKIT=1
 
-docker build --progress=plain \
-  --build-arg REMOTE_CACHE_URL \
-  --build-arg BUILDKITE_PULL_REQUEST \
-  --build-arg BUILDKITE_COMMIT \
-  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
-  -t cr.ray.io/rayproject/oss-ci-base_test \
-  -f ci/docker/base.test.Dockerfile .
+if [[ -f ci/docker/base.test.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.test.wanda.yaml
+else
+  docker build --progress=plain \
+    --build-arg REMOTE_CACHE_URL \
+    --build-arg BUILDKITE_PULL_REQUEST \
+    --build-arg BUILDKITE_COMMIT \
+    --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
+    -t cr.ray.io/rayproject/oss-ci-base_test \
+    -f ci/docker/base.test.Dockerfile .
+fi
 
 echo "--- :docker: Building base dependency image for BUILDS :gear:"
 
-docker build --progress=plain \
-  --build-arg REMOTE_CACHE_URL \
-  --build-arg BUILDKITE_PULL_REQUEST \
-  --build-arg BUILDKITE_COMMIT \
-  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
-  --build-arg DOCKER_IMAGE_BASE_TEST=cr.ray.io/rayproject/oss-ci-base_test \
-  -t cr.ray.io/rayproject/oss-ci-base_build \
-  -f ci/docker/base.build.Dockerfile .
+if [[ -f ci/docker/base.build.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.build.wanda.yaml
+else
+  docker build --progress=plain \
+    --build-arg REMOTE_CACHE_URL \
+    --build-arg BUILDKITE_PULL_REQUEST \
+    --build-arg BUILDKITE_COMMIT \
+    --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
+    --build-arg DOCKER_IMAGE_BASE_TEST=cr.ray.io/rayproject/oss-ci-base_test \
+    -t cr.ray.io/rayproject/oss-ci-base_build \
+    -f ci/docker/base.build.Dockerfile .
+fi
 
 echo "--- :docker: Building base dependency image for ML :airplane:"
 
-docker build --progress=plain \
-  --build-arg REMOTE_CACHE_URL \
-  --build-arg BUILDKITE_PULL_REQUEST \
-  --build-arg BUILDKITE_COMMIT \
-  --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
-  --build-arg DOCKER_IMAGE_BASE_TEST=cr.ray.io/rayproject/oss-ci-base_test \
-  -t cr.ray.io/rayproject/oss-ci-base_ml \
-  -f ci/docker/base.ml.Dockerfile .
-
+if [[ -f ci/docker/base.ml.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.ml.wanda.yaml
+else
+  docker build --progress=plain \
+    --build-arg REMOTE_CACHE_URL \
+    --build-arg BUILDKITE_PULL_REQUEST \
+    --build-arg BUILDKITE_COMMIT \
+    --build-arg BUILDKITE_PULL_REQUEST_BASE_BRANCH \
+    --build-arg DOCKER_IMAGE_BASE_TEST=cr.ray.io/rayproject/oss-ci-base_test \
+    -t cr.ray.io/rayproject/oss-ci-base_ml \
+    -f ci/docker/base.ml.Dockerfile .
+fi
 
 if [[ "${NO_PUSH:-}" == "1" ]]; then
   echo "--- :exclamation: Not pushing the image as this is a local build only!"
