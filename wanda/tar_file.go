@@ -85,7 +85,7 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 	if _, err := io.Copy(h, f); err != nil {
 		return nil, fmt.Errorf("read file %q: %w", t.srcFile, err)
 	}
-	contentDigest := fmt.Sprintf("sha256:%x", h.Sum(nil))
+	contentDigest := sha256DigestString(h)
 
 	meta := t.meta
 	if meta == nil {

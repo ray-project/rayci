@@ -100,5 +100,5 @@ func (s *tarStream) digest() (string, error) {
 		}
 	}
 
-	return fmt.Sprintf("sha256:%x", h.Sum(nil)), nil
+	return sha256DigestString(h), nil
 }
