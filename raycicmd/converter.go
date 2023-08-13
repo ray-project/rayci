@@ -83,9 +83,9 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		if !ok {
 			return nil, fmt.Errorf("wanda step missing name")
 		}
-		file, ok := stringInMap(step, "file")
+		file, ok := stringInMap(step, "wanda")
 		if !ok {
-			return nil, fmt.Errorf("wanda step missing file")
+			return nil, fmt.Errorf("wanda step file is not a string")
 		}
 
 		s := &wandaStep{
