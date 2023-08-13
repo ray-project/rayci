@@ -127,9 +127,17 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		envMap[k] = v
 	}
 
+	result["env"] = envMap
+
+	var envKeys []string
+	for k := range envMap {
+		envKeys = append(envKeys, k)
+	}
+	sort.Strings(envKeys)
+
 	result["plugins"] = []any{
 		map[string]any{
-			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envList(envMap)),
+			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envKeys),
 		},
 	}
 
