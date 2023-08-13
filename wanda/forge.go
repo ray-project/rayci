@@ -159,7 +159,9 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	if f.config.WorkRepo != "" {
-		if err := d.run("push", nameTag); err != nil {
+		cmd := d.cmd("push", nameTag)
+		cmd.Env = nil
+		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
 	}
