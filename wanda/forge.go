@@ -61,9 +61,11 @@ func Build(specFile string, config *ForgeConfig) error {
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
-	WorkDir       string
-	DockerBin     string
-	WorkRepo      string
+	WorkDir   string
+	DockerBin string
+	WorkRepo  string
+	BuildID   string
+
 	ReadOnlyCache bool
 }
 
@@ -137,9 +139,29 @@ func (f *Forge) Build(spec *Spec) error {
 	// TODO(aslonnie): check if the image output already exists
 	// if yes, then just perform retag, rather than rebuilding.
 
+	var tags []string
+	var nameTag string
+	if f.config.WorkRepo != "" {
+		if f.config.BuildID != "" {
+			nameTag = fmt.Sprintf(
+				"%s:%s-%s", f.config.WorkRepo, f.config.BuildID, spec.Name,
+			)
+		} else {
+			nameTag = fmt.Sprintf("%s:%s", f.config.WorkRepo, spec.Name)
+		}
+		tags = append(tags, nameTag)
+	}
+	tags = append(tags, spec.Tags...)
+
 	d := newDockerCmd(f.config.DockerBin)
-	if err := d.build(input, ts, spec.Tags); err != nil {
+	if err := d.build(input, ts, tags); err != nil {
 		return fmt.Errorf("build docker: %w", err)
+	}
+
+	if f.config.WorkRepo != "" {
+		if err := d.run("push", nameTag); err != nil {
+			return fmt.Errorf("push docker: %w", err)
+		}
 	}
 
 	// "TODO: push back to cr on !f.config.ReadOnlyCache
