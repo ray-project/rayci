@@ -38,6 +38,15 @@ func lookupEnvInArray(envs []string, key string) (string, bool) {
 	return "", false
 }
 
+func findInSlice(s []string, v string) bool {
+	for _, e := range s {
+		if e == v {
+			return true
+		}
+	}
+	return false
+}
+
 func TestConvertPipelineStep(t *testing.T) {
 	const buildID = "abc123"
 
@@ -64,6 +73,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+			},
 		},
 	}, {
 		in: map[string]any{
@@ -83,6 +97,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+			},
 		},
 	}, {
 		in:  map[string]any{"wait": nil},
@@ -143,37 +162,15 @@ func TestConvertPipelineStep(t *testing.T) {
 		}
 
 		envs := dockerPlugin["environment"].([]string)
-		envBuildID, ok := lookupEnvInArray(envs, "RAYCI_BUILD_ID")
-		if !ok {
-			t.Errorf("convertPipelineStep %+v: no RAYCI_BUILD_ID", test.in)
-		}
-		if envBuildID != buildID {
-			t.Errorf(
-				"convertPipelineStep %+v: got RAYCI_BUILD_ID %q, want %q",
-				test.in, envBuildID, buildID,
-			)
-		}
 
-		envTemp, ok := lookupEnvInArray(envs, "RAYCI_TEMP")
-		if !ok {
-			t.Errorf("convertPipelineStep %+v: no RAYCI_TEMP", test.in)
-		}
-		if want := "s3://ci-temp/abc123/"; envTemp != want {
-			t.Errorf(
-				"convertPipelineStep %+v: got RAYCI_TEMP %q, want %q",
-				test.in, envTemp, want,
-			)
-		}
-
-		buildCache, ok := lookupEnvInArray(envs, "BUILDKITE_BAZEL_CACHE_URL")
-		if !ok {
-			t.Errorf("convertPipelineStep %+v: no build cache", test.in)
-		}
-		if want := "https://bazel-build-cache"; buildCache != want {
-			t.Errorf(
-				"convertPipelineStep %+v: got build cache %q, want %q",
-				test.in, buildCache, want,
-			)
+		for _, env := range []string{
+			"RAYCI_BUILD_ID",
+			"RAYCI_TEMP",
+			"BUILDKITE_BAZEL_CACHE_URL",
+		} {
+			if !findInSlice(envs, env) {
+				t.Errorf("convertPipelineStep %+v: no %q", test.in, env)
+			}
 		}
 	}
 }
