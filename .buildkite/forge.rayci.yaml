@@ -1,4 +1,4 @@
-gropu: forge
+group: forge
 steps:
 - name: forge
   wanda: .buildkite/forge.wanda.yaml
