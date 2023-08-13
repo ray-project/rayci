@@ -23,7 +23,7 @@ func forgeNameFromDockerfile(name string) (string, bool) {
 // builtin builder command to build a forge container image.
 const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
 	`'export DOCKER_BUILDKIT=1 ; ` +
-	`DEST_IMG="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
+	`DEST_IMG="$${RAYCI_WORK_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
 	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
 	` docker build --progress=plain -t "$${DEST_IMG}" ` +
 	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +

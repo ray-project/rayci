@@ -14,7 +14,7 @@ type config struct {
 	ArtifactsBucket string `yaml:"artifacts_bucket"`
 
 	CITemp     string `yaml:"ci_temp"`
-	CITempRepo string `yaml:"ci_temp_repo"`
+	CIWorkRepo string `yaml:"ci_work_repo"`
 
 	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"runner_queues"`
@@ -76,7 +76,7 @@ var branchPipelineConfig = &config{
 	ArtifactsBucket: "ray-ci-artifact-branch-public",
 
 	CITemp:     "s3://ray-ci-artifact-branch-public/ci-temp/",
-	CITempRepo: rayCIECR + "/rayci_temp_branch",
+	CIWorkRepo: rayCIECR + "/rayci_temp_branch",
 
 	BuilderQueues: map[string]string{
 		"builder":       "builder_queue_branch",
@@ -107,7 +107,7 @@ var prPipelineConfig = &config{
 	ArtifactsBucket: "ray-ci-artifact-pr-public",
 
 	CITemp:     "s3://ray-ci-artifact-pr-public/ci-temp/",
-	CITempRepo: rayCIECR + "/rayci_temp_pr",
+	CIWorkRepo: rayCIECR + "/rayci_temp_pr",
 
 	BuilderQueues: map[string]string{
 		"builder":       "builder_queue_pr",

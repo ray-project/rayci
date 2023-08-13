@@ -58,7 +58,7 @@ func TestMakeForgeGroup(t *testing.T) {
 		ArtifactsBucket: "rayci-artifacts",
 
 		CITemp:     "s3://ci-temp",
-		CITempRepo: rayCIECR + "/rayci_test",
+		CIWorkRepo: rayCIECR + "/rayci_test",
 
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",
@@ -108,8 +108,8 @@ func TestMakeForgeGroup(t *testing.T) {
 		}
 
 		envMap := map[string]string{
-			"RAYCI_BUILD_ID": buildID,
-			"RAYCI_TMP_REPO": config.CITempRepo,
+			"RAYCI_BUILD_ID":  buildID,
+			"RAYCI_WORK_REPO": config.CIWorkRepo,
 		}
 
 		g, err := makeForgeGroup(root, buildID, config, envMap)
@@ -134,7 +134,7 @@ func TestMakeForgeGroup(t *testing.T) {
 			"commands": []string{forgeBuilderCommand},
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":         buildID,
-				"RAYCI_TMP_REPO":         config.CITempRepo,
+				"RAYCI_WORK_REPO":        config.CIWorkRepo,
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.forge",
 				"RAYCI_FORGE_NAME":       "forge",
 			},
@@ -156,7 +156,7 @@ func TestMakeForgeGroup(t *testing.T) {
 			"commands": []string{forgeBuilderCommand},
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":         buildID,
-				"RAYCI_TMP_REPO":         config.CITempRepo,
+				"RAYCI_WORK_REPO":        config.CIWorkRepo,
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.wheel-forge",
 				"RAYCI_FORGE_NAME":       "wheel-forge",
 			},
