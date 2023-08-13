@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 func findDockerPlugin(plugins []any) (map[string]any, bool) {
@@ -20,22 +19,6 @@ func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	}
 
 	return nil, false
-}
-
-func lookupEnvInArray(envs []string, key string) (string, bool) {
-	for _, e := range envs {
-		k, v, ok := strings.Cut(e, "=")
-		if ok {
-			if k == key {
-				return v, true
-			}
-		} else {
-			if e == key {
-				return "", true
-			}
-		}
-	}
-	return "", false
 }
 
 func findInSlice(s []string, v string) bool {

@@ -35,6 +35,15 @@ type config struct {
 	Env map[string]string `yaml:"env"`
 }
 
+func builderAgent(config *config) string {
+	if config.BuilderQueues != nil {
+		if q, ok := config.BuilderQueues["builder"]; ok {
+			return q
+		}
+	}
+	return ""
+}
+
 func localDefaultConfig(envs Envs) *config {
 	return &config{
 		CITemp: filepath.Join(getEnv(envs, "HOME"), ".cache/rayci"),
