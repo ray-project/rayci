@@ -181,6 +181,9 @@ func TestCheckStepKeys(t *testing.T) {
 		step: map[string]any{}, allowed: []string{"a"}, ok: true,
 	}, {
 		step: map[string]any{"a": "b"}, allowed: nil, ok: false,
+	}, {
+		step:    map[string]any{"name": "x", "file": "f"},
+		allowed: []string{"name", "wanda"}, ok: false,
 	}} {
 		got := checkStepKeys(test.step, test.allowed)
 		if test.ok != (got == nil) {

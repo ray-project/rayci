@@ -26,8 +26,14 @@ func main() {
 
 	args := flag.Args()
 
-	if len(args) != 1 {
-		log.Fatal("needs exactly one argument for the spec file")
+	var input string
+	if !*rayCI {
+		if len(args) != 1 {
+			log.Fatal("needs exactly one argument for the spec file")
+		}
+		input = args[0]
+	} else {
+		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
 	config := &wanda.ForgeConfig{
@@ -38,7 +44,7 @@ func main() {
 		BuildID:       *buildID,
 	}
 
-	if err := wanda.Build(args[0], config); err != nil {
+	if err := wanda.Build(input, config); err != nil {
 		log.Fatal(err)
 	}
 }
