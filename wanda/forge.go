@@ -159,11 +159,16 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	if f.config.WorkRepo != "" {
-		cmd := d.cmd("push", nameTag)
-		cmd.Env = nil
-		if err := cmd.Run(); err != nil {
+		if err := d.run("push", nameTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
+		/*
+			cmd := d.cmd("push", nameTag)
+			cmd.Env = nil
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("push docker: %w", err)
+			}
+		*/
 	}
 
 	// "TODO: push back to cr on !f.config.ReadOnlyCache
