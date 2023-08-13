@@ -63,7 +63,7 @@ func Build(specFile string, config *ForgeConfig) error {
 type ForgeConfig struct {
 	WorkDir       string
 	DockerBin     string
-	CacheRepo     string
+	WorkRepo      string
 	ReadOnlyCache bool
 }
 

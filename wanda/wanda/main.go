@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
 	"github.com/ray-project/rayci/wanda"
 )
@@ -10,13 +11,16 @@ import (
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
-	cacheRepo := flag.String("cache_repo", "", "cache container repository")
-	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	rayCI := flag.Bool("rayci", false, "takes RAYCI_ env vars for input")
+	workRepo := flag.String("work_repo", "", "cache container repository")
+	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 
 	flag.Parse()
 
-	_ = *rayCI
+	if *rayCI {
+		*workRepo = os.Getenv("RAYCI_WORK_REPO")
+		*readOnly = os.Getenv("BUILDKITE_CACHE_READONLY") == "true"
+	}
 
 	args := flag.Args()
 
@@ -27,7 +31,7 @@ func main() {
 	config := &wanda.ForgeConfig{
 		WorkDir:       *workDir,
 		DockerBin:     *docker,
-		CacheRepo:     *cacheRepo,
+		WorkRepo:      *workRepo,
 		ReadOnlyCache: *readOnly,
 	}
 
