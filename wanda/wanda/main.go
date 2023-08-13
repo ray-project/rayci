@@ -12,8 +12,11 @@ func main() {
 	docker := flag.String("docker", "", "path to the docker client binary")
 	cacheRepo := flag.String("cache_repo", "", "cache container repository")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
+	rayCI := flag.Bool("rayci", false, "takes RAYCI_ env vars for input")
 
 	flag.Parse()
+
+	_ = *rayCI
 
 	args := flag.Args()
 

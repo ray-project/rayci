@@ -24,6 +24,7 @@ func newConverter(config *config, buildID string) *converter {
 
 	envMap := make(map[string]string)
 	envMap["RAYCI_BUILD_ID"] = buildID
+	envMap["RAYCI_TMP_REPO"] = config.CITempRepo
 	envMap["RAYCI_TEMP"] = c.ciTempForBuild
 	for k, v := range c.config.Env {
 		envMap[k] = v
@@ -72,6 +73,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		}
 		return cloneMap(step), nil
 	}
+	// special steps for building container images.
 	if _, ok := step["wanda"]; ok {
 		// a wanda step
 		if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
@@ -85,12 +87,16 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		if !ok {
 			return nil, fmt.Errorf("wanda step missing file")
 		}
-		var deps []string
-		if v, ok := stringInMap(step, "depends_on"); ok {
-			deps = []string{v}
-		}
-		return makeWandaStep(c.buildID, name, file, deps, c.config), nil
 
+		s := &wandaStep{
+			name:     name,
+			file:     file,
+			buildID:  c.buildID,
+			envs:     c.envMap,
+			ciConfig: c.config,
+		}
+
+		return s.buildkiteStep(), nil
 	}
 
 	// a normal command step

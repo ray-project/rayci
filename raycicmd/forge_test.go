@@ -78,7 +78,7 @@ func TestMakeForgeGroup(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, "ci/forge"), 0700); err != nil {
 			t.Fatalf("make forge dir: %v", err)
 		}
-		g, err := makeForgeGroup(root, buildID, config)
+		g, err := makeForgeGroup(root, buildID, config, nil)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}
@@ -107,7 +107,12 @@ func TestMakeForgeGroup(t *testing.T) {
 			t.Fatalf("write wheel-forge file: %v", err)
 		}
 
-		g, err := makeForgeGroup(root, buildID, config)
+		envMap := map[string]string{
+			"RAYCI_BUILD_ID": buildID,
+			"RAYCI_TMP_REPO": config.CITempRepo,
+		}
+
+		g, err := makeForgeGroup(root, buildID, config, envMap)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}
@@ -191,7 +196,9 @@ func TestMakeForgeGroup(t *testing.T) {
 			t.Fatalf("write v2 forge file: %v", err)
 		}
 
-		g, err := makeForgeGroup(root, buildID, config)
+		envMap := map[string]string{"RAYCI_BUILD_ID": buildID}
+
+		g, err := makeForgeGroup(root, buildID, config, envMap)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}
@@ -213,7 +220,6 @@ func TestMakeForgeGroup(t *testing.T) {
 			"commands": []string{forgeBuilderCommand},
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":         buildID,
-				"RAYCI_TMP_REPO":         config.CITempRepo,
 				"RAYCI_FORGE_DOCKERFILE": "ci/forge/Dockerfile.forge",
 				"RAYCI_FORGE_NAME":       "forge",
 			},
@@ -235,7 +241,6 @@ func TestMakeForgeGroup(t *testing.T) {
 			"commands": []string{forgeBuilderCommand},
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":         buildID,
-				"RAYCI_TMP_REPO":         config.CITempRepo,
 				"RAYCI_FORGE_DOCKERFILE": "civ2/forge/Dockerfile.forgev2",
 				"RAYCI_FORGE_NAME":       "forgev2",
 			},

@@ -30,7 +30,7 @@ const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
 	`docker push "$${DEST_IMG}" '`
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
-const runWandaURL = rawGitHubURL + "ray-project/rayci/master/run_wanda.sh"
+const runWandaURL = rawGitHubURL + "ray-project/rayci/lonnie-x/run_wanda.sh"
 
 var wandaCommands = []string{
 	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
@@ -46,61 +46,85 @@ func builderAgent(config *config) string {
 	return ""
 }
 
-func makeWandaStep(
-	buildID, name, file string, deps []string, config *config,
-) map[string]any {
-	agent := builderAgent(config)
+type wandaStep struct {
+	name    string
+	file    string
+	buildID string
+
+	dependsOn any
+
+	envs     map[string]string
+	ciConfig *config
+}
+
+func (s *wandaStep) buildkiteStep() map[string]any {
+	agent := builderAgent(s.ciConfig)
+
+	envs := make(map[string]string)
+	for k, v := range s.envs {
+		envs[k] = v
+	}
+	envs["RAYCI_WANDA_NAME"] = s.name
+	envs["RAYCI_WANDA_FILE"] = s.file
 
 	bkStep := map[string]any{
-		"label":    "wanda: " + name,
-		"key":      name,
+		"label":    "wanda: " + s.name,
+		"key":      s.name,
 		"commands": wandaCommands,
-		"env": map[string]string{
-			"RAYCI_BUILD_ID":   buildID,
-			"RAYCI_TMP_REPO":   config.CITempRepo,
-			"RAYCI_WANDA_NAME": name,
-			"RAYCI_WANDA_FILE": file,
-		},
+		"env":      envs,
 	}
 
-	if len(deps) != 0 {
-		bkStep["depends_on"] = deps
+	if s.dependsOn != nil {
+		bkStep["depends_on"] = s.dependsOn
 	}
 	if agent != "" {
 		bkStep["agents"] = newBkAgents(agent)
 	}
-	if config.BuilderPriority != 0 {
-		bkStep["priority"] = config.BuilderPriority
+	if p := s.ciConfig.BuilderPriority; p != 0 {
+		bkStep["priority"] = p
 	}
 	return bkStep
 }
 
-func makeForgeStep(buildID, name, file string, config *config) map[string]any {
-	agent := builderAgent(config)
+type forgeStep struct {
+	name    string
+	file    string
+	buildID string
+
+	envs     map[string]string
+	ciConfig *config
+}
+
+func (s *forgeStep) buildkiteStep() map[string]any {
+	agent := builderAgent(s.ciConfig)
+
+	envs := make(map[string]string)
+	for k, v := range s.envs {
+		envs[k] = v
+	}
+	envs["RAYCI_FORGE_NAME"] = s.name
+	envs["RAYCI_FORGE_DOCKERFILE"] = s.file
 
 	bkStep := map[string]any{
-		"label":    name,
-		"key":      name,
+		"label":    s.name,
+		"key":      s.name,
 		"commands": []string{forgeBuilderCommand},
-		"env": map[string]string{
-			"RAYCI_BUILD_ID":         buildID,
-			"RAYCI_TMP_REPO":         config.CITempRepo,
-			"RAYCI_FORGE_NAME":       name,
-			"RAYCI_FORGE_DOCKERFILE": file,
-		},
+		"env":      envs,
 	}
 
 	if agent != "" {
 		bkStep["agents"] = newBkAgents(agent)
 	}
-	if config.BuilderPriority != 0 {
-		bkStep["priority"] = config.BuilderPriority
+	if p := s.ciConfig.BuilderPriority; p != 0 {
+		bkStep["priority"] = p
 	}
 
 	return bkStep
 }
 
-func makeForgeGroup(repoDir, buildID string, config *config) (
+func makeForgeGroup(
+	repoDir, buildID string, config *config, envs map[string]string,
+) (
 	*bkPipelineGroup, error,
 ) {
 	g := &bkPipelineGroup{
@@ -129,8 +153,14 @@ func makeForgeGroup(repoDir, buildID string, config *config) (
 			}
 
 			filePath := filepath.Join(dir, name)
-			step := makeForgeStep(buildID, forgeName, filePath, config)
-			g.Steps = append(g.Steps, step)
+			step := &forgeStep{
+				name:     forgeName,
+				file:     filePath,
+				buildID:  buildID,
+				envs:     envs,
+				ciConfig: config,
+			}
+			g.Steps = append(g.Steps, step.buildkiteStep())
 		}
 	}
 
