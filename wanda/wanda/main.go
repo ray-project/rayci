@@ -13,6 +13,7 @@ func main() {
 	docker := flag.String("docker", "", "path to the docker client binary")
 	rayCI := flag.Bool("rayci", false, "takes RAYCI_ env vars for input")
 	workRepo := flag.String("work_repo", "", "cache container repository")
+	buildID := flag.String("build_id", "", "build ID for the image tag")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 
 	flag.Parse()
@@ -20,6 +21,7 @@ func main() {
 	if *rayCI {
 		*workRepo = os.Getenv("RAYCI_WORK_REPO")
 		*readOnly = os.Getenv("BUILDKITE_CACHE_READONLY") == "true"
+		*buildID = os.Getenv("RAYCI_BUILD_ID")
 	}
 
 	args := flag.Args()
@@ -33,6 +35,7 @@ func main() {
 		DockerBin:     *docker,
 		WorkRepo:      *workRepo,
 		ReadOnlyCache: *readOnly,
+		BuildID:       *buildID,
 	}
 
 	if err := wanda.Build(args[0], config); err != nil {
