@@ -16,4 +16,6 @@ export GOPRIVATE="github.com/ray-project/rayci"
 
 echo "--- Run wanda"
 
+export
+
 exec "$GOPATH/bin/wanda" "$@"
