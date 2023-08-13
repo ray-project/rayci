@@ -10,15 +10,36 @@ type converter struct {
 	buildID string
 
 	ciTempForBuild string
+
+	envMap map[string]string
 }
 
 func newConverter(config *config, buildID string) *converter {
-	return &converter{
+	c := &converter{
 		config:  config,
 		buildID: buildID,
 
 		ciTempForBuild: config.CITemp + buildID + "/",
 	}
+
+	envMap := make(map[string]string)
+	envMap["RAYCI_BUILD_ID"] = buildID
+	envMap["RAYCI_TEMP"] = c.ciTempForBuild
+	for k, v := range c.config.Env {
+		envMap[k] = v
+	}
+
+	c.envMap = envMap
+
+	return c
+}
+
+func (c *converter) envMapCopy() map[string]string {
+	m := make(map[string]string)
+	for k, v := range c.envMap {
+		m[k] = v
+	}
+	return m
 }
 
 func (c *converter) mapAgent(instanceType string) (string, error) {
@@ -40,25 +61,6 @@ func (c *converter) jobEnvImage(name string) string {
 }
 
 const dockerPlugin = "docker#v5.8.0"
-
-func envList(m map[string]string) []string {
-	var keys []string
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var envs []string
-	for _, k := range keys {
-		v := m[k]
-		if v == "" {
-			envs = append(envs, k)
-		} else {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-		}
-	}
-	return envs
-}
 
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
@@ -127,7 +129,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		envMap[k] = v
 	}
 
-	result["env"] = envMap
+	result["env"] = c.envMapCopy()
 
 	var envKeys []string
 	for k := range envMap {
