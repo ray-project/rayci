@@ -30,6 +30,7 @@ func dockerCmdEnvs() []string {
 	for _, k := range []string{
 		"HOME",
 		"USER",
+		"PATH",
 	} {
 		if v, ok := os.LookupEnv(k); ok {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
