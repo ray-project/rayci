@@ -29,9 +29,10 @@ func resolveBuildArgs(buildArgs []string) map[string]string {
 }
 
 type imageSource struct {
-	name string
-	id   string
-	src  string // where to fetch this image from
+	name  string
+	id    string
+	src   string // where to fetch this image from
+	local string // local reference/tag
 }
 
 type buildInput struct {

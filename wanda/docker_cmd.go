@@ -68,26 +68,35 @@ func (c *dockerCmd) pull(src, asTag string) error {
 	return nil
 }
 
+func (c *dockerCmd) tag(src, asTag string) error {
+	return c.run("tag", src, asTag)
+}
+
 func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 	// Pull down the required images, and tag them properly.
 	var froms []string
 	for from := range core.Froms {
-		if strings.HasPrefix(from, "@") {
-			// A local image, no need to pull.
-			continue
-		}
 		froms = append(froms, from)
 	}
 	sort.Strings(froms)
-	for _, ref := range froms {
-		srcRef := core.Froms[ref]
-		if srcRef == "" {
-			srcRef = ref
+
+	for _, from := range froms {
+		src, ok := in.froms[from]
+		if !ok {
+			return fmt.Errorf("missing base image source for %q", from)
 		}
-		if err := c.pull(srcRef, ref); err != nil {
-			return fmt.Errorf("pull %s(%s): %w", ref, srcRef, err)
+
+		if src.local != "" {
+			if err := c.tag(src.local, src.name); err != nil {
+				return fmt.Errorf("tag %s %s: %w", src.local, src.name, err)
+			}
+		} else {
+			if err := c.pull(src.src, src.name); err != nil {
+				return fmt.Errorf("pull %s(%s): %w", src.name, src.src, err)
+			}
 		}
 	}
+	// TODO(aslonnie): maybe recheck all the IDs of the from images?
 
 	// Build the image.
 	var args []string

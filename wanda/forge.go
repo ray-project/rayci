@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	cranename "github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/daemon"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"gopkg.in/yaml.v3"
 )
 
@@ -100,6 +103,94 @@ func (f *Forge) workTag(name string) string {
 	return fmt.Sprintf("%s:%s", f.config.WorkRepo, name)
 }
 
+func resolveRemoteImage(name, ref string) (*imageSource, error) {
+	parsed, err := cranename.ParseReference(ref)
+	if err != nil {
+		return nil, fmt.Errorf("parse reference %s: %w", ref, err)
+	}
+	img, err := remote.Image(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("fetch image %s: %w", ref, err)
+	}
+
+	digest, err := img.Digest()
+	if err != nil {
+		return nil, fmt.Errorf("get digest for %s: %w", ref, err)
+	}
+
+	id, err := img.ConfigName()
+	if err != nil {
+		return nil, fmt.Errorf("get config name/id for %s: %w", ref, err)
+	}
+
+	src := parsed.Context().Digest(digest.String())
+
+	return &imageSource{
+		name: name,
+		id:   id.String(),
+		src:  src.String(),
+	}, nil
+}
+
+func resolveLocalImage(name, ref string) (*imageSource, error) {
+	parsed, err := cranename.ParseReference(ref)
+	if err != nil {
+		return nil, fmt.Errorf("parse reference %s: %w", ref, err)
+	}
+
+	img, err := daemon.Image(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("fetch image %s: %w", ref, err)
+	}
+	id, err := img.ConfigName()
+	if err != nil {
+		return nil, fmt.Errorf("get config name/id for %s: %w", ref, err)
+	}
+
+	return &imageSource{
+		name: name,
+		id:   id.String(),
+	}, nil
+}
+
+func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
+	m := make(map[string]*imageSource)
+	for _, from := range froms {
+		if strings.HasPrefix(from, "@") {
+			// A local image.
+			name := strings.TrimPrefix(from, "@")
+			src, err := resolveLocalImage(from, name)
+			if err != nil {
+				return nil, fmt.Errorf("resolve local image %s: %w", from, err)
+			}
+			m[from] = src
+			continue
+		}
+		if f.config.NamePrefix != "" {
+			if strings.HasPrefix(from, f.config.NamePrefix) {
+				fromName := strings.TrimPrefix(from, f.config.NamePrefix)
+				workTag := f.workTag(fromName)
+
+				src, err := resolveRemoteImage(from, workTag)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"resolve remote work image %s: %w", from, err,
+					)
+				}
+				m[from] = src
+				continue
+			}
+		}
+
+		src, err := resolveRemoteImage(from, from)
+		if err != nil {
+			return nil, fmt.Errorf("resolve remote image %s: %w", from, err)
+		}
+		m[from] = src
+	}
+	return m, nil
+}
+
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
@@ -111,21 +202,11 @@ func (f *Forge) Build(spec *Spec) error {
 
 	in := newBuildInput(ts, spec.BuildArgs)
 
-	// TODO(aslonnie): fetch and determine the image digests.
-	// For now, we just assume that the digest does not change.
-	// we are not caching the result anyways right now, so it does not matter.
-	froms := make(map[string]string)
-	for _, from := range spec.Froms {
-		if f.config.NamePrefix != "" {
-			if strings.HasPrefix(from, f.config.NamePrefix) {
-				fromName := strings.TrimPrefix(from, f.config.NamePrefix)
-				workTag := f.workTag(fromName)
-				_ = workTag
-			}
-		} else {
-			froms[from] = ""
-		}
+	froms, err := f.resolveBases(spec.Froms)
+	if err != nil {
+		return fmt.Errorf("resolve bases: %w", err)
 	}
+	in.froms = froms
 
 	inputCore, err := in.makeCore(spec.Dockerfile)
 	if err != nil {
