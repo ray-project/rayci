@@ -3,7 +3,9 @@ package wanda
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 )
 
 type buildInputCore struct {
@@ -13,23 +15,39 @@ type buildInputCore struct {
 	BuildArgs    map[string]string // Resolved build args.
 }
 
-type fromSource struct {
+func resolveBuildArgs(buildArgs []string) map[string]string {
+	m := make(map[string]string)
+	for _, s := range buildArgs {
+		k, v, ok := strings.Cut(s, "=")
+		if ok {
+			m[k] = v
+		} else {
+			m[s] = os.Getenv(s)
+		}
+	}
+	return m
+}
+
+type imageSource struct {
+	name string
 	id   string
-	srcs []string
+	src  string // where to fetch this image from
 }
 
 type buildInput struct {
-	context *tarStream
-	froms   map[string]*fromSource
+	context   *tarStream
+	froms     map[string]*imageSource
+	buildArgs []string
 
 	tags map[string]struct{}
 }
 
-func newBuildInput(context *tarStream) *buildInput {
+func newBuildInput(context *tarStream, buildArgs []string) *buildInput {
 	return &buildInput{
-		context: context,
-		tags:    make(map[string]struct{}),
-		froms:   make(map[string]*fromSource),
+		context:   context,
+		tags:      make(map[string]struct{}),
+		froms:     make(map[string]*imageSource),
+		buildArgs: buildArgs,
 	}
 }
 
@@ -46,9 +64,7 @@ func (i *buildInput) tagList() []string {
 	return tags
 }
 
-func (i *buildInput) makeCore(
-	dockerfile string, buildArgs map[string]string,
-) (*buildInputCore, error) {
+func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 	context, err := i.context.digest()
 	if err != nil {
 		return nil, fmt.Errorf("compute build context digest: %w", err)
@@ -58,6 +74,8 @@ func (i *buildInput) makeCore(
 	for name, src := range i.froms {
 		froms[name] = src.id
 	}
+
+	buildArgs := resolveBuildArgs(i.buildArgs)
 
 	core := &buildInputCore{
 		Dockerfile:   dockerfile,

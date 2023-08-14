@@ -100,19 +100,6 @@ func (f *Forge) workTag(name string) string {
 	return fmt.Sprintf("%s:%s", f.config.WorkRepo, name)
 }
 
-func resolveBuildArgs(buildArgs []string) map[string]string {
-	m := make(map[string]string)
-	for _, s := range buildArgs {
-		k, v, ok := strings.Cut(s, "=")
-		if ok {
-			m[k] = v
-		} else {
-			m[s] = os.Getenv(s)
-		}
-	}
-	return m
-}
-
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
@@ -122,9 +109,7 @@ func (f *Forge) Build(spec *Spec) error {
 		f.addSrcFile(ts, src)
 	}
 
-	buildArgs := resolveBuildArgs(spec.BuildArgs)
-
-	in := newBuildInput(ts)
+	in := newBuildInput(ts, spec.BuildArgs)
 
 	// TODO(aslonnie): fetch and determine the image digests.
 	// For now, we just assume that the digest does not change.
@@ -142,7 +127,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
-	inputCore, err := in.makeCore(spec.Dockerfile, buildArgs)
+	inputCore, err := in.makeCore(spec.Dockerfile)
 	if err != nil {
 		return fmt.Errorf("make build input core: %w", err)
 	}

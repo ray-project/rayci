@@ -17,10 +17,10 @@ func TestDockerCmdBuild(t *testing.T) {
 
 	const tag = "cr.ray.io/rayproject/wanda-test"
 
-	input := newBuildInput(ts)
+	buildArgs := []string{"MESSAGE=test mesasge"}
+	input := newBuildInput(ts, buildArgs)
 
-	buildArgs := map[string]string{"MESSAGE": "test mesasge"}
-	core, err := input.makeCore("Dockerfile", buildArgs)
+	core, err := input.makeCore("Dockerfile")
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}
