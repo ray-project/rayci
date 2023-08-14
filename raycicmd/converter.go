@@ -98,6 +98,9 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 			envs:     c.envMap,
 			ciConfig: c.config,
 		}
+		if dependsOn, ok := step["depends_on"]; ok {
+			s.dependsOn = dependsOn
+		}
 
 		return s.buildkiteStep(), nil
 	}
