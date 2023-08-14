@@ -43,4 +43,19 @@ func TestBuildInputCore(t *testing.T) {
 	if got := core.BuildArgs["MESSAGE"]; got != "test-msg" {
 		t.Errorf("build args MESSAGE got %q, want `test-msg`", got)
 	}
+
+	digest, err := core.digest()
+	if err != nil {
+		t.Fatalf("compute digest: %v", err)
+	}
+
+	core.Dockerfile = "Dockerfile2"
+	digest2, err := core.digest()
+	if err != nil {
+		t.Fatalf("compute digest for the second time: %v", err)
+	}
+	if digest == digest2 {
+		t.Errorf("same digest after change: %q vs %q", digest, digest2)
+	}
+
 }

@@ -8,13 +8,6 @@ import (
 	"strings"
 )
 
-type buildInputCore struct {
-	Dockerfile   string            // Name of the Dockerfile to use.
-	Froms        map[string]string // Map from image names to image digests.
-	BuildContext string            // Digests of the build context.
-	BuildArgs    map[string]string // Resolved build args.
-}
-
 func resolveBuildArgs(buildArgs []string) map[string]string {
 	m := make(map[string]string)
 	for _, s := range buildArgs {
@@ -65,6 +58,13 @@ func (i *buildInput) tagList() []string {
 	return tags
 }
 
+type buildInputCore struct {
+	Dockerfile   string            // Name of the Dockerfile to use.
+	Froms        map[string]string // Map from image names to image digests.
+	BuildContext string            // Digests of the build context.
+	BuildArgs    map[string]string // Resolved build args.
+}
+
 func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 	context, err := i.context.digest()
 	if err != nil {
@@ -88,8 +88,8 @@ func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 	return core, nil
 }
 
-func (i *buildInputCore) digest() (string, error) {
-	bs, err := json.Marshal(i)
+func (c *buildInputCore) digest() (string, error) {
+	bs, err := json.Marshal(c)
 	if err != nil {
 		return "", fmt.Errorf("marshal build input: %w", err)
 	}
