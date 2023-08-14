@@ -58,7 +58,7 @@ func newDockerCmd(bin string) *dockerCmd {
 }
 
 func (c *dockerCmd) cmd(args ...string) *exec.Cmd {
-	cmd := exec.Command("docker", args...)
+	cmd := exec.Command(c.bin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = c.envs
