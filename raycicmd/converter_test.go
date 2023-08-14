@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 func findDockerPlugin(plugins []any) (map[string]any, bool) {
@@ -20,22 +19,6 @@ func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	}
 
 	return nil, false
-}
-
-func lookupEnvInArray(envs []string, key string) (string, bool) {
-	for _, e := range envs {
-		k, v, ok := strings.Cut(e, "=")
-		if ok {
-			if k == key {
-				return v, true
-			}
-		} else {
-			if e == key {
-				return "", true
-			}
-		}
-	}
-	return "", false
 }
 
 func findInSlice(s []string, v string) bool {
@@ -53,7 +36,7 @@ func TestConvertPipelineStep(t *testing.T) {
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
-		CITempRepo:      "fakeecr",
+		CIWorkRepo:      "fakeecr",
 
 		RunnerQueues: map[string]string{"default": "fakerunner"},
 
@@ -77,6 +60,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
 			},
 		},
 	}, {
@@ -101,6 +85,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
 			},
 		},
 	}, {
@@ -181,7 +166,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
-		CITempRepo:      "fakeecr",
+		CIWorkRepo:      "fakeecr",
 
 		RunnerQueues: map[string]string{"default": "fakerunner"},
 

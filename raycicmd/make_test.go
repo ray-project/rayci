@@ -180,7 +180,7 @@ func TestMakePipeline(t *testing.T) {
 	config := &config{
 		ArtifactsBucket: "artifacts",
 		CITemp:          "s3://ci-temp",
-		CITempRepo:      "fakeecr",
+		CIWorkRepo:      "fakeecr",
 
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",

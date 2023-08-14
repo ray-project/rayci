@@ -22,44 +22,52 @@ func forgeNameFromDockerfile(name string) (string, bool) {
 
 // builtin builder command to build a forge container image.
 const forgeBuilderCommand = `/bin/bash -euo pipefail -c ` +
-	`'export DOCKER_BUILDKIT=1 ; ` +
-	`DEST_IMG="$${RAYCI_TMP_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ; ` +
+	`'export DOCKER_BUILDKIT=1 ;` +
+	`DEST_IMG="$${RAYCI_WORK_REPO}:$${RAYCI_BUILD_ID}-$${RAYCI_FORGE_NAME}" ;` +
 	`tar --mtime="UTC 2020-01-01" -c -f - "$${RAYCI_FORGE_DOCKERFILE}" |` +
 	` docker build --progress=plain -t "$${DEST_IMG}" ` +
-	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ; ` +
+	` -f "$${RAYCI_FORGE_DOCKERFILE}" - ;` +
 	`docker push "$${DEST_IMG}" '`
 
-func makeForgeStep(buildID, name, file string, config *config) map[string]any {
-	agent := ""
-	if config.BuilderQueues != nil {
-		if q, ok := config.BuilderQueues["builder"]; ok {
-			agent = q
-		}
+type forgeStep struct {
+	name    string
+	file    string
+	buildID string
+
+	envs     map[string]string
+	ciConfig *config
+}
+
+func (s *forgeStep) buildkiteStep() map[string]any {
+	agent := builderAgent(s.ciConfig)
+
+	envs := make(map[string]string)
+	for k, v := range s.envs {
+		envs[k] = v
 	}
+	envs["RAYCI_FORGE_NAME"] = s.name
+	envs["RAYCI_FORGE_DOCKERFILE"] = s.file
 
 	bkStep := map[string]any{
-		"label":    name,
-		"key":      name,
+		"label":    s.name,
+		"key":      s.name,
 		"commands": []string{forgeBuilderCommand},
-		"env": map[string]string{
-			"RAYCI_BUILD_ID":         buildID,
-			"RAYCI_TMP_REPO":         config.CITempRepo,
-			"RAYCI_FORGE_DOCKERFILE": file,
-			"RAYCI_FORGE_NAME":       name,
-		},
+		"env":      envs,
 	}
 
 	if agent != "" {
 		bkStep["agents"] = newBkAgents(agent)
 	}
-	if config.BuilderPriority != 0 {
-		bkStep["priority"] = config.BuilderPriority
+	if p := s.ciConfig.BuilderPriority; p != 0 {
+		bkStep["priority"] = p
 	}
 
 	return bkStep
 }
 
-func makeForgeGroup(repoDir, buildID string, config *config) (
+func makeForgeGroup(
+	repoDir, buildID string, config *config, envs map[string]string,
+) (
 	*bkPipelineGroup, error,
 ) {
 	g := &bkPipelineGroup{
@@ -88,8 +96,14 @@ func makeForgeGroup(repoDir, buildID string, config *config) (
 			}
 
 			filePath := filepath.Join(dir, name)
-			step := makeForgeStep(buildID, forgeName, filePath, config)
-			g.Steps = append(g.Steps, step)
+			step := &forgeStep{
+				name:     forgeName,
+				file:     filePath,
+				buildID:  buildID,
+				envs:     envs,
+				ciConfig: config,
+			}
+			g.Steps = append(g.Steps, step.buildkiteStep())
 		}
 	}
 
