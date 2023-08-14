@@ -1,4 +1,6 @@
 group: forge
 steps:
-- name: forge
-  wanda: .buildkite/forge.wanda.yaml
+  - name: forge
+    wanda: .buildkite/forge.wanda.yaml
+  - name: hello
+    wanda: .buildkite/hello.wanda.yaml
