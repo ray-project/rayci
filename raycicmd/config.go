@@ -59,10 +59,6 @@ const rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
 
 const rayBazelBuildCache = "https://bazel-cache-dev.s3.us-west-2.amazonaws.com"
 
-var rayCIEnv = map[string]string{
-	"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
-}
-
 var defaultForgeDirs = []string{".buildkite/forge", "ci/forge", "ci/v2/forge"}
 
 var branchPipelineConfig = &config{
@@ -91,7 +87,9 @@ var branchPipelineConfig = &config{
 
 	ForgeDirs: defaultForgeDirs,
 
-	Env: rayCIEnv,
+	Env: map[string]string{
+		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
+	},
 }
 
 var prPipelineConfig = &config{
@@ -123,7 +121,10 @@ var prPipelineConfig = &config{
 
 	ForgeDirs: defaultForgeDirs,
 
-	Env: rayCIEnv,
+	Env: map[string]string{
+		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
+		"BUILDKITE_CACHE_READONLY":  "true",
+	},
 }
 
 func ciDefaultConfig(envs Envs) *config {
