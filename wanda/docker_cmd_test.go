@@ -15,13 +15,18 @@ func TestDockerCmdBuild(t *testing.T) {
 	ts := newTarStream()
 	ts.addFile("Dockerfile", nil, "testdata/Dockerfile")
 
-	input := &buildInput{
-		Dockerfile: "Dockerfile",
-		BuildArgs:  map[string]string{"MESSAGE": "test mesasge"},
+	const tag = "cr.ray.io/rayproject/wanda-test"
+
+	buildArgs := []string{"MESSAGE=test mesasge"}
+	input := newBuildInput(ts, buildArgs)
+	input.addTag(tag)
+
+	core, err := input.makeCore("Dockerfile")
+	if err != nil {
+		t.Fatalf("make build input core: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/wanda-test"
-	if err := cmd.build(input, ts, []string{tag}); err != nil {
+	if err := cmd.build(input, core); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
