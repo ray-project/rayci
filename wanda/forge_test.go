@@ -9,14 +9,15 @@ import (
 
 func TestForge(t *testing.T) {
 	config := &ForgeConfig{
-		WorkDir: "testdata",
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
 	if err := Build("testdata/hello.spec.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/wanda-test"
+	const tag = "cr.ray.io/rayproject/hello"
 
 	ref, err := name.ParseReference(tag)
 	if err != nil {
