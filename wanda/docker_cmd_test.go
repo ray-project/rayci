@@ -19,6 +19,7 @@ func TestDockerCmdBuild(t *testing.T) {
 
 	buildArgs := []string{"MESSAGE=test mesasge"}
 	input := newBuildInput(ts, buildArgs)
+	input.addTag(tag)
 
 	core, err := input.makeCore("Dockerfile")
 	if err != nil {
