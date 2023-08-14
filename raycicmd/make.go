@@ -104,7 +104,9 @@ func makePipeline(repoDir string, config *config, buildID string) (
 
 			bkGroup, err := c.convertPipelineGroup(g)
 			if err != nil {
-				return nil, fmt.Errorf("convert pipeline group %s: %w", file, err)
+				return nil, fmt.Errorf(
+					"convert pipeline group %s: %w", file, err,
+				)
 			}
 			if len(bkGroup.Steps) == 0 {
 				continue // skip empty groups
