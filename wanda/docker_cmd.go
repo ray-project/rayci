@@ -1,7 +1,6 @@
 package wanda
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -9,21 +8,6 @@ import (
 	"sort"
 	"strings"
 )
-
-type buildInput struct {
-	Dockerfile   string            // Name of the Dockerfile to use.
-	Froms        map[string]string // Map from image names to image digests.
-	BuildContext string            // Digests of the build context.
-	BuildArgs    map[string]string // Resolved build args.
-}
-
-func (i *buildInput) digest() (string, error) {
-	bs, err := json.Marshal(i)
-	if err != nil {
-		return "", fmt.Errorf("marshal build input: %w", err)
-	}
-	return sha256Digest(bs), nil
-}
 
 func dockerCmdEnvs() []string {
 	var envs []string
@@ -84,12 +68,10 @@ func (c *dockerCmd) pull(src, asTag string) error {
 	return nil
 }
 
-func (c *dockerCmd) build(
-	in *buildInput, context *tarStream, tags []string,
-) error {
+func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 	// Pull down the required images, and tag them properly.
 	var froms []string
-	for from := range in.Froms {
+	for from := range core.Froms {
 		if strings.HasPrefix(from, "@") {
 			// A local image, no need to pull.
 			continue
@@ -98,7 +80,7 @@ func (c *dockerCmd) build(
 	}
 	sort.Strings(froms)
 	for _, ref := range froms {
-		srcRef := in.Froms[ref]
+		srcRef := core.Froms[ref]
 		if srcRef == "" {
 			srcRef = ref
 		}
@@ -111,19 +93,19 @@ func (c *dockerCmd) build(
 	var args []string
 
 	args = append(args, "build", "--progress=plain")
-	args = append(args, "-f", in.Dockerfile)
+	args = append(args, "-f", core.Dockerfile)
 
-	for _, t := range tags {
+	for _, t := range in.tagList() {
 		args = append(args, "-t", t)
 	}
 
 	var buildArgKeys []string
-	for k := range in.BuildArgs {
+	for k := range core.BuildArgs {
 		buildArgKeys = append(buildArgKeys, k)
 	}
 	sort.Strings(buildArgKeys)
 	for _, k := range buildArgKeys {
-		v := in.BuildArgs[k]
+		v := core.BuildArgs[k]
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -132,7 +114,7 @@ func (c *dockerCmd) build(
 	log.Printf("docker %s", strings.Join(args, " "))
 
 	buildCmd := c.cmd(args...)
-	buildCmd.Stdin = newWriterToReader(context)
+	buildCmd.Stdin = newWriterToReader(in.context)
 
 	return buildCmd.Run()
 }

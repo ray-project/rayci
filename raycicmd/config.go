@@ -13,8 +13,9 @@ type config struct {
 
 	ArtifactsBucket string `yaml:"artifacts_bucket"`
 
-	CITemp     string `yaml:"ci_temp"`
-	CIWorkRepo string `yaml:"ci_work_repo"`
+	CITemp      string `yaml:"ci_temp"`
+	CIWorkRepo  string `yaml:"ci_work_repo"`
+	ForgePrefix string `yaml:"wanda_prefix"`
 
 	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"runner_queues"`
@@ -64,9 +65,13 @@ const (
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
 )
 
-const rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
+const (
+	rayCIECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
 
-const rayBazelBuildCache = "https://bazel-cache-dev.s3.us-west-2.amazonaws.com"
+	rayBazelBuildCache = "https://bazel-cache-dev.s3.us-west-2.amazonaws.com"
+
+	defaultForgePrefix = "cr.ray.io/rayproject/"
+)
 
 var defaultForgeDirs = []string{".buildkite/forge", "ci/forge", "ci/v2/forge"}
 
@@ -75,8 +80,9 @@ var branchPipelineConfig = &config{
 
 	ArtifactsBucket: "ray-ci-artifact-branch-public",
 
-	CITemp:     "s3://ray-ci-artifact-branch-public/ci-temp/",
-	CIWorkRepo: rayCIECR + "/rayci_temp_branch",
+	CITemp:      "s3://ray-ci-artifact-branch-public/ci-temp/",
+	CIWorkRepo:  rayCIECR + "/rayci_temp_branch",
+	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
 		"builder":       "builder_queue_branch",
@@ -106,8 +112,9 @@ var prPipelineConfig = &config{
 
 	ArtifactsBucket: "ray-ci-artifact-pr-public",
 
-	CITemp:     "s3://ray-ci-artifact-pr-public/ci-temp/",
-	CIWorkRepo: rayCIECR + "/rayci_temp_pr",
+	CITemp:      "s3://ray-ci-artifact-pr-public/ci-temp/",
+	CIWorkRepo:  rayCIECR + "/rayci_temp_pr",
+	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
 		"builder":       "builder_queue_pr",
