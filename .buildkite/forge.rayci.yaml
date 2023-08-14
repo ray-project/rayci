@@ -4,3 +4,4 @@ steps:
     wanda: .buildkite/forge.wanda.yaml
   - name: hello
     wanda: .buildkite/hello.wanda.yaml
+    depends_on: forge
