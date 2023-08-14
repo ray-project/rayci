@@ -29,6 +29,7 @@ func newConverter(config *config, buildID string) *converter {
 	if config.ForgePrefix != "" {
 		envMap["RAYCI_FORGE_PREFIX"] = config.ForgePrefix
 	}
+
 	for k, v := range c.config.Env {
 		envMap[k] = v
 	}

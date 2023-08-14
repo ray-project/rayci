@@ -58,7 +58,7 @@ func (s *tarStream) writeTo(tw *tar.Writer) error {
 	for _, name := range names {
 		f := s.files[name]
 		if err := f.writeTo(tw, s.modTime); err != nil {
-			return fmt.Errorf("write file %q to stream", name)
+			return fmt.Errorf("write file %q to stream: %w", name, err)
 		}
 	}
 	return nil
@@ -92,11 +92,11 @@ func (s *tarStream) digest() (string, error) {
 
 		r, err := f.record()
 		if err != nil {
-			return "", fmt.Errorf("digest file %q", name)
+			return "", fmt.Errorf("digest file %q: %w", name, err)
 		}
 
 		if err := enc.Encode(r); err != nil {
-			return "", fmt.Errorf("write record for file %q", name)
+			return "", fmt.Errorf("write record for file %q: %w", name, err)
 		}
 	}
 
