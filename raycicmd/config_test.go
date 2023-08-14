@@ -71,3 +71,16 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestBuilderAgent(t *testing.T) {
+	c := &config{
+		BuilderQueues: map[string]string{
+			"builder": "mybuilder",
+		},
+	}
+
+	q := builderAgent(c)
+	if q != "mybuilder" {
+		t.Errorf("builder agent got %q, want `mybuilder`", q)
+	}
+}
