@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	cranename "github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -78,6 +79,8 @@ type Forge struct {
 	config *ForgeConfig
 
 	workDir string
+
+	remoteOpts []remote.Option
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -87,7 +90,13 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
 
-	return &Forge{config: config, workDir: absWorkDir}, nil
+	return &Forge{
+		config:  config,
+		workDir: absWorkDir,
+		remoteOpts: []remote.Option{
+			remote.WithAuthFromKeychain(authn.DefaultKeychain),
+		},
+	}, nil
 }
 
 func (f *Forge) addSrcFile(ts *tarStream, src string) {
@@ -103,12 +112,14 @@ func (f *Forge) workTag(name string) string {
 	return fmt.Sprintf("%s:%s", f.config.WorkRepo, name)
 }
 
-func resolveRemoteImage(name, ref string) (*imageSource, error) {
+func resolveRemoteImage(name, ref string, opts ...remote.Option) (
+	*imageSource, error,
+) {
 	parsed, err := cranename.ParseReference(ref)
 	if err != nil {
 		return nil, fmt.Errorf("parse reference %s: %w", ref, err)
 	}
-	img, err := remote.Image(parsed)
+	img, err := remote.Image(parsed, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("fetch image %s: %w", ref, err)
 	}
@@ -171,7 +182,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 				fromName := strings.TrimPrefix(from, f.config.NamePrefix)
 				workTag := f.workTag(fromName)
 
-				src, err := resolveRemoteImage(from, workTag)
+				src, err := resolveRemoteImage(from, workTag, f.remoteOpts...)
 				if err != nil {
 					return nil, fmt.Errorf(
 						"resolve remote work image %s: %w", from, err,
@@ -182,7 +193,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 			}
 		}
 
-		src, err := resolveRemoteImage(from, from)
+		src, err := resolveRemoteImage(from, from, f.remoteOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("resolve remote image %s: %w", from, err)
 		}
