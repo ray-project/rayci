@@ -1,7 +1,6 @@
 package wanda
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -9,21 +8,6 @@ import (
 	"sort"
 	"strings"
 )
-
-type buildInput struct {
-	Dockerfile   string            // Name of the Dockerfile to use.
-	Froms        map[string]string // Map from image names to image digests.
-	BuildContext string            // Digests of the build context.
-	BuildArgs    map[string]string // Resolved build args.
-}
-
-func (i *buildInput) digest() (string, error) {
-	bs, err := json.Marshal(i)
-	if err != nil {
-		return "", fmt.Errorf("marshal build input: %w", err)
-	}
-	return sha256Digest(bs), nil
-}
 
 func dockerCmdEnvs() []string {
 	var envs []string
@@ -84,46 +68,53 @@ func (c *dockerCmd) pull(src, asTag string) error {
 	return nil
 }
 
-func (c *dockerCmd) build(
-	in *buildInput, context *tarStream, tags []string,
-) error {
+func (c *dockerCmd) tag(src, asTag string) error {
+	return c.run("tag", src, asTag)
+}
+
+func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 	// Pull down the required images, and tag them properly.
 	var froms []string
-	for from := range in.Froms {
-		if strings.HasPrefix(from, "@") {
-			// A local image, no need to pull.
-			continue
-		}
+	for from := range core.Froms {
 		froms = append(froms, from)
 	}
 	sort.Strings(froms)
-	for _, ref := range froms {
-		srcRef := in.Froms[ref]
-		if srcRef == "" {
-			srcRef = ref
+
+	for _, from := range froms {
+		src, ok := in.froms[from]
+		if !ok {
+			return fmt.Errorf("missing base image source for %q", from)
 		}
-		if err := c.pull(srcRef, ref); err != nil {
-			return fmt.Errorf("pull %s(%s): %w", ref, srcRef, err)
+
+		if src.local != "" {
+			if err := c.tag(src.local, src.name); err != nil {
+				return fmt.Errorf("tag %s %s: %w", src.local, src.name, err)
+			}
+		} else {
+			if err := c.pull(src.src, src.name); err != nil {
+				return fmt.Errorf("pull %s(%s): %w", src.name, src.src, err)
+			}
 		}
 	}
+	// TODO(aslonnie): maybe recheck all the IDs of the from images?
 
 	// Build the image.
 	var args []string
 
 	args = append(args, "build", "--progress=plain")
-	args = append(args, "-f", in.Dockerfile)
+	args = append(args, "-f", core.Dockerfile)
 
-	for _, t := range tags {
+	for _, t := range in.tagList() {
 		args = append(args, "-t", t)
 	}
 
 	var buildArgKeys []string
-	for k := range in.BuildArgs {
+	for k := range core.BuildArgs {
 		buildArgKeys = append(buildArgKeys, k)
 	}
 	sort.Strings(buildArgKeys)
 	for _, k := range buildArgKeys {
-		v := in.BuildArgs[k]
+		v := core.BuildArgs[k]
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -132,7 +123,7 @@ func (c *dockerCmd) build(
 	log.Printf("docker %s", strings.Join(args, " "))
 
 	buildCmd := c.cmd(args...)
-	buildCmd.Stdin = newWriterToReader(context)
+	buildCmd.Stdin = newWriterToReader(in.context)
 
 	return buildCmd.Run()
 }
