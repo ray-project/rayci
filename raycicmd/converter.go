@@ -24,7 +24,12 @@ func newConverter(config *config, buildID string) *converter {
 
 	envMap := make(map[string]string)
 	envMap["RAYCI_BUILD_ID"] = buildID
+	envMap["RAYCI_WORK_REPO"] = config.CIWorkRepo
 	envMap["RAYCI_TEMP"] = c.ciTempForBuild
+	if config.ForgePrefix != "" {
+		envMap["RAYCI_FORGE_PREFIX"] = config.ForgePrefix
+	}
+
 	for k, v := range c.config.Env {
 		envMap[k] = v
 	}
@@ -57,7 +62,7 @@ func (c *converter) jobEnvImage(name string) string {
 		name = "forge"
 	}
 
-	return fmt.Sprintf("%s:%s-%s", c.config.CITempRepo, c.buildID, name)
+	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.buildID, name)
 }
 
 const dockerPlugin = "docker#v5.8.0"

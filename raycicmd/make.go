@@ -66,9 +66,11 @@ func makePipeline(repoDir string, config *config, buildID string) (
 ) {
 	pl := new(bkPipeline)
 
+	c := newConverter(config, buildID)
+
 	// Build steps that build the forge images.
 
-	forgeGroup, err := makeForgeGroup(repoDir, buildID, config)
+	forgeGroup, err := makeForgeGroup(repoDir, buildID, config, c.envMapCopy())
 	if err != nil {
 		return nil, fmt.Errorf("make forge group: %w", err)
 	}
@@ -82,8 +84,6 @@ func makePipeline(repoDir string, config *config, buildID string) (
 	if len(bkDirs) == 0 {
 		bkDirs = []string{".buildkite"}
 	}
-
-	c := newConverter(config, buildID)
 
 	for _, bkDir := range bkDirs {
 		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
