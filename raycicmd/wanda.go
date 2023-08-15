@@ -5,7 +5,7 @@ import (
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
-const runWandaURL = rawGitHubURL + "ray-project/rayci/lonnie-x/run_wanda.sh"
+const runWandaURL = rawGitHubURL + "ray-project/rayci/stable/run_wanda.sh"
 
 var wandaCommands = []string{
 	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
