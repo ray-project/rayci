@@ -89,6 +89,27 @@ func TestConvertPipelineStep(t *testing.T) {
 			},
 		},
 	}, {
+		in: map[string]any{
+			"name":       "forge",
+			"wanda":      "ci/forge.wanda.yaml",
+			"depends_on": "ci-base",
+		},
+		out: map[string]any{
+			"label":    "wanda: forge",
+			"key":      "forge",
+			"commands": wandaCommands,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+
+				"RAYCI_WANDA_FILE": "ci/forge.wanda.yaml",
+				"RAYCI_WANDA_NAME": "forge",
+			},
+			"depends_on": "ci-base",
+		},
+	}, {
 		in:  map[string]any{"wait": nil},
 		out: map[string]any{"wait": nil},
 	}, {
@@ -102,6 +123,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		}
 
 		_, isWait := got["wait"]
+		_, isWanda := test.in["wanda"]
 
 		plugins, ok := got["plugins"]
 		if ok {
@@ -125,7 +147,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			)
 		}
 
-		if isWait {
+		if isWait || isWanda {
 			continue
 		}
 

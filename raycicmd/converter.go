@@ -77,6 +77,34 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		}
 		return cloneMap(step), nil
 	}
+	// special steps for building container images.
+	if _, ok := step["wanda"]; ok {
+		// a wanda step
+		if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
+			return nil, fmt.Errorf("check wanda step keys: %w", err)
+		}
+		name, ok := stringInMap(step, "name")
+		if !ok {
+			return nil, fmt.Errorf("wanda step missing name")
+		}
+		file, ok := stringInMap(step, "wanda")
+		if !ok {
+			return nil, fmt.Errorf("wanda step file is not a string")
+		}
+
+		s := &wandaStep{
+			name:     name,
+			file:     file,
+			buildID:  c.buildID,
+			envs:     c.envMap,
+			ciConfig: c.config,
+		}
+		if dependsOn, ok := step["depends_on"]; ok {
+			s.dependsOn = dependsOn
+		}
+
+		return s.buildkiteStep(), nil
+	}
 
 	// a normal command step
 	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {
