@@ -15,7 +15,7 @@ type config struct {
 
 	CITemp      string `yaml:"ci_temp"`
 	CIWorkRepo  string `yaml:"ci_work_repo"`
-	ForgePrefix string `yaml:"wanda_prefix"`
+	ForgePrefix string `yaml:"forge_prefix"`
 
 	BuilderQueues map[string]string `yaml:"builder_queues"`
 	RunnerQueues  map[string]string `yaml:"runner_queues"`
