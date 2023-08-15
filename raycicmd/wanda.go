@@ -9,7 +9,7 @@ const runWandaURL = rawGitHubURL + "ray-project/rayci/lonnie-x/run_wanda.sh"
 
 var wandaCommands = []string{
 	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
-	`RAYCI_BRANCH=lonnie-x /bin/bash /tmp/run_wanda.sh -rayci`,
+	`/bin/bash /tmp/run_wanda.sh -rayci`,
 }
 
 type wandaStep struct {
