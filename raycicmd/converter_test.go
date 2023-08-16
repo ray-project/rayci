@@ -43,7 +43,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
-	}, buildID)
+	}, buildID, "beta")
 
 	for _, test := range []struct {
 		in  map[string]any
@@ -61,6 +61,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
 			},
 		},
 	}, {
@@ -86,6 +87,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
 			},
 		},
 	}, {
@@ -103,6 +105,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
 
 				"RAYCI_WANDA_FILE": "ci/forge.wanda.yaml",
 				"RAYCI_WANDA_NAME": "forge",
@@ -197,7 +200,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 		},
 
 		RunnerPriority: 1,
-	}, buildID)
+	}, buildID, "")
 
 	g := &pipelineGroup{
 		Group: "fancy",
@@ -231,7 +234,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 		CITemp:          "s3://ci-temp/",
 
 		RunnerQueues: map[string]string{"default": "runner"},
-	}, "buildid")
+	}, "buildid", "")
 
 	g := &pipelineGroup{
 		Group: "fancy",

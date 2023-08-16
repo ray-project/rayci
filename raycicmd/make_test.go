@@ -191,7 +191,7 @@ func TestMakePipeline(t *testing.T) {
 
 	buildID := "fakebuild"
 
-	got, err := makePipeline(tmp, config, buildID)
+	got, err := makePipeline(tmp, config, buildID, "")
 	if err != nil {
 		t.Fatalf("makePipeline: %v", err)
 	}
