@@ -89,7 +89,9 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("make build id: %w", err)
 	}
 
-	pipeline, err := makePipeline(flags.RepoDir, config, buildID)
+	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
+
+	pipeline, err := makePipeline(flags.RepoDir, config, buildID, rayciBranch)
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)
 	}
