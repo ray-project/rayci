@@ -10,10 +10,6 @@ import (
 )
 
 func TestResolveLocalImage(t *testing.T) {
-
-}
-
-func TestResolveRemoteImage(t *testing.T) {
 	random, err := random.Image(1024, 1)
 	if err != nil {
 		t.Fatal("create random image: ", err)
