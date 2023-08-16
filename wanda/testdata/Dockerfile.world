@@ -1,0 +1,3 @@
+FROM cr.ray.io/rayproject/hello
+
+COPY world.txt /opt/app/world.txt
