@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -46,6 +47,12 @@ func TestForge(t *testing.T) {
 }
 
 func TestForgeWithWorkRepo(t *testing.T) {
+	if os.Getenv("BUILDKITE") == "true" {
+		t.Log("does not work when the daemon cannot reach the local registry")
+		t.Skip()
+		return
+	}
+
 	cr := registry.New()
 	server := httptest.NewServer(cr)
 	defer server.Close()
