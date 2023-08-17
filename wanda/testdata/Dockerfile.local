@@ -1,0 +1,3 @@
+FROM mybase
+
+COPY Dockerfile.local /opt/app/Dockerfile
