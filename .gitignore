@@ -1,5 +1,6 @@
 /tags
 /.vscode
+/_release
 .DS_Store
 
 __pycache__
