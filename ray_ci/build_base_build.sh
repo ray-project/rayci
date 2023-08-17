@@ -15,25 +15,10 @@ TMP_DIR="$(mktemp -d)"
 
 echo "--- Install wanda"
 
-curl -sL 'https://github.com/ray-project/rayci/releases/download/v0.1.2/wanda-linux-amd64' -o "$TMP_DIR/wanda"
+curl -sL 'https://github.com/ray-project/rayci/releases/download/v0.1.3/wanda-linux-amd64' -o "$TMP_DIR/wanda"
 chmod +x "$TMP_DIR/wanda"
 
-WORK_REPO=029272617770.dkr.ecr.us-west-2.amazonaws.com/rayci_temp_pr
-PIPELINE_V1_BRANCH="0183465b-c6fb-479b-8577-4cfd743b545d"
-PIPELINE_V1_BASE="018341aa-4065-4829-ba19-9958daebf20d"
-PIPELINE_V2_POSTMERGE="0189e759-8c96-4302-b6b5-b4274406bf89"
-
-if [[ "${BUILDKITE_PIPELINE_ID}" == "${PIPELINE_V1_BRANCH}"
-  || "${BUILDKITE_PIPELINE_ID}" == "${PIPELINE_V1_BASE}"
-  || "${BUILDKITE_PIPELINE_ID}" == "${PIPELINE_V2_POSTMERGE}" ]]; then
-  WORK_REPO=029272617770.dkr.ecr.us-west-2.amazonaws.com/rayci_temp_branch
-fi
- 
-WANDA=(
-  "$TMP_DIR/wanda"
-  -name_prefix=cr.ray.io/rayproject/
-  -work_repo="${WORK_REPO}"
-)
+WANDA=("$TMP_DIR/wanda")
 
 echo "--- :docker: Building base dependency image for TESTS :python:"
 
@@ -43,7 +28,7 @@ export BUILDKITE_BAZEL_CACHE_URL="${REMOTE_CACHE_URL}"
 
 if [[ -f ci/docker/base.test.wanda.yaml ]]; then
   "${WANDA[@]}" ci/docker/base.test.wanda.yaml
-  # Retag for old wanda definition file's local resolving.
+  # Retag to pacify old wanda definition file's local resolving.
   docker tag cr.ray.io/rayproject/oss-ci-base_test oss-ci-base_test
 else
   docker build --progress=plain \
