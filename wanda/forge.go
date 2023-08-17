@@ -154,13 +154,7 @@ func (f *Forge) Build(spec *Spec) error {
 	// Work tag is the tag we use to save the image in the work repo.
 	var workTag string
 	if f.config.WorkRepo != "" {
-		if f.config.BuildID != "" {
-			workTag = fmt.Sprintf(
-				"%s:%s-%s", f.config.WorkRepo, f.config.BuildID, spec.Name,
-			)
-		} else {
-			workTag = fmt.Sprintf("%s:%s", f.config.WorkRepo, spec.Name)
-		}
+		workTag = f.workTag(spec.Name)
 		in.addTag(workTag)
 	}
 	// Name tag is the tag we use to reference the image locally.
