@@ -23,6 +23,8 @@ echo "--- :docker: Building base dependency image for TESTS :python:"
 
 export DOCKER_BUILDKIT=1
 
+export BUILDKITE_BAZEL_CACHE_URL="${REMOTE_CACHE_URL}"
+
 if [[ -f ci/docker/base.test.wanda.yaml ]]; then
   "${WANDA[@]}" ci/docker/base.test.wanda.yaml
 else
