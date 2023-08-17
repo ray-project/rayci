@@ -62,7 +62,10 @@ func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 		"add-caps":      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
 		"security-opts": []string{"apparmor=unconfined"},
 
-		"volumes": []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		"volumes": []string{
+			"/var/run/docker.sock:/var/run/docker.sock",
+			"/tmp/artifacts:/artifact-mount",
+		},
 
 		"environment": envs,
 	}
@@ -79,5 +82,5 @@ var (
 
 	defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
 
-	defaultArtifactPaths = []string{"tmp/artifacts/**/*"}
+	defaultArtifactPaths = []string{"/tmp/artifacts/**/*"}
 )
