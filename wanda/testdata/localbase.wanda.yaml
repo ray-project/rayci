@@ -1,0 +1,3 @@
+name: localbase
+dockerfile: Dockerfile.localbase
+tags: [ "mybase" ]

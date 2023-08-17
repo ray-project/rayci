@@ -2,6 +2,6 @@ FROM scratch
 
 ARG MESSAGE=hello
 ENV MESSAGE=${MESSAGE}
-COPY Dockerfile /opt/Dockerfile
+COPY Dockerfile.hello /opt/Dockerfile
 
 CMD "echo ${MESSAGE}"

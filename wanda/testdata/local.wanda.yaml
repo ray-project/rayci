@@ -1,0 +1,4 @@
+name: local
+dockerfile: Dockerfile.local
+froms: [ "@mybase"]
+tags: [ "cr.ray.io/rayproject/local" ]
