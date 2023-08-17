@@ -1,0 +1,6 @@
+name: hello
+froms:
+  - cr.ray.io/rayproject/forge
+dockerfile: .buildkite/hello.Dockerfile
+srcs:
+  - .buildkite/hello.txt

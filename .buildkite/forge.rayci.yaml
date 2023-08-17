@@ -1,0 +1,13 @@
+group: forge
+steps:
+  - name: forge
+    wanda: .buildkite/forge.wanda.yaml
+
+  - name: hello
+    wanda: .buildkite/hello.wanda.yaml
+    depends_on: forge
+  
+  - name: hello test
+    depends_on: hello
+    job_env: hello
+    command: cat /opt/app/hello.txt

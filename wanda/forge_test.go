@@ -1,12 +1,13 @@
 package wanda
 
 import (
+	"testing"
+
 	"archive/tar"
 	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
-	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
