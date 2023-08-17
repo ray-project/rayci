@@ -48,6 +48,9 @@ func TestResolveLocalImage(t *testing.T) {
 	if want := imageID.String(); want != src.id {
 		t.Errorf("got image id %q, want %q", src.id, want)
 	}
+	if src.local != tagStr {
+		t.Errorf("got image local %q, want %q", src.local, tagStr)
+	}
 
 	dockerCmd := newDockerCmd("")
 	if err := dockerCmd.run("image", "rm", tagStr); err != nil {
