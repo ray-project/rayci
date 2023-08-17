@@ -6,7 +6,7 @@ RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 TMP_DIR="$(mktemp -d)"
 
-echo "--- Install rayci"
+echo "--- Install wanda"
 
 curl -sL 'https://go.dev/dl/go1.20.6.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
