@@ -1,0 +1,4 @@
+name: forge
+froms:
+  - ubuntu:22.04
+dockerfile: .buildkite/forge.Dockerfile
