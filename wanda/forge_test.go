@@ -11,9 +11,88 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	cranev1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
+
+func filesInLayer(layer cranev1.Layer) (map[string]string, error) {
+	rc, err := layer.Uncompressed()
+	if err != nil {
+		return nil, fmt.Errorf("uncompress layer: %w", err)
+	}
+	defer rc.Close()
+
+	tr := tar.NewReader(rc)
+
+	files := make(map[string]string)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read tar header: %w", err)
+		}
+
+		if hdr.FileInfo().IsDir() {
+			continue
+		}
+
+		content, err := io.ReadAll(tr)
+		if err != nil {
+			return nil, fmt.Errorf("read tar content: %w", err)
+		}
+
+		files[hdr.Name] = string(content)
+	}
+
+	return files, nil
+}
+
+const worldDotTxt = "This is my world!"
+
+func TestForgeLocal(t *testing.T) {
+	config := &ForgeConfig{WorkDir: "testdata"}
+
+	if err := Build("testdata/localbase.wanda.yaml", config); err != nil {
+		t.Fatalf("build base: %v", err)
+	}
+
+	if err := Build("testdata/local.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	const resultRef = "cr.ray.io/rayproject/local"
+	ref, err := name.ParseReference(resultRef)
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+
+	if len(layers) != 1 {
+		t.Fatalf("got %d layers, want 2", len(layers))
+	}
+
+	files, err := filesInLayer(layers[0])
+	if err != nil {
+		t.Fatalf("read layer: %v", err)
+	}
+
+	if _, ok := files["opt/app/Dockerfile"]; !ok {
+		t.Errorf("Dockerfile not in image")
+	}
+}
 
 func TestForge(t *testing.T) {
 	config := &ForgeConfig{
@@ -21,7 +100,7 @@ func TestForge(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/hello.spec.yaml", config); err != nil {
+	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -45,6 +124,39 @@ func TestForge(t *testing.T) {
 	if len(layers) != 1 {
 		t.Fatalf("got %d layers, want 1", len(layers))
 	}
+
+	if err := Build("testdata/world.wanda.yaml", config); err != nil {
+		t.Fatalf("build world: %v", err)
+	}
+
+	world := "cr.ray.io/rayproject/world"
+	ref2, err := name.ParseReference(world)
+	if err != nil {
+		t.Fatalf("parse world reference: %v", err)
+	}
+
+	img2, err := daemon.Image(ref2)
+	if err != nil {
+		t.Fatalf("read world image: %v", err)
+	}
+
+	layers2, err := img2.Layers()
+	if err != nil {
+		t.Fatalf("read world layers: %v", err)
+	}
+
+	if len(layers2) != 2 {
+		t.Fatalf("got %d world layers, want 1", len(layers2))
+	}
+
+	files, err := filesInLayer(layers2[1])
+	if err != nil {
+		t.Fatalf("read world layer files: %v", err)
+	}
+
+	if got := files["opt/app/world.txt"]; got != worldDotTxt {
+		t.Errorf("world.txt in image, got %q, want %q", got, worldDotTxt)
+	}
 }
 
 func TestForgeWithWorkRepo(t *testing.T) {
@@ -67,11 +179,11 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		BuildID:    "abc123",
 	}
 
-	if err := Build("testdata/hello.spec.yaml", config); err != nil {
+	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("build hello: %v", err)
 	}
 
-	if err := Build("testdata/world.spec.yaml", config); err != nil {
+	if err := Build("testdata/world.wanda.yaml", config); err != nil {
 		t.Fatalf("build world: %v", err)
 	}
 
@@ -94,39 +206,11 @@ func TestForgeWithWorkRepo(t *testing.T) {
 	if len(layers) != 2 {
 		t.Fatalf("got %d layers, want 2", len(layers))
 	}
-
-	layer, err := layers[1].Uncompressed()
+	files, err := filesInLayer(layers[1])
 	if err != nil {
-		t.Fatalf("uncompress layer: %v", err)
+		t.Fatalf("read layer: %v", err)
 	}
-
-	tr := tar.NewReader(layer)
-
-	files := make(map[string]string)
-
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatalf("read tar header: %v", err)
-		}
-
-		if hdr.FileInfo().IsDir() {
-			continue
-		}
-
-		content, err := io.ReadAll(tr)
-		if err != nil {
-			t.Fatalf("read tar content: %v", err)
-		}
-
-		t.Log(hdr.Name)
-		files[hdr.Name] = string(content)
-	}
-
-	if got, want := files["opt/app/world.txt"], "This is my world!"; got != want {
-		t.Errorf("world.txt in image, got %q, want %q", got, want)
+	if got := files["opt/app/world.txt"]; got != worldDotTxt {
+		t.Errorf("world.txt in image, got %q, want %q", got, worldDotTxt)
 	}
 }

@@ -13,7 +13,7 @@ func TestDockerCmdBuild(t *testing.T) {
 	cmd := newDockerCmd("") // uses real docker client
 
 	ts := newTarStream()
-	ts.addFile("Dockerfile", nil, "testdata/Dockerfile")
+	ts.addFile("Dockerfile.hello", nil, "testdata/Dockerfile.hello")
 
 	const tag = "cr.ray.io/rayproject/wanda-test"
 
@@ -21,7 +21,7 @@ func TestDockerCmdBuild(t *testing.T) {
 	input := newBuildInput(ts, buildArgs)
 	input.addTag(tag)
 
-	core, err := input.makeCore("Dockerfile")
+	core, err := input.makeCore("Dockerfile.hello")
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}

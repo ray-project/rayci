@@ -27,18 +27,18 @@ func TestBuildInputTags(t *testing.T) {
 
 func TestBuildInputCore(t *testing.T) {
 	ts := newTarStream()
-	ts.addFile("Dockerfile", nil, "testdata/Dockerfile")
+	ts.addFile("Dockerfile.hello", nil, "testdata/Dockerfile.hello")
 
 	in := newBuildInput(ts, []string{"MESSAGE=test=msg"})
 	in.addTag("myimage")
 
-	core, err := in.makeCore("Dockerfile")
+	core, err := in.makeCore("Dockerfile.hello")
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}
 
-	if core.Dockerfile != "Dockerfile" {
-		t.Errorf("got %q, want Dockerfile", core.Dockerfile)
+	if core.Dockerfile != "Dockerfile.hello" {
+		t.Errorf("got %q, want Dockerfile.hello", core.Dockerfile)
 	}
 	if got := core.BuildArgs["MESSAGE"]; got != "test=msg" {
 		t.Errorf("build args MESSAGE got %q, want `test=msg`", got)
