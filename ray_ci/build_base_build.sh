@@ -43,6 +43,8 @@ export BUILDKITE_BAZEL_CACHE_URL="${REMOTE_CACHE_URL}"
 
 if [[ -f ci/docker/base.test.wanda.yaml ]]; then
   "${WANDA[@]}" ci/docker/base.test.wanda.yaml
+  # Retag for old wanda definition file's local resolving.
+  docker tag cr.ray.io/rayproject/oss-ci-base_test oss-ci-base_test
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
