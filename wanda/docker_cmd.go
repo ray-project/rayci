@@ -28,7 +28,8 @@ func dockerCmdEnvs() []string {
 }
 
 type dockerCmd struct {
-	bin string
+	bin     string
+	workDir string
 
 	envs []string
 }
@@ -41,11 +42,18 @@ func newDockerCmd(bin string) *dockerCmd {
 	return &dockerCmd{bin: bin, envs: envs}
 }
 
+func (c *dockerCmd) setWorkDir(dir string) {
+	c.workDir = dir
+}
+
 func (c *dockerCmd) cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command(c.bin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = c.envs
+	if c.workDir != "" {
+		cmd.Dir = c.workDir
+	}
 	return cmd
 }
 
@@ -114,12 +122,19 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
 
-	args = append(args, "-") // read context from stdin
+	if in.context != nil {
+		args = append(args, "-") // read context from stdin
+	} else {
+		// copy everything
+		args = append(args, ".")
+	}
 
 	log.Printf("docker %s", strings.Join(args, " "))
 
 	buildCmd := c.cmd(args...)
-	buildCmd.Stdin = newWriterToReader(in.context)
+	if in.context != nil {
+		buildCmd.Stdin = newWriterToReader(in.context)
+	}
 
 	return buildCmd.Run()
 }
