@@ -183,10 +183,12 @@ func (f *Forge) Build(spec *Spec) error {
 
 	cacheTag := f.cacheTag(inputDigest)
 	workTag := f.workTag(spec.Name)
+	cachable := f.config.RayCI && f.config.WorkRepo != "" &&
+		!spec.CopyEverything
 
 	// TODO(aslonnie): check if the image output already exists
 	// if yes, then just perform retag, rather than rebuilding.
-	if f.config.RayCI && f.config.WorkRepo != "" {
+	if cachable {
 		ct, err := cranename.NewTag(cacheTag)
 		if err != nil {
 			return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
@@ -223,7 +225,9 @@ func (f *Forge) Build(spec *Spec) error {
 	// When running on rayCI, we only need the workTag and the cacheTag.
 	// Otherwise, add extra tags.
 	if f.config.RayCI {
-		in.addTag(cacheTag)
+		if cachable {
+			in.addTag(cacheTag)
+		}
 	} else {
 		// Name tag is the tag we use to reference the image locally.
 		// It is also what can be referenced by following steps.
@@ -251,7 +255,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 
 		// Save cache result too.
-		if f.config.RayCI && !f.config.ReadOnlyCache {
+		if cachable && !f.config.ReadOnlyCache {
 			if err := d.run("push", cacheTag); err != nil {
 				return fmt.Errorf("push cache: %w", err)
 			}
