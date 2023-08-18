@@ -245,7 +245,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	// Push the image to the work repo.
-	if f.config.WorkRepo == "" {
+	if f.config.WorkRepo != "" {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
