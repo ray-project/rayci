@@ -39,12 +39,15 @@ func main() {
 	}
 
 	config := &wanda.ForgeConfig{
-		WorkDir:       *workDir,
-		DockerBin:     *docker,
-		WorkRepo:      *workRepo,
-		NamePrefix:    *namePrefix,
+		WorkDir:    *workDir,
+		DockerBin:  *docker,
+		WorkRepo:   *workRepo,
+		NamePrefix: *namePrefix,
+		BuildID:    *buildID,
+
+		RayCI: *rayCI,
+
 		ReadOnlyCache: *readOnly,
-		BuildID:       *buildID,
 	}
 
 	if err := wanda.Build(input, config); err != nil {

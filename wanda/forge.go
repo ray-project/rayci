@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
+	cranename "github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
@@ -36,6 +37,8 @@ type ForgeConfig struct {
 	NamePrefix string
 	BuildID    string
 
+	RayCI bool
+
 	ReadOnlyCache bool
 }
 
@@ -46,6 +49,8 @@ type Forge struct {
 	workDir string
 
 	remoteOpts []remote.Option
+
+	cacheHitCount int
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -64,17 +69,32 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 	}, nil
 }
 
+func (f *Forge) cacheHit() int { return f.cacheHitCount }
+
 func (f *Forge) addSrcFile(ts *tarStream, src string) {
 	ts.addFile(src, nil, filepath.Join(f.workDir, src))
 }
 
-func (f *Forge) workTag(name string) string {
-	if f.config.BuildID != "" {
-		return fmt.Sprintf(
-			"%s:%s-%s", f.config.WorkRepo, f.config.BuildID, name,
-		)
+func (f *Forge) workRepo() string {
+	if f.config.WorkRepo != "" {
+		return f.config.WorkRepo
 	}
-	return fmt.Sprintf("%s:%s", f.config.WorkRepo, name)
+	return "localhost:5000/rayci"
+}
+
+func (f *Forge) workTag(name string) string {
+	workRepo := f.workRepo()
+	if f.config.BuildID != "" {
+		return fmt.Sprintf("%s:%s-%s", workRepo, f.config.BuildID, name)
+	}
+	return fmt.Sprintf("%s:%s", workRepo, name)
+}
+
+func (f *Forge) cacheTag(inputDigest string) string {
+	if _, d, ok := strings.Cut(inputDigest, ":"); ok {
+		inputDigest = d
+	}
+	return fmt.Sprintf("%s:c-%s", f.workRepo(), inputDigest)
 }
 
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
@@ -133,10 +153,13 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
-	ts := newTarStream()
-	f.addSrcFile(ts, spec.Dockerfile)
-	for _, src := range spec.Srcs {
-		f.addSrcFile(ts, src)
+	var ts *tarStream
+	if !spec.CopyEverything {
+		ts = newTarStream()
+		f.addSrcFile(ts, spec.Dockerfile)
+		for _, src := range spec.Srcs {
+			f.addSrcFile(ts, src)
+		}
 	}
 
 	in := newBuildInput(ts, spec.BuildArgs)
@@ -158,42 +181,82 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 	log.Println("build input digest: ", inputDigest)
 
+	cacheTag := f.cacheTag(inputDigest)
+	workTag := f.workTag(spec.Name)
+
 	// TODO(aslonnie): check if the image output already exists
 	// if yes, then just perform retag, rather than rebuilding.
+	if f.config.RayCI && f.config.WorkRepo != "" {
+		ct, err := cranename.NewTag(cacheTag)
+		if err != nil {
+			return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
+		}
 
-	// Get all the tags.
+		wt, err := cranename.NewTag(workTag)
+		if err != nil {
+			return fmt.Errorf("parse work tag %q: %w", workTag, err)
+		}
+
+		desc, err := remote.Get(ct, f.remoteOpts...)
+		if err != nil {
+			log.Printf("fetch cache image: %v", err)
+		} else {
+			// Cache hit!
+			log.Printf("cache hit: %s", desc.Digest)
+			f.cacheHitCount++
+
+			if err := remote.Tag(wt, desc, f.remoteOpts...); err != nil {
+				return fmt.Errorf("tag cache image: %w", err)
+			}
+
+			return nil // and we are done.
+		}
+	}
+
+	// Add all the tags.
 
 	// Work tag is the tag we use to save the image in the work repo.
-	var workTag string
 	if f.config.WorkRepo != "" {
-		workTag = f.workTag(spec.Name)
 		in.addTag(workTag)
 	}
-	// Name tag is the tag we use to reference the image locally.
-	// It is also what can be referenced by following steps.
-	if f.config.NamePrefix != "" {
-		nameTag := f.config.NamePrefix + spec.Name
-		in.addTag(nameTag)
-	}
-	// And add any extra tags.
-	for _, tag := range spec.Tags {
-		in.addTag(tag)
+
+	// When running on rayCI, we only need the workTag and the cacheTag.
+	// Otherwise, add extra tags.
+	if f.config.RayCI {
+		in.addTag(cacheTag)
+	} else {
+		// Name tag is the tag we use to reference the image locally.
+		// It is also what can be referenced by following steps.
+		if f.config.NamePrefix != "" {
+			nameTag := f.config.NamePrefix + spec.Name
+			in.addTag(nameTag)
+		}
+		// And add any extra tags.
+		for _, tag := range spec.Tags {
+			in.addTag(tag)
+		}
 	}
 
 	// Now we can build the image.
 	d := newDockerCmd(f.config.DockerBin)
+	d.setWorkDir(f.workDir)
 	if err := d.build(in, inputCore); err != nil {
 		return fmt.Errorf("build docker: %w", err)
 	}
 
 	// Push the image to the work repo.
-	if f.config.WorkRepo != "" {
+	if f.config.WorkRepo == "" {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
-	}
 
-	// TODO(aslonnie): push back to cr on !f.config.ReadOnlyCache
+		// Save cache result too.
+		if f.config.RayCI && !f.config.ReadOnlyCache {
+			if err := d.run("push", cacheTag); err != nil {
+				return fmt.Errorf("push cache: %w", err)
+			}
+		}
+	}
 
 	return nil
 }
