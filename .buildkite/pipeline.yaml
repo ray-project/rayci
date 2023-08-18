@@ -1,4 +1,3 @@
-# TODO(aslonnie): use rayci to launch and run all the tests.
 steps:
   - label: "test rayci with rayci"
     commands:

@@ -218,6 +218,7 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 		WorkRepo:   fmt.Sprintf("%s/work", addr),
 		BuildID:    "abc123",
+		RayCI:      true,
 	}
 
 	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
@@ -253,5 +254,46 @@ func TestForgeWithWorkRepo(t *testing.T) {
 	}
 	if got := files["opt/app/world.txt"]; got != worldDotTxt {
 		t.Errorf("world.txt in image, got %q, want %q", got, worldDotTxt)
+	}
+
+	// Now test caching, on anthoer forge, with a different build ID.
+
+	config.BuildID = "def456"
+	forge, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("make new forge: %v", err)
+	}
+
+	helloSpec, err := parseSpecFile("testdata/hello.wanda.yaml")
+	if err != nil {
+		t.Fatalf("parse hello spec: %v", err)
+	}
+
+	if err := forge.Build(helloSpec); err != nil {
+		t.Fatalf("rebuild hello: %v", err)
+	}
+
+	if hit := forge.cacheHit(); hit != 1 {
+		t.Errorf("got %d cache hits, want 1", hit)
+	}
+
+	hello := fmt.Sprintf("%s/work:def456-hello", addr)
+	helloRef, err := name.ParseReference(hello)
+	if err != nil {
+		t.Fatalf("parse hello reference: %v", err)
+	}
+
+	helloImg, err := remote.Image(helloRef)
+	if err != nil {
+		t.Fatalf("read hello image: %v", err)
+	}
+
+	helloLayers, err := helloImg.Layers()
+	if err != nil {
+		t.Fatalf("read hello layers: %v", err)
+	}
+
+	if len(helloLayers) != 1 {
+		t.Fatalf("got hello %d layers, want 2", len(layers))
 	}
 }
