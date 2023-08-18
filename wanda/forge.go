@@ -220,9 +220,11 @@ func (f *Forge) Build(spec *Spec) error {
 		in.addTag(workTag)
 	}
 
-	// When running on rayCI, we only need the workTag.
-	// otherwise, add extra tags.
-	if !f.config.RayCI {
+	// When running on rayCI, we only need the workTag and the cacheTag.
+	// Otherwise, add extra tags.
+	if f.config.RayCI {
+		in.addTag(cacheTag)
+	} else {
 		// Name tag is the tag we use to reference the image locally.
 		// It is also what can be referenced by following steps.
 		if f.config.NamePrefix != "" {
@@ -233,8 +235,6 @@ func (f *Forge) Build(spec *Spec) error {
 		for _, tag := range spec.Tags {
 			in.addTag(tag)
 		}
-	} else {
-		in.addTag(cacheTag)
 	}
 
 	// Now we can build the image.
@@ -245,19 +245,18 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	// Push the image to the work repo.
-	if f.config.WorkRepo != "" {
+	if f.config.WorkRepo == "" {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
 
+		// Save cache result too.
 		if f.config.RayCI && !f.config.ReadOnlyCache {
 			if err := d.run("push", cacheTag); err != nil {
 				return fmt.Errorf("push cache: %w", err)
 			}
 		}
 	}
-
-	// TODO(aslonnie): push back to cr on !f.config.ReadOnlyCache
 
 	return nil
 }
