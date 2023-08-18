@@ -66,9 +66,13 @@ type buildInputCore struct {
 }
 
 func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
-	context, err := i.context.digest()
-	if err != nil {
-		return nil, fmt.Errorf("compute build context digest: %w", err)
+	context := ""
+	if i.context != nil {
+		d, err := i.context.digest()
+		if err != nil {
+			return nil, fmt.Errorf("compute build context digest: %w", err)
+		}
+		context = d
 	}
 
 	froms := make(map[string]string)
