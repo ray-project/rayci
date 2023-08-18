@@ -63,6 +63,9 @@ const (
 
 	// dev only
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
+
+	// pipeline for this repo
+	rayCIPipeline = "01890992-4f1a-4cc4-b99d-f2da360eb3ab"
 )
 
 const (
@@ -146,7 +149,7 @@ var prPipelineConfig = &config{
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
 	switch pipelineID {
-	case rayBranchPipeline, rayV2PostmergePipeline:
+	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
 		return prPipelineConfig
