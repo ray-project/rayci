@@ -84,7 +84,7 @@ var branchPipelineConfig = &config{
 	ArtifactsBucket: "ray-ci-artifact-branch-public",
 
 	CITemp:      "s3://ray-ci-artifact-branch-public/ci-temp/",
-	CIWorkRepo:  rayCIECR + "/rayci_temp_branch",
+	CIWorkRepo:  rayCIECR + "/rayproject/citemp",
 	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
@@ -116,7 +116,7 @@ var prPipelineConfig = &config{
 	ArtifactsBucket: "ray-ci-artifact-pr-public",
 
 	CITemp:      "s3://ray-ci-artifact-pr-public/ci-temp/",
-	CIWorkRepo:  rayCIECR + "/rayci_temp_pr",
+	CIWorkRepo:  rayCIECR + "/rayproject/citemp",
 	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
