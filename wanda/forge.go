@@ -186,8 +186,6 @@ func (f *Forge) Build(spec *Spec) error {
 	cachable := f.config.RayCI && f.config.WorkRepo != "" &&
 		!spec.CopyEverything
 
-	// TODO(aslonnie): check if the image output already exists
-	// if yes, then just perform retag, rather than rebuilding.
 	if cachable {
 		ct, err := cranename.NewTag(cacheTag)
 		if err != nil {
