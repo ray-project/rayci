@@ -24,8 +24,9 @@ func resolveLocalImage(name, ref string) (*imageSource, error) {
 	}
 
 	return &imageSource{
-		name: name,
-		id:   id.String(),
+		name:  name,
+		id:    id.String(),
+		local: ref,
 	}, nil
 }
 

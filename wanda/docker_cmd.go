@@ -60,7 +60,7 @@ func (c *dockerCmd) pull(src, asTag string) error {
 	}
 
 	if src != asTag {
-		if err := c.run("tag", src, asTag); err != nil {
+		if err := c.tag(src, asTag); err != nil {
 			return fmt.Errorf("tag %s %s: %w", src, asTag, err)
 		}
 	}
@@ -85,15 +85,11 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 		if !ok {
 			return fmt.Errorf("missing base image source for %q", from)
 		}
-
-		if src.local != "" {
-			if err := c.tag(src.local, src.name); err != nil {
-				return fmt.Errorf("tag %s %s: %w", src.local, src.name, err)
-			}
-		} else {
-			if err := c.pull(src.src, src.name); err != nil {
-				return fmt.Errorf("pull %s(%s): %w", src.name, src.src, err)
-			}
+		if src.local != "" { // local image, already ready.
+			continue
+		}
+		if err := c.pull(src.src, src.name); err != nil {
+			return fmt.Errorf("pull %s(%s): %w", src.name, src.src, err)
 		}
 	}
 	// TODO(aslonnie): maybe recheck all the IDs of the from images?
