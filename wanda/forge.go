@@ -199,7 +199,7 @@ func (f *Forge) Build(spec *Spec) error {
 
 		desc, err := remote.Get(ct, f.remoteOpts...)
 		if err != nil {
-			log.Printf("fetch cache image: %v", err)
+			log.Printf("Cache image miss: %v", err)
 		} else {
 			// Cache hit!
 			log.Printf("cache hit: %s", desc.Digest)
