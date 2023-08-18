@@ -133,10 +133,13 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
-	ts := newTarStream()
-	f.addSrcFile(ts, spec.Dockerfile)
-	for _, src := range spec.Srcs {
-		f.addSrcFile(ts, src)
+	var ts *tarStream
+	if !spec.CopyEverything {
+		ts = newTarStream()
+		f.addSrcFile(ts, spec.Dockerfile)
+		for _, src := range spec.Srcs {
+			f.addSrcFile(ts, src)
+		}
 	}
 
 	in := newBuildInput(ts, spec.BuildArgs)
@@ -182,6 +185,7 @@ func (f *Forge) Build(spec *Spec) error {
 
 	// Now we can build the image.
 	d := newDockerCmd(f.config.DockerBin)
+	d.setWorkDir(f.workDir)
 	if err := d.build(in, inputCore); err != nil {
 		return fmt.Errorf("build docker: %w", err)
 	}
