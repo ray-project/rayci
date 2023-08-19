@@ -79,6 +79,9 @@ var (
 			map[string]any{"exit_status": 255, "limit": 3},
 		},
 	}
+	defaultBuilderRetry = map[string]any{
+		"automatic": map[string]any{"limit": 1},
+	}
 
 	defaultTimeoutInMinutes = int((5 * time.Hour).Minutes())
 

@@ -38,6 +38,9 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 		"key":      s.name,
 		"commands": wandaCommands,
 		"env":      envs,
+		"retry":    defaultBuilderRetry,
+
+		"timeout_in_minutes": defaultTimeoutInMinutes,
 	}
 
 	if s.dependsOn != nil {
