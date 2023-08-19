@@ -111,6 +111,10 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_WANDA_NAME": "forge",
 			},
 			"depends_on": "ci-base",
+			"retry": map[string]any{
+				"automatic": map[string]any{"limit": 1},
+			},
+			"timeout_in_minutes": 300,
 		},
 	}, {
 		in:  map[string]any{"wait": nil},
