@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ray-project/rayci/wanda"
 )
@@ -16,6 +18,7 @@ func main() {
 	namePrefix := flag.String("name_prefix", "", "prefix for the image name")
 	buildID := flag.String("build_id", "", "build ID for the image tag")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
+	epoch := flag.String("epoch", "", "epoch for the image tag")
 
 	flag.Parse()
 
@@ -38,12 +41,18 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
+	if *epoch != "" {
+		year, week := time.Now().UTC().ISOWeek()
+		*epoch = fmt.Sprintf("%04d%02d", year, week)
+	}
+
 	config := &wanda.ForgeConfig{
 		WorkDir:    *workDir,
 		DockerBin:  *docker,
 		WorkRepo:   *workRepo,
 		NamePrefix: *namePrefix,
 		BuildID:    *buildID,
+		Epoch:      *epoch,
 
 		RayCI: *rayCI,
 
