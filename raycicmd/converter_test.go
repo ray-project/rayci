@@ -124,6 +124,10 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
 			"depends_on": "ci-base",
+			"retry": map[string]any{
+				"automatic": map[string]any{"limit": 1},
+			},
+			"timeout_in_minutes": 300,
 		},
 	}, {
 		in:  map[string]any{"wait": nil},
