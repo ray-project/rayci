@@ -33,3 +33,11 @@ func TestBuildID(t *testing.T) {
 		}
 	})
 }
+
+func TestGitCommit(t *testing.T) {
+	env := newEnvsMap(map[string]string{"BUILDKITE_COMMIT": "123abcdefg"})
+	got := gitCommit(env)
+	if want := "123abcdefg"; got != want {
+		t.Errorf("gitCommit: got %q, want %q", got, want)
+	}
+}

@@ -72,13 +72,16 @@ func TestMakeForgeGroup(t *testing.T) {
 	}
 
 	buildID := "fakebuild"
+	info := &buildInfo{
+		BuildID: buildID,
+	}
 
 	t.Run("no forge", func(t *testing.T) {
 		root := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(root, "ci/forge"), 0700); err != nil {
 			t.Fatalf("make forge dir: %v", err)
 		}
-		g, err := makeForgeGroup(root, buildID, config, nil)
+		g, err := makeForgeGroup(root, info, config, nil)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}
@@ -112,7 +115,7 @@ func TestMakeForgeGroup(t *testing.T) {
 			"RAYCI_WORK_REPO": config.CIWorkRepo,
 		}
 
-		g, err := makeForgeGroup(root, buildID, config, envMap)
+		g, err := makeForgeGroup(root, info, config, envMap)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}
@@ -198,7 +201,7 @@ func TestMakeForgeGroup(t *testing.T) {
 
 		envMap := map[string]string{"RAYCI_BUILD_ID": buildID}
 
-		g, err := makeForgeGroup(root, buildID, config, envMap)
+		g, err := makeForgeGroup(root, info, config, envMap)
 		if err != nil {
 			t.Fatalf("make forge group: %v", err)
 		}

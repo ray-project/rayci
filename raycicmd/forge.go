@@ -66,7 +66,7 @@ func (s *forgeStep) buildkiteStep() map[string]any {
 }
 
 func makeForgeGroup(
-	repoDir, buildID string, config *config, envs map[string]string,
+	repoDir string, info *buildInfo, config *config, envs map[string]string,
 ) (
 	*bkPipelineGroup, error,
 ) {
@@ -99,7 +99,7 @@ func makeForgeGroup(
 			step := &forgeStep{
 				name:     forgeName,
 				file:     filePath,
-				buildID:  buildID,
+				buildID:  info.BuildID,
 				envs:     envs,
 				ciConfig: config,
 			}
