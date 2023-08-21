@@ -61,16 +61,16 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	return g, nil
 }
 
-func makePipeline(repoDir string, config *config, buildID, rayciBranch string) (
+func makePipeline(repoDir string, config *config, info *buildInfo) (
 	*bkPipeline, error,
 ) {
 	pl := new(bkPipeline)
 
-	c := newConverter(config, buildID, rayciBranch)
+	c := newConverter(config, info)
 
 	// Build steps that build the forge images.
 
-	forgeGroup, err := makeForgeGroup(repoDir, buildID, config, c.envMapCopy())
+	forgeGroup, err := makeForgeGroup(repoDir, info, config, c.envMapCopy())
 	if err != nil {
 		return nil, fmt.Errorf("make forge group: %w", err)
 	}

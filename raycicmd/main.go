@@ -90,8 +90,15 @@ func Main(args []string, envs Envs) error {
 	}
 
 	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
+	commit := gitCommit(envs)
 
-	pipeline, err := makePipeline(flags.RepoDir, config, buildID, rayciBranch)
+	info := &buildInfo{
+		BuildID:     buildID,
+		RayCIBranch: rayciBranch,
+		GitCommit:   commit,
+	}
+
+	pipeline, err := makePipeline(flags.RepoDir, config, info)
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)
 	}
