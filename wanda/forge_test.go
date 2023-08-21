@@ -219,6 +219,7 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		WorkRepo:   fmt.Sprintf("%s/work", addr),
 		BuildID:    "abc123",
 		RayCI:      true,
+		Epoch:      "1",
 	}
 
 	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
@@ -295,5 +296,19 @@ func TestForgeWithWorkRepo(t *testing.T) {
 
 	if len(helloLayers) != 1 {
 		t.Fatalf("got hello %d layers, want 2", len(layers))
+	}
+
+	config.Epoch = "2"
+	forge2, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("make forge for new epoch: %v", err)
+	}
+
+	if err := forge2.Build(helloSpec); err != nil {
+		t.Fatalf("rebuild hello: %v", err)
+	}
+
+	if hit := forge2.cacheHit(); hit != 0 {
+		t.Errorf("got %d cache hits, want 0", hit)
 	}
 }

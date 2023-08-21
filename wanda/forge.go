@@ -36,6 +36,7 @@ type ForgeConfig struct {
 	WorkRepo   string
 	NamePrefix string
 	BuildID    string
+	Epoch      string
 
 	RayCI bool
 
@@ -174,6 +175,7 @@ func (f *Forge) Build(spec *Spec) error {
 	if err != nil {
 		return fmt.Errorf("make build input core: %w", err)
 	}
+	inputCore.Epoch = f.config.Epoch
 
 	inputDigest, err := inputCore.digest()
 	if err != nil {
