@@ -14,23 +14,32 @@ type converter struct {
 	envMap map[string]string
 }
 
-func newConverter(config *config, buildID, rayciBranch string) *converter {
+func newConverter(config *config, info *buildInfo) *converter {
 	c := &converter{
 		config:  config,
-		buildID: buildID,
+		buildID: info.BuildID,
 
-		ciTempForBuild: config.CITemp + buildID + "/",
+		ciTempForBuild: config.CITemp + info.BuildID + "/",
 	}
 
 	envMap := make(map[string]string)
-	envMap["RAYCI_BUILD_ID"] = buildID
+	envMap["RAYCI_BUILD_ID"] = info.BuildID
 	envMap["RAYCI_WORK_REPO"] = config.CIWorkRepo
 	envMap["RAYCI_TEMP"] = c.ciTempForBuild
-	if rayciBranch != "" {
-		envMap["RAYCI_BRANCH"] = rayciBranch
+	if info.RayCIBranch != "" {
+		envMap["RAYCI_BRANCH"] = info.RayCIBranch
 	}
 	if config.ForgePrefix != "" {
 		envMap["RAYCI_FORGE_PREFIX"] = config.ForgePrefix
+	}
+
+	if c.config.ArtifactsBucket != "" && info.GitCommit != "" {
+		dest := fmt.Sprintf(
+			"s3://%s/%s",
+			c.config.ArtifactsBucket,
+			info.GitCommit,
+		)
+		envMap["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = dest
 	}
 
 	for k, v := range c.config.Env {

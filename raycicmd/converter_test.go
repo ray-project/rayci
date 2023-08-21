@@ -32,6 +32,11 @@ func findInSlice(s []string, v string) bool {
 
 func TestConvertPipelineStep(t *testing.T) {
 	const buildID = "abc123"
+	info := &buildInfo{
+		BuildID:     buildID,
+		RayCIBranch: "beta",
+		GitCommit:   "abcdefg1234567890",
+	}
 
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
@@ -43,7 +48,9 @@ func TestConvertPipelineStep(t *testing.T) {
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
-	}, buildID, "beta")
+	}, info)
+
+	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890"
 
 	for _, test := range []struct {
 		in  map[string]any
@@ -62,6 +69,8 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
 		},
 	}, {
@@ -88,6 +97,8 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
 		},
 	}, {
@@ -109,6 +120,8 @@ func TestConvertPipelineStep(t *testing.T) {
 
 				"RAYCI_WANDA_FILE": "ci/forge.wanda.yaml",
 				"RAYCI_WANDA_NAME": "forge",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
 			"depends_on": "ci-base",
 		},
@@ -187,6 +200,11 @@ func TestConvertPipelineStep(t *testing.T) {
 
 func TestConvertPipelineStep_priority(t *testing.T) {
 	const buildID = "abc123"
+	info := &buildInfo{
+		BuildID:     buildID,
+		RayCIBranch: "beta",
+		GitCommit:   "abcdefg1234567890",
+	}
 
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
@@ -200,7 +218,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 		},
 
 		RunnerPriority: 1,
-	}, buildID, "")
+	}, info)
 
 	g := &pipelineGroup{
 		Group: "fancy",
@@ -229,12 +247,17 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 }
 
 func TestConvertPipelineGroup(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		BuildID: buildID,
+	}
+
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
 
 		RunnerQueues: map[string]string{"default": "runner"},
-	}, "buildid", "")
+	}, info)
 
 	g := &pipelineGroup{
 		Group: "fancy",
