@@ -193,6 +193,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		for _, env := range []string{
 			"RAYCI_BUILD_ID",
 			"RAYCI_TEMP",
+			"RAYCI_WORK_REPO",
 			"BUILDKITE_BAZEL_CACHE_URL",
 		} {
 			if !findInSlice(envs, env) {

@@ -147,14 +147,8 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		result["priority"] = priority
 	}
 
-	envMap := make(map[string]string)
-	envMap["RAYCI_BUILD_ID"] = c.buildID
-	envMap["RAYCI_TEMP"] = c.ciTempForBuild
-	for k, v := range c.config.Env {
-		envMap[k] = v
-	}
-
-	result["env"] = c.envMapCopy()
+	envMap := c.envMapCopy()
+	result["env"] = envMap
 
 	var envKeys []string
 	for k := range envMap {
