@@ -133,8 +133,14 @@ func TestConvertPipelineStep(t *testing.T) {
 		in:  map[string]any{"wait": nil},
 		out: map[string]any{"wait": nil},
 	}, {
-		in:  map[string]any{"wait": nil, "continue_on_failure": true},
-		out: map[string]any{"wait": nil, "continue_on_failure": true},
+		in: map[string]any{
+			"wait": nil, "continue_on_failure": true,
+			"depends_on": "dep", "if": "false",
+		},
+		out: map[string]any{
+			"wait": nil, "continue_on_failure": true,
+			"depends_on": "dep", "if": "false",
+		},
 	}} {
 		got, err := c.convertPipelineStep(test.in)
 		if err != nil {
