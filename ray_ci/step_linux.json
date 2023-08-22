@@ -33,6 +33,8 @@
                     "BUILDKITE_BUILD_ID",
                     "BUILDKITE_PARALLEL_JOB",
                     "BUILDKITE_PARALLEL_JOB_COUNT",
+                    "BUILDKITE_PIPELINE_SLUG",
+                    "BUILDKITE_PIPELINE_ID",
                     "BUILDKITE_MESSAGE",
                     "BUILDKITE_BUILD_NUMBER",
                     "PS4"
