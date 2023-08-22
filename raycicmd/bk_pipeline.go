@@ -37,7 +37,6 @@ var buildkiteEnvs = []string{
 	"BUILDKITE",
 	"BUILDKITE_BRANCH",
 	"BUILDKITE_COMMIT",
-	"BUILDKITE_HOOK_WORKING_DIR",
 	"BUILDKITE_LABEL",
 	"BUILDKITE_PIPELINE_ID",
 	"BUILDKITE_PIPELINE_SLUG",
@@ -49,6 +48,7 @@ var buildkiteEnvs = []string{
 	"BUILDKITE_PARALLEL_JOB_COUNT",
 	"BUILDKITE_PULL_REQUEST",
 	"BUILDKITE_MESSAGE",
+	"RAYCI_CHECKOUT_DIR",
 }
 
 func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
