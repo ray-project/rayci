@@ -49,7 +49,7 @@ func gitCommit(envs Envs) string {
 }
 
 func gitDiff(envs Envs) []string {
-	base_branch := getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
+	base_branch := "master"
 	if base_branch == "" {
 		return []string{}
 	}
@@ -64,5 +64,6 @@ func gitDiff(envs Envs) []string {
 		log.Printf("Fail to resolve git diff: %v", err)
 		return []string{}
 	}
+	log.Printf("git diff: %s", diffs)
 	return strings.Split(string(bytes.TrimSpace(diffs)), "\n")
 }
