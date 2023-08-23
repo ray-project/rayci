@@ -16,5 +16,4 @@ export GOPRIVATE="github.com/ray-project/rayci"
 
 echo "--- Run rayci"
 
-export $(python ci/pipeline/determine_tests_to_run.py)
 exec "$GOPATH/bin/rayci" "$@"
