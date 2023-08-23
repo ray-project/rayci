@@ -44,6 +44,8 @@ func newConverter(config *config, info *buildInfo) *converter {
 		envMap["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = dest
 	}
 
+	envMap["RAYCI_CORE_CHANGE"] = strconv.FormatBool(anyCoreChange(info.GitDiff))
+
 	for k, v := range c.config.Env {
 		envMap[k] = v
 	}
