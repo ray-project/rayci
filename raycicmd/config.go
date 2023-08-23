@@ -143,6 +143,7 @@ var prPipelineConfig = &config{
 	Env: map[string]string{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 		"BUILDKITE_CACHE_READONLY":  "true",
+		"RAY_CI_PYTHON_AFFECTED": os.Getenv("RAY_CI_PYTHON_AFFECTED"),
 	},
 }
 
