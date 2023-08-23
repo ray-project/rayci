@@ -79,7 +79,7 @@ func (c *converter) jobEnvImage(name string) string {
 
 const dockerPlugin = "docker#v5.8.0"
 
-func (c *converter) convertPipelineStep(step map[string]any) (
+func (c *converter) convertPipelineStep(step map[string]any, changes []string) (
 	map[string]any, error,
 ) {
 	if _, ok := step["wait"]; ok {
@@ -116,6 +116,11 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		}
 
 		return s.buildkiteStep(), nil
+	}
+
+	team, _ := stringInMap(step, "team")
+	if !affectedByChange(team, changes) {
+		return nil, nil // skip steps that are not affected by changes
 	}
 
 	// a normal command step
@@ -165,7 +170,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	return result, nil
 }
 
-func (c *converter) convertPipelineGroup(g *pipelineGroup) (
+func (c *converter) convertPipelineGroup(g *pipelineGroup, changes []string) (
 	*bkPipelineGroup, error,
 ) {
 	bkGroup := &bkPipelineGroup{
@@ -174,9 +179,12 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup) (
 	}
 
 	for _, step := range g.Steps {
-		bkStep, err := c.convertPipelineStep(step)
+		bkStep, err := c.convertPipelineStep(step, changes)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
+		}
+		if bkStep == nil {
+			continue // skip empty steps
 		}
 		bkGroup.Steps = append(bkGroup.Steps, bkStep)
 	}

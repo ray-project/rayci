@@ -41,3 +41,11 @@ func TestGitCommit(t *testing.T) {
 		t.Errorf("gitCommit: got %q, want %q", got, want)
 	}
 }
+
+func TestGitDiff(t *testing.T) {
+	env := newEnvsMap(map[string]string{})
+	got := gitDiff(env)
+	if len(got) != 0 {
+		t.Errorf("gitDiff: got %v, want empty", got)
+	}
+}

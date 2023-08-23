@@ -91,11 +91,13 @@ func Main(args []string, envs Envs) error {
 
 	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
 	commit := gitCommit(envs)
+	diff := gitDiff(envs)
 
 	info := &buildInfo{
 		BuildID:     buildID,
 		RayCIBranch: rayciBranch,
 		GitCommit:   commit,
+		GitDiff:     diff,
 	}
 
 	pipeline, err := makePipeline(flags.RepoDir, config, info)

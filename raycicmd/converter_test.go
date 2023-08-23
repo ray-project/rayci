@@ -141,10 +141,24 @@ func TestConvertPipelineStep(t *testing.T) {
 			"wait": nil, "continue_on_failure": true,
 			"depends_on": "dep", "if": "false",
 		},
+	}, {
+		in: map[string]any{
+			"team": "core",
+		},
+		out: nil,
 	}} {
-		got, err := c.convertPipelineStep(test.in)
+		got, err := c.convertPipelineStep(test.in, []string{"python/ray/air/abc.py"})
 		if err != nil {
 			t.Errorf("convertPipelineStep %+v: %v", test.in, err)
+			continue
+		}
+		if test.out == nil {
+			if got != nil {
+				t.Errorf(
+					"convertPipelineStep %+v: got %+v, want %+v",
+					test.in, got, test.out,
+				)
+			}
 			continue
 		}
 
@@ -239,7 +253,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+	bk, err := c.convertPipelineGroup(g, []string{})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -278,7 +292,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 1"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+	bk, err := c.convertPipelineGroup(g, []string{})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}

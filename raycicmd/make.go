@@ -102,7 +102,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 			}
 
-			bkGroup, err := c.convertPipelineGroup(g)
+			bkGroup, err := c.convertPipelineGroup(g, info.GitDiff)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"convert pipeline group %s: %w", file, err,
