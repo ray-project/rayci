@@ -66,6 +66,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"RAYCI_CORE_CHANGE":         "true",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
@@ -94,6 +95,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"RAYCI_CORE_CHANGE":         "true",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
@@ -114,6 +116,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"RAYCI_CORE_CHANGE":         "true",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",

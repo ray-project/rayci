@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 )
 
 type converter struct {
@@ -26,6 +27,7 @@ func newConverter(config *config, info *buildInfo) *converter {
 	envMap["RAYCI_BUILD_ID"] = info.BuildID
 	envMap["RAYCI_WORK_REPO"] = config.CIWorkRepo
 	envMap["RAYCI_TEMP"] = c.ciTempForBuild
+	envMap["RAYCI_CORE_CHANGE"] = strconv.FormatBool(anyCoreChange(info.GitDiff))
 	if info.RayCIBranch != "" {
 		envMap["RAYCI_BRANCH"] = info.RayCIBranch
 	}

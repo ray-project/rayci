@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 )
 
 type buildInfo struct {
 	BuildID     string
 	RayCIBranch string
 	GitCommit   string
+	GitDiff     []string
 }
 
 func makeBuildID(envs Envs) (string, error) {
@@ -44,4 +46,23 @@ func gitCommit(envs Envs) string {
 		}
 	}
 	return commit
+}
+
+func gitDiff(envs Envs) []string {
+	base_branch := getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
+	if base_branch == "" {
+		return []string{}
+	}
+	cmd := exec.Command(
+		"git", 
+		"diff", 
+		"--name-only", 
+		fmt.Sprintf("$(git merge-base origin/%s HEAD)..HEAD)", base_branch),
+	)
+	diffs, err := cmd.Output()
+	if err != nil {
+		log.Printf("Fail to resolve git diff: %v", err)
+		return []string{}
+	}
+	return strings.Split(string(bytes.TrimSpace(diffs)), "\n")
 }
