@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/ray-project/rayci/wanda"
 )
+
+var sfoAround = time.FixedZone("SFO", -7*60*60)
 
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
@@ -41,9 +42,9 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
-	if *epoch != "" {
-		year, week := time.Now().UTC().ISOWeek()
-		*epoch = fmt.Sprintf("%04d%02d", year, week)
+	if *epoch == "" {
+		now := time.Now().In(sfoAround)
+		*epoch = now.Format("20060102") // YYYYMMDD
 	}
 
 	config := &wanda.ForgeConfig{
