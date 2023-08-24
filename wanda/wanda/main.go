@@ -9,6 +9,8 @@ import (
 	"github.com/ray-project/rayci/wanda"
 )
 
+var sfoAround = time.FixedZone("SFO", -7*60*60)
+
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
@@ -41,7 +43,7 @@ func main() {
 	}
 
 	if *epoch == "" {
-		now := time.Now().UTC()
+		now := time.Now().In(sfoAround)
 		*epoch = now.Format("20060102") // YYYYMMDD
 	}
 
