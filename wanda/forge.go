@@ -95,7 +95,7 @@ func (f *Forge) cacheTag(inputDigest string) string {
 	if _, d, ok := strings.Cut(inputDigest, ":"); ok {
 		inputDigest = d
 	}
-	return fmt.Sprintf("%s:c-%s", f.workRepo(), inputDigest)
+	return fmt.Sprintf("%s:z-%s", f.workRepo(), inputDigest)
 }
 
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
