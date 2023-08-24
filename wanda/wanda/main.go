@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -41,9 +40,9 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
-	if *epoch != "" {
-		year, week := time.Now().UTC().ISOWeek()
-		*epoch = fmt.Sprintf("%04d%02d", year, week)
+	if *epoch == "" {
+		now := time.Now().UTC()
+		*epoch = now.Format("20060102") // YYYYMMDD
 	}
 
 	config := &wanda.ForgeConfig{
