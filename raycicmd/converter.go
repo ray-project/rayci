@@ -150,15 +150,22 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	envMap := c.envMapCopy()
 	result["env"] = envMap
 
-	var envKeys []string
+	envKeys := make(map[string]struct{})
 	for k := range envMap {
-		envKeys = append(envKeys, k)
+		envKeys[k] = struct{}{}
 	}
-	sort.Strings(envKeys)
+	for _, k := range c.config.HookEnvKeys {
+		envKeys[k] = struct{}{}
+	}
+	var envKeyList []string
+	for k := range envKeys {
+		envKeyList = append(envKeyList, k)
+	}
+	sort.Strings(envKeyList)
 
 	result["plugins"] = []any{
 		map[string]any{
-			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envKeys),
+			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envKeyList),
 		},
 	}
 

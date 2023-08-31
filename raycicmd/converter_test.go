@@ -48,6 +48,8 @@ func TestConvertPipelineStep(t *testing.T) {
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
+
+		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 	}, info)
 
 	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890"
@@ -201,6 +203,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"RAYCI_TEMP",
 			"RAYCI_WORK_REPO",
 			"BUILDKITE_BAZEL_CACHE_URL",
+			"RAYCI_CHECKOUT_DIR",
 		} {
 			if !findInSlice(envs, env) {
 				t.Errorf("convertPipelineStep %+v: no %q", test.in, env)
