@@ -34,6 +34,10 @@ type config struct {
 
 	// Env is the environment variables to set for runner steps.
 	Env map[string]string `yaml:"env"`
+
+	// HookEnvKeys is the list of environment variable keys to pass into
+	// build jobs from buildkite hooks.
+	HookEnvKeys []string `yaml:"hook_env_keys"`
 }
 
 func builderAgent(config *config) string {
@@ -108,6 +112,8 @@ var branchPipelineConfig = &config{
 	Env: map[string]string{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 	},
+
+	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 }
 
 var prPipelineConfig = &config{
@@ -144,6 +150,8 @@ var prPipelineConfig = &config{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 		"BUILDKITE_CACHE_READONLY":  "true",
 	},
+
+	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 }
 
 func ciDefaultConfig(envs Envs) *config {
