@@ -38,6 +38,11 @@ type config struct {
 	// HookEnvKeys is the list of environment variable keys to pass into
 	// build jobs from buildkite hooks.
 	HookEnvKeys []string `yaml:"hook_env_keys"`
+
+	// Command to populate the buildkite step tags. When this command is specified,
+	// a buildkite step is skipped if it is tagged by something that is not returned
+	// by this command.
+	TagFilterCommand []string `yaml:"tag_filter_command"`
 }
 
 func builderAgent(config *config) string {
@@ -152,6 +157,13 @@ var prPipelineConfig = &config{
 	},
 
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+
+	TagFilterCommand: []string{
+		"python",
+		"ci/pipeline/determine_tests_to_run.py",
+		"--output",
+		"rayci_tags",
+	},
 }
 
 func ciDefaultConfig(envs Envs) *config {

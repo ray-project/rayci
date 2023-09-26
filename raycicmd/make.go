@@ -4,11 +4,17 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
+
+type tagFilter struct {
+	tags   []string
+	runAll bool
+}
 
 func isRayCIYaml(p string) bool {
 	if strings.HasSuffix(p, ".rayci.yaml") {
@@ -61,6 +67,20 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	return g, nil
 }
 
+func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
+	if len(tagFilterCommand) == 0 {
+		return &tagFilter{tags: []string{}, runAll: true}, nil
+	}
+	// TODO: put the execution in an unprivileged sandbox
+	cmd := exec.Command(tagFilterCommand[0], tagFilterCommand[1:]...)
+	filters, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("tag filter script: %w", err)
+	}
+
+	return &tagFilter{tags: strings.Fields(string(filters)), runAll: false}, nil
+}
+
 func makePipeline(repoDir string, config *config, info *buildInfo) (
 	*bkPipeline, error,
 ) {
@@ -85,6 +105,10 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		bkDirs = []string{".buildkite"}
 	}
 
+	tagFilters, err := runTagFilterCommand(config.TagFilterCommand)
+	if err != nil {
+		return nil, fmt.Errorf("run tag filter command: %w", err)
+	}
 	for _, bkDir := range bkDirs {
 		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
 
@@ -102,7 +126,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 			}
 
-			bkGroup, err := c.convertPipelineGroup(g)
+			bkGroup, err := c.convertPipelineGroup(g, tagFilters)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"convert pipeline group %s: %w", file, err,

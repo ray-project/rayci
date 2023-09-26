@@ -149,6 +149,15 @@ func TestConvertPipelineStep(t *testing.T) {
 			t.Errorf("convertPipelineStep %+v: %v", test.in, err)
 			continue
 		}
+		if got == nil {
+			if test.out != nil {
+				t.Errorf(
+					"convertPipelineStep %+v: got:\n %s\nwant:\n %s",
+					test.in, got, test.out,
+				)
+			}
+			continue
+		}
 
 		_, isWait := got["wait"]
 		_, isWanda := test.in["wanda"]
@@ -242,7 +251,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{}, runAll: true})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -278,10 +287,11 @@ func TestConvertPipelineGroup(t *testing.T) {
 		Steps: []map[string]any{
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
-			{"commands": []string{"echo 1"}},
+			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
+			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{"foo"}, runAll: false})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -291,5 +301,32 @@ func TestConvertPipelineGroup(t *testing.T) {
 	}
 	if len(bk.Steps) != 3 {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+	}
+}
+
+func TestDoesIntersect(t *testing.T) {
+	for _, test := range []struct {
+		in01 []string
+		in02 []interface{}
+		out  bool
+	}{{
+		in01: []string{"foo", "bar"},
+		in02: []interface{}{"foo", "w00t"},
+		out:  true,
+	}, {
+		in01: []string{"foo", "bar"},
+		in02: []interface{}{"hi", "w00t"},
+		out:  false,
+	}, {
+		in01: []string{},
+		in02: []interface{}{},
+		out:  false,
+	}} {
+		if got := doesIntersect(test.in01, test.in02); got != test.out {
+			t.Errorf(
+				"runTagFilter %+v, %+v: got %+v, want %+v",
+				test.in01, test.in02, got, test.out,
+			)
+		}
 	}
 }
