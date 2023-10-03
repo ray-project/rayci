@@ -172,7 +172,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	return result, nil
 }
 
-func (c *converter) convertPipelineGroup(g *pipelineGroup) (
+func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
 	*bkPipelineGroup, error,
 ) {
 	bkGroup := &bkPipelineGroup{
@@ -181,6 +181,14 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup) (
 	}
 
 	for _, step := range g.Steps {
+		// filter steps by tags
+		if stepTags, ok := step["tags"]; ok {
+			if !filter.hit(fieldToStringList(stepTags)) {
+				continue
+			}
+		}
+
+		// convert step to buildkite step
 		bkStep, err := c.convertPipelineStep(step)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)

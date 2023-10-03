@@ -149,6 +149,15 @@ func TestConvertPipelineStep(t *testing.T) {
 			t.Errorf("convertPipelineStep %+v: %v", test.in, err)
 			continue
 		}
+		if got == nil {
+			if test.out != nil {
+				t.Errorf(
+					"convertPipelineStep %+v: got:\n %s\nwant:\n %s",
+					test.in, got, test.out,
+				)
+			}
+			continue
+		}
 
 		_, isWait := got["wait"]
 		_, isWanda := test.in["wanda"]
@@ -242,7 +251,7 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{}, runAll: true})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -278,10 +287,12 @@ func TestConvertPipelineGroup(t *testing.T) {
 		Steps: []map[string]any{
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
-			{"commands": []string{"echo 1"}},
+			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
+			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g)
+
+	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{"foo"}})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}

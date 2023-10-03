@@ -85,6 +85,10 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		bkDirs = []string{".buildkite"}
 	}
 
+	tagFilters, err := runTagFilterCommand(config.TagFilterCommand)
+	if err != nil {
+		return nil, fmt.Errorf("run tag filter command: %w", err)
+	}
 	for _, bkDir := range bkDirs {
 		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
 
@@ -102,7 +106,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 			}
 
-			bkGroup, err := c.convertPipelineGroup(g)
+			bkGroup, err := c.convertPipelineGroup(g, tagFilters)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"convert pipeline group %s: %w", file, err,

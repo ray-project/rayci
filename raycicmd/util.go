@@ -66,3 +66,26 @@ func checkStepKeys(m map[string]any, allowed []string) error {
 	}
 	return nil
 }
+
+func fieldToStringList(v any) []string {
+	switch v := v.(type) {
+	case nil:
+		return nil
+	case []string:
+		var list []string
+		list = append(list, v...)
+		return list
+	case []any:
+		var list []string
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				list = append(list, str)
+			}
+		}
+		return list
+	case string:
+		return []string{v}
+	default:
+		return nil
+	}
+}
