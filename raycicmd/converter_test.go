@@ -291,7 +291,8 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{"foo"}, runAll: false})
+
+	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{"foo"}})
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -301,32 +302,5 @@ func TestConvertPipelineGroup(t *testing.T) {
 	}
 	if len(bk.Steps) != 3 {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
-	}
-}
-
-func TestDoesIntersect(t *testing.T) {
-	for _, test := range []struct {
-		in01 []string
-		in02 []interface{}
-		out  bool
-	}{{
-		in01: []string{"foo", "bar"},
-		in02: []interface{}{"foo", "w00t"},
-		out:  true,
-	}, {
-		in01: []string{"foo", "bar"},
-		in02: []interface{}{"hi", "w00t"},
-		out:  false,
-	}, {
-		in01: []string{},
-		in02: []interface{}{},
-		out:  false,
-	}} {
-		if got := doesIntersect(test.in01, test.in02); got != test.out {
-			t.Errorf(
-				"runTagFilter %+v, %+v: got %+v, want %+v",
-				test.in01, test.in02, got, test.out,
-			)
-		}
 	}
 }

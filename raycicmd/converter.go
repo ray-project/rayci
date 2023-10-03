@@ -172,19 +172,6 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	return result, nil
 }
 
-func doesIntersect(arr1 []string, arr2 []interface{}) bool {
-	set := make(map[string]bool)
-	for _, s := range arr1 {
-		set[s] = true
-	}
-	for _, s := range arr2 {
-		if set[s.(string)] {
-			return true
-		}
-	}
-	return false
-}
-
 func (c *converter) convertPipelineGroup(g *pipelineGroup, tagFilter *tagFilter) (
 	*bkPipelineGroup, error,
 ) {
@@ -195,11 +182,10 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup, tagFilter *tagFilter)
 
 	for _, step := range g.Steps {
 		// filter steps by tags
-		stepTags, ok := step["tags"].([]interface{})
-		filterTags := tagFilter.tags
-		runAll := tagFilter.runAll
-		if ok && !runAll && !doesIntersect(filterTags, stepTags) {
-			continue
+		if stepTags, ok := step["tags"]; ok {
+			if !tagFilter.hit(fieldToStringList(stepTags)) {
+				continue
+			}
 		}
 
 		// convert step to buildkite step

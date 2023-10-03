@@ -190,3 +190,23 @@ func TestCheckStepKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestFieldToStringList(t *testing.T) {
+	for _, test := range []struct {
+		in   any
+		want []string
+	}{
+		{nil, nil},
+		{"hello", []string{"hello"}},
+		{[]string{"hello", "world"}, []string{"hello", "world"}},
+		{[]any{"hello", "world"}, []string{"hello", "world"}},
+		{[]any{"hello", 42}, []string{"hello"}},
+	} {
+		got := fieldToStringList(test.in)
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("fieldToStringList(%v): got %v, want %v",
+				test.in, got, test.want,
+			)
+		}
+	}
+}

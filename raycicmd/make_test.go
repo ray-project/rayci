@@ -142,29 +142,6 @@ func TestParsePipelineFile(t *testing.T) {
 	})
 }
 
-func TestRunTagFilterCommand(t *testing.T) {
-	for _, test := range []struct {
-		in  []string
-		out *tagFilter
-	}{{
-		in:  []string{"echo", "RAYCI_COVERAGE"},
-		out: &tagFilter{tags: []string{"RAYCI_COVERAGE"}, runAll: false},
-	}, {
-		in:  []string{},
-		out: &tagFilter{tags: []string{}, runAll: true},
-	}, {
-		in:  []string{"exit", "1"},
-		out: nil,
-	}} {
-		if got, _ := runTagFilterCommand(test.in); !reflect.DeepEqual(got, test.out) {
-			t.Errorf(
-				"runTagFilter %+v: got %+v, want %+v",
-				test.in, got, test.out,
-			)
-		}
-	}
-}
-
 func TestMakePipeline(t *testing.T) {
 	tmp := t.TempDir()
 

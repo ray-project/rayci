@@ -4,17 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
-
-type tagFilter struct {
-	tags   []string
-	runAll bool
-}
 
 func isRayCIYaml(p string) bool {
 	if strings.HasSuffix(p, ".rayci.yaml") {
@@ -65,20 +59,6 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	}
 
 	return g, nil
-}
-
-func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
-	if len(tagFilterCommand) == 0 {
-		return &tagFilter{tags: []string{}, runAll: true}, nil
-	}
-	// TODO: put the execution in an unprivileged sandbox
-	cmd := exec.Command(tagFilterCommand[0], tagFilterCommand[1:]...)
-	filters, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("tag filter script: %w", err)
-	}
-
-	return &tagFilter{tags: strings.Fields(string(filters)), runAll: false}, nil
 }
 
 func makePipeline(repoDir string, config *config, info *buildInfo) (
