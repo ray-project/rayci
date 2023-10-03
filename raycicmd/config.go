@@ -39,9 +39,14 @@ type config struct {
 	// build jobs from buildkite hooks.
 	HookEnvKeys []string `yaml:"hook_env_keys"`
 
-	// Command to populate the buildkite step tags. When this command is specified,
-	// a buildkite step is skipped if it is tagged by something that is not returned
-	// by this command.
+	// Command to populate the buildkite step tags. When this command is
+	// specified, a buildkite step is skipped if it is tagged by something that
+	// is not returned by this command.
+	//
+	// If the first arg (the binary) starts with "./", then it is treated as
+	// a file path relative the repsitory root, and it will be checked if the
+	// file exists. If the file does not exist, then the command is ignored
+	// and all steps will be executed.
 	TagFilterCommand []string `yaml:"tag_filter_command"`
 }
 
