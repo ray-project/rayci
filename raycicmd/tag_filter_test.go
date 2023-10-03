@@ -40,11 +40,17 @@ func TestTagFilter(t *testing.T) {
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
 		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
+		cmd:  []string{"echo", "\t  \n  \t"},
+		want: &tagFilter{},
+	}, {
 		cmd:  []string{},
-		want: &tagFilter{runAll: true},
+		want: runAllTags,
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
+	}, {
+		cmd:  []string{"./local-not-exist.sh"},
+		want: runAllTags,
 	}} {
 		got, err := runTagFilterCommand(test.cmd)
 		if test.wantErr {

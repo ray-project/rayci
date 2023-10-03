@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -31,10 +32,22 @@ func (f *tagFilter) hit(tags []string) bool {
 	return intersects(f.tags, tags)
 }
 
+var runAllTags = &tagFilter{runAll: true}
+
 func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
 	if len(tagFilterCommand) == 0 {
-		return &tagFilter{runAll: true}, nil
+		return runAllTags, nil
 	}
+
+	bin := tagFilterCommand[0]
+	if strings.HasPrefix(bin, "./") {
+		// A local in repo launcher, and the file does not exist yet.
+		// Run all tags in this case.
+		if _, err := os.Lstat(bin); os.IsNotExist(err) {
+			return runAllTags, nil
+		}
+	}
+
 	// TODO: put the execution in an unprivileged sandbox
 	cmd := exec.Command(tagFilterCommand[0], tagFilterCommand[1:]...)
 	filters, err := cmd.Output()
@@ -42,5 +55,9 @@ func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	return &tagFilter{tags: strings.Fields(string(filters))}, nil
+	tags := strings.Fields(string(filters))
+	if len(tags) == 0 {
+		tags = nil
+	}
+	return &tagFilter{tags: tags}, nil
 }

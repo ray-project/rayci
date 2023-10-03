@@ -158,12 +158,7 @@ var prPipelineConfig = &config{
 
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
-	TagFilterCommand: []string{
-		"python",
-		"ci/pipeline/determine_tests_to_run.py",
-		"--output",
-		"rayci_tags",
-	},
+	TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 }
 
 func ciDefaultConfig(envs Envs) *config {
