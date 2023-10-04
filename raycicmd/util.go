@@ -67,7 +67,7 @@ func checkStepKeys(m map[string]any, allowed []string) error {
 	return nil
 }
 
-func fieldToStringList(v any) []string {
+func toStringList(v any) []string {
 	switch v := v.(type) {
 	case nil:
 		return nil

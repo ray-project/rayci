@@ -16,11 +16,14 @@ type wandaStep struct {
 	name    string
 	file    string
 	buildID string
+	label   string
 
 	dependsOn any
 
 	envs     map[string]string
 	ciConfig *config
+
+	matrix any
 }
 
 func (s *wandaStep) buildkiteStep() map[string]any {
@@ -33,8 +36,13 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	envs["RAYCI_WANDA_NAME"] = s.name
 	envs["RAYCI_WANDA_FILE"] = s.file
 
+	label := s.label
+	if label == "" {
+		label = "wanda: " + s.name
+	}
+
 	bkStep := map[string]any{
-		"label":    "wanda: " + s.name,
+		"label":    label,
 		"key":      s.name,
 		"commands": wandaCommands,
 		"env":      envs,
@@ -51,6 +59,9 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	}
 	if p := s.ciConfig.BuilderPriority; p != 0 {
 		bkStep["priority"] = p
+	}
+	if s.matrix != nil {
+		bkStep["matrix"] = s.matrix
 	}
 	return bkStep
 }

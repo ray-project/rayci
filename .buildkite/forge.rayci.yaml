@@ -11,3 +11,13 @@ steps:
     depends_on: hello
     job_env: hello
     command: cat /opt/app/hello.txt
+
+  - name: python-base
+    label: python {{matrix}}
+    wanda: .buildkite/python.wanda.yaml
+    matrix:
+      - "3.9"
+      - "3.10"
+      - "3.11"
+    env:
+      PYTHON_VERSION: "{{matrix}}"
