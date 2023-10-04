@@ -3,6 +3,7 @@ package wanda
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,6 +22,9 @@ func Build(specFile string, config *ForgeConfig) error {
 	if err != nil {
 		return fmt.Errorf("parse spec file: %w", err)
 	}
+
+	// Expand env variable.
+	spec = spec.expandVar(os.LookupEnv)
 
 	forge, err := NewForge(config)
 	if err != nil {
