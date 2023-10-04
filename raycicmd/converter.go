@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"log"
 	"sort"
 )
 
@@ -79,6 +80,36 @@ func (c *converter) jobEnvImage(name string) string {
 
 const dockerPlugin = "docker#v5.8.0"
 
+type envEntry struct {
+	k string
+	v string
+}
+
+func parseStepEnvs(v any) ([]*envEntry, error) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("not a map")
+	}
+
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var entries []*envEntry
+	for _, k := range keys {
+		str, ok := (m[k]).(string)
+		if !ok {
+			return nil, fmt.Errorf(
+				"value of env %q is not a string", k,
+			)
+		}
+		entries = append(entries, &envEntry{k: k, v: str})
+	}
+	return entries, nil
+}
+
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
@@ -103,13 +134,36 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		if !ok {
 			return nil, fmt.Errorf("wanda step file is not a string")
 		}
+		label, _ := stringInMap(step, "label")
+
+		var matrix any
+		if m, ok := step["matrix"]; ok {
+			matrix = m
+		}
+
+		envs := c.envMapCopy()
+		if stepEnvs, ok := step["env"]; ok {
+			entries, err := parseStepEnvs(stepEnvs)
+			if err != nil {
+				return nil, fmt.Errorf("parse wanda step envs: %w", err)
+			}
+			for _, entry := range entries {
+				if _, ok := envs[entry.k]; ok {
+					log.Printf("wanda step env %q ignored", entry.k)
+				} else {
+					envs[entry.k] = entry.v
+				}
+			}
+		}
 
 		s := &wandaStep{
 			name:     name,
+			label:    label,
 			file:     file,
 			buildID:  c.buildID,
-			envs:     c.envMap,
+			envs:     envs,
 			ciConfig: c.config,
+			matrix:   matrix,
 		}
 		if dependsOn, ok := step["depends_on"]; ok {
 			s.dependsOn = dependsOn
@@ -183,7 +237,7 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
 	for _, step := range g.Steps {
 		// filter steps by tags
 		if stepTags, ok := step["tags"]; ok {
-			if !filter.hit(fieldToStringList(stepTags)) {
+			if !filter.hit(toStringList(stepTags)) {
 				continue
 			}
 		}

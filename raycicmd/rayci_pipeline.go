@@ -16,7 +16,10 @@ var (
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"instance_type", "queue", "job_env", "tags",
 	}
-	wandaStepAllowedKeys = []string{"name", "wanda", "depends_on"}
+	wandaStepAllowedKeys = []string{
+		"name", "wanda", "depends_on",
+		"matrix", "env",
+	}
 
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",

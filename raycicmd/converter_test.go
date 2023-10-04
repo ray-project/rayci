@@ -8,6 +8,44 @@ import (
 	"reflect"
 )
 
+func TestParseStepEnvs(t *testing.T) {
+	for _, test := range []struct {
+		in      any
+		want    []*envEntry
+		wantErr bool
+	}{
+		{in: nil, wantErr: true},
+		{in: "string", wantErr: true},
+		{in: []string{"A=B"}, wantErr: true},
+		{in: map[string]string{"A": "B"}, wantErr: true},
+		{
+			in: map[string]any{"PY_VERSION": "py36", "A": "B"},
+			want: []*envEntry{
+				{k: "A", v: "B"},
+				{k: "PY_VERSION", v: "py36"},
+			},
+		},
+	} {
+		got, err := parseStepEnvs(test.in)
+		if test.wantErr {
+			if err == nil {
+				t.Errorf("parseStepEnvs(%+v): want error, got nil", test.in)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("parseStepEnvs(%+v) got error: %v", test.in, err)
+			continue
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf(
+				"parseStepEnvs(%+v): got %+v, want %+v",
+				test.in, got, test.want,
+			)
+		}
+	}
+}
+
 func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	for _, p := range plugins {
 		if m, ok := p.(map[string]any); ok {
@@ -106,11 +144,14 @@ func TestConvertPipelineStep(t *testing.T) {
 	}, {
 		in: map[string]any{
 			"name":       "forge",
+			"label":      "my forge",
 			"wanda":      "ci/forge.wanda.yaml",
 			"depends_on": "ci-base",
+			"env":        map[string]any{"PY_VERSION": "{{matrix}}"},
+			"matrix":     []any{"py36", "py37"},
 		},
 		out: map[string]any{
-			"label":    "wanda: forge",
+			"label":    "my forge",
 			"key":      "forge",
 			"commands": wandaCommands,
 			"env": map[string]string{
@@ -124,7 +165,10 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_WANDA_NAME": "forge",
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+
+				"PY_VERSION": "{{matrix}}",
 			},
+			"matrix":     []any{"py36", "py37"},
 			"depends_on": "ci-base",
 			"retry": map[string]any{
 				"automatic": map[string]any{"limit": 1},
