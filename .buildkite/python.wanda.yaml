@@ -1,4 +1,6 @@
 name: "wanda-py$PYTHON_VERSION"
 froms:
   - "python:$PYTHON_VERSION"
-dockerfile: .buildkite/python.Dockerfile
+build_args:
+  - PYTHON_VERSION
+dockerfile: .buildkite/wanda-py.Dockerfile
