@@ -13,9 +13,9 @@ steps:
   - label: Python {{matrix}} tests
     command: "docker run --rm $$RAY_CI_WORKREPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}} python --version"
     matrix:
-      - 3.9
-      - 3.10
-      - 3.11
+      - "3.9"
+      - "3.10"
+      - "3.11"
     depends_on:
       - python-base
       - forge
