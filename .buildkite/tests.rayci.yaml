@@ -11,7 +11,10 @@ steps:
     queue: small
     depends_on: forge
   - label: Python {{matrix}} tests
-    command: "docker run --rm $$RAY_CI_WORKREPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}} python --version"
+    command:
+      - export IMAGE=$$RAYCI_WORK_REPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}}
+      - echo $$IMAGE
+      - docker run -ti --rm $$IMAGE
     matrix:
       - "3.9"
       - "3.10"
