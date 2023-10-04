@@ -16,8 +16,6 @@ steps:
       - 3.9
       - 3.10
       - 3.11
-    env:
-      PYTHON_VERSION: "{{matrix}}"
     depends_on:
       - python-base
       - forge
