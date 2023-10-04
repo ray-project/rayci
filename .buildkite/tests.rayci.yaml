@@ -12,6 +12,7 @@ steps:
     depends_on: forge
   - label: Python {{matrix}} tests
     command:
+      - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 029272617770.dkr.ecr.us-west-2.amazonaws.com
       - export IMAGE=$$RAYCI_WORK_REPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}}
       - echo $$IMAGE
       - docker run -ti --rm $$IMAGE python --version
