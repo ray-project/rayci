@@ -17,7 +17,7 @@ var (
 		"instance_type", "queue", "job_env", "tags",
 	}
 	wandaStepAllowedKeys = []string{
-		"name", "wanda", "depends_on",
+		"name", "label", "wanda", "depends_on",
 		"matrix", "env",
 	}
 
