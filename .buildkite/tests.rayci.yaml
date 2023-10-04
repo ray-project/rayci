@@ -14,7 +14,7 @@ steps:
     command:
       - export IMAGE=$$RAYCI_WORK_REPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}}
       - echo $$IMAGE
-      - docker run -ti --rm $$IMAGE
+      - docker run -ti --rm $$IMAGE python --version
     matrix:
       - "3.9"
       - "3.10"
