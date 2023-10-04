@@ -50,6 +50,7 @@ func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
 
 	// TODO: put the execution in an unprivileged sandbox
 	cmd := exec.Command(tagFilterCommand[0], tagFilterCommand[1:]...)
+	cmd.Stderr = os.Stderr
 	filters, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("tag filter script: %w", err)
