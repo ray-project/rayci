@@ -2,5 +2,5 @@ name: "wanda-py$PYTHON_VERSION"
 froms:
   - "python:$PYTHON_VERSION"
 build_args:
-  - PYTHON_VERSION
+  - BASE_IMAGE=python:$PYTHON_VERSION
 dockerfile: .buildkite/wanda-py.Dockerfile
