@@ -332,6 +332,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
 			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
+			{"wanda": "panda", "tags": []interface{}{"bar"}},
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 		},
 	}
