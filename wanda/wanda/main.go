@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -44,7 +45,8 @@ func main() {
 
 	if *epoch == "" {
 		now := time.Now().In(sfoAround)
-		*epoch = now.Format("20060102") // YYYYMMDD
+		year, week := now.ISOWeek()
+		*epoch = fmt.Sprintf("%d%02d", year, week)
 	}
 
 	config := &wanda.ForgeConfig{
