@@ -113,6 +113,7 @@ var branchPipelineConfig = &config{
 		"large":     "runner_queue_branch",
 		"gpu":       "gpu_runner_queue_branch",
 		"gpu-large": "gpu_large_runner_queue_branch",
+		"trainium":  "trainium_runner_queue_branch",
 
 		"medium-arm64": "runner_queue_arm64_medium_branch",
 	},
@@ -147,6 +148,7 @@ var prPipelineConfig = &config{
 		"large":     "runner_queue_pr",
 		"gpu":       "gpu_runner_queue_pr",
 		"gpu-large": "gpu_large_runner_queue_pr",
+		"trainium":  "trainium_runner_queue_pr",
 
 		"medium-arm64": "runner_queue_arm64_medium_pr",
 	},
