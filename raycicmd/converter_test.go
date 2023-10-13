@@ -334,10 +334,15 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
 			{"wanda": "panda", "tags": []interface{}{"bar"}},
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
+			{"commands": []string{"exit 1"}, "tags": "disabled"},
 		},
 	}
 
-	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{"foo"}})
+	filter := &tagFilter{
+		skipTags: []string{"disabled"},
+		tags:     []string{"foo"},
+	}
+	bk, err := c.convertPipelineGroup(g, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}

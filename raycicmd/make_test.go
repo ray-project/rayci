@@ -160,6 +160,9 @@ func TestMakePipeline(t *testing.T) {
 			`  - label: "test1"`,
 			`    key: "test1"`,
 			`    commands: [ "echo test1" ]`,
+			`  - label: "disabled"`,
+			`    tags: disabled`,
+			`    commands: [ "exit 1" ]`,
 		),
 	}, {
 		name:    ".buildkite/forge/Dockerfile.forge",
@@ -187,6 +190,7 @@ func TestMakePipeline(t *testing.T) {
 		},
 		RunnerQueues: map[string]string{"default": "runner_x"},
 		ForgeDirs:    defaultForgeDirs,
+		SkipTags:     []string{"disabled"},
 	}
 
 	buildID := "fakebuild"
