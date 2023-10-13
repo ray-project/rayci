@@ -61,7 +61,7 @@ func (i *buildInput) tagList() []string {
 type buildInputCore struct {
 	// Epoch changes from time to time.
 	// When it changes, the cache is invalidated and the build reruns.
-	Epoch string `json:",omitempty""`
+	Epoch string `json:",omitempty"`
 
 	Dockerfile   string            // Name of the Dockerfile to use.
 	Froms        map[string]string // Map from image names to image digests.
