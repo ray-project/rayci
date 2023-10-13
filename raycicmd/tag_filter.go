@@ -8,8 +8,10 @@ import (
 )
 
 type tagFilter struct {
-	tags   []string
+	skipTags []string
+
 	runAll bool
+	tags   []string
 }
 
 func intersects(set1, set2 []string) bool {
@@ -26,30 +28,33 @@ func intersects(set1, set2 []string) bool {
 }
 
 func (f *tagFilter) hit(tags []string) bool {
+	if intersects(f.skipTags, tags) {
+		return false
+	}
 	if f.runAll {
 		return true
 	}
 	return intersects(f.tags, tags)
 }
 
-var runAllTags = &tagFilter{runAll: true}
+func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
+	filter := &tagFilter{skipTags: skips, runAll: true}
 
-func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
-	if len(tagFilterCommand) == 0 {
-		return runAllTags, nil
+	if len(filterCmd) == 0 {
+		return filter, nil
 	}
 
-	bin := tagFilterCommand[0]
+	bin := filterCmd[0]
 	if strings.HasPrefix(bin, "./") {
 		// A local in repo launcher, and the file does not exist yet.
 		// Run all tags in this case.
 		if _, err := os.Lstat(bin); os.IsNotExist(err) {
-			return runAllTags, nil
+			return filter, nil
 		}
 	}
 
 	// TODO: put the execution in an unprivileged sandbox
-	cmd := exec.Command(tagFilterCommand[0], tagFilterCommand[1:]...)
+	cmd := exec.Command(filterCmd[0], filterCmd[1:]...)
 	cmd.Stderr = os.Stderr
 	filters, err := cmd.Output()
 	if err != nil {
@@ -60,5 +65,8 @@ func runTagFilterCommand(tagFilterCommand []string) (*tagFilter, error) {
 	if len(tags) == 0 {
 		tags = nil
 	}
-	return &tagFilter{tags: tags}, nil
+	filter.runAll = false
+	filter.tags = tags
+
+	return filter, nil
 }

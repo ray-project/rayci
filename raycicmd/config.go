@@ -48,6 +48,9 @@ type config struct {
 	// file exists. If the file does not exist, then the command is ignored
 	// and all steps will be executed.
 	TagFilterCommand []string `yaml:"tag_filter_command"`
+
+	// SkipTags is the list of tags that will always be skipped.
+	SkipTags []string `yaml:"skip_tags"`
 }
 
 func builderAgent(config *config) string {
@@ -125,6 +128,8 @@ var branchPipelineConfig = &config{
 	},
 
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+
+	SkipTags: []string{"disabled"},
 }
 
 var prPipelineConfig = &config{
@@ -166,6 +171,8 @@ var prPipelineConfig = &config{
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
 	TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
+
+	SkipTags: []string{"disabled"},
 }
 
 func ciDefaultConfig(envs Envs) *config {

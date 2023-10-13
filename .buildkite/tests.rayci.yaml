@@ -23,3 +23,6 @@ steps:
     depends_on:
       - python-base
       - forge
+  - label: "Failing test"
+    tags: disabled
+    command: exit 1

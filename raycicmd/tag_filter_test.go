@@ -31,11 +31,12 @@ func TestIntersects(t *testing.T) {
 		}
 	}
 }
-func TestTagFilter(t *testing.T) {
+func TestNewTagFilter(t *testing.T) {
 	for _, test := range []struct {
-		cmd     []string
-		want    *tagFilter
-		wantErr bool
+		cmd      []string
+		skipTags []string
+		want     *tagFilter
+		wantErr  bool
 	}{{
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
 		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
@@ -44,15 +45,21 @@ func TestTagFilter(t *testing.T) {
 		want: &tagFilter{},
 	}, {
 		cmd:  []string{},
-		want: runAllTags,
+		want: &tagFilter{runAll: true},
+	}, {
+		cmd:  nil,
+		want: &tagFilter{runAll: true},
+	}, {
+		skipTags: []string{"disabled"},
+		want:     &tagFilter{skipTags: []string{"disabled"}, runAll: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
 	}, {
 		cmd:  []string{"./local-not-exist.sh"},
-		want: runAllTags,
+		want: &tagFilter{runAll: true},
 	}} {
-		got, err := runTagFilterCommand(test.cmd)
+		got, err := newTagFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -68,6 +75,64 @@ func TestTagFilter(t *testing.T) {
 				"run %q: got %+v, want %+v",
 				test.cmd, got, test.want,
 			)
+		}
+	}
+}
+
+func TestTagFilter(t *testing.T) {
+	filter := &tagFilter{
+		skipTags: []string{"disabled"},
+		tags:     []string{"tune"},
+	}
+
+	for _, tags := range [][]string{
+		{"tune"},
+		{"tune", "foo"},
+		{"bar", "tune"},
+	} {
+		if !filter.hit(tags) {
+			t.Errorf("miss %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		{"disabled"},
+		{},
+		{"data"},
+		{"tune", "disabled"},
+		{"disabled", "tune"},
+	} {
+		if filter.hit(tags) {
+			t.Errorf("hit %+v", tags)
+		}
+	}
+}
+
+func TestTagFilter_runAll(t *testing.T) {
+	filter := &tagFilter{
+		skipTags: []string{"disabled"},
+		runAll:   true,
+	}
+
+	for _, tags := range [][]string{
+		nil,
+		{},
+		{"data"},
+		{"tune"},
+		{"tune", "foo"},
+		{"bar", "tune"},
+	} {
+		if !filter.hit(tags) {
+			t.Errorf("miss %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		{"tune", "disabled"},
+		{"disabled", "tune"},
+	} {
+		if filter.hit(tags) {
+			t.Errorf("hit %+v", tags)
 		}
 	}
 }
