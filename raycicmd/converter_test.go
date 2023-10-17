@@ -265,7 +265,7 @@ func TestConvertPipelineStep(t *testing.T) {
 	}
 }
 
-func TestConvertPipelineStep_priority(t *testing.T) {
+func TestConvertPipelineGroup_priority(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
 		BuildID:     buildID,
@@ -295,7 +295,8 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	bk, err := c.convertPipelineGroup(g, &tagFilter{tags: []string{}, runAll: true})
+	filter := &tagFilter{tags: []string{}, runAll: true}
+	bk, err := c.convertPipelineGroup(g, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -310,6 +311,73 @@ func TestConvertPipelineStep_priority(t *testing.T) {
 	}
 	if p := (steps[2].(map[string]any))["priority"]; p != 1 {
 		t.Errorf("low priority step: got priority %v, want 1", p)
+	}
+}
+
+func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		BuildID:     buildID,
+		RayCIBranch: "beta",
+		GitCommit:   "abcdefg1234567890",
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+
+		Env: map[string]string{
+			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+		},
+
+		DockerPlugin: &dockerPluginConfig{
+			AllowMountBuildkiteAgent: true,
+		},
+	}, info)
+
+	g := &pipelineGroup{
+		Group: "fancy",
+		Steps: []map[string]any{{
+			"commands":              []string{"has agent"},
+			"mount_buildkite_agent": true,
+		}, {
+			"commands":              []string{"has no agent"},
+			"mount_buildkite_agent": false,
+		}},
+	}
+	filter := &tagFilter{tags: []string{}, runAll: true}
+	bk, err := c.convertPipelineGroup(g, filter)
+	if err != nil {
+		t.Fatalf("convertPipelineGroup: %v", err)
+	}
+
+	if len(bk.Steps) != 2 {
+		t.Fatalf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+	}
+
+	steps := bk.Steps
+
+	p0, ok := findDockerPlugin(steps[0].(map[string]any)["plugins"].([]any))
+	if !ok {
+		t.Errorf("docker plugin not found in step 0")
+		return
+	}
+	v, ok := boolInMap(p0, "mount_buildkite_agent")
+	if v != true || ok != true {
+		t.Errorf("step 0: got docker mount bk agent %v, %v, want true", v, ok)
+	}
+
+	p1, ok := findDockerPlugin(steps[1].(map[string]any)["plugins"].([]any))
+	if !ok {
+		t.Errorf("docker plugin not found in step 0")
+		return
+	}
+	v, ok = boolInMap(p1, "mount_buildkite_agnet")
+	if v != false || ok != false {
+		t.Errorf("step 1: got docker mount bk agent %v, %v, want false", v, ok)
 	}
 }
 

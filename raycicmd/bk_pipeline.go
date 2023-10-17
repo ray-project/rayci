@@ -51,11 +51,20 @@ var buildkiteEnvs = []string{
 	"BUILDKITE_MESSAGE",
 }
 
-func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
-	envs := append([]string(nil), buildkiteEnvs...)
-	envs = append(envs, extraEnvs...)
+type stepDockerPluginConfig struct {
+	extraEnvs           []string
+	mountBuildkiteAgent bool
+}
 
-	return map[string]any{
+func makeRayDockerPlugin(
+	image string, config *stepDockerPluginConfig,
+) map[string]any {
+	envs := append([]string(nil), buildkiteEnvs...)
+	if len(config.extraEnvs) > 0 {
+		envs = append(envs, config.extraEnvs...)
+	}
+
+	m := map[string]any{
 		"image":         image,
 		"shell":         []string{"/bin/bash", "-elic"},
 		"workdir":       "/ray",
@@ -69,6 +78,12 @@ func makeRayDockerPlugin(image string, extraEnvs []string) map[string]any {
 
 		"environment": envs,
 	}
+
+	if config.mountBuildkiteAgent {
+		m["mount_buildkite_agent"] = true
+	}
+
+	return m
 }
 
 var (
