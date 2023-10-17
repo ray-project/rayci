@@ -8,6 +8,10 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+type dockerPluginConfig struct {
+	AllowMountBuildkiteAgent bool `yaml:"mount_buildkite_agent"`
+}
+
 type config struct {
 	name string
 
@@ -51,6 +55,9 @@ type config struct {
 
 	// SkipTags is the list of tags that will always be skipped.
 	SkipTags []string `yaml:"skip_tags"`
+
+	// Additional docker plugin configs.
+	DockerPlugin *dockerPluginConfig `yaml:"docker_plugin"`
 }
 
 func builderAgent(config *config) string {
