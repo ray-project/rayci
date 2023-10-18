@@ -6,6 +6,43 @@ import (
 	"reflect"
 )
 
+func TestBoolInMap(t *testing.T) {
+	for _, test := range []struct {
+		m    map[string]any
+		key  string
+		want bool
+		ok   bool
+	}{{
+		m:    map[string]any{"a": true},
+		key:  "a",
+		want: true,
+		ok:   true,
+	}, {
+		m:   map[string]any{"b": "a"},
+		key: "a",
+	}, {
+		m:   map[string]any{"a": 1},
+		key: "a",
+	}, {
+		m:   nil,
+		key: "a",
+	}} {
+		got, ok := boolInMap(test.m, test.key)
+		if got != test.want {
+			t.Errorf(
+				"boolInMap(%v, %v): got %v, want %v",
+				test.m, test.key, got, test.want,
+			)
+		}
+		if ok != test.ok {
+			t.Errorf(
+				"boolInMap(%v, %v): got ok %v, want %v",
+				test.m, test.key, ok, test.ok,
+			)
+		}
+	}
+}
+
 func TestStringInMap(t *testing.T) {
 	for _, test := range []struct {
 		m    map[string]any

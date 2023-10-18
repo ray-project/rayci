@@ -217,11 +217,19 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	}
 	sort.Strings(envKeyList)
 
-	result["plugins"] = []any{
-		map[string]any{
-			dockerPlugin: makeRayDockerPlugin(jobEnvImage, envKeyList),
-		},
+	mountBuildkiteAgent := false
+	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
+		v, _ := boolInMap(step, "mount_buildkite_agent")
+		mountBuildkiteAgent = v
 	}
+
+	dockerPluginConfig := &stepDockerPluginConfig{
+		extraEnvs:           envKeyList,
+		mountBuildkiteAgent: mountBuildkiteAgent,
+	}
+	result["plugins"] = []any{map[string]any{
+		dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
+	}}
 
 	return result, nil
 }

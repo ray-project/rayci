@@ -4,6 +4,15 @@ import (
 	"fmt"
 )
 
+func boolInMap(m map[string]any, key string) (bool, bool) {
+	v, ok := m[key]
+	if !ok {
+		return false, false
+	}
+	b, ok := v.(bool)
+	return b, ok
+}
+
 func stringInMap(m map[string]any, key string) (string, bool) {
 	v, ok := m[key]
 	if !ok {
