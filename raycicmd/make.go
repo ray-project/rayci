@@ -68,16 +68,6 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 
 	c := newConverter(config, info)
 
-	// Build steps that build the forge images.
-
-	forgeGroup, err := makeForgeGroup(repoDir, info, config, c.envMapCopy())
-	if err != nil {
-		return nil, fmt.Errorf("make forge group: %w", err)
-	}
-	if len(forgeGroup.Steps) > 0 {
-		pl.Steps = append(pl.Steps, forgeGroup)
-	}
-
 	// Build steps for CI.
 
 	bkDirs := config.BuildkiteDirs

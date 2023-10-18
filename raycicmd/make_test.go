@@ -164,9 +164,6 @@ func TestMakePipeline(t *testing.T) {
 			`    tags: disabled`,
 			`    commands: [ "exit 1" ]`,
 		),
-	}, {
-		name:    ".buildkite/forge/Dockerfile.forge",
-		content: `FROM ubuntu:latest`,
 	}} {
 
 		dir := filepath.Join(tmp, filepath.Dir(f.name))
@@ -189,7 +186,6 @@ func TestMakePipeline(t *testing.T) {
 			"builder": "builder_queue",
 		},
 		RunnerQueues: map[string]string{"default": "runner_x"},
-		ForgeDirs:    defaultForgeDirs,
 		SkipTags:     []string{"disabled"},
 	}
 
@@ -203,8 +199,8 @@ func TestMakePipeline(t *testing.T) {
 		t.Fatalf("makePipeline: %v", err)
 	}
 
-	if len(got.Steps) != 2 { // all steps are groups.
-		t.Errorf("got %d groups, want 2", len(got.Steps))
+	if len(got.Steps) != 1 { // all steps are groups.
+		t.Errorf("got %d groups, want 1", len(got.Steps))
 	}
 
 	// sub funtions are already tested in their unit tests.
@@ -216,7 +212,7 @@ func TestMakePipeline(t *testing.T) {
 		totalSteps += len(g.Steps)
 	}
 
-	if totalSteps != 2 {
-		t.Fatalf("got %d steps, want 2", totalSteps)
+	if totalSteps != 1 {
+		t.Fatalf("got %d steps, want 1", totalSteps)
 	}
 }

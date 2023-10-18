@@ -75,11 +75,6 @@ type config struct {
 	// Optional. Default is `[]string{".buildkite"}` .
 	BuildkiteDirs []string `yaml:"buildkite_dirs"`
 
-	// ForgeDir is the directory of forge Dockerfile files.
-	//
-	// Deprecated, don't use.
-	ForgeDirs []string `yaml:"forge_dirs"`
-
 	// Env is the environment variables to set for runner steps.
 	//
 	// Optional.
@@ -155,8 +150,6 @@ const (
 	defaultForgePrefix = "cr.ray.io/rayproject/"
 )
 
-var defaultForgeDirs = []string{".buildkite/forge", "ci/forge", "ci/v2/forge"}
-
 var branchPipelineConfig = &config{
 	name: "ray-branch",
 
@@ -182,8 +175,6 @@ var branchPipelineConfig = &config{
 
 		"medium-arm64": "runner_queue_arm64_medium_branch",
 	},
-
-	ForgeDirs: defaultForgeDirs,
 
 	Env: map[string]string{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
@@ -222,8 +213,6 @@ var prPipelineConfig = &config{
 
 	BuilderPriority: 1,
 	RunnerPriority:  1,
-
-	ForgeDirs: defaultForgeDirs,
 
 	Env: map[string]string{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
