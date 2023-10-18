@@ -81,6 +81,8 @@ type config struct {
 	ForgeDirs []string `yaml:"forge_dirs"`
 
 	// Env is the environment variables to set for runner steps.
+	//
+	// Optional.
 	Env map[string]string `yaml:"env"`
 
 	// HookEnvKeys is the list of environment variable keys to pass into
