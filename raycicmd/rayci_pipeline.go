@@ -24,5 +24,6 @@ var (
 
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
+		"mount_buildkite_agent",
 	}
 )
