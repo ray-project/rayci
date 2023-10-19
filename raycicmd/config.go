@@ -12,7 +12,7 @@ type dockerPluginConfig struct {
 	// AllowMountDockerSocket sets if it is allowed for jobs to mount the
 	// buildkite agent. This should only be set for pipelines where all builds
 	// on the pipeline are trusted.
-	AllowMountBuildkiteAgent bool `yaml:"mount_buildkite_agent"`
+	AllowMountBuildkiteAgent bool `yaml:"allow_mount_buildkite_agent"`
 }
 
 type config struct {
