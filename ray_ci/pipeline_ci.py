@@ -229,7 +229,8 @@ def main(
 
     pipeline_path = Path(pipeline).expanduser()
     if not pipeline_path.exists():
-        raise ValueError(f"Pipeline file does not exist: {pipeline}")
+        print(json.dumps([]))
+        return
 
     base_step_file = base_step_file or DEFAULT_BASE_STEPS_JSON
     with open(base_step_file, "r") as f:
