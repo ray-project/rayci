@@ -38,10 +38,14 @@ if [ "${KICK_OFF_EARLY}" = "1" ]; then
   fi
 
   if [[ "$(docker manifest inspect $EARLY_IMAGE_GPU)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+    if [[ -e .buildkite/pipeline.gpu.yml ]]; then
+      python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+        "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+    fi
+    if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
+      python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+        "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+    fi
   else
       echo "Docker image NOT FOUND for early test kick-off GPU: $EARLY_IMAGE_GPU"
   fi
@@ -236,14 +240,22 @@ echo "--- :rocket: Launching GPU tests :tv:"
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
   echo "Kicking off the rest of the GPU pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+  if [[ -e .buildkite/pipeline.gpu.yml ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+  fi
+  if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
     python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  fi
 else
   echo "Kicking off the full GPU pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  if [[ -e .buildkite/pipeline.gpu.yml ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+  fi
+  if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
+    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
+  fi
 fi
