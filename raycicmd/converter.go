@@ -188,7 +188,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 
 	result := cloneMapExcept(step, commandStepDropKeys)
 
-	if agentQueue != "~" { // queue type not supported, skip.
+	if agentQueue != skipQueue { // queue type not supported, skip.
 		result["agents"] = newBkAgents(agentQueue)
 	} else {
 		result["agents"] = newBkAgents("na")

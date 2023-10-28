@@ -8,6 +8,8 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+const skipQueue = "~"
+
 type dockerPluginConfig struct {
 	// AllowMountDockerSocket sets if it is allowed for jobs to mount the
 	// buildkite agent. This should only be set for pipelines where all builds
@@ -55,7 +57,8 @@ type config struct {
 
 	// RunnerQueues is a mapping from job instance types to buildkite agent
 	// queues for runners. If not set, the agent queue will be omitted, and the
-	// default queue will be used.
+	// default queue will be used. If it mapped to "~", then the job will be
+	// marked with `skip: true`.
 	//
 	// Optional but highly recommended.
 	RunnerQueues map[string]string `yaml:"runner_queues"`

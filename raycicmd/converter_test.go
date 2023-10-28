@@ -83,7 +83,7 @@ func TestConvertPipelineStep(t *testing.T) {
 
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
-			"broken":  "~",
+			"broken":  skipQueue,
 		},
 
 		Env: map[string]string{
