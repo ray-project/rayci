@@ -123,7 +123,6 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 		out: map[string]any{
 			"commands":           []string{"echo 1"},
-			"agents":             newBkAgents("na"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,

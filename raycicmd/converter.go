@@ -191,7 +191,6 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	if agentQueue != skipQueue { // queue type not supported, skip.
 		result["agents"] = newBkAgents(agentQueue)
 	} else {
-		result["agents"] = newBkAgents("na")
 		result["skip"] = true
 	}
 

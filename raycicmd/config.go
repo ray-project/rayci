@@ -8,7 +8,9 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-const skipQueue = "~"
+const (
+	skipQueue = "~"
+)
 
 type dockerPluginConfig struct {
 	// AllowMountDockerSocket sets if it is allowed for jobs to mount the
