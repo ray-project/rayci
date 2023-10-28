@@ -178,6 +178,9 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	}
 
 	queue, _ := stringInMapAnyKey(step, "queue", "instance_type")
+	if queue == "" {
+		queue = "default"
+	}
 	agentQueue, err := c.mapAgent(queue)
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
@@ -185,7 +188,13 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 
 	result := cloneMapExcept(step, commandStepDropKeys)
 
-	result["agents"] = newBkAgents(agentQueue)
+	if agentQueue != "~" { // queue type not supported, skip.
+		result["agents"] = newBkAgents(agentQueue)
+	} else {
+		result["agents"] = newBkAgents("na")
+		result["skip"] = true
+	}
+
 	result["retry"] = defaultRayRetry
 	result["timeout_in_minutes"] = defaultTimeoutInMinutes
 	result["artifact_paths"] = defaultArtifactPaths
