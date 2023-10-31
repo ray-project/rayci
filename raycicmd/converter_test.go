@@ -81,7 +81,10 @@ func TestConvertPipelineStep(t *testing.T) {
 		CITemp:          "s3://ci-temp/",
 		CIWorkRepo:      "fakeecr",
 
-		RunnerQueues: map[string]string{"default": "fakerunner"},
+		RunnerQueues: map[string]string{
+			"default": "fakerunner",
+			"broken":  skipQueue,
+		},
 
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
@@ -112,6 +115,27 @@ func TestConvertPipelineStep(t *testing.T) {
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
+		},
+	}, {
+		in: map[string]any{
+			"commands":      []string{"echo 1"},
+			"instance_type": "broken",
+		},
+		out: map[string]any{
+			"commands":           []string{"echo 1"},
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+			"skip": true,
 		},
 	}, {
 		in: map[string]any{
