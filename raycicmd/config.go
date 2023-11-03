@@ -110,9 +110,9 @@ type config struct {
 	DockerPlugin *dockerPluginConfig `yaml:"docker_plugin"`
 }
 
-func builderAgent(config *config) string {
+func builderAgent(config *config, instanceType string) string {
 	if config.BuilderQueues != nil {
-		if q, ok := config.BuilderQueues["builder"]; ok {
+		if q, ok := config.BuilderQueues[instanceType]; ok {
 			return q
 		}
 	}

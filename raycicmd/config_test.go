@@ -76,11 +76,16 @@ func TestBuilderAgent(t *testing.T) {
 	c := &config{
 		BuilderQueues: map[string]string{
 			"builder": "mybuilder",
+			"other":   "otherbuilder",
 		},
 	}
 
-	q := builderAgent(c)
+	q := builderAgent(c, "builder")
 	if q != "mybuilder" {
 		t.Errorf("builder agent got %q, want `mybuilder`", q)
+	}
+	q = builderAgent(c, "other")
+	if q != "otherbuilder" {
+		t.Errorf("builder agent got %q, want `otherbuilder`", q)
 	}
 }
