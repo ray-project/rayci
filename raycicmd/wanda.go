@@ -6,6 +6,7 @@ import (
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
 const runWandaURL = rawGitHubURL + "ray-project/rayci/stable/run_wanda.sh"
+const defaultBuilderType = "builder"
 
 var wandaCommands = []string{
 	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
@@ -13,10 +14,11 @@ var wandaCommands = []string{
 }
 
 type wandaStep struct {
-	name    string
-	file    string
-	buildID string
-	label   string
+	name         string
+	file         string
+	buildID      string
+	label        string
+	instanceType string
 
 	dependsOn any
 
@@ -27,7 +29,11 @@ type wandaStep struct {
 }
 
 func (s *wandaStep) buildkiteStep() map[string]any {
-	agent := builderAgent(s.ciConfig)
+	instanceType := s.instanceType
+	if instanceType == "" {
+		instanceType = defaultBuilderType
+	}
+	agent := builderAgent(s.ciConfig, instanceType)
 
 	envs := make(map[string]string)
 	for k, v := range s.envs {

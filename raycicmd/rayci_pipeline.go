@@ -19,7 +19,7 @@ var (
 	}
 	wandaStepAllowedKeys = []string{
 		"name", "label", "wanda", "depends_on",
-		"matrix", "env", "tags",
+		"matrix", "env", "tags", "instance_type",
 	}
 
 	commandStepDropKeys = []string{
