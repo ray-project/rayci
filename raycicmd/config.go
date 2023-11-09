@@ -233,7 +233,7 @@ var prPipelineConfig = &config{
 
 	TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 
-	SkipTags: []string{"disabled"},
+	SkipTags: []string{"disabled", "skip-on-premerge"},
 }
 
 func ciDefaultConfig(envs Envs) *config {
