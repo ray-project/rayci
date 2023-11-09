@@ -6,9 +6,15 @@ RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 TMP_DIR="$(mktemp -d)"
 
-echo "--- Install wanda"
+echo "--- Install wanda ($HOSTTYPE)"
 
-curl -sL 'https://go.dev/dl/go1.20.6.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
+if [[ "$HOSTTYPE" == "arm64" || "$HOSTTYPE" == "aarch64" ]]; then
+  GO_TGZ=https://go.dev/dl/go1.21.4.linux-arm64.tar.gz
+else
+  GO_TGZ=https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
+fi
+
+curl -sfL "$GO_TGZ" | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"

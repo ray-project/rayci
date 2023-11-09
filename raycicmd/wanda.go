@@ -5,7 +5,8 @@ import (
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
-const runWandaURL = rawGitHubURL + "ray-project/rayci/stable/run_wanda.sh"
+const runWandaURL = rawGitHubURL +
+	"ray-project/rayci/$${RAYCI_BRANCH:-stable}/run_wanda.sh"
 const defaultBuilderType = "builder"
 
 var wandaCommands = []string{

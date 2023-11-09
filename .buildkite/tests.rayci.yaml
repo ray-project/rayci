@@ -10,6 +10,13 @@ steps:
       - git diff --exit-code
     queue: small
     depends_on: forge
+    
+  - label: Go arm64 tests
+    command: go test ./...
+    job_env: forge-arm64
+    queue: medium-arm64
+    depends_on: forge-arm64
+
   - label: Python {{matrix}} tests
     command:
       - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 029272617770.dkr.ecr.us-west-2.amazonaws.com

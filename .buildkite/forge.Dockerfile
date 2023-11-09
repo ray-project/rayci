@@ -26,7 +26,12 @@ echo \
 apt-get update
 apt-get install -y docker-ce-cli
 
-curl -sSL "https://golang.org/dl/go1.20.6.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
+if [[ "$HOSTTYPE" == "aarch64" || "$HOSTTYPE" == "arm64" ]]; then
+  curl -sSfL "https://golang.org/dl/go1.21.4.linux-arm64.tar.gz" -o "/tmp/golang.tar.gz"
+else
+  curl -sSfL "https://golang.org/dl/go1.21.4.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
+fi
+
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
 rm "/tmp/golang.tar.gz"
 ln -s /usr/local/go/bin/go /usr/local/bin/go

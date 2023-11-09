@@ -21,3 +21,7 @@ steps:
       - "3.11"
     env:
       PYTHON_VERSION: "{{matrix}}"
+
+  - name: forge-arm64
+    wanda: .buildkite/forge-arm64.wanda.yaml
+    instance_type: builder-arm64

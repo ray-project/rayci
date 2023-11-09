@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -67,6 +68,8 @@ type buildInputCore struct {
 	Froms        map[string]string // Map from image names to image digests.
 	BuildContext string            // Digests of the build context.
 	BuildArgs    map[string]string // Resolved build args.
+
+	Platform string `json:",omitempty"` // "amd64" (empty string) or "arm64"
 }
 
 func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
@@ -86,11 +89,17 @@ func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 
 	buildArgs := resolveBuildArgs(i.buildArgs)
 
+	platform := runtime.GOARCH
+	if platform == "amd64" {
+		platform = ""
+	}
+
 	core := &buildInputCore{
 		Dockerfile:   dockerfile,
 		Froms:        froms,
 		BuildContext: context,
 		BuildArgs:    buildArgs,
+		Platform:     platform,
 	}
 
 	return core, nil
