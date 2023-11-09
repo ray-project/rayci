@@ -6,7 +6,7 @@ RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 TMP_DIR="$(mktemp -d)"
 
-echo "--- Install wanda"
+echo "--- Install wanda ($HOSTTYPE)"
 
 GO_TGZ=https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
 if [[ "$HOSTTYPE" == "arm64" || "$HOSTTYPE" == "aarch64" ]]; then
