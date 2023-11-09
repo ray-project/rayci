@@ -13,6 +13,7 @@ steps:
     
   - label: Go arm64 tests
     command: go test ./...
+    job_env: forge-arm64
     queue: medium-arm64
     depends_on: forge-arm64
 
