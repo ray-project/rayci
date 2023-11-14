@@ -96,7 +96,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 			}
 
-			if !tagFilters.hit(g.Tags) {
+			if len(g.Tags) > 0 && !tagFilters.hit(g.Tags) {
 				continue
 			}
 
