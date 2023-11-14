@@ -164,6 +164,16 @@ func TestMakePipeline(t *testing.T) {
 			`    tags: disabled`,
 			`    commands: [ "exit 1" ]`,
 		),
+	}, {
+		name: ".buildkite/disabled.rayci.yaml",
+		content: multi(
+			`group: g`,
+			`tags: ["disabled"]`,
+			`steps: `,
+			`  - label: "test1"`,
+			`    key: "test1"`,
+			`    commands: [ "echo test1" ]`,
+		),
 	}} {
 
 		dir := filepath.Join(tmp, filepath.Dir(f.name))

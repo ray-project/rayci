@@ -203,6 +203,9 @@ func TestConvertPipelineStep(t *testing.T) {
 		in:  map[string]any{"wait": nil},
 		out: map[string]any{"wait": nil},
 	}, {
+		in:  map[string]any{"wait": nil, "tags": []string{"foo"}},
+		out: map[string]any{"wait": nil},
+	}, {
 		in: map[string]any{
 			"wait": nil, "continue_on_failure": true,
 			"depends_on": "dep", "if": "false",

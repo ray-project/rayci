@@ -1,8 +1,9 @@
 package raycicmd
 
 type pipelineGroup struct {
-	Group string `yaml:"group"`
-	Key   string `yaml:"key"`
+	Group string   `yaml:"group"`
+	Key   string   `yaml:"key"`
+	Tags  []string `yaml:"tags"`
 
 	Steps []map[string]any `yaml:"steps"`
 }
@@ -10,20 +11,23 @@ type pipelineGroup struct {
 var (
 	waitStepAllowedKeys = []string{
 		"wait", "continue_on_failure", "if", "depends_on",
+		"tags",
 	}
+	waitStepDropKeys = []string{"tags"}
+
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"instance_type", "queue", "job_env", "tags",
 		"mount_buildkite_agent",
 	}
-	wandaStepAllowedKeys = []string{
-		"name", "label", "wanda", "depends_on",
-		"matrix", "env", "tags", "instance_type",
-	}
-
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
 		"mount_buildkite_agent",
+	}
+
+	wandaStepAllowedKeys = []string{
+		"name", "label", "wanda", "depends_on",
+		"matrix", "env", "tags", "instance_type",
 	}
 )
