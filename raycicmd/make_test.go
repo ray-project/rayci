@@ -160,6 +160,10 @@ func TestMakePipeline(t *testing.T) {
 			`  - label: "test1"`,
 			`    key: "test1"`,
 			`    commands: [ "echo test1" ]`,
+			`  - label: "tagged test2"`,
+			`    key: "test1"`,
+			`    tags: "enabled"`,
+			`    commands: [ "echo test2" ]`,
 			`  - label: "disabled"`,
 			`    tags: disabled`,
 			`    commands: [ "exit 1" ]`,
@@ -192,6 +196,7 @@ func TestMakePipeline(t *testing.T) {
 		CITemp:          "s3://ci-temp",
 		CIWorkRepo:      "fakeecr",
 
+		TagFilterCommand: []string{"echo", "enabled"},
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",
 		},
@@ -222,7 +227,7 @@ func TestMakePipeline(t *testing.T) {
 		totalSteps += len(g.Steps)
 	}
 
-	if totalSteps != 1 {
+	if totalSteps != 2 {
 		t.Fatalf("got %d steps, want 1", totalSteps)
 	}
 }
