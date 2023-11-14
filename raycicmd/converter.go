@@ -118,7 +118,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
 			return nil, fmt.Errorf("check wait step keys: %w", err)
 		}
-		return cloneMap(step), nil
+		return cloneMapExcept(step, waitStepDropKeys), nil
 	}
 	// special steps for building container images.
 	if _, ok := step["wanda"]; ok {
