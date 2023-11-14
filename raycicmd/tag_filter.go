@@ -28,6 +28,9 @@ func intersects(set1, set2 []string) bool {
 }
 
 func (f *tagFilter) hit(tags []string) bool {
+	if len(tags) == 0 {
+		return true
+	}
 	if intersects(f.skipTags, tags) {
 		return false
 	}

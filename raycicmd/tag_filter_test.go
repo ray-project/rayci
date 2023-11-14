@@ -86,6 +86,7 @@ func TestTagFilter(t *testing.T) {
 	}
 
 	for _, tags := range [][]string{
+		{},
 		{"tune"},
 		{"tune", "foo"},
 		{"bar", "tune"},
@@ -97,7 +98,6 @@ func TestTagFilter(t *testing.T) {
 
 	for _, tags := range [][]string{
 		{"disabled"},
-		{},
 		{"data"},
 		{"tune", "disabled"},
 		{"disabled", "tune"},

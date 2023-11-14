@@ -135,7 +135,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 			return nil, fmt.Errorf("wanda step file is not a string")
 		}
 		label, _ := stringInMap(step, "label")
-		instance_type, _ := stringInMap(step, "instance_type")
+		instanceType, _ := stringInMap(step, "instance_type")
 
 		var matrix any
 		if m, ok := step["matrix"]; ok {
@@ -165,7 +165,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 			envs:         envs,
 			ciConfig:     c.config,
 			matrix:       matrix,
-			instanceType: instance_type,
+			instanceType: instanceType,
 		}
 		if dependsOn, ok := step["depends_on"]; ok {
 			s.dependsOn = dependsOn
