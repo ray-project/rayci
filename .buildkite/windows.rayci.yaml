@@ -1,0 +1,6 @@
+group: windows
+steps:
+  - name: forge
+    job_env: WINDOWS
+    instance_type: windows
+    command: echo "Hello, Windows!"

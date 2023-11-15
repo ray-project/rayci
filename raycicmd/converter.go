@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+const windowsJobEnv = "WINDOWS"
+
 type converter struct {
 	config  *config
 	buildID string
@@ -110,71 +112,68 @@ func parseStepEnvs(v any) ([]*envEntry, error) {
 	return entries, nil
 }
 
-func (c *converter) convertPipelineStep(step map[string]any) (
-	map[string]any, error,
-) {
-	if _, ok := step["wait"]; ok {
-		// a wait step
-		if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
-			return nil, fmt.Errorf("check wait step keys: %w", err)
-		}
-		return cloneMapExcept(step, waitStepDropKeys), nil
+func (c *converter) convertWait(step map[string]any) (map[string]any, error) {
+	// a wait step
+	if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
+		return nil, fmt.Errorf("check wait step keys: %w", err)
 	}
-	// special steps for building container images.
-	if _, ok := step["wanda"]; ok {
-		// a wanda step
-		if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
-			return nil, fmt.Errorf("check wanda step keys: %w", err)
-		}
-		name, ok := stringInMap(step, "name")
-		if !ok {
-			return nil, fmt.Errorf("wanda step missing name")
-		}
-		file, ok := stringInMap(step, "wanda")
-		if !ok {
-			return nil, fmt.Errorf("wanda step file is not a string")
-		}
-		label, _ := stringInMap(step, "label")
-		instanceType, _ := stringInMap(step, "instance_type")
+	return cloneMapExcept(step, waitStepDropKeys), nil
+}
 
-		var matrix any
-		if m, ok := step["matrix"]; ok {
-			matrix = m
-		}
+func (c *converter) convertWanda(step map[string]any) (map[string]any, error) {
+	// a wanda step
+	if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
+		return nil, fmt.Errorf("check wanda step keys: %w", err)
+	}
+	name, ok := stringInMap(step, "name")
+	if !ok {
+		return nil, fmt.Errorf("wanda step missing name")
+	}
+	file, ok := stringInMap(step, "wanda")
+	if !ok {
+		return nil, fmt.Errorf("wanda step file is not a string")
+	}
+	label, _ := stringInMap(step, "label")
+	instanceType, _ := stringInMap(step, "instance_type")
 
-		envs := c.envMapCopy()
-		if stepEnvs, ok := step["env"]; ok {
-			entries, err := parseStepEnvs(stepEnvs)
-			if err != nil {
-				return nil, fmt.Errorf("parse wanda step envs: %w", err)
-			}
-			for _, entry := range entries {
-				if _, ok := envs[entry.k]; ok {
-					log.Printf("wanda step env %q ignored", entry.k)
-				} else {
-					envs[entry.k] = entry.v
-				}
-			}
-		}
-
-		s := &wandaStep{
-			name:         name,
-			label:        label,
-			file:         file,
-			buildID:      c.buildID,
-			envs:         envs,
-			ciConfig:     c.config,
-			matrix:       matrix,
-			instanceType: instanceType,
-		}
-		if dependsOn, ok := step["depends_on"]; ok {
-			s.dependsOn = dependsOn
-		}
-
-		return s.buildkiteStep(), nil
+	var matrix any
+	if m, ok := step["matrix"]; ok {
+		matrix = m
 	}
 
-	// a normal command step
+	envs := c.envMapCopy()
+	if stepEnvs, ok := step["env"]; ok {
+		entries, err := parseStepEnvs(stepEnvs)
+		if err != nil {
+			return nil, fmt.Errorf("parse wanda step envs: %w", err)
+		}
+		for _, entry := range entries {
+			if _, ok := envs[entry.k]; ok {
+				log.Printf("wanda step env %q ignored", entry.k)
+			} else {
+				envs[entry.k] = entry.v
+			}
+		}
+	}
+
+	s := &wandaStep{
+		name:         name,
+		label:        label,
+		file:         file,
+		buildID:      c.buildID,
+		envs:         envs,
+		ciConfig:     c.config,
+		matrix:       matrix,
+		instanceType: instanceType,
+	}
+	if dependsOn, ok := step["depends_on"]; ok {
+		s.dependsOn = dependsOn
+	}
+
+	return s.buildkiteStep(), nil
+}
+
+func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {
 		return nil, fmt.Errorf("check command step keys: %w", err)
 	}
@@ -198,10 +197,6 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 
 	result["retry"] = defaultRayRetry
 	result["timeout_in_minutes"] = defaultTimeoutInMinutes
-	result["artifact_paths"] = defaultArtifactPaths
-
-	jobEnv, _ := stringInMap(step, "job_env")
-	jobEnvImage := c.jobEnvImage(jobEnv)
 
 	priority, ok := step["priority"]
 	if !ok {
@@ -233,15 +228,39 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 		mountBuildkiteAgent = v
 	}
 
+	jobEnv, _ := stringInMap(step, "job_env")
 	dockerPluginConfig := &stepDockerPluginConfig{
 		extraEnvs:           envKeyList,
 		mountBuildkiteAgent: mountBuildkiteAgent,
 	}
-	result["plugins"] = []any{map[string]any{
-		dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
-	}}
+
+	if jobEnv == windowsJobEnv { // a special job env
+		result["plugins"] = []any{map[string]any{
+			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
+		}}
+	} else {
+		// default Linux Job env.
+		jobEnvImage := c.jobEnvImage(jobEnv)
+		result["plugins"] = []any{map[string]any{
+			dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
+		}}
+		result["artifact_paths"] = defaultArtifactPaths
+	}
 
 	return result, nil
+}
+
+func (c *converter) convertPipelineStep(step map[string]any) (
+	map[string]any, error,
+) {
+	if _, ok := step["wait"]; ok {
+		return c.convertWait(step)
+	}
+	// special steps for building container images.
+	if _, ok := step["wanda"]; ok {
+		return c.convertWanda(step)
+	}
+	return c.convertRunner(step)
 }
 
 func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
