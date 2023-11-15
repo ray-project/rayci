@@ -37,3 +37,32 @@ func TestWandaStep(t *testing.T) {
 		t.Errorf("got agents queue %q, want `mybuilder`", got)
 	}
 }
+
+func TestWandaStep_skip(t *testing.T) {
+	s := &wandaStep{
+		name:    "forge",
+		file:    "ci/forge.wanda.yaml",
+		buildID: "abc123",
+
+		envs:         map[string]string{"RAYCI_BRANCH": "stable"},
+		instanceType: "builder-arm64",
+
+		ciConfig: &config{
+			BuilderQueues: map[string]string{"builder-arm64": "~"},
+		},
+	}
+
+	bk := s.buildkiteStep()
+
+	key, ok := stringInMap(bk, "key")
+	if !ok || key != "forge" {
+		t.Errorf("got key %q, want `forge`", key)
+	}
+
+	if got := bk["skip"].(bool); !got {
+		t.Errorf("got skip %v, want true", got)
+	}
+	if _, ok := bk["agent"]; ok {
+		t.Errorf("got agent %v, want nil", bk["agent"])
+	}
+}

@@ -34,8 +34,6 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	if instanceType == "" {
 		instanceType = defaultBuilderType
 	}
-	agent := builderAgent(s.ciConfig, instanceType)
-
 	envs := make(map[string]string)
 	for k, v := range s.envs {
 		envs[k] = v
@@ -61,9 +59,14 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	if s.dependsOn != nil {
 		bkStep["depends_on"] = s.dependsOn
 	}
-	if agent != "" {
-		bkStep["agents"] = newBkAgents(agent)
+
+	agentQueue := builderAgent(s.ciConfig, instanceType)
+	if agentQueue == skipQueue {
+		bkStep["skip"] = true
+	} else if agentQueue != "" {
+		bkStep["agents"] = newBkAgents(agentQueue)
 	}
+
 	if p := s.ciConfig.BuilderPriority; p != 0 {
 		bkStep["priority"] = p
 	}
