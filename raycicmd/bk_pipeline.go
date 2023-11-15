@@ -56,13 +56,37 @@ type stepDockerPluginConfig struct {
 	mountBuildkiteAgent bool
 }
 
-func makeRayDockerPlugin(
-	image string, config *stepDockerPluginConfig,
-) map[string]any {
+func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
 	envs := append([]string(nil), buildkiteEnvs...)
 	if len(config.extraEnvs) > 0 {
 		envs = append(envs, config.extraEnvs...)
 	}
+	return envs
+}
+
+const windowsBuildEnvImage = "rayproject/buildenv:windows"
+
+func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
+	envs := append([]string(nil), buildkiteEnvs...)
+	if len(config.extraEnvs) > 0 {
+		envs = append(envs, config.extraEnvs...)
+	}
+
+	m := map[string]any{
+		"image":          windowsBuildEnvImage,
+		"shell":          []string{"bash", "-c"},
+		"shm-size":       "2.5gb",
+		"mount-checkout": true,
+		"environment":    envs,
+	}
+
+	return m
+}
+
+func makeRayDockerPlugin(
+	image string, config *stepDockerPluginConfig,
+) map[string]any {
+	envs := dockerPluginEnvList(config)
 
 	m := map[string]any{
 		"image":         image,

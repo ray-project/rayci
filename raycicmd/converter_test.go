@@ -83,6 +83,7 @@ func TestConvertPipelineStep(t *testing.T) {
 
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
+			"windows": "fakewinrunner",
 			"broken":  skipQueue,
 		},
 
@@ -200,6 +201,32 @@ func TestConvertPipelineStep(t *testing.T) {
 			"timeout_in_minutes": 300,
 		},
 	}, {
+		in: map[string]any{
+			"label":         "windows job",
+			"key":           "win",
+			"command":       "echo windows",
+			"job_env":       "WINDOWS",
+			"instance_type": "windows",
+		},
+		out: map[string]any{
+			"label":   "windows job",
+			"key":     "win",
+			"command": "echo windows",
+			"agents":  newBkAgents("fakewinrunner"),
+
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+	}, {
 		in:  map[string]any{"wait": nil},
 		out: map[string]any{"wait": nil},
 	}, {
@@ -269,11 +296,20 @@ func TestConvertPipelineStep(t *testing.T) {
 		if !ok {
 			t.Errorf("convertPipelineStep %+v: no docker image", test.in)
 		}
-		if want := fmt.Sprintf("fakeecr:%s-forge", buildID); image != want {
-			t.Errorf(
-				"convertPipelineStep %+v: got docker image %q, want %q",
-				test.in, image, want,
-			)
+		if test.in["job_env"] == windowsJobEnv {
+			if want := windowsBuildEnvImage; image != want {
+				t.Errorf(
+					"convertPipelineStep %+v: got docker image %q, want %q",
+					test.in, image, want,
+				)
+			}
+		} else {
+			if want := fmt.Sprintf("fakeecr:%s-forge", buildID); image != want {
+				t.Errorf(
+					"convertPipelineStep %+v: got docker image %q, want %q",
+					test.in, image, want,
+				)
+			}
 		}
 
 		envs := dockerPlugin["environment"].([]string)
