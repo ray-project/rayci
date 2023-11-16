@@ -12,6 +12,11 @@ steps:
     job_env: hello
     command: cat /opt/app/hello.txt
 
+  - name: retry test
+    depends_on: hello
+    job_env: hello
+    command: if [[ "$${BUILDKITE_RETRY_COUNT-0}" == 0 ]]; then exit 1; fi
+
   - name: python-base
     label: python {{matrix}}
     wanda: .buildkite/python.wanda.yaml

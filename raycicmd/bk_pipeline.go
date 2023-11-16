@@ -39,6 +39,7 @@ var buildkiteEnvs = []string{
 	"BUILDKITE_COMMIT",
 	"BUILDKITE_HOOK_WORKING_DIR",
 	"BUILDKITE_LABEL",
+	"BUILDKITE_RETRY_COUNT",
 	"BUILDKITE_PIPELINE_ID",
 	"BUILDKITE_PIPELINE_SLUG",
 	"BUILDKITE_BUILD_ID",
@@ -114,6 +115,7 @@ var (
 	defaultRayRetry = map[string]any{
 		"manual": map[string]any{"permit_on_passed": true},
 		"automatic": []any{
+			map[string]any{"exit_status": 1, "limit": 1},
 			map[string]any{"exit_status": -1, "limit": 3},
 			map[string]any{"exit_status": 255, "limit": 3},
 		},
