@@ -232,9 +232,11 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 		dockerPluginConfig.mountBuildkiteAgent = v
 	}
 	publishPortsStr, _ := stringInMap(step, "docker_publish_tcp_ports")
-	publishPorts := strings.Split(publishPortsStr, ",")
-	if len(publishPorts) > 0 {
-		dockerPluginConfig.publishTCPPorts = publishPorts
+	if publishPortsStr != "" {
+		publishPorts := strings.Split(publishPortsStr, ",")
+		if len(publishPorts) > 0 {
+			dockerPluginConfig.publishTCPPorts = publishPorts
+		}
 	}
 
 	if jobEnv == windowsJobEnv { // a special job env
