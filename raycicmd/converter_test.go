@@ -125,7 +125,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 		dockerPluginOut: map[string]any{
 			"publish": []string{
-				"localhost:5555:5555/tcp", "localhost:5556:5556/tcp",
+				"127.0.0.1:5555:5555/tcp", "127.0.0.1:5556:5556/tcp",
 			},
 		},
 	}, {

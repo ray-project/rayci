@@ -112,7 +112,7 @@ func makeRayDockerPlugin(
 	if len(config.publishTCPPorts) > 0 {
 		var publish []string
 		for _, p := range config.publishTCPPorts {
-			publish = append(publish, fmt.Sprintf("localhost:%s:%s/tcp", p, p))
+			publish = append(publish, fmt.Sprintf("127.0.0.1:%s:%s/tcp", p, p))
 		}
 		m["publish"] = publish
 	}
