@@ -211,27 +211,30 @@ func TestForgeWithWorkRepo(t *testing.T) {
 	cr := registry.New()
 
 	var server *httptest.Server
+	var crAddr string
 	if os.Getenv("WANDA_TEST_CR_PORT") == "" {
 		server = httptest.NewServer(cr)
+		crAddr = server.Listener.Addr().String()
 	} else {
 		server = httptest.NewUnstartedServer(cr)
 		listenAddr := fmt.Sprintf(":%s", os.Getenv("WANDA_TEST_CR_PORT"))
-		listener, err := net.Listen("tcp", listenAddr)
+		listener, err := net.Listen("tcp4", listenAddr)
 		if err != nil {
 			t.Fatal("listen error:", err)
 		}
 		server.Listener = listener
 
+		port := listener.Addr().(*net.TCPAddr).Port
+		crAddr = fmt.Sprintf("localhost:%d", port)
+
 		server.Start()
 	}
 	defer server.Close()
 
-	addr := server.Listener.Addr().String()
-
 	config := &ForgeConfig{
 		WorkDir:    "testdata",
 		NamePrefix: "cr.ray.io/rayproject/",
-		WorkRepo:   fmt.Sprintf("%s/work", addr),
+		WorkRepo:   fmt.Sprintf("%s/work", crAddr),
 		BuildID:    "abc123",
 		RayCI:      true,
 		Epoch:      "1",
@@ -245,7 +248,7 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		t.Fatalf("build world: %v", err)
 	}
 
-	world := fmt.Sprintf("%s/work:abc123-world", addr)
+	world := fmt.Sprintf("%s/work:abc123-world", crAddr)
 	ref, err := name.ParseReference(world)
 	if err != nil {
 		t.Fatalf("parse reference: %v", err)
@@ -293,7 +296,7 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		t.Errorf("got %d cache hits, want 1", hit)
 	}
 
-	hello := fmt.Sprintf("%s/work:def456-hello", addr)
+	hello := fmt.Sprintf("%s/work:def456-hello", crAddr)
 	helloRef, err := name.ParseReference(hello)
 	if err != nil {
 		t.Fatalf("parse hello reference: %v", err)
