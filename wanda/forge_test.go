@@ -1,6 +1,7 @@
 package wanda
 
 import (
+	"net"
 	"testing"
 
 	"archive/tar"
@@ -208,7 +209,21 @@ func TestForgeWithWorkRepo(t *testing.T) {
 	}
 
 	cr := registry.New()
-	server := httptest.NewServer(cr)
+
+	var server *httptest.Server
+	if os.Getenv("WANDA_TEST_CR_PORT") == "" {
+		server = httptest.NewServer(cr)
+	} else {
+		server = httptest.NewUnstartedServer(cr)
+		listenAddr := fmt.Sprintf(":%s", os.Getenv("WANDA_TEST_CR_PORT"))
+		listener, err := net.Listen("tcp", listenAddr)
+		if err != nil {
+			t.Fatal("listen error:", err)
+		}
+		server.Listener = listener
+
+		server.Start()
+	}
 	defer server.Close()
 
 	addr := server.Listener.Addr().String()

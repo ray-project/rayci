@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
 
 const windowsJobEnv = "WINDOWS"
@@ -222,16 +223,18 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 	}
 	sort.Strings(envKeyList)
 
-	mountBuildkiteAgent := false
-	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
-		v, _ := boolInMap(step, "mount_buildkite_agent")
-		mountBuildkiteAgent = v
-	}
-
 	jobEnv, _ := stringInMap(step, "job_env")
 	dockerPluginConfig := &stepDockerPluginConfig{
-		extraEnvs:           envKeyList,
-		mountBuildkiteAgent: mountBuildkiteAgent,
+		extraEnvs: envKeyList,
+	}
+	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
+		v, _ := boolInMap(step, "mount_buildkite_agent")
+		dockerPluginConfig.mountBuildkiteAgent = v
+	}
+	publishPortsStr, _ := stringInMap(step, "docker_publish_tcp_ports")
+	publishPorts := strings.Split(publishPortsStr, ",")
+	if len(publishPorts) > 0 {
+		dockerPluginConfig.publishTCPPorts = publishPorts
 	}
 
 	if jobEnv == windowsJobEnv { // a special job env
