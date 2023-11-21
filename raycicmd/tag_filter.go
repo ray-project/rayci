@@ -66,6 +66,8 @@ func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
 
 	filtersStr := strings.TrimSpace(string(filters))
 	if filtersStr == "*" {
+		// '*" means run everything.
+		// It is equivalent to having no tag filters.
 		return filter, nil
 	}
 
