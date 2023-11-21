@@ -64,7 +64,12 @@ func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	tags := strings.Fields(string(filters))
+	filtersStr := strings.TrimSpace(string(filters))
+	if filtersStr == "*" {
+		return filter, nil
+	}
+
+	tags := strings.Fields(filtersStr)
 	if len(tags) == 0 {
 		tags = nil
 	}
