@@ -272,8 +272,9 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
 	*bkPipelineGroup, error,
 ) {
 	bkGroup := &bkPipelineGroup{
-		Group: g.Group,
-		Key:   g.Key,
+		Group:     g.Group,
+		Key:       g.Key,
+		DependsOn: g.DependsOn,
 	}
 
 	for _, step := range g.Steps {

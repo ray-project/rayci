@@ -479,7 +479,8 @@ func TestConvertPipelineGroup(t *testing.T) {
 	}, info)
 
 	g := &pipelineGroup{
-		Group: "fancy",
+		Group:     "fancy",
+		DependsOn: []string{"forge"},
 		Steps: []map[string]any{
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
@@ -501,6 +502,12 @@ func TestConvertPipelineGroup(t *testing.T) {
 
 	if bk.Group != "fancy" {
 		t.Errorf("convertPipelineGroup: got group %s, want fancy", bk.Group)
+	}
+	if want := []string{"forge"}; !reflect.DeepEqual(bk.DependsOn, want) {
+		t.Errorf(
+			"convertPipelineGroup: got depends_on %+v, want %+v",
+			bk.DependsOn, want,
+		)
 	}
 	if len(bk.Steps) != 3 {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))

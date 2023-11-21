@@ -5,6 +5,8 @@ type pipelineGroup struct {
 	Key   string   `yaml:"key"`
 	Tags  []string `yaml:"tags"`
 
+	DependsOn []string `yaml:"depends_on"`
+
 	Steps []map[string]any `yaml:"steps"`
 }
 
