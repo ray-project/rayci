@@ -99,14 +99,20 @@ func TestConvertPipelineStep(t *testing.T) {
 	for _, test := range []struct {
 		in  map[string]any
 		out map[string]any // buildkite pipeline step
+
+		dockerPluginOut map[string]any // extra fields expected in docker plugin
 	}{{
-		in: map[string]any{"commands": []string{"echo 1", "echo 2"}},
+		in: map[string]any{
+			"commands":                 []string{"echo 1", "echo 2"},
+			"docker_publish_tcp_ports": "5555,5556",
+		},
 		out: map[string]any{
 			"commands":           []string{"echo 1", "echo 2"},
 			"agents":             newBkAgents("fakerunner"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
+
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
@@ -115,6 +121,11 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_BRANCH":              "beta",
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+		dockerPluginOut: map[string]any{
+			"publish": []string{
+				"127.0.0.1:5555:5555/tcp", "127.0.0.1:5556:5556/tcp",
 			},
 		},
 	}, {
@@ -323,6 +334,16 @@ func TestConvertPipelineStep(t *testing.T) {
 		} {
 			if !findInSlice(envs, env) {
 				t.Errorf("convertPipelineStep %+v: no %q", test.in, env)
+			}
+		}
+
+		for k, v := range test.dockerPluginOut {
+			if !reflect.DeepEqual(dockerPlugin[k], v) {
+				t.Errorf(
+					"convertPipelineStep %+v: "+
+						"got %+v for docker plugin %q, want %+v",
+					test.in, dockerPlugin[k], k, v,
+				)
 			}
 		}
 	}
