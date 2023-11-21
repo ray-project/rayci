@@ -5,9 +5,10 @@ import (
 )
 
 type bkPipelineGroup struct {
-	Group string `yaml:"group,omitempty"`
-	Key   string `yaml:"key,omitempty"`
-	Steps []any  `yaml:"steps,omitempty"`
+	Group     string   `yaml:"group,omitempty"`
+	Key       string   `yaml:"key,omitempty"`
+	DependsOn []string `yaml:"depends_on,omitempty"`
+	Steps     []any    `yaml:"steps,omitempty"`
 }
 
 type bkPipeline struct {
