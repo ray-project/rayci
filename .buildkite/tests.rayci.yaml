@@ -1,21 +1,23 @@
 group: go tests
 steps:
   - label: Go tests
-    command: go test ./...
+    command: WANDA_TEST_CR_PORT=5555 go test ./...
     queue: small
+    docker_publish_tcp_ports: "5555"
     depends_on: forge
+  - label: Go arm64 tests
+    command: WANDA_TEST_CR_PORT=5555 go test ./...
+    job_env: forge-arm64
+    queue: medium-arm64
+    docker_publish_tcp_ports: "5555"
+    depends_on: forge-arm64
+
   - label: Go fmt
     command:
       - go fmt ./...
       - git diff --exit-code
     queue: small
-    depends_on: forge
-    
-  - label: Go arm64 tests
-    command: go test ./...
-    job_env: forge-arm64
-    queue: medium-arm64
-    depends_on: forge-arm64
+    depends_on: forge    
 
   - label: Python {{matrix}} tests
     command:

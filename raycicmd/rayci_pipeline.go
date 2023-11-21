@@ -19,11 +19,11 @@ var (
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"instance_type", "queue", "job_env", "tags",
-		"mount_buildkite_agent",
+		"docker_publish_tcp_ports", "mount_buildkite_agent",
 	}
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
-		"mount_buildkite_agent",
+		"docker_publish_tcp_ports", "mount_buildkite_agent",
 	}
 
 	wandaStepAllowedKeys = []string{

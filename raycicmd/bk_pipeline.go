@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -55,6 +56,7 @@ var buildkiteEnvs = []string{
 type stepDockerPluginConfig struct {
 	extraEnvs           []string
 	mountBuildkiteAgent bool
+	publishTCPPorts     []string
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -106,6 +108,13 @@ func makeRayDockerPlugin(
 
 	if config.mountBuildkiteAgent {
 		m["mount_buildkite_agent"] = true
+	}
+	if len(config.publishTCPPorts) > 0 {
+		var publish []string
+		for _, p := range config.publishTCPPorts {
+			publish = append(publish, fmt.Sprintf("127.0.0.1:%s:%s/tcp", p, p))
+		}
+		m["publish"] = publish
 	}
 
 	return m
