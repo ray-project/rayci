@@ -41,6 +41,9 @@ func TestNewTagFilter(t *testing.T) {
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
 		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
+		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
+		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
+	}, {
 		cmd:  []string{"echo", "\t  \n  \t"},
 		want: &tagFilter{},
 	}, {
@@ -48,6 +51,9 @@ func TestNewTagFilter(t *testing.T) {
 		want: &tagFilter{runAll: true},
 	}, {
 		cmd:  nil,
+		want: &tagFilter{runAll: true},
+	}, {
+		cmd:  []string{"echo", "*"},
 		want: &tagFilter{runAll: true},
 	}, {
 		skipTags: []string{"disabled"},

@@ -64,7 +64,14 @@ func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	tags := strings.Fields(string(filters))
+	filtersStr := strings.TrimSpace(string(filters))
+	if filtersStr == "*" {
+		// '*" means run everything (except the skips).
+		// It is equivalent to having no tag filters configured.
+		return filter, nil
+	}
+
+	tags := strings.Fields(filtersStr)
 	if len(tags) == 0 {
 		tags = nil
 	}
