@@ -82,6 +82,9 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 		"shm-size":       "2.5gb",
 		"mount-checkout": true,
 		"environment":    envs,
+		"volumes": []string{
+			`\\.\pipe\docker_engine:\\.\pipe\docker_engine`,
+		},
 	}
 
 	return m

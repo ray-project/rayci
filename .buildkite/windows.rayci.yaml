@@ -3,4 +3,7 @@ steps:
   - name: ":windows: windows example"
     job_env: WINDOWS
     instance_type: windows
-    command: echo "Hello, Windows!"
+    commands: 
+      - bash .buildkite/windows_docker.sh
+      - /c/tools/docker/docker ps
+      - echo "Hello, Windows!"
