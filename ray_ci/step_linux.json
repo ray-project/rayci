@@ -37,6 +37,7 @@
                     "BUILDKITE_PIPELINE_ID",
                     "BUILDKITE_MESSAGE",
                     "BUILDKITE_BUILD_NUMBER",
+                    "NVIDIA_DISABLE_REQUIRE=1",
                     "PS4"
                 ]
             }
