@@ -7,7 +7,7 @@
 	"agents": {
 		"queue": "!!REPLACE!!"
 	},
-	"timeout_in_minutes": 180,
+	"timeout_in_minutes": 360,
 	"artifact_paths": "/tmp/artifacts/.*/**",
     "env": {"PS4": "> "},
 	"retry": {
