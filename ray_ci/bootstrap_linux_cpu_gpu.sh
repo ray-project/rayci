@@ -21,14 +21,16 @@ else
 fi
 
 if [ "${KICK_OFF_EARLY}" = "1" ]; then
-  echo "--- :running: Kicking off some tests early"
+  if [[ -f .buildkite/pipeline.test.yml ]]; then
+      echo "--- :running: Kicking off some tests early"
 
-  if [[ "$(docker manifest inspect $EARLY_IMAGE_TEST)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-      "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-  else
-    echo "Docker image NOT FOUND for early test kick-off TEST: $EARLY_IMAGE_TEST"
-  fi
+      if [[ "$(docker manifest inspect $EARLY_IMAGE_TEST)" ]]; then
+          python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+      else
+          echo "Docker image NOT FOUND for early test kick-off TEST: $EARLY_IMAGE_TEST"
+      fi
+  if
 
   if [[ "$(docker manifest inspect $EARLY_IMAGE_ML)" ]]; then
     python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
@@ -146,14 +148,16 @@ fi
 
 echo "--- :rocket: Launching TEST tests :python:"
 
-if [ "${KICK_OFF_EARLY}" = "1" ]; then
-  echo "Kicking off the rest of the TEST pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-else
-  echo "Kicking off the full TEST pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+if [[ -f .buildkite/pipeline.test.yml ]]; then
+    if [ "${KICK_OFF_EARLY}" = "1" ]; then
+        echo "Kicking off the rest of the TEST pipeline"
+        python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+    else
+        echo "Kicking off the full TEST pipeline"
+        python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
+    fi
 fi
 
 # --- ML image + pipeline
