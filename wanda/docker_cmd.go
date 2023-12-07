@@ -11,18 +11,19 @@ import (
 
 func dockerCmdEnvs() []string {
 	var envs []string
+	envs = append(envs, "DOCKER_BUILDKIT=1")
 	for _, k := range []string{
 		"HOME",
 		"USER",
 		"PATH",
 		"DOCKER_CONFIG",
+		"DOCKER_BUILDKIT",
 		"AWS_REGION",
 	} {
 		if v, ok := os.LookupEnv(k); ok {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
-	envs = append(envs, "DOCKER_BUILDKIT=1")
 
 	return envs
 }
@@ -105,7 +106,7 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 	// Build the image.
 	var args []string
 
-	args = append(args, "build", "--progress=plain")
+	args = append(args, "build")
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {

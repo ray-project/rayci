@@ -2,17 +2,11 @@ package raycicmd
 
 import (
 	"fmt"
+	"os"
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
-const runWandaURL = rawGitHubURL +
-	"ray-project/rayci/$${RAYCI_BRANCH:-stable}/run_wanda.sh"
 const defaultBuilderType = "builder"
-
-var wandaCommands = []string{
-	fmt.Sprintf(`curl -sfL "%s" > /tmp/run_wanda.sh`, runWandaURL),
-	`/bin/bash /tmp/run_wanda.sh -rayci`,
-}
 
 type wandaStep struct {
 	name         string
@@ -27,6 +21,19 @@ type wandaStep struct {
 	ciConfig *config
 
 	matrix any
+}
+
+func getWandaCommands() []string {
+	rayciBranch := os.Getenv("RAYCI_BRANCH")
+	if rayciBranch == "" {
+		rayciBranch = "stable"
+	}
+	runWandaURL := rawGitHubURL + "ray-project/rayci/" + rayciBranch + "/run_wanda.sh"
+
+	return []string{
+		fmt.Sprintf(`bash -c "curl -sfL %s > /tmp/run_wanda.sh"`, runWandaURL),
+		`bash /tmp/run_wanda.sh -rayci`,
+	}
 }
 
 func (s *wandaStep) buildkiteStep() map[string]any {
@@ -49,7 +56,7 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	bkStep := map[string]any{
 		"label":    label,
 		"key":      s.name,
-		"commands": wandaCommands,
+		"commands": getWandaCommands(),
 		"env":      envs,
 		"retry":    defaultBuilderRetry,
 

@@ -189,7 +189,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		out: map[string]any{
 			"label":    "my forge",
 			"key":      "forge",
-			"commands": wandaCommands,
+			"commands": getWandaCommands(),
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
