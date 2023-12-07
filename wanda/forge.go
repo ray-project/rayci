@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	cranename "github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
@@ -70,6 +72,10 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		workDir: absWorkDir,
 		remoteOpts: []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
+			remote.WithPlatform(v1.Platform{
+				OS:           runtime.GOOS,
+				Architecture: runtime.GOARCH,
+			}),
 		},
 	}, nil
 }

@@ -187,9 +187,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"matrix":     []any{"py36", "py37"},
 		},
 		out: map[string]any{
-			"label":    "my forge",
-			"key":      "forge",
-			"commands": wandaCommands,
+			"label": "my forge",
+			"key":   "forge",
+			"commands": getWandaCommands(map[string]string{
+				"RAYCI_BRANCH": "beta",
+			}),
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",

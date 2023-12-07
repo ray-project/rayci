@@ -8,13 +8,19 @@ TMP_DIR="$(mktemp -d)"
 
 echo "--- Install wanda ($HOSTTYPE)"
 
-if [[ "$HOSTTYPE" == "arm64" || "$HOSTTYPE" == "aarch64" ]]; then
-  GO_TGZ=https://go.dev/dl/go1.21.4.linux-arm64.tar.gz
+if [[ "${OSTYPE}" == msys ]]; then
+  curl -sfL https://go.dev/dl/go1.21.5.windows-amd64.zip > "$TMP_DIR/go.zip"
+  unzip "$TMP_DIR/go.zip" -d "$TMP_DIR"
+  rm "$TMP_DIR/go.zip"
 else
-  GO_TGZ=https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
+  if [[ "$HOSTTYPE" == "arm64" || "$HOSTTYPE" == "aarch64" ]]; then
+    GO_TGZ=https://go.dev/dl/go1.21.4.linux-arm64.tar.gz
+  else
+    GO_TGZ=https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
+  fi
+  curl -sfL "$GO_TGZ" | tar -xzf - -C "$TMP_DIR"
 fi
 
-curl -sfL "$GO_TGZ" | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"

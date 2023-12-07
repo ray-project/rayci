@@ -1,0 +1,4 @@
+name: hello-windows
+froms:
+  - mcr.microsoft.com/windows/servercore:ltsc2019
+dockerfile: .buildkite/windows.Dockerfile

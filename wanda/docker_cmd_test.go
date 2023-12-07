@@ -68,6 +68,20 @@ func TestDockerCmdBuild(t *testing.T) {
 	}
 }
 
+func TestDockerCmdIsDockerBuildkit(t *testing.T) {
+	t.Setenv("DOCKER_BUILDKIT", "0")
+	cmd01 := newDockerCmd("")
+	if cmd01.isDockerBuildkit() {
+		t.Fatalf("expected isDockerBuildkit to be false")
+	}
+
+	t.Setenv("DOCKER_BUILDKIT", "1")
+	cmd02 := newDockerCmd("")
+	if !cmd02.isDockerBuildkit() {
+		t.Fatalf("expected isDockerBuildkit to be true")
+	}
+}
+
 func TestDockerCmdBuild_copyEverything(t *testing.T) {
 	cmd := newDockerCmd("") // uses real docker client
 
