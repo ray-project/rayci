@@ -8,6 +8,8 @@ import (
 )
 
 const windowsJobEnv = "WINDOWS"
+const windowsJobQueue = "windows"
+const windowsBuildEnvImage = "rayproject/buildenv:windows"
 
 type converter struct {
 	config  *config
@@ -239,9 +241,13 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 		}
 	}
 
-	if jobEnv == windowsJobEnv { // a special job env
+	if queue == windowsJobQueue {
+		jobEnvImage := windowsBuildEnvImage
+		if jobEnv != windowsJobEnv {
+			jobEnvImage = c.jobEnvImage(jobEnv)
+		}
 		result["plugins"] = []any{map[string]any{
-			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
+			dockerPlugin: makeRayWindowsDockerPlugin(jobEnvImage, dockerPluginConfig),
 		}}
 	} else {
 		// default Linux Job env.

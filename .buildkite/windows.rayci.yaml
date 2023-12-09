@@ -8,8 +8,9 @@ steps:
 
   - name: ":windows: windows example"
     job_env: WINDOWS
+    depends_on: hello-windows
     instance_type: windows
     commands: 
       - bash .buildkite/windows_docker.sh
-      - /c/tools/docker/docker ps
+      - /c/tools/docker/docker pull $$RAYCI_WORK_REPO:$$RAYCI_BUILD_ID-hello-windows
       - echo "Hello, Windows!"

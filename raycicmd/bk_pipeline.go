@@ -68,16 +68,14 @@ func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
 	return envs
 }
 
-const windowsBuildEnvImage = "rayproject/buildenv:windows"
-
-func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
+func makeRayWindowsDockerPlugin(image string, config *stepDockerPluginConfig) map[string]any {
 	envs := append([]string(nil), buildkiteEnvs...)
 	if len(config.extraEnvs) > 0 {
 		envs = append(envs, config.extraEnvs...)
 	}
 
 	m := map[string]any{
-		"image":          windowsBuildEnvImage,
+		"image":          image,
 		"shell":          []string{"bash", "-c"},
 		"shm-size":       "2.5gb",
 		"mount-checkout": true,
