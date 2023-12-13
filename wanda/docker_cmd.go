@@ -11,13 +11,11 @@ import (
 
 func dockerCmdEnvs() []string {
 	var envs []string
-	envs = append(envs, "DOCKER_BUILDKIT=1")
 	for _, k := range []string{
 		"HOME",
 		"USER",
 		"PATH",
 		"DOCKER_CONFIG",
-		"DOCKER_BUILDKIT",
 		"AWS_REGION",
 	} {
 		if v, ok := os.LookupEnv(k); ok {
@@ -33,28 +31,39 @@ type dockerCmd struct {
 	workDir string
 
 	envs []string
+
+	useBuildKit bool
 }
 
-func newDockerCmd(bin string) *dockerCmd {
+type dockerCmdConfig struct {
+	bin string
+
+	disableBuildkit bool
+}
+
+func newDockerCmd(config *dockerCmdConfig) *dockerCmd {
+	bin := config.bin
 	if bin == "" {
 		bin = "docker"
 	}
 	envs := dockerCmdEnvs()
-	return &dockerCmd{bin: bin, envs: envs}
-}
 
-func (c *dockerCmd) isDockerBuildkit() bool {
-	for _, e := range c.envs {
-		if e == "DOCKER_BUILDKIT=0" {
-			return false
-		}
+	if config.disableBuildkit {
+		envs = append(envs, "DOCKER_BUILDKIT=0")
+	} else {
+		envs = append(envs, "DOCKER_BUILDKIT=1")
 	}
-	return true
+
+	return &dockerCmd{
+		bin:         bin,
+		envs:        envs,
+		useBuildKit: !config.disableBuildkit,
+	}
 }
 
-func (c *dockerCmd) setWorkDir(dir string) {
-	c.workDir = dir
-}
+func (c *dockerCmd) setUseBuildKit(b bool) { c.useBuildKit = b }
+
+func (c *dockerCmd) setWorkDir(dir string) { c.workDir = dir }
 
 func (c *dockerCmd) cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command(c.bin, args...)
@@ -114,11 +123,9 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 
 	// Build the image.
 	var args []string
-
-	if c.isDockerBuildkit() {
-		args = append(args, "build", "--progress=plain")
-	} else {
-		args = append(args, "build")
+	args = append(args, "build")
+	if c.useBuildKit {
+		args = append(args, "--progress=plain")
 	}
 	args = append(args, "-f", core.Dockerfile)
 

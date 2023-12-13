@@ -14,9 +14,9 @@ if [[ "${OSTYPE}" == msys ]]; then
   rm "$TMP_DIR/go.zip"
 else
   if [[ "$HOSTTYPE" == "arm64" || "$HOSTTYPE" == "aarch64" ]]; then
-    GO_TGZ=https://go.dev/dl/go1.21.4.linux-arm64.tar.gz
+    GO_TGZ=https://go.dev/dl/go1.21.5.linux-arm64.tar.gz
   else
-    GO_TGZ=https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
+    GO_TGZ=https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
   fi
   curl -sfL "$GO_TGZ" | tar -xzf - -C "$TMP_DIR"
 fi

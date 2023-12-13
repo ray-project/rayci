@@ -3,8 +3,6 @@ steps:
   - name: hello-windows
     wanda: .buildkite/windows.wanda.yaml
     instance_type: builder-windows
-    env:
-      DOCKER_BUILDKIT: "0"
 
   - name: ":windows: windows example"
     job_env: WINDOWS
