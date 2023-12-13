@@ -32,13 +32,13 @@ type dockerCmd struct {
 
 	envs []string
 
-	useBuildKit bool
+	useLegacyEngine bool
 }
 
 type dockerCmdConfig struct {
 	bin string
 
-	disableBuildkit bool
+	useLegacyEngine bool
 }
 
 func newDockerCmd(config *dockerCmdConfig) *dockerCmd {
@@ -48,20 +48,19 @@ func newDockerCmd(config *dockerCmdConfig) *dockerCmd {
 	}
 	envs := dockerCmdEnvs()
 
-	if config.disableBuildkit {
+	if config.useLegacyEngine {
 		envs = append(envs, "DOCKER_BUILDKIT=0")
 	} else {
+		// Default using buildkit.
 		envs = append(envs, "DOCKER_BUILDKIT=1")
 	}
 
 	return &dockerCmd{
-		bin:         bin,
-		envs:        envs,
-		useBuildKit: !config.disableBuildkit,
+		bin:             bin,
+		envs:            envs,
+		useLegacyEngine: config.useLegacyEngine,
 	}
 }
-
-func (c *dockerCmd) setUseBuildKit(b bool) { c.useBuildKit = b }
 
 func (c *dockerCmd) setWorkDir(dir string) { c.workDir = dir }
 
@@ -124,7 +123,7 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 	// Build the image.
 	var args []string
 	args = append(args, "build")
-	if c.useBuildKit {
+	if !c.useLegacyEngine {
 		args = append(args, "--progress=plain")
 	}
 	args = append(args, "-f", core.Dockerfile)

@@ -256,7 +256,7 @@ func (f *Forge) Build(spec *Spec) error {
 		bin: f.config.DockerBin,
 
 		// BuildKit is not supported on Windows.
-		disableBuildkit: runtime.GOOS == "windows",
+		useLegacyEngine: runtime.GOOS == "windows",
 	})
 	d.setWorkDir(f.workDir)
 
