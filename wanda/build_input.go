@@ -70,6 +70,7 @@ type buildInputCore struct {
 	BuildArgs    map[string]string // Resolved build args.
 
 	Platform string `json:",omitempty"` // "amd64" (empty string) or "arm64"
+	OS       string `json:",omitempty"` // "linux" (empty string) or "windows"
 }
 
 func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
@@ -94,12 +95,18 @@ func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 		platform = ""
 	}
 
+	os := runtime.GOOS
+	if os == "linux" {
+		os = ""
+	}
+
 	core := &buildInputCore{
 		Dockerfile:   dockerfile,
 		Froms:        froms,
 		BuildContext: context,
 		BuildArgs:    buildArgs,
 		Platform:     platform,
+		OS:           os,
 	}
 
 	return core, nil
