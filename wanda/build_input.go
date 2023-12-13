@@ -69,8 +69,8 @@ type buildInputCore struct {
 	BuildContext string            // Digests of the build context.
 	BuildArgs    map[string]string // Resolved build args.
 
-	Platform string `json:",omitempty"` // "amd64" (empty string) or "arm64"
-	OS       string `json:",omitempty"` // "linux" (empty string) or "windows"
+	Platform string `json:",omitempty"` // "amd64" (empty string) or GOARCH
+	OS       string `json:",omitempty"` // "linux" (empty string) or GOOS
 }
 
 func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
