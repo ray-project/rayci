@@ -1,3 +1,3 @@
-FROM mcr.microsoft.com/windows/servercore:ltsc2019
+FROM rayproject/buildenv:windows
 
 CMD ["bash", "-c", "echo REEf"]

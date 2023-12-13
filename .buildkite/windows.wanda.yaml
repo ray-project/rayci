@@ -1,4 +1,4 @@
 name: hello-windows
 froms:
-  - mcr.microsoft.com/windows/servercore:ltsc2019
+  - "@rayproject/buildenv:windows"
 dockerfile: .buildkite/windows.Dockerfile
