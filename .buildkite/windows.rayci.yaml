@@ -1,5 +1,9 @@
 group: windows
 steps:
+  - name: hello-windows
+    wanda: .buildkite/windows.wanda.yaml
+    instance_type: builder-windows
+
   - name: ":windows: windows example"
     job_env: WINDOWS
     instance_type: windows

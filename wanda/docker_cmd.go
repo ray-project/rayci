@@ -22,7 +22,6 @@ func dockerCmdEnvs() []string {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
-	envs = append(envs, "DOCKER_BUILDKIT=1")
 
 	return envs
 }
@@ -32,19 +31,38 @@ type dockerCmd struct {
 	workDir string
 
 	envs []string
+
+	useLegacyEngine bool
 }
 
-func newDockerCmd(bin string) *dockerCmd {
+type dockerCmdConfig struct {
+	bin string
+
+	useLegacyEngine bool
+}
+
+func newDockerCmd(config *dockerCmdConfig) *dockerCmd {
+	bin := config.bin
 	if bin == "" {
 		bin = "docker"
 	}
 	envs := dockerCmdEnvs()
-	return &dockerCmd{bin: bin, envs: envs}
+
+	if config.useLegacyEngine {
+		envs = append(envs, "DOCKER_BUILDKIT=0")
+	} else {
+		// Default using buildkit.
+		envs = append(envs, "DOCKER_BUILDKIT=1")
+	}
+
+	return &dockerCmd{
+		bin:             bin,
+		envs:            envs,
+		useLegacyEngine: config.useLegacyEngine,
+	}
 }
 
-func (c *dockerCmd) setWorkDir(dir string) {
-	c.workDir = dir
-}
+func (c *dockerCmd) setWorkDir(dir string) { c.workDir = dir }
 
 func (c *dockerCmd) cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command(c.bin, args...)
@@ -104,8 +122,10 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 
 	// Build the image.
 	var args []string
-
-	args = append(args, "build", "--progress=plain")
+	args = append(args, "build")
+	if !c.useLegacyEngine {
+		args = append(args, "--progress=plain")
+	}
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {

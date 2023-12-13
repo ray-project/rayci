@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	cranename "github.com/google/go-containerregistry/pkg/name"
+	crane "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
@@ -70,6 +72,10 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		workDir: absWorkDir,
 		remoteOpts: []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
+			remote.WithPlatform(crane.Platform{
+				OS:           runtime.GOOS,
+				Architecture: runtime.GOARCH,
+			}),
 		},
 	}, nil
 }
@@ -246,8 +252,14 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	// Now we can build the image.
-	d := newDockerCmd(f.config.DockerBin)
+	d := newDockerCmd(&dockerCmdConfig{
+		bin: f.config.DockerBin,
+
+		// BuildKit is not supported on Windows.
+		useLegacyEngine: runtime.GOOS == "windows",
+	})
 	d.setWorkDir(f.workDir)
+
 	if err := d.build(in, inputCore); err != nil {
 		return fmt.Errorf("build docker: %w", err)
 	}

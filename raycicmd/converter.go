@@ -16,6 +16,8 @@ type converter struct {
 	ciTempForBuild string
 
 	envMap map[string]string
+
+	launcherBranch string
 }
 
 func newConverter(config *config, info *buildInfo) *converter {
@@ -24,6 +26,8 @@ func newConverter(config *config, info *buildInfo) *converter {
 		buildID: info.BuildID,
 
 		ciTempForBuild: config.CITemp + info.BuildID + "/",
+
+		launcherBranch: info.RayCIBranch,
 	}
 
 	envMap := make(map[string]string)
@@ -158,14 +162,15 @@ func (c *converter) convertWanda(step map[string]any) (map[string]any, error) {
 	}
 
 	s := &wandaStep{
-		name:         name,
-		label:        label,
-		file:         file,
-		buildID:      c.buildID,
-		envs:         envs,
-		ciConfig:     c.config,
-		matrix:       matrix,
-		instanceType: instanceType,
+		name:           name,
+		label:          label,
+		file:           file,
+		buildID:        c.buildID,
+		envs:           envs,
+		ciConfig:       c.config,
+		matrix:         matrix,
+		instanceType:   instanceType,
+		launcherBranch: c.launcherBranch,
 	}
 	if dependsOn, ok := step["depends_on"]; ok {
 		s.dependsOn = dependsOn

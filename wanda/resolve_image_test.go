@@ -52,7 +52,7 @@ func TestResolveLocalImage(t *testing.T) {
 		t.Errorf("got image local %q, want %q", src.local, tagStr)
 	}
 
-	dockerCmd := newDockerCmd("")
+	dockerCmd := newDockerCmd(&dockerCmdConfig{})
 	if err := dockerCmd.run("image", "rm", tagStr); err != nil {
 		t.Fatal("remove image: ", err)
 	}

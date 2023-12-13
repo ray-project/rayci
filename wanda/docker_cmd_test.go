@@ -10,7 +10,7 @@ import (
 )
 
 func TestDockerCmdBuild(t *testing.T) {
-	cmd := newDockerCmd("") // uses real docker client
+	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 
 	ts := newTarStream()
 	ts.addFile("Dockerfile.hello", nil, "testdata/Dockerfile.hello")
@@ -69,7 +69,7 @@ func TestDockerCmdBuild(t *testing.T) {
 }
 
 func TestDockerCmdBuild_copyEverything(t *testing.T) {
-	cmd := newDockerCmd("") // uses real docker client
+	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 
 	cmd.setWorkDir("testdata")
 

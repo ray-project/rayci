@@ -164,8 +164,9 @@ var branchPipelineConfig = &config{
 	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
-		"builder":       "builder_queue_branch",
-		"builder-arm64": "builder_queue_arm64_branch",
+		"builder":         "builder_queue_branch",
+		"builder-arm64":   "builder_queue_arm64_branch",
+		"builder-windows": "builder_queue_windows_branch",
 	},
 
 	RunnerQueues: map[string]string{
@@ -202,8 +203,9 @@ var prPipelineConfig = &config{
 	ForgePrefix: defaultForgePrefix,
 
 	BuilderQueues: map[string]string{
-		"builder":       "builder_queue_pr",
-		"builder-arm64": "builder_queue_arm64_pr",
+		"builder":         "builder_queue_pr",
+		"builder-arm64":   "builder_queue_arm64_pr",
+		"builder-windows": "builder_queue_windows_pr",
 	},
 
 	RunnerQueues: map[string]string{
