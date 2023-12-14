@@ -8,6 +8,7 @@ import (
 )
 
 const windowsJobEnv = "WINDOWS"
+const macosJobEnv = "MACOS"
 
 type converter struct {
 	config  *config
@@ -244,10 +245,12 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 		}
 	}
 
-	if jobEnv == windowsJobEnv { // a special job env
+	if jobEnv == windowsJobEnv { // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
 		}}
+	} else if jobEnv == macosJobEnv { // a special job env for macos
+		// no plugins for macos
 	} else {
 		// default Linux Job env.
 		jobEnvImage := c.jobEnvImage(jobEnv)
