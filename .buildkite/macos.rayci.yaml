@@ -1,0 +1,13 @@
+group: macos
+steps:
+  - name: ":macos: macos example"
+    job_env: MACOS
+    instance_type: macos
+    commands: 
+      - echo "Hello, MacOS!"
+
+  - name: ":macos: macos example"
+    job_env: MACOS
+    instance_type: macos-arm64
+    commands: 
+      - echo "Hello, MacOS arm64!"
