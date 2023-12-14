@@ -131,6 +131,7 @@ var (
 			map[string]any{"exit_status": 1, "limit": 1},
 			map[string]any{"exit_status": -1, "limit": 3},
 			map[string]any{"exit_status": 255, "limit": 3},
+			map[string]any{"exit_status": 3221225786, "limit": 3},
 		},
 	}
 	defaultBuilderRetry = map[string]any{
