@@ -58,6 +58,7 @@ type stepDockerPluginConfig struct {
 	extraEnvs           []string
 	mountBuildkiteAgent bool
 	publishTCPPorts     []string
+	network             string
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -85,6 +86,9 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 		"volumes": []string{
 			`\\.\pipe\docker_engine:\\.\pipe\docker_engine`,
 		},
+	}
+	if config.network != "" {
+		m["network"] = config.network
 	}
 
 	return m
@@ -119,6 +123,9 @@ func makeRayDockerPlugin(
 			publish = append(publish, fmt.Sprintf("127.0.0.1:%s:%s/tcp", p, p))
 		}
 		m["publish"] = publish
+	}
+	if config.network != "" {
+		m["network"] = config.network
 	}
 
 	return m
