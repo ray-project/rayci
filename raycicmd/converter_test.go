@@ -130,6 +130,29 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
+			"commands":       []string{"echo 1", "echo 2"},
+			"docker_network": "host",
+		},
+		out: map[string]any{
+			"commands":           []string{"echo 1", "echo 2"},
+			"agents":             newBkAgents("fakerunner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+		dockerPluginOut: map[string]any{"network": "host"},
+	}, {
+		in: map[string]any{
 			"commands":      []string{"echo 1"},
 			"instance_type": "broken",
 		},

@@ -243,6 +243,10 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 			dockerPluginConfig.publishTCPPorts = publishPorts
 		}
 	}
+	dockerNetwork, _ := stringInMap(step, "docker_network")
+	if dockerNetwork != "" {
+		dockerPluginConfig.network = dockerNetwork
+	}
 
 	if jobEnv == windowsJobEnv { // a special job env
 		result["plugins"] = []any{map[string]any{
