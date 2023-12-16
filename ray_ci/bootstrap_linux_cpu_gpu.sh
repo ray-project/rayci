@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "--- :alarm_clock: Determine if we should kick-off some steps early"
-
 # --- BUILD image
 
 echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
