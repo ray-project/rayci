@@ -1,58 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "--- :alarm_clock: Determine if we should kick-off some steps early"
-
-# On pull requests, allow to run on latest available image if wheels are not affected
-if [ "${BUILDKITE_PULL_REQUEST}" != "false" ] && [ "$RAY_CI_CORE_CPP_AFFECTED" != "1" ] && [ "$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED" != "1" ] && [ "$RAY_CI_COMPILED_PYTHON_AFFECTED" != "1" ]; then
-  # Default to 0 (disabled, have to opt-in via [early_kickoff])
-  export KICK_OFF_EARLY=${KICK_OFF_EARLY:-0}
-
-  if [ "${KICK_OFF_EARLY}" = "1" ]; then
-    echo "Kicking off some tests early, as it was requested. "
-    echo "Also, this is a PR, core C++ is not affected, and requirements are not affected. "
-  else
-    echo "We could kick off tests early, but we were asked not to (KICK_OFF_EARLY=${KICK_OFF_EARLY}), so we don't."
-  fi
-else
-  export KICK_OFF_EARLY=0
-  echo "This is a branch build (PR=${BUILDKITE_PULL_REQUEST}) or C++ is affected (affected=$RAY_CI_CORE_CPP_AFFECTED), or requirements are affected (affected=$RAY_CI_PYTHON_DEPENDENCIES_AFFECTED). "
-  echo "We can't kick off tests early."
-fi
-
-if [ "${KICK_OFF_EARLY}" = "1" ]; then
-  if [[ -f .buildkite/pipeline.test.yml ]]; then
-      echo "--- :running: Kicking off some tests early"
-
-      if [[ "$(docker manifest inspect $EARLY_IMAGE_TEST)" ]]; then
-          python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-      else
-          echo "Docker image NOT FOUND for early test kick-off TEST: $EARLY_IMAGE_TEST"
-      fi
-  fi
-
-  if [[ "$(docker manifest inspect $EARLY_IMAGE_ML)" ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
-      "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
-  else
-      echo "Docker image NOT FOUND for early test kick-off ML: $EARLY_IMAGE_ML"
-  fi
-
-  if [[ "$(docker manifest inspect $EARLY_IMAGE_GPU)" ]]; then
-    if [[ -e .buildkite/pipeline.gpu.yml ]]; then
-      python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-        "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-    fi
-    if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
-      python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --early-only --image "$EARLY_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-        "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
-    fi
-  else
-      echo "Docker image NOT FOUND for early test kick-off GPU: $EARLY_IMAGE_GPU"
-  fi
-fi
-
 # --- BUILD image
 
 echo "--- :arrow_down: Pulling pre-built BASE BUILD image"
@@ -67,7 +15,7 @@ else
   BUILD_OWN_BASE=1
 fi
 
-if [ "$BUILD_OWN_BASE" = "1" ]; then
+if [[ "$BUILD_OWN_BASE" == "1" ]]; then
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_build.sh"
 fi
@@ -93,7 +41,7 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker push "$DOCKER_IMAGE_BUILD"
 
 # Only push latest images for branch builds
-if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+if [[ "${BUILDKITE_PULL_REQUEST}" == "false" ]]; then
   time docker push "$DOCKER_IMAGE_LATEST_BUILD"
 fi
 
@@ -149,20 +97,14 @@ fi
 echo "--- :rocket: Launching TEST tests :python:"
 
 if [[ -f .buildkite/pipeline.test.yml ]]; then
-    if [ "${KICK_OFF_EARLY}" = "1" ]; then
-        echo "Kicking off the rest of the TEST pipeline"
-        python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-    else
-        echo "Kicking off the full TEST pipeline"
-        python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
-          "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
-    fi
+  echo "Kicking off the TEST pipeline"
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_TEST" --queue "$RUNNER_QUEUE_DEFAULT" \
+    "./.buildkite/pipeline.test.yml" | buildkite-agent pipeline upload
 fi
 
 # --- ML image + pipeline
 
-if [ "${BUILD_OWN_BASE-}" != "1" ]; then
+if [[ "${BUILD_OWN_BASE-}" != "1" ]]; then
   echo "--- :arrow_down: Pulling pre-built BASE ML image"
   date +"%Y-%m-%d %H:%M:%S"
   time docker pull "$DOCKER_IMAGE_BASE_ML"
@@ -183,23 +125,24 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker push "$DOCKER_IMAGE_ML"
 
 # Only push latest images for branch builds
-if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+if [[ "${BUILDKITE_PULL_REQUEST}" == "false" ]]; then
   time docker push "$DOCKER_IMAGE_LATEST_ML"
 fi
 
 echo "--- :rocket: Launching ML tests :airplane:"
 
-if [ "${KICK_OFF_EARLY}" = "1" ]; then
-  echo "Kicking off the rest of the ML pipeline"
-  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
-    "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
-else
-  echo "Kicking off the full ML pipeline"
+if [[ -f .buildkite/pipeline.ml.yml ]]; then
+  echo "Kicking off the ML pipeline"
   python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_ML" --queue "$RUNNER_QUEUE_DEFAULT" \
     "./.buildkite/pipeline.ml.yml" | buildkite-agent pipeline upload
 fi
 
 # --- GPU image + pipeline
+
+if [[ ! -e .buildkite/pipeline.gpu.yml && ! -e .buildkite/pipeline.gpu_large.yml ]]; then
+  echo "No GPU tests found, skipping GPU pipeline"
+  exit 0
+fi
 
 echo "--- :arrow_down: Pulling pre-built BASE GPU image"
 date +"%Y-%m-%d %H:%M:%S"
@@ -213,7 +156,7 @@ else
   BUILD_OWN_GPU=1
 fi
 
-if [ "$BUILD_OWN_GPU" = "1" ]; then
+if [[ "$BUILD_OWN_GPU" == "1" ]]; then
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_gpu.sh"
 fi
@@ -236,30 +179,18 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker push "$DOCKER_IMAGE_GPU"
 
 # Only push latest images for branch builds
-if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+if [[ "${BUILDKITE_PULL_REQUEST}" == "false" ]]; then
   time docker push "$DOCKER_IMAGE_LATEST_GPU"
 fi
 
 echo "--- :rocket: Launching GPU tests :tv:"
 
-if [ "${KICK_OFF_EARLY}" = "1" ]; then
-  echo "Kicking off the rest of the GPU pipeline"
-  if [[ -e .buildkite/pipeline.gpu.yml ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  fi
-  if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --not-early-only --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
-  fi
-else
-  echo "Kicking off the full GPU pipeline"
-  if [[ -e .buildkite/pipeline.gpu.yml ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
-      "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
-  fi
-  if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
-    python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
-      "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
-  fi
+echo "Kicking off the GPU pipeline"
+if [[ -e .buildkite/pipeline.gpu.yml ]]; then
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_NORM" \
+    "./.buildkite/pipeline.gpu.yml" | buildkite-agent pipeline upload
+fi
+if [[ -e .buildkite/pipeline.gpu_large.yml ]]; then
+  python3 "${PIPELINE_REPO_DIR}/ray_ci/pipeline_ci.py" --image "$DOCKER_IMAGE_GPU" --queue "$RUNNER_QUEUE_GPU_LARGE" \
+    "./.buildkite/pipeline.gpu_large.yml" | buildkite-agent pipeline upload
 fi
