@@ -261,6 +261,14 @@ func TestConvertPipelineStep(t *testing.T) {
 			},
 		},
 	}, {
+		in: map[string]any{
+			"block": "block", "tags": []string{"foo"},
+			"if": "false", "depends_on": "dep",
+		},
+		out: map[string]any{
+			"block": "block", "if": "false", "depends_on": "dep",
+		},
+	}, {
 		in:  map[string]any{"wait": nil},
 		out: map[string]any{"wait": nil},
 	}, {
@@ -291,6 +299,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			continue
 		}
 
+		_, isBlock := got["block"]
 		_, isWait := got["wait"]
 		_, isWanda := test.in["wanda"]
 
@@ -316,7 +325,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			)
 		}
 
-		if isWait || isWanda {
+		if isWait || isBlock || isWanda {
 			continue
 		}
 

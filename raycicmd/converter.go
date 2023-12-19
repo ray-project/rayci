@@ -126,6 +126,14 @@ func (c *converter) convertWait(step map[string]any) (map[string]any, error) {
 	return cloneMapExcept(step, waitStepDropKeys), nil
 }
 
+func (c *converter) convertBlock(step map[string]any) (map[string]any, error) {
+	// a block step
+	if err := checkStepKeys(step, blockStepAllowedKeys); err != nil {
+		return nil, fmt.Errorf("check block step keys: %w", err)
+	}
+	return cloneMapExcept(step, blockStepDropKeys), nil
+}
+
 func (c *converter) convertWanda(step map[string]any) (map[string]any, error) {
 	// a wanda step
 	if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
@@ -270,6 +278,9 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
+	if _, ok := step["block"]; ok {
+		return c.convertBlock(step)
+	}
 	if _, ok := step["wait"]; ok {
 		return c.convertWait(step)
 	}

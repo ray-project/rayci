@@ -17,6 +17,11 @@ var (
 	}
 	waitStepDropKeys = []string{"tags"}
 
+	blockStepAllowedKeys = []string{
+		"block", "if", "depends_on", "tags",
+	}
+	blockStepDropKeys = []string{"tags"}
+
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
