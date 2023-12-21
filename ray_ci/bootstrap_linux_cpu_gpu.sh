@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [[ -f .buildkite/.sunset_civ1_linux && "${RAY_CI_RLLIB_CONTRIB_AFFECTED:-}" != "1" ]]; then
+  # We only run legacy CIv1 pipeline when RLlib or contrib marked as affected.
+  echo "Skipping legacy CIv1."
+  exit 0
+fi
+
 # --- BUILD image
 
 echo "--- :arrow_down: Pulling pre-built BASE BUILD image"

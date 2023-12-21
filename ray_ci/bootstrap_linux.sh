@@ -62,7 +62,7 @@ python3 -m pip install -U click pyyaml
 export $(python3 ci/pipeline/determine_tests_to_run.py)
 env
 
-if [ "$HOSTTYPE" = "aarch64" ]; then
+if [[ "$HOSTTYPE" == "aarch64" ]]; then
   echo "Running ARM64 pipeline"
   bash "${PIPELINE_REPO_DIR}/ray_ci/bootstrap_linux_arm64.sh"
 else

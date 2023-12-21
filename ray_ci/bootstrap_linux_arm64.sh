@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [[ -f .buildkite/.sunset_civ1_linux ]]; then
+  echo "Skipping legacy CIv1."
+  exit 0
+fi
+
 # --- BUILD image
 
 echo "--- :arrow_down: Pulling pre-built BASE ARM64 image"
@@ -15,7 +20,7 @@ else
   BUILD_OWN_BASE=1
 fi
 
-if [ "$BUILD_OWN_BASE" = "1" ]; then
+if [[ "$BUILD_OWN_BASE" == "1" ]]; then
   echo "--- :exclamation: No pre-built image found, building ourselves!"
   bash "${PIPELINE_REPO_DIR}/ray_ci/build_base_arm64.sh"
 fi
@@ -41,7 +46,7 @@ date +"%Y-%m-%d %H:%M:%S"
 time docker push "$DOCKER_IMAGE_ARM64"
 
 # Only push latest images for branch builds
-if [ "${BUILDKITE_PULL_REQUEST}" = "false" ]; then
+if [[ "${BUILDKITE_PULL_REQUEST}" == "false" ]]; then
   time docker push "$DOCKER_IMAGE_LATEST_ARM64"
 fi
 
