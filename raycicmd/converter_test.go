@@ -59,6 +59,18 @@ func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	return nil, false
 }
 
+func findMacosSandboxPlugin(plugins []any) bool {
+	for _, p := range plugins {
+		if m, ok := p.(map[string]any)[macosSandboxPlugin]; ok {
+			if f, ok := m.(map[string]string)["deny-file-read"]; ok && f == macosDenyFileRead {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func findInSlice(s []string, v string) bool {
 	for _, e := range s {
 		if e == v {
@@ -84,6 +96,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
 			"windows": "fakewinrunner",
+			"macos":   "fakemacrunner",
 			"broken":  skipQueue,
 		},
 
@@ -262,6 +275,31 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
+			"label":         "mac job",
+			"key":           "mac",
+			"command":       "echo mac",
+			"job_env":       "MACOS",
+			"instance_type": "macos",
+		},
+		out: map[string]any{
+			"label":   "mac job",
+			"key":     "mac",
+			"command": "echo mac",
+			"agents":  newBkAgents("fakemacrunner"),
+
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://artifacts_bucket/abcdefg1234567890",
+				"BUILDKITE_BAZEL_CACHE_URL":             "https://bazel-build-cache",
+				"RAYCI_BRANCH":                          "beta",
+				"RAYCI_BUILD_ID":                        "abc123",
+				"RAYCI_TEMP":                            "s3://ci-temp/abc123/",
+				"RAYCI_WORK_REPO":                       "fakeecr",
+			},
+		},
+	}, {
+		in: map[string]any{
 			"block": "block", "tags": []string{"foo"},
 			"if": "false", "depends_on": "dep",
 		},
@@ -326,6 +364,14 @@ func TestConvertPipelineStep(t *testing.T) {
 		}
 
 		if isWait || isBlock || isWanda {
+			continue
+		}
+
+		jobEnv, ok := test.in["job_env"]
+		if ok && jobEnv == macosJobEnv {
+			if !findMacosSandboxPlugin(plugins.([]any)) {
+				t.Errorf("convertPipelineStep %+v: no macos sandbox plugin", test.in)
+			}
 			continue
 		}
 
