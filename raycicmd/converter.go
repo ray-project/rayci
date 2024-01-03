@@ -8,6 +8,8 @@ import (
 )
 
 const windowsJobEnv = "WINDOWS"
+const macosJobEnv = "MACOS"
+const macosDenyFileRead = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
 
 type converter struct {
 	config  *config
@@ -86,6 +88,7 @@ func (c *converter) jobEnvImage(name string) string {
 }
 
 const dockerPlugin = "docker#v5.8.0"
+const macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
 
 type envEntry struct {
 	k string
@@ -259,6 +262,12 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 	if jobEnv == windowsJobEnv { // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
+		}}
+	} else if jobEnv == macosJobEnv { // a special job env for macos
+		result["plugins"] = []any{map[string]any{
+			macosSandboxPlugin: map[string]string{
+				"deny-file-read": macosDenyFileRead,
+			},
 		}}
 	} else {
 		// default Linux Job env.
