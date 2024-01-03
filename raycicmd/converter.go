@@ -258,11 +258,16 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 	if dockerNetwork != "" {
 		dockerPluginConfig.network = dockerNetwork
 	}
+	v, _ := boolInMap(step, "mount_windows_artifacts")
+	dockerPluginConfig.mountWindowsArtifacts = v
 
 	if jobEnv == windowsJobEnv { // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
 		}}
+		if dockerPluginConfig.mountWindowsArtifacts {
+			result["artifact_paths"] = windowsArtifactPaths
+		}
 	} else if jobEnv == macosJobEnv { // a special job env for macos
 		result["plugins"] = []any{map[string]any{
 			macosSandboxPlugin: map[string]string{
