@@ -11,3 +11,11 @@ steps:
     commands: 
       - bash .buildkite/windows_docker.sh
       - docker run -i --rm $${RAYCI_WORK_REPO}:$${RAYCI_BUILD_ID}-hello-windows bash -c "echo 'Hello, Windows!'"
+
+  - name: ":windows: windows artifact mount"
+    job_env: WINDOWS
+    mount_windows_artifacts: true
+    instance_type: windows
+    depends_on: hello-windows
+    commands: 
+      - touch /c/artifact-mount/hello-windows.txt
