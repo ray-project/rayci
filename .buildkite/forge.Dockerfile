@@ -39,13 +39,15 @@ ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 
 # Needs to be synchronized to the host group id as we map /var/run/docker.sock
 # into the container.
-addgroup --gid 1001 docker
+addgroup --gid 1001 docker0  # Used on old version of buildkite AMIs.
+addgroup --gid 993 docker
 
 adduser --home /opt/app --uid 2000 app
 mkdir -p /workdir /opt/app
 chown -R app:root /opt/app
 chown -R app:root /workdir
 usermod -a -G docker app
+usermod -a -G docker0 app
 
 EOF
 
