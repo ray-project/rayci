@@ -79,9 +79,12 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	return g, nil
 }
 
-func sortPipelineGroups(groups []*pipelineGroup) {
-	sort.Slice(groups, func(i, j int) bool {
-		return groups[i].sortKey < groups[j].sortKey
+func sortPipelineGroups(gs []*pipelineGroup) {
+	sort.Slice(gs, func(i, j int) bool {
+		if gs[i].sortKey == gs[j].sortKey {
+			return gs[i].filename < gs[j].filename
+		}
+		return gs[i].sortKey < gs[j].sortKey
 	})
 }
 
