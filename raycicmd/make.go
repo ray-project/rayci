@@ -70,14 +70,18 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 	}
 
 	g.filename = file
-	g.name = stripRayCIYamlSuffix(filepath.Base(file))
+	if g.SortKey != "" {
+		g.sortKey = g.SortKey
+	} else {
+		g.sortKey = stripRayCIYamlSuffix(filepath.Base(file))
+	}
 
 	return g, nil
 }
 
 func sortPipelineGroups(groups []*pipelineGroup) {
 	sort.Slice(groups, func(i, j int) bool {
-		return groups[i].sortKey() < groups[j].sortKey()
+		return groups[i].sortKey < groups[j].sortKey
 	})
 }
 

@@ -1,8 +1,8 @@
 package raycicmd
 
 type pipelineGroup struct {
-	name     string
 	filename string
+	sortKey  string
 
 	Group   string   `yaml:"group"`
 	Key     string   `yaml:"key"`
@@ -12,13 +12,6 @@ type pipelineGroup struct {
 	DependsOn []string `yaml:"depends_on"`
 
 	Steps []map[string]any `yaml:"steps"`
-}
-
-func (g *pipelineGroup) sortKey() string {
-	if g.SortKey != "" {
-		return g.SortKey
-	}
-	return g.name
 }
 
 var (

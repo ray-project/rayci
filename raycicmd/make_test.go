@@ -101,9 +101,6 @@ func TestParsePipelineFile(t *testing.T) {
 			t.Fatalf("parsePipelineFile: %v", err)
 		}
 
-		if g.name != "pipe" {
-			t.Errorf("got name %q, want `pipe`", g.name)
-		}
 		if g.filename != p {
 			t.Errorf("got filename %q, want %q", g.filename, p)
 		}
@@ -243,20 +240,26 @@ func TestMakePipeline(t *testing.T) {
 
 func TestSortPipelineGroups(t *testing.T) {
 	gs := []*pipelineGroup{{
-		name: "tune",
+		filename: "tune.rayci.yaml",
+		sortKey:  "tune",
 	}, {
-		name:    "macos",
-		SortKey: "~macos",
+		filename: "macos.rayci.yaml",
+		sortKey:  "~macos",
 	}, {
-		name: "_forge",
+		filename: "forge.rayci.yaml",
+		sortKey:  "_forge",
 	}}
 
 	sortPipelineGroups(gs)
 
-	want := []string{"_forge", "tune", "macos"}
+	want := []string{
+		"forge.rayci.yaml",
+		"tune.rayci.yaml",
+		"macos.rayci.yaml",
+	}
 	var got []string
 	for _, g := range gs {
-		got = append(got, g.name)
+		got = append(got, g.filename)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got key order %v, want %v", got, want)
