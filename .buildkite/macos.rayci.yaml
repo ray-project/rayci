@@ -1,4 +1,5 @@
 group: macos
+sort_key: "~macos"
 steps:
   - name: ":macos: macos example"
     job_env: MACOS

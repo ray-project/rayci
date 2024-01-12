@@ -1,4 +1,5 @@
 group: windows
+sort_key: "~windows"
 steps:
   - name: hello-windows
     wanda: .buildkite/windows.wanda.yaml
