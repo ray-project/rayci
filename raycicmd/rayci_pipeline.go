@@ -1,9 +1,13 @@
 package raycicmd
 
 type pipelineGroup struct {
-	Group string   `yaml:"group"`
-	Key   string   `yaml:"key"`
-	Tags  []string `yaml:"tags"`
+	filename string
+	sortKey  string
+
+	Group   string   `yaml:"group"`
+	Key     string   `yaml:"key"`
+	Tags    []string `yaml:"tags"`
+	SortKey string   `yaml:"sort_key,omitempty"`
 
 	DependsOn []string `yaml:"depends_on"`
 

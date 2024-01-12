@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
@@ -18,6 +19,16 @@ func isRayCIYaml(p string) bool {
 		return true
 	}
 	return false
+}
+
+func stripRayCIYamlSuffix(p string) string {
+	if strings.HasSuffix(p, ".rayci.yaml") {
+		return strings.TrimSuffix(p, ".rayci.yaml")
+	}
+	if strings.HasSuffix(p, ".rayci.yml") {
+		return strings.TrimSuffix(p, ".rayci.yml")
+	}
+	return p
 }
 
 func listCIYamlFiles(dir string) ([]string, error) {
@@ -58,7 +69,23 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 		return nil, fmt.Errorf("unmarshal pipeline file: %w", err)
 	}
 
+	g.filename = file
+	if g.SortKey != "" {
+		g.sortKey = g.SortKey
+	} else {
+		g.sortKey = stripRayCIYamlSuffix(filepath.Base(file))
+	}
+
 	return g, nil
+}
+
+func sortPipelineGroups(gs []*pipelineGroup) {
+	sort.Slice(gs, func(i, j int) bool {
+		if gs[i].sortKey == gs[j].sortKey {
+			return gs[i].filename < gs[j].filename
+		}
+		return gs[i].sortKey < gs[j].sortKey
+	})
 }
 
 func makePipeline(repoDir string, config *config, info *buildInfo) (
@@ -87,10 +114,9 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 			return nil, fmt.Errorf("list pipeline files: %w", err)
 		}
 
-		// map each file into a group.
+		var groups []*pipelineGroup
 		for _, name := range names {
 			file := filepath.Join(bkDir, name)
-
 			g, err := parsePipelineFile(file)
 			if err != nil {
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
@@ -100,10 +126,17 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				continue
 			}
 
+			groups = append(groups, g)
+		}
+
+		sortPipelineGroups(groups)
+
+		// map each file into a group.
+		for _, g := range groups {
 			bkGroup, err := c.convertPipelineGroup(g, tagFilters)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"convert pipeline group %s: %w", file, err,
+					"convert pipeline group %s: %w", g.filename, err,
 				)
 			}
 			if len(bkGroup.Steps) == 0 {

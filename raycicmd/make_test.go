@@ -71,6 +71,7 @@ func TestListCIYamlFiles(t *testing.T) {
 const goodTestPipeline = `
 group: g
 key: k
+sort_key: sk
 steps:
   - label: "test1"
     key: "test1"
@@ -90,7 +91,7 @@ steps:
 func TestParsePipelineFile(t *testing.T) {
 	t.Run("good", func(t *testing.T) {
 		tmp := t.TempDir()
-		p := filepath.Join(tmp, "pipeline.yaml")
+		p := filepath.Join(tmp, "pipe.rayci.yaml")
 		if err := os.WriteFile(p, []byte(goodTestPipeline), 0o600); err != nil {
 			t.Fatalf("write pipeline file: %v", err)
 		}
@@ -100,9 +101,14 @@ func TestParsePipelineFile(t *testing.T) {
 			t.Fatalf("parsePipelineFile: %v", err)
 		}
 
+		if g.filename != p {
+			t.Errorf("got filename %q, want %q", g.filename, p)
+		}
+
 		want := &pipelineGroup{
-			Group: "g",
-			Key:   "k",
+			Group:   "g",
+			Key:     "k",
+			SortKey: "sk",
 			Steps: []map[string]any{{
 				"label":    "test1",
 				"key":      "test1",
@@ -229,5 +235,33 @@ func TestMakePipeline(t *testing.T) {
 
 	if totalSteps != 2 {
 		t.Fatalf("got %d steps, want 1", totalSteps)
+	}
+}
+
+func TestSortPipelineGroups(t *testing.T) {
+	gs := []*pipelineGroup{{
+		filename: "tune.rayci.yaml",
+		sortKey:  "tune",
+	}, {
+		filename: "macos.rayci.yaml",
+		sortKey:  "~macos",
+	}, {
+		filename: "forge.rayci.yaml",
+		sortKey:  "_forge",
+	}}
+
+	sortPipelineGroups(gs)
+
+	want := []string{
+		"forge.rayci.yaml",
+		"tune.rayci.yaml",
+		"macos.rayci.yaml",
+	}
+	var got []string
+	for _, g := range gs {
+		got = append(got, g.filename)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got key order %v, want %v", got, want)
 	}
 }
