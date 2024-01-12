@@ -3,6 +3,11 @@ set -e
 
 cd "$RAY_REPO_DIR" || true
 
+if [[ ! -f .buildkite/pipeline.macos.yml ]]; then
+  echo "Pipeline file not found"
+  exit 0
+fi
+
 python3 -m pip install -U click pyyaml
 
 export $(python3 ci/pipeline/determine_tests_to_run.py)
