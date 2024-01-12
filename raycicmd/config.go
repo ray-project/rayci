@@ -190,6 +190,8 @@ var branchPipelineConfig = &config{
 
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
+	TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
+
 	SkipTags: []string{"disabled"},
 }
 
