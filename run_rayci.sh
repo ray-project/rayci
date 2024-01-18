@@ -8,7 +8,7 @@ TMP_DIR="$(mktemp -d)"
 
 echo "--- Install rayci"
 
-curl -sfL 'https://go.dev/dl/go1.21.5.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
+curl -sfL 'https://go.dev/dl/go1.21.6.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
