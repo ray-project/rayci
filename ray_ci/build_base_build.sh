@@ -29,8 +29,8 @@ export DOCKER_BUILDKIT=1
 
 export BUILDKITE_BAZEL_CACHE_URL="${REMOTE_CACHE_URL}"
 
-if [[ -f ci/docker/base.test.wanda.yaml ]]; then
-  "${WANDA[@]}" ci/docker/base.test.wanda.yaml
+if [[ -f ci/docker/base.test.py39.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.test.py39.wanda.yaml
   # Retag to pacify old wanda definition file's local resolving.
   docker tag cr.ray.io/rayproject/oss-ci-base_test oss-ci-base_test
 else
@@ -45,8 +45,8 @@ fi
 
 echo "--- :docker: Building base dependency image for BUILDS :gear:"
 
-if [[ -f ci/docker/base.build.wanda.yaml ]]; then
-  "${WANDA[@]}" ci/docker/base.build.wanda.yaml
+if [[ -f ci/docker/base.build.py39.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.build.py39.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
@@ -60,8 +60,8 @@ fi
 
 echo "--- :docker: Building base dependency image for ML :airplane:"
 
-if [[ -f ci/docker/base.ml.wanda.yaml ]]; then
-  "${WANDA[@]}" ci/docker/base.ml.wanda.yaml
+if [[ -f ci/docker/base.ml.py39.wanda.yaml ]]; then
+  "${WANDA[@]}" ci/docker/base.ml.py39.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
