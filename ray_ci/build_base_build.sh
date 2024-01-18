@@ -61,7 +61,7 @@ fi
 echo "--- :docker: Building base dependency image for ML :airplane:"
 
 if [[ -f ci/docker/base.ml.py39.wanda.yaml ]]; then
-  "${WANDA[@]}" ci/docker/base.ml.wanda.yaml
+  "${WANDA[@]}" ci/docker/base.ml.py39.wanda.yaml
 else
   docker build --progress=plain \
     --build-arg REMOTE_CACHE_URL \
