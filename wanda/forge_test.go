@@ -1,15 +1,15 @@
 package wanda
 
 import (
-	"net"
-	"runtime"
 	"testing"
 
 	"archive/tar"
 	"fmt"
 	"io"
+	"net"
 	"net/http/httptest"
 	"os"
+	"runtime"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"

@@ -3,7 +3,6 @@ package wanda
 import (
 	"testing"
 
-	"runtime"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -11,11 +10,6 @@ import (
 )
 
 func TestDockerCmdBuild(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("skipping test on non-linux")
-		return
-	}
-
 	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 
 	ts := newTarStream()
@@ -75,11 +69,6 @@ func TestDockerCmdBuild(t *testing.T) {
 }
 
 func TestDockerCmdBuild_copyEverything(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("skipping test on non-linux")
-		return
-	}
-
 	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 
 	cmd.setWorkDir("testdata")
