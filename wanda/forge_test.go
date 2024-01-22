@@ -1,14 +1,15 @@
 package wanda
 
 import (
-	"net"
 	"testing"
 
 	"archive/tar"
 	"fmt"
 	"io"
+	"net"
 	"net/http/httptest"
 	"os"
+	"runtime"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -202,9 +203,8 @@ func TestForge(t *testing.T) {
 }
 
 func TestForgeWithWorkRepo(t *testing.T) {
-	if os.Getenv("BUILDKITE") == "true" {
-		t.Log("does not work when the daemon cannot reach the local registry")
-		t.Skip()
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping test on non-linux")
 		return
 	}
 
