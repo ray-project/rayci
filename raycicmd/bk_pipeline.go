@@ -143,6 +143,10 @@ var (
 			map[string]any{"exit_status": 1, "limit": 1},
 			map[string]any{"exit_status": -1, "limit": 3},
 			map[string]any{"exit_status": 255, "limit": 3},
+			// 125 is the exit code for a container failed error
+			map[string]any{"exit_status": 125, "limit": 3},
+			// 127 is the exit code for a command not found error
+			map[string]any{"exit_status": 127, "limit": 3},
 			map[string]any{"exit_status": 3221225786, "limit": 3},
 		},
 	}
