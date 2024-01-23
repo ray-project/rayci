@@ -83,9 +83,9 @@ func findInSlice(s []string, v string) bool {
 func TestConvertPipelineStep(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
-		BuildID:     buildID,
-		RayCIBranch: "beta",
-		GitCommit:   "abcdefg1234567890",
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
 	}
 
 	c := newConverter(&config{
@@ -458,9 +458,9 @@ func TestConvertPipelineStep(t *testing.T) {
 func TestConvertPipelineGroup_priority(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
-		BuildID:     buildID,
-		RayCIBranch: "beta",
-		GitCommit:   "abcdefg1234567890",
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
 	}
 
 	c := newConverter(&config{
@@ -507,9 +507,9 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
-		BuildID:     buildID,
-		RayCIBranch: "beta",
-		GitCommit:   "abcdefg1234567890",
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
 	}
 
 	c := newConverter(&config{
@@ -574,7 +574,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 func TestConvertPipelineGroup(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
-		BuildID: buildID,
+		buildID: buildID,
 	}
 
 	c := newConverter(&config{

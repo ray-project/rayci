@@ -247,3 +247,15 @@ func TestFieldToStringList(t *testing.T) {
 		}
 	}
 }
+
+func TestCopyEnvMap(t *testing.T) {
+	m := map[string]string{
+		"A": "b",
+		"C": "d",
+	}
+
+	cp := copyEnvMap(m)
+	if !reflect.DeepEqual(cp, m) {
+		t.Errorf("copyEnvMap(%v): got %v", m, cp)
+	}
+}

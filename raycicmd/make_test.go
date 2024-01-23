@@ -212,7 +212,7 @@ func TestMakePipeline(t *testing.T) {
 
 	buildID := "fakebuild"
 	info := &buildInfo{
-		BuildID: buildID,
+		buildID: buildID,
 	}
 
 	got, err := makePipeline(tmp, config, info)
