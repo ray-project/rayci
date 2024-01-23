@@ -143,10 +143,13 @@ var (
 			map[string]any{"exit_status": 1, "limit": 1},
 			map[string]any{"exit_status": -1, "limit": 3},
 			map[string]any{"exit_status": 255, "limit": 3},
-			// 125 is the exit code for a container failed error
+			// elastic CI stack environment hook failure
+			map[string]any{"exit_status": 53, "limit": 3},
+			// container failed error
 			map[string]any{"exit_status": 125, "limit": 3},
-			// 127 is the exit code for a command not found error
+			// command not found error
 			map[string]any{"exit_status": 127, "limit": 3},
+			// spot instance termination on windows
 			map[string]any{"exit_status": 3221225786, "limit": 3},
 		},
 	}
