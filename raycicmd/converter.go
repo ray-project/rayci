@@ -51,8 +51,8 @@ func newConverter(config *config, info *buildInfo) *converter {
 	c.envMap = envMap
 
 	c.stepConverters = []stepConverter{
-		newWaitConverter(),
-		newBlockConverter(),
+		waitConverter,
+		blockConverter,
 		newWandaConverter(config, info, envMap),
 	}
 

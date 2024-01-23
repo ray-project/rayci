@@ -12,36 +12,33 @@ type stepConverter interface {
 	convert(step map[string]any) (map[string]any, error)
 }
 
-type waitConverter struct{}
+type basicConverter struct {
+	signatureKey string
 
-func newWaitConverter() *waitConverter { return &waitConverter{} }
+	allowedKeys []string
+	dropKeys    []string
+}
 
-func (c *waitConverter) match(step map[string]any) bool {
-	_, ok := step["wait"]
+func (c *basicConverter) match(step map[string]any) bool {
+	_, ok := step[c.signatureKey]
 	return ok
 }
 
-func (c *waitConverter) convert(step map[string]any) (map[string]any, error) {
-	// a wait step
-	if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
+func (c *basicConverter) convert(step map[string]any) (map[string]any, error) {
+	if err := checkStepKeys(step, c.allowedKeys); err != nil {
 		return nil, fmt.Errorf("check wait step keys: %w", err)
 	}
-	return cloneMapExcept(step, waitStepDropKeys), nil
+	return cloneMapExcept(step, c.dropKeys), nil
 }
 
-type blockConverter struct{}
-
-func newBlockConverter() *blockConverter { return &blockConverter{} }
-
-func (c *blockConverter) match(step map[string]any) bool {
-	_, ok := step["block"]
-	return ok
+var waitConverter = &basicConverter{
+	signatureKey: "wait",
+	allowedKeys:  waitStepAllowedKeys,
+	dropKeys:     waitStepDropKeys,
 }
 
-func (c *blockConverter) convert(step map[string]any) (map[string]any, error) {
-	// a block step
-	if err := checkStepKeys(step, blockStepAllowedKeys); err != nil {
-		return nil, fmt.Errorf("check block step keys: %w", err)
-	}
-	return cloneMapExcept(step, blockStepDropKeys), nil
+var blockConverter = &basicConverter{
+	signatureKey: "block",
+	allowedKeys:  blockStepAllowedKeys,
+	dropKeys:     blockStepDropKeys,
 }
