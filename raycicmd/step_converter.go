@@ -12,32 +12,34 @@ type stepConverter interface {
 	convert(step map[string]any) (map[string]any, error)
 }
 
-type basicConverter struct {
+type basicStepConverter struct {
 	signatureKey string
 
 	allowedKeys []string
 	dropKeys    []string
 }
 
-func (c *basicConverter) match(step map[string]any) bool {
+func (c *basicStepConverter) match(step map[string]any) bool {
 	_, ok := step[c.signatureKey]
 	return ok
 }
 
-func (c *basicConverter) convert(step map[string]any) (map[string]any, error) {
+func (c *basicStepConverter) convert(step map[string]any) (
+	map[string]any, error,
+) {
 	if err := checkStepKeys(step, c.allowedKeys); err != nil {
 		return nil, fmt.Errorf("check wait step keys: %w", err)
 	}
 	return cloneMapExcept(step, c.dropKeys), nil
 }
 
-var waitConverter = &basicConverter{
+var waitConverter = &basicStepConverter{
 	signatureKey: "wait",
 	allowedKeys:  waitStepAllowedKeys,
 	dropKeys:     waitStepDropKeys,
 }
 
-var blockConverter = &basicConverter{
+var blockConverter = &basicStepConverter{
 	signatureKey: "block",
 	allowedKeys:  blockStepAllowedKeys,
 	dropKeys:     blockStepDropKeys,
