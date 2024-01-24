@@ -2,7 +2,9 @@ package raycicmd
 
 import (
 	"fmt"
+	"log"
 	"path"
+	"sort"
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
@@ -83,4 +85,108 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 		bkStep["matrix"] = s.matrix
 	}
 	return bkStep
+}
+
+type wandaConverter struct {
+	config *config
+	info   *buildInfo
+	envMap map[string]string
+}
+
+func newWandaConverter(
+	config *config, info *buildInfo, envMap map[string]string,
+) *wandaConverter {
+	return &wandaConverter{
+		config: config,
+		info:   info,
+		envMap: envMap,
+	}
+}
+
+func (c *wandaConverter) match(step map[string]any) bool {
+	_, ok := step["wanda"]
+	return ok
+}
+
+type envEntry struct {
+	k string
+	v string
+}
+
+func parseStepEnvs(v any) ([]*envEntry, error) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("not a map")
+	}
+
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var entries []*envEntry
+	for _, k := range keys {
+		str, ok := (m[k]).(string)
+		if !ok {
+			return nil, fmt.Errorf(
+				"value of env %q is not a string", k,
+			)
+		}
+		entries = append(entries, &envEntry{k: k, v: str})
+	}
+	return entries, nil
+}
+
+func (c *wandaConverter) convert(step map[string]any) (map[string]any, error) {
+	if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
+		return nil, fmt.Errorf("check wanda step keys: %w", err)
+	}
+	name, ok := stringInMap(step, "name")
+	if !ok {
+		return nil, fmt.Errorf("wanda step missing name")
+	}
+	file, ok := stringInMap(step, "wanda")
+	if !ok {
+		return nil, fmt.Errorf("wanda step file is not a string")
+	}
+	label, _ := stringInMap(step, "label")
+	instanceType, _ := stringInMap(step, "instance_type")
+
+	var matrix any
+	if m, ok := step["matrix"]; ok {
+		matrix = m
+	}
+
+	envs := copyEnvMap(c.envMap)
+	if stepEnvs, ok := step["env"]; ok {
+		entries, err := parseStepEnvs(stepEnvs)
+		if err != nil {
+			return nil, fmt.Errorf("parse wanda step envs: %w", err)
+		}
+		for _, entry := range entries {
+			if _, ok := envs[entry.k]; ok {
+				log.Printf("wanda step env %q ignored", entry.k)
+			} else {
+				envs[entry.k] = entry.v
+			}
+		}
+	}
+
+	s := &wandaStep{
+		name:           name,
+		label:          label,
+		file:           file,
+		buildID:        c.info.buildID,
+		envs:           envs,
+		ciConfig:       c.config,
+		matrix:         matrix,
+		instanceType:   instanceType,
+		launcherBranch: c.info.launcherBranch,
+	}
+	if dependsOn, ok := step["depends_on"]; ok {
+		s.dependsOn = dependsOn
+	}
+
+	return s.buildkiteStep(), nil
 }

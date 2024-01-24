@@ -2,7 +2,6 @@ package raycicmd
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 )
@@ -12,42 +11,35 @@ const macosJobEnv = "MACOS"
 const macosDenyFileRead = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
 
 type converter struct {
-	config  *config
-	buildID string
-
-	ciTempForBuild string
-
+	config *config
+	info   *buildInfo
 	envMap map[string]string
 
-	launcherBranch string
+	stepConverters []stepConverter
 }
 
 func newConverter(config *config, info *buildInfo) *converter {
 	c := &converter{
-		config:  config,
-		buildID: info.BuildID,
-
-		ciTempForBuild: config.CITemp + info.BuildID + "/",
-
-		launcherBranch: info.RayCIBranch,
+		config: config,
+		info:   info,
 	}
 
 	envMap := make(map[string]string)
-	envMap["RAYCI_BUILD_ID"] = info.BuildID
+	envMap["RAYCI_BUILD_ID"] = info.buildID
 	envMap["RAYCI_WORK_REPO"] = config.CIWorkRepo
-	envMap["RAYCI_TEMP"] = c.ciTempForBuild
-	if info.RayCIBranch != "" {
-		envMap["RAYCI_BRANCH"] = info.RayCIBranch
+	envMap["RAYCI_TEMP"] = config.CITemp + info.buildID + "/"
+	if info.launcherBranch != "" {
+		envMap["RAYCI_BRANCH"] = info.launcherBranch
 	}
 	if config.ForgePrefix != "" {
 		envMap["RAYCI_FORGE_PREFIX"] = config.ForgePrefix
 	}
 
-	if c.config.ArtifactsBucket != "" && info.GitCommit != "" {
+	if c.config.ArtifactsBucket != "" && info.gitCommit != "" {
 		dest := fmt.Sprintf(
 			"s3://%s/%s",
 			c.config.ArtifactsBucket,
-			info.GitCommit,
+			info.gitCommit,
 		)
 		envMap["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = dest
 	}
@@ -58,15 +50,13 @@ func newConverter(config *config, info *buildInfo) *converter {
 
 	c.envMap = envMap
 
-	return c
-}
-
-func (c *converter) envMapCopy() map[string]string {
-	m := make(map[string]string)
-	for k, v := range c.envMap {
-		m[k] = v
+	c.stepConverters = []stepConverter{
+		waitConverter,
+		blockConverter,
+		newWandaConverter(config, info, envMap),
 	}
-	return m
+
+	return c
 }
 
 func (c *converter) mapAgent(instanceType string) (string, error) {
@@ -84,111 +74,11 @@ func (c *converter) jobEnvImage(name string) string {
 		name = "forge"
 	}
 
-	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.buildID, name)
+	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)
 }
 
 const dockerPlugin = "docker#v5.8.0"
 const macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
-
-type envEntry struct {
-	k string
-	v string
-}
-
-func parseStepEnvs(v any) ([]*envEntry, error) {
-	m, ok := v.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("not a map")
-	}
-
-	var keys []string
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var entries []*envEntry
-	for _, k := range keys {
-		str, ok := (m[k]).(string)
-		if !ok {
-			return nil, fmt.Errorf(
-				"value of env %q is not a string", k,
-			)
-		}
-		entries = append(entries, &envEntry{k: k, v: str})
-	}
-	return entries, nil
-}
-
-func (c *converter) convertWait(step map[string]any) (map[string]any, error) {
-	// a wait step
-	if err := checkStepKeys(step, waitStepAllowedKeys); err != nil {
-		return nil, fmt.Errorf("check wait step keys: %w", err)
-	}
-	return cloneMapExcept(step, waitStepDropKeys), nil
-}
-
-func (c *converter) convertBlock(step map[string]any) (map[string]any, error) {
-	// a block step
-	if err := checkStepKeys(step, blockStepAllowedKeys); err != nil {
-		return nil, fmt.Errorf("check block step keys: %w", err)
-	}
-	return cloneMapExcept(step, blockStepDropKeys), nil
-}
-
-func (c *converter) convertWanda(step map[string]any) (map[string]any, error) {
-	// a wanda step
-	if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
-		return nil, fmt.Errorf("check wanda step keys: %w", err)
-	}
-	name, ok := stringInMap(step, "name")
-	if !ok {
-		return nil, fmt.Errorf("wanda step missing name")
-	}
-	file, ok := stringInMap(step, "wanda")
-	if !ok {
-		return nil, fmt.Errorf("wanda step file is not a string")
-	}
-	label, _ := stringInMap(step, "label")
-	instanceType, _ := stringInMap(step, "instance_type")
-
-	var matrix any
-	if m, ok := step["matrix"]; ok {
-		matrix = m
-	}
-
-	envs := c.envMapCopy()
-	if stepEnvs, ok := step["env"]; ok {
-		entries, err := parseStepEnvs(stepEnvs)
-		if err != nil {
-			return nil, fmt.Errorf("parse wanda step envs: %w", err)
-		}
-		for _, entry := range entries {
-			if _, ok := envs[entry.k]; ok {
-				log.Printf("wanda step env %q ignored", entry.k)
-			} else {
-				envs[entry.k] = entry.v
-			}
-		}
-	}
-
-	s := &wandaStep{
-		name:           name,
-		label:          label,
-		file:           file,
-		buildID:        c.buildID,
-		envs:           envs,
-		ciConfig:       c.config,
-		matrix:         matrix,
-		instanceType:   instanceType,
-		launcherBranch: c.launcherBranch,
-	}
-	if dependsOn, ok := step["depends_on"]; ok {
-		s.dependsOn = dependsOn
-	}
-
-	return s.buildkiteStep(), nil
-}
 
 func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {
@@ -223,7 +113,7 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 		result["priority"] = priority
 	}
 
-	envMap := c.envMapCopy()
+	envMap := copyEnvMap(c.envMap)
 	result["env"] = envMap
 
 	envKeys := make(map[string]struct{})
@@ -289,16 +179,12 @@ func (c *converter) convertRunner(step map[string]any) (map[string]any, error) {
 func (c *converter) convertPipelineStep(step map[string]any) (
 	map[string]any, error,
 ) {
-	if _, ok := step["block"]; ok {
-		return c.convertBlock(step)
+	for _, stepConverter := range c.stepConverters {
+		if stepConverter.match(step) {
+			return stepConverter.convert(step)
+		}
 	}
-	if _, ok := step["wait"]; ok {
-		return c.convertWait(step)
-	}
-	// special steps for building container images.
-	if _, ok := step["wanda"]; ok {
-		return c.convertWanda(step)
-	}
+
 	return c.convertRunner(step)
 }
 

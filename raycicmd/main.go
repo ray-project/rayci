@@ -93,9 +93,9 @@ func Main(args []string, envs Envs) error {
 	commit := gitCommit(envs)
 
 	info := &buildInfo{
-		BuildID:     buildID,
-		RayCIBranch: rayciBranch,
-		GitCommit:   commit,
+		buildID:        buildID,
+		launcherBranch: rayciBranch,
+		gitCommit:      commit,
 	}
 
 	pipeline, err := makePipeline(flags.RepoDir, config, info)
