@@ -12,7 +12,7 @@
 		]
 	},
 	"plugins": [{
-			"ray-project/dind#104e9f556a0144ddd7f6e7f6d92346dcbb75fa79": {
+			"ray-project/dind#v1.0.11": {
 				"network-name": "dind-network",
 				"certs-volume-name": "ray-docker-certs-client",
 				"additional-volume-mount": "shared-ci-volume:/shared"
