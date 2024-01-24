@@ -4,3 +4,4 @@ steps:
     instance_type: release
     commands:
       - echo "Hello, Release!"
+    depends_on: forge
