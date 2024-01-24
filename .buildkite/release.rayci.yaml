@@ -1,0 +1,6 @@
+group: release
+steps:
+  - name: hello-release
+    instance_type: release
+    commands:
+      - echo "Hello, Release!"
