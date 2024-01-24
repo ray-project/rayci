@@ -170,18 +170,18 @@ var branchPipelineConfig = &config{
 	},
 
 	RunnerQueues: map[string]string{
-		"default":     "runner_queue_small_branch",
-		"small":       "runner_queue_small_branch",
-		"medium":      "runner_queue_medium_branch",
-		"large":       "runner_queue_branch",
-		"gpu":         "gpu_runner_queue_branch",
-		"gpu-large":   "gpu_large_runner_queue_branch",
-		"trainium":    "trainium_runner_queue_branch",
-		"windows":     "windows_queue_branch",
-		"macos":       "macos-branch",
-		"macos-arm64": "macos-branch-arm64",
-
+		"default":      "runner_queue_small_branch",
+		"small":        "runner_queue_small_branch",
+		"medium":       "runner_queue_medium_branch",
+		"large":        "runner_queue_branch",
+		"gpu":          "gpu_runner_queue_branch",
+		"gpu-large":    "gpu_large_runner_queue_branch",
+		"trainium":     "trainium_runner_queue_branch",
+		"windows":      "windows_queue_branch",
+		"macos":        "macos-branch",
+		"macos-arm64":  "macos-branch-arm64",
 		"medium-arm64": "runner_queue_arm64_medium_branch",
+		"release":      "release_queue_small",
 	},
 
 	Env: map[string]string{
