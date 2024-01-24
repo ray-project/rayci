@@ -44,7 +44,12 @@ func (c *commandConverter) jobEnvImage(name string) string {
 const dockerPlugin = "docker#v5.8.0"
 const macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
 
-func (c *commandConverter) match(step map[string]any) bool { return true }
+func (c *commandConverter) match(step map[string]any) bool {
+	// This converter is used as a default converter.
+	// All steps that are not matching other steps will be treated as a
+	// command step. Therefore, it matches everything.
+	return true
+}
 
 func (c *commandConverter) convert(step map[string]any) (
 	map[string]any, error,
