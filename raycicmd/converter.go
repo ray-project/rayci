@@ -60,7 +60,7 @@ func newConverter(config *config, info *buildInfo) *converter {
 	return c
 }
 
-func (c *converter) convertPipelineStep(step map[string]any) (
+func (c *converter) convertStep(step map[string]any) (
 	map[string]any, error,
 ) {
 	for _, stepConverter := range c.stepConverters {
@@ -71,7 +71,7 @@ func (c *converter) convertPipelineStep(step map[string]any) (
 	return c.defaultConverter.convert(step)
 }
 
-func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
+func (c *converter) convertGroup(g *pipelineGroup, filter *tagFilter) (
 	*bkPipelineGroup, error,
 ) {
 	bkGroup := &bkPipelineGroup{
@@ -89,7 +89,7 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
 		}
 
 		// convert step to buildkite step
-		bkStep, err := c.convertPipelineStep(step)
+		bkStep, err := c.convertStep(step)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
@@ -97,4 +97,23 @@ func (c *converter) convertPipelineGroup(g *pipelineGroup, filter *tagFilter) (
 	}
 
 	return bkGroup, nil
+}
+
+func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
+	[]*bkPipelineGroup, error,
+) {
+	var bkGroups []*bkPipelineGroup
+
+	for _, g := range gs {
+		bkGroup, err := c.convertGroup(g, filter)
+		if err != nil {
+			return nil, err
+		}
+		if len(bkGroup.Steps) == 0 {
+			continue // skip empty groups
+		}
+		bkGroups = append(bkGroups, bkGroup)
+	}
+
+	return bkGroups, nil
 }

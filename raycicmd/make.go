@@ -132,19 +132,11 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		sortPipelineGroups(groups)
 
 		// map each file into a group.
-		for _, g := range groups {
-			bkGroup, err := c.convertPipelineGroup(g, tagFilters)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"convert pipeline group %s: %w", g.filename, err,
-				)
-			}
-			if len(bkGroup.Steps) == 0 {
-				continue // skip empty groups
-			}
-
-			pl.Steps = append(pl.Steps, bkGroup)
+		steps, err := c.convertGroups(groups, tagFilters)
+		if err != nil {
+			return nil, fmt.Errorf("convert pipeline groups: %w", err)
 		}
+		pl.Steps = steps
 	}
 
 	totalSteps := 0

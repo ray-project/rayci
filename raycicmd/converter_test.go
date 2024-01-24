@@ -350,7 +350,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"depends_on": "dep", "if": "false",
 		},
 	}} {
-		got, err := c.convertPipelineStep(test.in)
+		got, err := c.convertStep(test.in)
 		if err != nil {
 			t.Errorf("convertPipelineStep %+v: %v", test.in, err)
 			continue
@@ -486,7 +486,7 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 		},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertPipelineGroup(g, filter)
+	bk, err := c.convertGroup(g, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -539,7 +539,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 		}},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertPipelineGroup(g, filter)
+	bk, err := c.convertGroup(g, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
@@ -601,7 +601,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 		skipTags: []string{"disabled"},
 		tags:     []string{"foo"},
 	}
-	bk, err := c.convertPipelineGroup(g, filter)
+	bk, err := c.convertGroup(g, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
