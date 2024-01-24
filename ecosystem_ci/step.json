@@ -12,7 +12,7 @@
 		]
 	},
 	"plugins": [{
-			"ray-project/dind#v1.0.10": {
+			"ray-project/dind#architkulkarni-patch-1": {
 				"network-name": "dind-network",
 				"certs-volume-name": "ray-docker-certs-client",
 				"additional-volume-mount": "shared-ci-volume:/shared"
