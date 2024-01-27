@@ -16,8 +16,6 @@ type converter struct {
 	stepConverters []stepConverter
 
 	defaultConverter stepConverter
-
-	nodeMap map[string]*jobNode
 }
 
 func newConverter(config *config, info *buildInfo) *converter {
