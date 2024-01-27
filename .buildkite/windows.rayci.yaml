@@ -10,6 +10,7 @@ steps:
     instance_type: windows
     depends_on: hello-windows
     commands: 
+      - exit 1
       - bash .buildkite/windows_docker.sh
       - docker run -i --rm $${RAYCI_WORK_REPO}:$${RAYCI_BUILD_ID}-hello-windows bash -c "echo 'Hello, Windows!'"
 
