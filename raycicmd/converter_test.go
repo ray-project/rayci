@@ -486,10 +486,15 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 		},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertGroup(g, filter)
+	result, err := c.convertGroups([]*pipelineGroup{g}, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
+
+	if len(result) != 1 {
+		t.Fatalf("convertPipelineGroup: got %d groups, want 1", len(result))
+	}
+	bk := result[0]
 
 	if len(bk.Steps) != 3 {
 		t.Fatalf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
@@ -539,10 +544,15 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 		}},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertGroup(g, filter)
+	result, err := c.convertGroups([]*pipelineGroup{g}, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
+
+	if len(result) != 1 {
+		t.Fatalf("convertPipelineGroup: got %d groups, want 1", len(result))
+	}
+	bk := result[0]
 
 	if len(bk.Steps) != 2 {
 		t.Fatalf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
@@ -591,7 +601,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
 			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
-			{"wanda": "panda", "tags": []interface{}{"bar"}},
+			{"name": "panda", "wanda": "panda", "tags": []interface{}{"bar"}},
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 			{"commands": []string{"exit 1"}, "tags": "disabled"},
 		},
@@ -601,10 +611,14 @@ func TestConvertPipelineGroup(t *testing.T) {
 		skipTags: []string{"disabled"},
 		tags:     []string{"foo"},
 	}
-	bk, err := c.convertGroup(g, filter)
+	result, err := c.convertGroups([]*pipelineGroup{g}, filter)
 	if err != nil {
 		t.Fatalf("convertPipelineGroup: %v", err)
 	}
+	if len(result) != 1 {
+		t.Fatalf("convertPipelineGroup: got %d groups, want 1", len(result))
+	}
+	bk := result[0]
 
 	if bk.Group != "fancy" {
 		t.Errorf("convertPipelineGroup: got group %s, want fancy", bk.Group)
