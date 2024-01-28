@@ -167,8 +167,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 	}
 
-	// TODO(aslonnie): for any node that is not included, also include its
-	// dependencies.
+	// TODO(aslonnie): for any included node, also include its dependencies.
 
 	var bkGroups []*bkPipelineGroup
 	for _, g := range groupNodes {
