@@ -80,7 +80,7 @@ func parsePipelineFile(file string) (*pipelineGroup, error) {
 }
 
 func sortPipelineGroups(gs []*pipelineGroup) {
-	sort.Slice(gs, func(i, j int) bool { return gs[i].less(gs[j]) })
+	sort.Slice(gs, func(i, j int) bool { return gs[i].lessThan(gs[j]) })
 }
 
 func makePipeline(repoDir string, config *config, info *buildInfo) (
