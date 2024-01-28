@@ -14,6 +14,13 @@ type pipelineGroup struct {
 	Steps []map[string]any `yaml:"steps"`
 }
 
+func (g *pipelineGroup) less(other *pipelineGroup) bool {
+	if g.sortKey == other.sortKey {
+		return g.filename < other.filename
+	}
+	return g.sortKey < other.sortKey
+}
+
 var (
 	waitStepAllowedKeys = []string{
 		"wait", "continue_on_failure", "if", "depends_on",
