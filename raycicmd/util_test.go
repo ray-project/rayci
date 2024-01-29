@@ -228,7 +228,7 @@ func TestCheckStepKeys(t *testing.T) {
 	}
 }
 
-func TestFieldToStringList(t *testing.T) {
+func TestToStringList(t *testing.T) {
 	for _, test := range []struct {
 		in   any
 		want []string
