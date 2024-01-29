@@ -131,20 +131,21 @@ func (c *commandConverter) convert(step map[string]any) (
 	v, _ := boolInMap(step, "mount_windows_artifacts")
 	dockerPluginConfig.mountWindowsArtifacts = v
 
-	if jobEnv == windowsJobEnv { // a special job env for windows
+	switch jobEnv {
+	case windowsJobEnv: // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
 		}}
 		if dockerPluginConfig.mountWindowsArtifacts {
 			result["artifact_paths"] = windowsArtifactPaths
 		}
-	} else if jobEnv == macosJobEnv { // a special job env for macos
+	case macosJobEnv: // a special job env for macos
 		result["plugins"] = []any{map[string]any{
 			macosSandboxPlugin: map[string]string{
 				"deny-file-read": macosDenyFileRead,
 			},
 		}}
-	} else {
+	default:
 		// default Linux Job env.
 		jobEnvImage := c.jobEnvImage(jobEnv)
 		result["plugins"] = []any{map[string]any{
