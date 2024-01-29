@@ -4,10 +4,6 @@ import (
 	"fmt"
 )
 
-const windowsJobEnv = "WINDOWS"
-const macosJobEnv = "MACOS"
-const macosDenyFileRead = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
-
 type converter struct {
 	config *config
 	info   *buildInfo

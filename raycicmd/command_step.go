@@ -41,8 +41,15 @@ func (c *commandConverter) jobEnvImage(name string) string {
 	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)
 }
 
-const dockerPlugin = "docker#v5.8.0"
-const macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
+const (
+	dockerPlugin = "docker#v5.8.0"
+
+	macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
+	macosJobEnv        = "MACOS"
+	macosDenyFileRead  = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
+
+	windowsJobEnv = "WINDOWS"
+)
 
 func (c *commandConverter) match(step map[string]any) bool {
 	// This converter is used as a default converter.
