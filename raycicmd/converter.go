@@ -161,6 +161,21 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 
 	// Populate dependsOn.
 	for _, g := range groupNodes {
+		// A group node is different from a step node.
+		//
+		// When a group is being depended on, all its steps are being depended
+		// on. The gating is equivalent to wait step at the end of the group.
+		//
+		// When a group depensd on a node, it means all its steps depend on the
+		// node. The gating is equivalent to wait step at the beginning of the
+		// group.
+		commonDeps := make(map[string]struct{})
+		for _, dep := range g.srcGroup.DependsOn {
+			if depNode, ok := nameNodes[dep]; ok {
+				commonDeps[depNode.id] = struct{}{}
+			}
+		}
+
 		var lastGate *jobNode
 		for _, step := range g.steps {
 			// Track step dependencies.
@@ -175,16 +190,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 				step.dependsOn[lastGate.id] = struct{}{}
 			}
 
+			// Always add group common deps.
+			for dep := range commonDeps {
+				step.dependsOn[dep] = struct{}{}
+			}
+
 			if isBlockOrWait(step.srcStep) {
 				lastGate = step
-			}
-		}
-
-		if deps := g.srcGroup.DependsOn; len(deps) > 0 {
-			for _, dep := range deps {
-				if depNode, ok := nameNodes[dep]; ok {
-					g.dependsOn[depNode.id] = struct{}{}
-				}
 			}
 		}
 	}
@@ -216,6 +228,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		thisRound[nodeID] = struct{}{}
 	}
 
+	// BFS to include all dependencies.
 	for len(thisRound) > 0 {
 		nextRound := make(map[string]struct{})
 		for nodeID := range thisRound {
@@ -228,10 +241,10 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 				}
 			}
 		}
-
 		thisRound = nextRound
 	}
 
+	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
 	for _, g := range groupNodes {
 		if !g.include {
