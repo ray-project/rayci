@@ -14,6 +14,8 @@ type jobNode struct {
 	// fields used for steps
 	srcStep map[string]any // set for steps
 
+	dependsOn map[string]struct{}
+
 	// mark if this node should be included
 	include bool
 }

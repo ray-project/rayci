@@ -98,12 +98,22 @@ func (c *converter) convertGroup(n *jobNode) (
 	return bkGroup, nil
 }
 
+func keyOfStep(step map[string]any) string {
+	if k, ok := stringInMap(step, "name"); ok {
+		return k
+	}
+
+	k, _ := stringInMap(step, "key")
+	return k
+}
+
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 	[]*bkPipelineGroup, error,
 ) {
 
 	var groupNodes []*jobNode
 
+	nodeMap := make(map[string]*jobNode)
 	for i, g := range gs {
 		node := &jobNode{
 			id:       fmt.Sprintf("g%d", i),
@@ -113,25 +123,25 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 
 		for j, step := range g.Steps {
-			k, ok := stringInMap(step, "name")
-			if !ok {
-				k, _ = stringInMap(step, "key")
-			}
+			k := keyOfStep(step)
 
 			var tags []string
 			if v, ok := step["tags"]; ok {
 				tags = toStringList(v)
 			}
 
-			node.steps = append(node.steps, &jobNode{
+			stepNode := &jobNode{
 				id:      fmt.Sprintf("g%d_s%d", i, j),
 				userKey: k,
 				srcStep: step,
 				tags:    tags,
-			})
+			}
+			node.steps = append(node.steps, stepNode)
+			nodeMap[stepNode.id] = stepNode
 		}
 
 		groupNodes = append(groupNodes, node)
+		nodeMap[node.id] = node
 	}
 
 	// Build namedNodes, and check if we have duplicated user keys.
@@ -153,22 +163,78 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 	}
 
-	// Apply tags filter.
+	// Populate dependsOn.
 	for _, g := range groupNodes {
-		if filter.hit(g.tags) {
-			g.include = true
+		var lastGate *jobNode
+		for _, step := range g.steps {
+			// Track step dependencies.
+			if dependsOn, ok := step.srcStep["depends_on"]; !ok {
+				deps := toStringList(dependsOn)
+				for _, dep := range deps {
+					if depNode, ok := nameNodes[dep]; ok {
+						step.dependsOn[depNode.id] = struct{}{}
+					}
+				}
+			} else if lastGate != nil {
+				step.dependsOn[lastGate.id] = struct{}{}
+			}
+
+			if isBlockOrWait(step.srcStep) {
+				lastGate = step
+			}
 		}
 
-		for _, step := range g.steps {
-			if filter.hit(step.tags) {
-				step.include = true
-				g.include = true // include group if any step is included
+		if deps := g.srcGroup.DependsOn; len(deps) > 0 {
+			for _, dep := range deps {
+				if depNode, ok := nameNodes[dep]; ok {
+					g.dependsOn[depNode.id] = struct{}{}
+				}
 			}
 		}
 	}
 
-	// TODO(aslonnie): for any included node, also include its
-	// dependencies.
+	includeNodes := make(map[string]struct{})
+
+	// Apply tags filter.
+	for _, g := range groupNodes {
+		includeGroup := false
+		if filter.hit(g.tags) {
+			includeGroup = true
+		}
+
+		for _, step := range g.steps {
+			if filter.hit(step.tags) {
+				includeNodes[step.id] = struct{}{}
+				includeGroup = true
+			}
+		}
+
+		if includeGroup {
+			includeNodes[g.id] = struct{}{}
+		}
+	}
+
+	// For any included node, also include their dependencies.
+	thisRound := make(map[string]struct{})
+	for nodeID := range includeNodes {
+		thisRound[nodeID] = struct{}{}
+	}
+
+	for len(thisRound) > 0 {
+		nextRound := make(map[string]struct{})
+		for nodeID := range thisRound {
+			node := nodeMap[nodeID]
+			node.include = true
+			for dep := range node.dependsOn {
+				if _, ok := includeNodes[dep]; !ok {
+					nextRound[dep] = struct{}{}
+					includeNodes[dep] = struct{}{}
+				}
+			}
+		}
+
+		thisRound = nextRound
+	}
 
 	var bkGroups []*bkPipelineGroup
 	for _, g := range groupNodes {
