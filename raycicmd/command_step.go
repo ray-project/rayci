@@ -41,8 +41,15 @@ func (c *commandConverter) jobEnvImage(name string) string {
 	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)
 }
 
-const dockerPlugin = "docker#v5.8.0"
-const macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
+const (
+	dockerPlugin = "docker#v5.8.0"
+
+	macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
+	macosJobEnv        = "MACOS"
+	macosDenyFileRead  = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
+
+	windowsJobEnv = "WINDOWS"
+)
 
 func (c *commandConverter) match(step map[string]any) bool {
 	// This converter is used as a default converter.
@@ -124,20 +131,21 @@ func (c *commandConverter) convert(step map[string]any) (
 	v, _ := boolInMap(step, "mount_windows_artifacts")
 	dockerPluginConfig.mountWindowsArtifacts = v
 
-	if jobEnv == windowsJobEnv { // a special job env for windows
+	switch jobEnv {
+	case windowsJobEnv: // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
 		}}
 		if dockerPluginConfig.mountWindowsArtifacts {
 			result["artifact_paths"] = windowsArtifactPaths
 		}
-	} else if jobEnv == macosJobEnv { // a special job env for macos
+	case macosJobEnv: // a special job env for macos
 		result["plugins"] = []any{map[string]any{
 			macosSandboxPlugin: map[string]string{
 				"deny-file-read": macosDenyFileRead,
 			},
 		}}
-	} else {
+	default:
 		// default Linux Job env.
 		jobEnvImage := c.jobEnvImage(jobEnv)
 		result["plugins"] = []any{map[string]any{
