@@ -455,6 +455,19 @@ func TestConvertPipelineStep(t *testing.T) {
 	}
 }
 
+func convertSingleGroup(c *converter, g *pipelineGroup, filter *tagFilter) (
+	*bkPipelineGroup, error,
+) {
+	result, err := c.convertGroups([]*pipelineGroup{g}, filter)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) != 1 {
+		return nil, fmt.Errorf("got %d groups, want 1", len(result))
+	}
+	return result[0], nil
+}
+
 func TestConvertPipelineGroup_priority(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
@@ -486,13 +499,9 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 		},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertGroup(g, filter)
+	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
-		t.Fatalf("convertPipelineGroup: %v", err)
-	}
-
-	if len(bk.Steps) != 3 {
-		t.Fatalf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+		t.Fatalf("convert: %v", err)
 	}
 
 	steps := bk.Steps
@@ -539,9 +548,9 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 		}},
 	}
 	filter := &tagFilter{tags: []string{}, runAll: true}
-	bk, err := c.convertGroup(g, filter)
+	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
-		t.Fatalf("convertPipelineGroup: %v", err)
+		t.Fatalf("convert: %v", err)
 	}
 
 	if len(bk.Steps) != 2 {
@@ -591,7 +600,11 @@ func TestConvertPipelineGroup(t *testing.T) {
 			{"commands": []string{"echo 1"}},
 			{"wait": nil},
 			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
-			{"wanda": "panda", "tags": []interface{}{"bar"}},
+			{
+				"name":  "panda",
+				"wanda": "panda.yaml",
+				"tags":  []interface{}{"bar"},
+			},
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
 			{"commands": []string{"exit 1"}, "tags": "disabled"},
 		},
@@ -601,9 +614,9 @@ func TestConvertPipelineGroup(t *testing.T) {
 		skipTags: []string{"disabled"},
 		tags:     []string{"foo"},
 	}
-	bk, err := c.convertGroup(g, filter)
+	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
-		t.Fatalf("convertPipelineGroup: %v", err)
+		t.Fatalf("convert: %v", err)
 	}
 
 	if bk.Group != "fancy" {

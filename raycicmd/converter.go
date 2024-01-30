@@ -67,25 +67,24 @@ func (c *converter) convertStep(step map[string]any) (
 	return c.defaultConverter.convert(step)
 }
 
-func (c *converter) convertGroup(g *pipelineGroup, filter *tagFilter) (
+func (c *converter) convertGroup(n *stepNode) (
 	*bkPipelineGroup, error,
 ) {
+	g := n.srcGroup
+
 	bkGroup := &bkPipelineGroup{
 		Group:     g.Group,
 		Key:       g.Key,
 		DependsOn: g.DependsOn,
 	}
 
-	for _, step := range g.Steps {
-		// filter steps by tags
-		if stepTags, ok := step["tags"]; ok {
-			if !filter.hit(toStringList(stepTags)) {
-				continue
-			}
+	for _, step := range n.steps {
+		if !step.marked {
+			continue
 		}
 
 		// convert step to buildkite step
-		bkStep, err := c.convertStep(step)
+		bkStep, err := c.convertStep(step.src)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
@@ -95,13 +94,89 @@ func (c *converter) convertGroup(g *pipelineGroup, filter *tagFilter) (
 	return bkGroup, nil
 }
 
+func stepKey(step map[string]any) string {
+	if k, ok := stringInMap(step, "name"); ok {
+		return k
+	}
+	k, _ := stringInMap(step, "key")
+	return k
+}
+
+func stepTags(step map[string]any) []string {
+	if v, ok := step["tags"]; ok {
+		return toStringList(v)
+	}
+	return nil
+}
+
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 	[]*bkPipelineGroup, error,
 ) {
-	var bkGroups []*bkPipelineGroup
 
-	for _, g := range gs {
-		bkGroup, err := c.convertGroup(g, filter)
+	var groupNodes []*stepNode
+
+	for i, g := range gs {
+		node := &stepNode{
+			id:       fmt.Sprintf("g%d", i),
+			key:      g.Key,
+			srcGroup: g,
+			tags:     g.Tags,
+		}
+
+		for j, step := range g.Steps {
+			node.steps = append(node.steps, &stepNode{
+				id:   fmt.Sprintf("g%d_s%d", i, j),
+				key:  stepKey(step),
+				tags: stepTags(step),
+				src:  step,
+			})
+		}
+
+		groupNodes = append(groupNodes, node)
+	}
+
+	// Check if we have duplicated user keys.
+	nameNodes := make(map[string]bool)
+	for _, groupNode := range groupNodes {
+		if k := groupNode.key; k != "" {
+			if nameNodes[k] {
+				return nil, fmt.Errorf("duplicate node key %q", k)
+			}
+			nameNodes[groupNode.key] = true
+		}
+
+		for _, step := range groupNode.steps {
+			if k := step.key; k != "" {
+				if nameNodes[k] {
+					return nil, fmt.Errorf("duplicate node key %q", k)
+				}
+			}
+		}
+	}
+
+	// Apply tags filter.
+	for _, groupNode := range groupNodes {
+		if filter.hit(groupNode.tags) {
+			groupNode.marked = true
+		}
+
+		for _, step := range groupNode.steps {
+			if filter.hit(step.tags) {
+				step.marked = true
+				groupNode.marked = true // include group if any step is included
+			}
+		}
+	}
+
+	// TODO(aslonnie): for any included node, also include its dependencies.
+
+	var bkGroups []*bkPipelineGroup
+	for _, groupNode := range groupNodes {
+		if !groupNode.marked {
+			continue
+		}
+
+		bkGroup, err := c.convertGroup(groupNode)
 		if err != nil {
 			return nil, err
 		}
