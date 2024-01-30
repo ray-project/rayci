@@ -8,28 +8,28 @@ import (
 )
 
 type testDepNode struct {
-	d []string
-	m bool
+	dependencies []string
+	marked       bool
 }
 
 func newTestDepNode(deps []string) *testDepNode {
-	return &testDepNode{d: deps}
+	return &testDepNode{dependencies: deps}
 }
-func (n *testDepNode) deps() []string { return n.d }
-func (n *testDepNode) mark()          { n.m = true }
+func (n *testDepNode) deps() []string { return n.dependencies }
+func (n *testDepNode) mark()          { n.marked = true }
 
-type testDepGraph struct{ g map[string]*testDepNode }
+type testDepGraph struct{ nodes map[string]*testDepNode }
 
-func newTestDepGraph(g map[string][]string) *testDepGraph {
+func newTestDepGraph(graph map[string][]string) *testDepGraph {
 	nodes := make(map[string]*testDepNode)
-	for k, deps := range g {
-		nodes[k] = newTestDepNode(deps)
+	for name, deps := range graph {
+		nodes[name] = newTestDepNode(deps)
 	}
-	return &testDepGraph{g: nodes}
+	return &testDepGraph{nodes: nodes}
 }
 
 func (g *testDepGraph) depNode(id string) depNode {
-	n, ok := g.g[id]
+	n, ok := g.nodes[id]
 	if !ok {
 		return nil
 	}
@@ -38,9 +38,9 @@ func (g *testDepGraph) depNode(id string) depNode {
 
 func (g *testDepGraph) marked() []string {
 	var marked []string
-	for k, node := range g.g {
-		if node.m {
-			marked = append(marked, k)
+	for name, node := range g.nodes {
+		if node.marked {
+			marked = append(marked, name)
 		}
 	}
 	sort.Strings(marked)
@@ -49,85 +49,85 @@ func (g *testDepGraph) marked() []string {
 
 func TestMarkDeps(t *testing.T) {
 	for _, test := range []struct {
-		g    map[string][]string
-		s    []string
-		want []string
+		graph  map[string][]string
+		starts []string
+		want   []string
 	}{{
-		g:    map[string][]string{},
-		s:    []string{},
-		want: nil,
+		graph:  map[string][]string{},
+		starts: []string{},
+		want:   nil,
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {},
 		},
-		s:    []string{"a"},
-		want: []string{"a", "b"},
+		starts: []string{"a"},
+		want:   []string{"a", "b"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {},
 		},
-		s:    []string{"b"},
-		want: []string{"b"},
+		starts: []string{"b"},
+		want:   []string{"b"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {},
 		},
-		s:    nil,
-		want: nil,
+		starts: nil,
+		want:   nil,
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {"c"},
 			"c": {"d"},
 			"d": {},
 		},
-		s:    []string{"a"},
-		want: []string{"a", "b", "c", "d"},
+		starts: []string{"a"},
+		want:   []string{"a", "b", "c", "d"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {"c"},
 			"c": {"d"},
 		},
-		s:    []string{"a", "e"},
-		want: []string{"a", "b", "c"},
+		starts: []string{"a", "e"},
+		want:   []string{"a", "b", "c"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"a"},
 		},
-		s:    []string{"a"},
-		want: []string{"a"},
+		starts: []string{"a"},
+		want:   []string{"a"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {"a"},
 		},
-		s:    []string{"a"},
-		want: []string{"a", "b"},
+		starts: []string{"a"},
+		want:   []string{"a", "b"},
 	}, {
-		g: map[string][]string{
+		graph: map[string][]string{
 			"a": {"b"},
 			"b": {"c"},
 			"c": {"a"},
 			"d": {"e"},
 		},
-		s:    []string{"a"},
-		want: []string{"a", "b", "c"},
+		starts: []string{"a"},
+		want:   []string{"a", "b", "c"},
 	}} {
-		g := newTestDepGraph(test.g)
+		graph := newTestDepGraph(test.graph)
 		set := make(map[string]struct{})
-		for _, id := range test.s {
-			set[id] = struct{}{}
+		for _, name := range test.starts {
+			set[name] = struct{}{}
 		}
-		markDeps(g, set)
-		got := g.marked()
+		markDeps(graph, set)
+		got := graph.marked()
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf(
 				"mark graph %v with %v, got %v, want %v",
-				test.g, test.s, got, test.want,
+				test.graph, test.starts, got, test.want,
 			)
 		}
 	}

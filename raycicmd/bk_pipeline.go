@@ -86,7 +86,7 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 
 	m := map[string]any{
 		"image":          windowsBuildEnvImage,
-		"shell":          []string{"bash", "-c"},
+		"shell":          []string{"bash", "-eo", "pipefail", "-c"},
 		"shm-size":       "2.5gb",
 		"mount-checkout": true,
 		"environment":    envs,
