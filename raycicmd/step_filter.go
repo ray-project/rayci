@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type jobFilter struct {
+type stepFilter struct {
 	skipTags []string
 
 	runAll bool
@@ -29,14 +29,14 @@ func intersects(set1, set2 []string) bool {
 	return false
 }
 
-func (f *jobFilter) hit(selects, tags []string) bool {
+func (f *stepFilter) hit(selects, tags []string) bool {
 	if f.hitSelects(selects) {
 		return true
 	}
 	return f.hitTags(tags)
 }
 
-func (f *jobFilter) hitSelects(selects []string) bool {
+func (f *stepFilter) hitSelects(selects []string) bool {
 	if f.selects != nil && len(selects) > 0 {
 		for _, k := range selects {
 			if f.selects[k] {
@@ -47,7 +47,7 @@ func (f *jobFilter) hitSelects(selects []string) bool {
 	return false
 }
 
-func (f *jobFilter) hitTags(tags []string) bool {
+func (f *stepFilter) hitTags(tags []string) bool {
 	if len(tags) == 0 {
 		return true
 	}
@@ -60,7 +60,7 @@ func (f *jobFilter) hitTags(tags []string) bool {
 	return intersects(f.tags, tags)
 }
 
-func (f *jobFilter) addSelects(selects []string) {
+func (f *stepFilter) addSelects(selects []string) {
 	if f.selects == nil {
 		f.selects = make(map[string]bool)
 	}
@@ -69,8 +69,8 @@ func (f *jobFilter) addSelects(selects []string) {
 	}
 }
 
-func newTagFilter(skips []string, filterCmd []string) (*jobFilter, error) {
-	filter := &jobFilter{skipTags: skips, runAll: true}
+func newStepFilter(skips []string, filterCmd []string) (*stepFilter, error) {
+	filter := &stepFilter{skipTags: skips, runAll: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil

@@ -36,37 +36,37 @@ func TestNewJobFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
-		want     *jobFilter
+		want     *stepFilter
 		wantErr  bool
 	}{{
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
-		want: &jobFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
-		want: &jobFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "\t  \n  \t"},
-		want: &jobFilter{},
+		want: &stepFilter{},
 	}, {
 		cmd:  []string{},
-		want: &jobFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  nil,
-		want: &jobFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  []string{"echo", "*"},
-		want: &jobFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		skipTags: []string{"disabled"},
-		want:     &jobFilter{skipTags: []string{"disabled"}, runAll: true},
+		want:     &stepFilter{skipTags: []string{"disabled"}, runAll: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
 	}, {
 		cmd:  []string{"./local-not-exist.sh"},
-		want: &jobFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}} {
-		got, err := newTagFilter(test.skipTags, test.cmd)
+		got, err := newStepFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -87,7 +87,7 @@ func TestNewJobFilter(t *testing.T) {
 }
 
 func TestJobFilter_tags(t *testing.T) {
-	filter := &jobFilter{
+	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
 	}
@@ -116,7 +116,7 @@ func TestJobFilter_tags(t *testing.T) {
 }
 
 func TestJobFilter_runAll(t *testing.T) {
-	filter := &jobFilter{
+	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		runAll:   true,
 	}

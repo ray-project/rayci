@@ -67,7 +67,7 @@ func (c *converter) convertStep(step map[string]any) (
 	return c.defaultConverter.convert(step)
 }
 
-func (c *converter) convertGroup(n *jobNode) (
+func (c *converter) convertGroup(n *stepNode) (
 	*bkPipelineGroup, error,
 ) {
 	g := n.srcGroup
@@ -78,13 +78,13 @@ func (c *converter) convertGroup(n *jobNode) (
 		DependsOn: g.DependsOn,
 	}
 
-	for _, step := range n.steps {
-		if !step.include {
+	for _, step := range n.subSteps {
+		if !step.marked {
 			continue
 		}
 
 		// convert step to buildkite step
-		bkStep, err := c.convertStep(step.srcStep)
+		bkStep, err := c.convertStep(step.src)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
@@ -109,45 +109,45 @@ func tagsOfStep(step map[string]any) []string {
 	return nil
 }
 
-func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
+func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
-	graph := newNodeGraph()
+	nodes := newStepNodeSet()
 
-	var groupNodes []*jobNode
+	var groupNodes []*stepNode
 	for i, g := range gs {
-		node := &jobNode{
+		node := &stepNode{
 			id:       fmt.Sprintf("g%d", i),
-			userKey:  g.Key,
+			key:      g.Key,
 			srcGroup: g,
 			tags:     g.Tags,
 		}
 
 		for j, step := range g.Steps {
-			stepNode := &jobNode{
-				id:      fmt.Sprintf("g%d_s%d", i, j),
-				srcStep: step,
-				userKey: keyOfStep(step),
-				tags:    tagsOfStep(step),
+			stepNode := &stepNode{
+				id:   fmt.Sprintf("g%d_s%d", i, j),
+				src:  step,
+				key:  keyOfStep(step),
+				tags: tagsOfStep(step),
 			}
-			node.steps = append(node.steps, stepNode)
-			graph.add(stepNode)
+			node.subSteps = append(node.subSteps, stepNode)
+			nodes.add(stepNode)
 		}
 
 		groupNodes = append(groupNodes, node)
-		graph.add(node)
+		nodes.add(node)
 	}
 
-	// Build namedNodes, and check if we have duplicated user keys.
-	for _, g := range groupNodes {
-		if k := g.userKey; k != "" {
-			if err := graph.addName(g.id, k); err != nil {
+	// check if we have duplicated user keys.
+	for _, groupNode := range groupNodes {
+		if k := groupNode.key; k != "" {
+			if err := nodes.addName(groupNode.id, k); err != nil {
 				return nil, fmt.Errorf("add group %q: %w", k, err)
 			}
 		}
-		for _, step := range g.steps {
-			if k := step.userKey; k != "" {
-				if err := graph.addName(step.id, k); err != nil {
+		for _, step := range groupNode.subSteps {
+			if k := step.key; k != "" {
+				if err := nodes.addName(step.id, k); err != nil {
 					return nil, fmt.Errorf("add node %q: %w", k, err)
 				}
 			}
@@ -155,7 +155,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 	}
 
 	// Populate dependsOn.
-	for _, g := range groupNodes {
+	for _, groupNode := range groupNodes {
 		// A group node is different from a step node.
 		//
 		// When a group is being depended on, all its steps are being depended
@@ -165,19 +165,19 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 		// node. The gating is equivalent to wait step at the beginning of the
 		// group.
 		commonDeps := make(map[string]struct{})
-		for _, dep := range g.srcGroup.DependsOn {
-			if depNode, ok := graph.byName(dep); ok {
+		for _, dep := range groupNode.srcGroup.DependsOn {
+			if depNode, ok := nodes.byName(dep); ok {
 				commonDeps[depNode.id] = struct{}{}
 			}
 		}
 
-		var lastGate *jobNode
-		for _, step := range g.steps {
+		var lastGate *stepNode
+		for _, step := range groupNode.subSteps {
 			// Track step dependencies.
-			if dependsOn, ok := step.srcStep["depends_on"]; !ok {
+			if dependsOn, ok := step.src["depends_on"]; !ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
-					if depNode, ok := graph.byName(dep); ok {
+					if depNode, ok := nodes.byName(dep); ok {
 						step.addDependsOn(depNode.id)
 					}
 				}
@@ -190,7 +190,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 				step.addDependsOn(dep)
 			}
 
-			if isBlockOrWait(step.srcStep) {
+			if isBlockOrWait(step.src) {
 				lastGate = step
 			}
 		}
@@ -204,7 +204,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 			hitGroup = true
 		}
 
-		for _, step := range g.steps {
+		for _, step := range g.subSteps {
 			if filter.hit(step.selectKeys(), step.tags) {
 				hits[step.id] = struct{}{}
 				hitGroup = true
@@ -215,16 +215,16 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 			hits[g.id] = struct{}{}
 		}
 	}
-	graph.markDeps(hits)
+	nodes.markDeps(hits)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
-	for _, g := range groupNodes {
-		if !g.include {
+	for _, groupNode := range groupNodes {
+		if !groupNode.marked {
 			continue
 		}
 
-		bkGroup, err := c.convertGroup(g)
+		bkGroup, err := c.convertGroup(groupNode)
 		if err != nil {
 			return nil, err
 		}

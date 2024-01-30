@@ -97,7 +97,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		bkDirs = []string{".buildkite"}
 	}
 
-	tagFilters, err := newTagFilter(config.SkipTags, config.TagFilterCommand)
+	tagFilters, err := newStepFilter(config.SkipTags, config.TagFilterCommand)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)
 	}
