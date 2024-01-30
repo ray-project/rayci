@@ -6,24 +6,23 @@ import (
 
 // stepNode is a node for a job node or a group in the pipeline.
 type stepNode struct {
-	id string
+	id string // Unique name of a step node.
 
 	// User defined key. Optional.
 	key string
 
 	tags []string
 
-	// Fields used for steps.
-	src map[string]any
-
 	// Fields used for groups.
 	srcGroup *pipelineGroup // set for group nodes
 	subSteps []*stepNode
 
+	// Fields used for steps.
+	src map[string]any // Source definition of the step when it is not a group.
+
 	dependsOn map[string]struct{}
 
-	// marked is set to true if this node will be included
-	// in the converstion.
+	// marked is set to true when the node will be included in a conversion.
 	marked bool
 }
 
