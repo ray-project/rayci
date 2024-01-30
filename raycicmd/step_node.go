@@ -12,7 +12,7 @@ type stepNode struct {
 
 	// Fields used for groups.
 	srcGroup *pipelineGroup // set for group nodes
-	steps    []*stepNode
+	subSteps []*stepNode
 
 	// Fields used for steps.
 	src map[string]any // Source definition of the step when it is not a group.

@@ -78,7 +78,7 @@ func (c *converter) convertGroup(n *stepNode) (
 		DependsOn: g.DependsOn,
 	}
 
-	for _, step := range n.steps {
+	for _, step := range n.subSteps {
 		if !step.marked {
 			continue
 		}
@@ -124,7 +124,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 
 		for j, step := range g.Steps {
-			node.steps = append(node.steps, &stepNode{
+			node.subSteps = append(node.subSteps, &stepNode{
 				id:   fmt.Sprintf("g%d_s%d", i, j),
 				key:  stepKey(step),
 				tags: stepTags(step),
@@ -145,7 +145,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 			nameNodes[groupNode.key] = true
 		}
 
-		for _, step := range groupNode.steps {
+		for _, step := range groupNode.subSteps {
 			if k := step.key; k != "" {
 				if nameNodes[k] {
 					return nil, fmt.Errorf("duplicate node key %q", k)
@@ -160,7 +160,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 			groupNode.marked = true
 		}
 
-		for _, step := range groupNode.steps {
+		for _, step := range groupNode.subSteps {
 			if filter.hit(step.tags) {
 				step.marked = true
 				groupNode.marked = true // include group if any step is included
