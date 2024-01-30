@@ -167,7 +167,7 @@ func TestMakePipeline(t *testing.T) {
 			`    key: "test1"`,
 			`    commands: [ "echo test1" ]`,
 			`  - label: "tagged test2"`,
-			`    key: "test1"`,
+			`    key: "test2"`,
 			`    tags: "enabled"`,
 			`    commands: [ "echo test2" ]`,
 			`  - label: "disabled"`,

@@ -98,18 +98,23 @@ func keyOfStep(step map[string]any) string {
 	if k, ok := stringInMap(step, "name"); ok {
 		return k
 	}
-
 	k, _ := stringInMap(step, "key")
 	return k
+}
+
+func tagsOfStep(step map[string]any) []string {
+	if v, ok := step["tags"]; ok {
+		return toStringList(v)
+	}
+	return nil
 }
 
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 	[]*bkPipelineGroup, error,
 ) {
+	graph := newNodeGraph()
 
 	var groupNodes []*jobNode
-
-	nodeMap := make(map[string]*jobNode)
 	for i, g := range gs {
 		node := &jobNode{
 			id:       fmt.Sprintf("g%d", i),
@@ -119,41 +124,31 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 
 		for j, step := range g.Steps {
-			k := keyOfStep(step)
-
-			var tags []string
-			if v, ok := step["tags"]; ok {
-				tags = toStringList(v)
-			}
-
 			stepNode := &jobNode{
 				id:      fmt.Sprintf("g%d_s%d", i, j),
-				userKey: k,
 				srcStep: step,
-				tags:    tags,
+				userKey: keyOfStep(step),
+				tags:    tagsOfStep(step),
 			}
 			node.steps = append(node.steps, stepNode)
-			nodeMap[stepNode.id] = stepNode
+			graph.add(stepNode)
 		}
 
 		groupNodes = append(groupNodes, node)
-		nodeMap[node.id] = node
+		graph.add(node)
 	}
 
 	// Build namedNodes, and check if we have duplicated user keys.
-	nameNodes := make(map[string]*jobNode)
 	for _, g := range groupNodes {
 		if k := g.userKey; k != "" {
-			if _, ok := nameNodes[k]; ok {
-				return nil, fmt.Errorf("duplicate node key %q", k)
+			if err := graph.addName(g.id, k); err != nil {
+				return nil, fmt.Errorf("add group %q: %w", k, err)
 			}
-			nameNodes[g.userKey] = g
 		}
-
 		for _, step := range g.steps {
 			if k := step.userKey; k != "" {
-				if _, ok := nameNodes[k]; ok {
-					return nil, fmt.Errorf("duplicate node key %q", k)
+				if err := graph.addName(step.id, k); err != nil {
+					return nil, fmt.Errorf("add node %q: %w", k, err)
 				}
 			}
 		}
@@ -171,7 +166,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		// group.
 		commonDeps := make(map[string]struct{})
 		for _, dep := range g.srcGroup.DependsOn {
-			if depNode, ok := nameNodes[dep]; ok {
+			if depNode, ok := graph.byName(dep); ok {
 				commonDeps[depNode.id] = struct{}{}
 			}
 		}
@@ -182,17 +177,17 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 			if dependsOn, ok := step.srcStep["depends_on"]; !ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
-					if depNode, ok := nameNodes[dep]; ok {
-						step.dependsOn[depNode.id] = struct{}{}
+					if depNode, ok := graph.byName(dep); ok {
+						step.addDependsOn(depNode.id)
 					}
 				}
 			} else if lastGate != nil {
-				step.dependsOn[lastGate.id] = struct{}{}
+				step.addDependsOn(lastGate.id)
 			}
 
-			// Always add group common deps.
+			// Add all group common deps.
 			for dep := range commonDeps {
-				step.dependsOn[dep] = struct{}{}
+				step.addDependsOn(dep)
 			}
 
 			if isBlockOrWait(step.srcStep) {
@@ -201,48 +196,26 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 		}
 	}
 
-	includeNodes := make(map[string]struct{})
-
 	// Apply tags filter.
+	hits := make(map[string]struct{})
 	for _, g := range groupNodes {
-		includeGroup := false
+		hitGroup := false
 		if filter.hit(g.tags) {
-			includeGroup = true
+			hitGroup = true
 		}
 
 		for _, step := range g.steps {
 			if filter.hit(step.tags) {
-				includeNodes[step.id] = struct{}{}
-				includeGroup = true
+				hits[step.id] = struct{}{}
+				hitGroup = true
 			}
 		}
 
-		if includeGroup {
-			includeNodes[g.id] = struct{}{}
+		if hitGroup {
+			hits[g.id] = struct{}{}
 		}
 	}
-
-	// For any included node, also include their dependencies.
-	thisRound := make(map[string]struct{})
-	for nodeID := range includeNodes {
-		thisRound[nodeID] = struct{}{}
-	}
-
-	// BFS to include all dependencies.
-	for len(thisRound) > 0 {
-		nextRound := make(map[string]struct{})
-		for nodeID := range thisRound {
-			node := nodeMap[nodeID]
-			node.include = true
-			for dep := range node.dependsOn {
-				if _, ok := includeNodes[dep]; !ok {
-					nextRound[dep] = struct{}{}
-					includeNodes[dep] = struct{}{}
-				}
-			}
-		}
-		thisRound = nextRound
-	}
+	graph.markDeps(hits)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
