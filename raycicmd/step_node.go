@@ -6,10 +6,12 @@ import (
 
 // stepNode is a node for a job node or a group in the pipeline.
 type stepNode struct {
-	id   string
-	tags []string
+	id string
 
-	key string // User defined key.
+	// User defined key. Optional.
+	key string
+
+	tags []string
 
 	// Fields used for steps.
 	src map[string]any
