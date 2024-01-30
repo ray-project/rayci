@@ -167,7 +167,7 @@ func TestMakePipeline(t *testing.T) {
 			`    key: "test1"`,
 			`    commands: [ "echo test1" ]`,
 			`  - label: "tagged test2"`,
-			`    key: "test1"`,
+			`    key: "test2"`,
 			`    tags: "enabled"`,
 			`    commands: [ "echo test2" ]`,
 			`  - label: "disabled"`,
@@ -180,12 +180,11 @@ func TestMakePipeline(t *testing.T) {
 			`group: g`,
 			`tags: ["disabled"]`,
 			`steps: `,
-			`  - label: "test1"`,
-			`    key: "test1"`,
-			`    commands: [ "echo test1" ]`,
+			`  - label: "test3"`,
+			`    key: "test3"`,
+			`    commands: [ "echo test3" ]`,
 		),
 	}} {
-
 		dir := filepath.Join(tmp, filepath.Dir(f.name))
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("mkdir for %q: %v", f.name, err)
