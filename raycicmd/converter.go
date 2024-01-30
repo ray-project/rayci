@@ -109,7 +109,7 @@ func stepTags(step map[string]any) []string {
 	return nil
 }
 
-func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
+func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
 

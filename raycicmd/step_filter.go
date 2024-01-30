@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type tagFilter struct {
+type stepFilter struct {
 	skipTags []string
 
 	runAll bool
@@ -27,7 +27,7 @@ func intersects(set1, set2 []string) bool {
 	return false
 }
 
-func (f *tagFilter) hit(tags []string) bool {
+func (f *stepFilter) hit(tags []string) bool {
 	if len(tags) == 0 {
 		return true
 	}
@@ -40,8 +40,8 @@ func (f *tagFilter) hit(tags []string) bool {
 	return intersects(f.tags, tags)
 }
 
-func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
-	filter := &tagFilter{skipTags: skips, runAll: true}
+func newStepFilter(skips []string, filterCmd []string) (*stepFilter, error) {
+	filter := &stepFilter{skipTags: skips, runAll: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil

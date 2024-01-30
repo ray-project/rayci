@@ -31,41 +31,41 @@ func TestIntersects(t *testing.T) {
 		}
 	}
 }
-func TestNewTagFilter(t *testing.T) {
+func TestNewStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
-		want     *tagFilter
+		want     *stepFilter
 		wantErr  bool
 	}{{
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
-		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
-		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "\t  \n  \t"},
-		want: &tagFilter{},
+		want: &stepFilter{},
 	}, {
 		cmd:  []string{},
-		want: &tagFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  nil,
-		want: &tagFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  []string{"echo", "*"},
-		want: &tagFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		skipTags: []string{"disabled"},
-		want:     &tagFilter{skipTags: []string{"disabled"}, runAll: true},
+		want:     &stepFilter{skipTags: []string{"disabled"}, runAll: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
 	}, {
 		cmd:  []string{"./local-not-exist.sh"},
-		want: &tagFilter{runAll: true},
+		want: &stepFilter{runAll: true},
 	}} {
-		got, err := newTagFilter(test.skipTags, test.cmd)
+		got, err := newStepFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -85,8 +85,8 @@ func TestNewTagFilter(t *testing.T) {
 	}
 }
 
-func TestTagFilter(t *testing.T) {
-	filter := &tagFilter{
+func TestStepFilter(t *testing.T) {
+	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
 	}
@@ -114,8 +114,8 @@ func TestTagFilter(t *testing.T) {
 	}
 }
 
-func TestTagFilter_runAll(t *testing.T) {
-	filter := &tagFilter{
+func TestStepFilter_runAll(t *testing.T) {
+	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		runAll:   true,
 	}
