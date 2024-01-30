@@ -455,7 +455,7 @@ func TestConvertPipelineStep(t *testing.T) {
 	}
 }
 
-func convertSingleGroup(c *converter, g *pipelineGroup, filter *tagFilter) (
+func convertSingleGroup(c *converter, g *pipelineGroup, filter *stepFilter) (
 	*bkPipelineGroup, error,
 ) {
 	result, err := c.convertGroups([]*pipelineGroup{g}, filter)
@@ -498,7 +498,7 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	filter := &tagFilter{tags: []string{}, runAll: true}
+	filter := &stepFilter{tags: []string{}, runAll: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -547,7 +547,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 			"mount_buildkite_agent": false,
 		}},
 	}
-	filter := &tagFilter{tags: []string{}, runAll: true}
+	filter := &stepFilter{tags: []string{}, runAll: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -610,7 +610,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 		},
 	}
 
-	filter := &tagFilter{
+	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"foo"},
 	}
