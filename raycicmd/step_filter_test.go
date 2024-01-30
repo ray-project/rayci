@@ -32,7 +32,7 @@ func TestIntersects(t *testing.T) {
 		}
 	}
 }
-func TestNewJobFilter(t *testing.T) {
+func TestNewTagFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
@@ -86,7 +86,7 @@ func TestNewJobFilter(t *testing.T) {
 	}
 }
 
-func TestJobFilter_tags(t *testing.T) {
+func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
@@ -115,7 +115,7 @@ func TestJobFilter_tags(t *testing.T) {
 	}
 }
 
-func TestJobFilter_runAll(t *testing.T) {
+func TestStepFilter_runAll(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		runAll:   true,
