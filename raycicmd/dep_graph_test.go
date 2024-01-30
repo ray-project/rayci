@@ -66,6 +66,20 @@ func TestMarkDeps(t *testing.T) {
 	}, {
 		g: map[string][]string{
 			"a": {"b"},
+			"b": {},
+		},
+		s:    []string{"b"},
+		want: []string{"b"},
+	}, {
+		g: map[string][]string{
+			"a": {"b"},
+			"b": {},
+		},
+		s:    nil,
+		want: nil,
+	}, {
+		g: map[string][]string{
+			"a": {"b"},
 			"b": {"c"},
 			"c": {"d"},
 			"d": {},
