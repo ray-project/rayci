@@ -175,6 +175,15 @@ func TestMakePipeline(t *testing.T) {
 			`    commands: [ "exit 1" ]`,
 		),
 	}, {
+		name: "private/buildkite/private.rayci.yaml",
+		content: multi(
+			`group: private`,
+			`steps: `,
+			`  - label: "private test"`,
+			`    key: "private-test"`,
+			`    commands: [ "echo a private test" ]`,
+		),
+	}, {
 		name: ".buildkite/disabled.rayci.yaml",
 		content: multi(
 			`group: g`,
@@ -205,8 +214,9 @@ func TestMakePipeline(t *testing.T) {
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",
 		},
-		RunnerQueues: map[string]string{"default": "runner_x"},
-		SkipTags:     []string{"disabled"},
+		RunnerQueues:  map[string]string{"default": "runner_x"},
+		SkipTags:      []string{"disabled"},
+		BuildkiteDirs: []string{".buildkite", "private/buildkite"},
 	}
 
 	buildID := "fakebuild"
@@ -219,7 +229,7 @@ func TestMakePipeline(t *testing.T) {
 		t.Fatalf("makePipeline: %v", err)
 	}
 
-	if len(got.Steps) != 1 { // all steps are groups.
+	if len(got.Steps) != 2 { // all steps are groups.
 		t.Errorf("got %d groups, want 1", len(got.Steps))
 	}
 
@@ -232,7 +242,7 @@ func TestMakePipeline(t *testing.T) {
 		totalSteps += len(g.Steps)
 	}
 
-	if totalSteps != 2 {
+	if totalSteps != 3 {
 		t.Fatalf("got %d steps, want 1", totalSteps)
 	}
 }
