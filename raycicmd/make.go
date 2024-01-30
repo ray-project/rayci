@@ -117,10 +117,6 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
 			}
 
-			if !tagFilters.hit(g.Tags) {
-				continue
-			}
-
 			groups = append(groups, g)
 		}
 

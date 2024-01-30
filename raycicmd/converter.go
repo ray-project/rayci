@@ -109,7 +109,7 @@ func tagsOfStep(step map[string]any) []string {
 	return nil
 }
 
-func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
+func (c *converter) convertGroups(gs []*pipelineGroup, filter *jobFilter) (
 	[]*bkPipelineGroup, error,
 ) {
 	graph := newNodeGraph()
@@ -200,12 +200,12 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *tagFilter) (
 	hits := make(map[string]struct{})
 	for _, g := range groupNodes {
 		hitGroup := false
-		if filter.hit(g.tags) {
+		if filter.hit(g.selectKeys(), g.tags) {
 			hitGroup = true
 		}
 
 		for _, step := range g.steps {
-			if filter.hit(step.tags) {
+			if filter.hit(step.selectKeys(), step.tags) {
 				hits[step.id] = struct{}{}
 				hitGroup = true
 			}

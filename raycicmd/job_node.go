@@ -41,3 +41,12 @@ func (n *jobNode) deps() []string {
 }
 
 func (n *jobNode) mark() { n.include = true }
+
+func (n *jobNode) selectKeys() []string {
+	var keys []string
+	keys = append(keys, n.id)
+	if n.userKey != "" {
+		keys = append(keys, n.userKey)
+	}
+	return keys
+}

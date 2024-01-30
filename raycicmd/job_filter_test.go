@@ -1,8 +1,9 @@
 package raycicmd
 
 import (
-	"reflect"
 	"testing"
+
+	"reflect"
 )
 
 func TestIntersects(t *testing.T) {
@@ -31,39 +32,39 @@ func TestIntersects(t *testing.T) {
 		}
 	}
 }
-func TestNewTagFilter(t *testing.T) {
+func TestNewJobFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
-		want     *tagFilter
+		want     *jobFilter
 		wantErr  bool
 	}{{
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
-		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &jobFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
-		want: &tagFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &jobFilter{tags: []string{"RAYCI_COVERAGE"}},
 	}, {
 		cmd:  []string{"echo", "\t  \n  \t"},
-		want: &tagFilter{},
+		want: &jobFilter{},
 	}, {
 		cmd:  []string{},
-		want: &tagFilter{runAll: true},
+		want: &jobFilter{runAll: true},
 	}, {
 		cmd:  nil,
-		want: &tagFilter{runAll: true},
+		want: &jobFilter{runAll: true},
 	}, {
 		cmd:  []string{"echo", "*"},
-		want: &tagFilter{runAll: true},
+		want: &jobFilter{runAll: true},
 	}, {
 		skipTags: []string{"disabled"},
-		want:     &tagFilter{skipTags: []string{"disabled"}, runAll: true},
+		want:     &jobFilter{skipTags: []string{"disabled"}, runAll: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
 	}, {
 		cmd:  []string{"./local-not-exist.sh"},
-		want: &tagFilter{runAll: true},
+		want: &jobFilter{runAll: true},
 	}} {
 		got, err := newTagFilter(test.skipTags, test.cmd)
 		if test.wantErr {
@@ -85,8 +86,8 @@ func TestNewTagFilter(t *testing.T) {
 	}
 }
 
-func TestTagFilter(t *testing.T) {
-	filter := &tagFilter{
+func TestJobFilter_tags(t *testing.T) {
+	filter := &jobFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
 	}
@@ -97,7 +98,7 @@ func TestTagFilter(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hit(tags) {
+		if !filter.hitTags(tags) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -108,14 +109,14 @@ func TestTagFilter(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.hit(tags) {
+		if filter.hitTags(tags) {
 			t.Errorf("hit %+v", tags)
 		}
 	}
 }
 
-func TestTagFilter_runAll(t *testing.T) {
-	filter := &tagFilter{
+func TestJobFilter_runAll(t *testing.T) {
+	filter := &jobFilter{
 		skipTags: []string{"disabled"},
 		runAll:   true,
 	}
@@ -128,7 +129,7 @@ func TestTagFilter_runAll(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hit(tags) {
+		if !filter.hit(nil, tags) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -137,7 +138,7 @@ func TestTagFilter_runAll(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.hit(tags) {
+		if filter.hit(nil, tags) {
 			t.Errorf("hit %+v", tags)
 		}
 	}

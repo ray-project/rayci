@@ -7,11 +7,13 @@ import (
 	"strings"
 )
 
-type tagFilter struct {
+type jobFilter struct {
 	skipTags []string
 
 	runAll bool
 	tags   []string
+
+	selects map[string]bool
 }
 
 func intersects(set1, set2 []string) bool {
@@ -27,7 +29,25 @@ func intersects(set1, set2 []string) bool {
 	return false
 }
 
-func (f *tagFilter) hit(tags []string) bool {
+func (f *jobFilter) hit(selects, tags []string) bool {
+	if f.hitSelects(selects) {
+		return true
+	}
+	return f.hitTags(tags)
+}
+
+func (f *jobFilter) hitSelects(selects []string) bool {
+	if f.selects != nil && len(selects) > 0 {
+		for _, k := range selects {
+			if f.selects[k] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (f *jobFilter) hitTags(tags []string) bool {
 	if len(tags) == 0 {
 		return true
 	}
@@ -40,8 +60,17 @@ func (f *tagFilter) hit(tags []string) bool {
 	return intersects(f.tags, tags)
 }
 
-func newTagFilter(skips []string, filterCmd []string) (*tagFilter, error) {
-	filter := &tagFilter{skipTags: skips, runAll: true}
+func (f *jobFilter) addSelects(selects []string) {
+	if f.selects == nil {
+		f.selects = make(map[string]bool)
+	}
+	for _, s := range selects {
+		f.selects[s] = true
+	}
+}
+
+func newTagFilter(skips []string, filterCmd []string) (*jobFilter, error) {
+	filter := &jobFilter{skipTags: skips, runAll: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil
