@@ -94,7 +94,7 @@ func (c *converter) convertGroup(n *stepNode) (
 	return bkGroup, nil
 }
 
-func keyOfStep(step map[string]any) string {
+func stepKey(step map[string]any) string {
 	if k, ok := stringInMap(step, "name"); ok {
 		return k
 	}
@@ -102,7 +102,7 @@ func keyOfStep(step map[string]any) string {
 	return k
 }
 
-func tagsOfStep(step map[string]any) []string {
+func stepTags(step map[string]any) []string {
 	if v, ok := step["tags"]; ok {
 		return toStringList(v)
 	}
@@ -127,8 +127,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			stepNode := &stepNode{
 				id:   fmt.Sprintf("g%d_s%d", i, j),
 				src:  step,
-				key:  keyOfStep(step),
-				tags: tagsOfStep(step),
+				key:  stepKey(step),
+				tags: stepTags(step),
 			}
 			node.subSteps = append(node.subSteps, stepNode)
 			nodes.add(stepNode)
