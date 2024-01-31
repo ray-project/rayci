@@ -101,6 +101,8 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)
 	}
+
+	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {
 		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
 
@@ -109,7 +111,6 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 			return nil, fmt.Errorf("list pipeline files: %w", err)
 		}
 
-		var groups []*pipelineGroup
 		for _, name := range names {
 			file := filepath.Join(bkDir, name)
 			g, err := parsePipelineFile(file)
@@ -123,16 +124,16 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 
 			groups = append(groups, g)
 		}
-
-		sortPipelineGroups(groups)
-
-		// map each file into a group.
-		steps, err := c.convertGroups(groups, tagFilters)
-		if err != nil {
-			return nil, fmt.Errorf("convert pipeline groups: %w", err)
-		}
-		pl.Steps = steps
 	}
+
+	sortPipelineGroups(groups)
+
+	// map each file into a group.
+	steps, err := c.convertGroups(groups, tagFilters)
+	if err != nil {
+		return nil, fmt.Errorf("convert pipeline groups: %w", err)
+	}
+	pl.Steps = steps
 
 	totalSteps := 0
 	for _, group := range pl.Steps {
