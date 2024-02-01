@@ -18,7 +18,7 @@ type stepFilter struct {
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
-	return step.hasAnyTag(f.skipTags)
+	return step.hasTagIn(f.skipTags)
 }
 
 func (f *stepFilter) hit(step *stepNode) bool {
@@ -40,7 +40,7 @@ func (f *stepFilter) hit(step *stepNode) bool {
 	if !step.hasTags() {
 		return true // step does not have any tags: a step that always runs
 	}
-	return step.hasAnyTag(f.tags)
+	return step.hasTagIn(f.tags)
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {

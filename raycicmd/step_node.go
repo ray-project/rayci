@@ -76,7 +76,7 @@ func (n *stepNode) keys() []string {
 
 func (n *stepNode) hasTags() bool { return len(n.tags) > 0 }
 
-func (n *stepNode) hasAnyTag(tags []string) bool {
+func (n *stepNode) hasTagIn(tags []string) bool {
 	return intersects(n.tags, tags)
 }
 
