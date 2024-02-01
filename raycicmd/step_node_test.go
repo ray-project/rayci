@@ -1,8 +1,9 @@
 package raycicmd
 
 import (
-	"reflect"
 	"testing"
+
+	"reflect"
 )
 
 func TestStepNodeDeps(t *testing.T) {
