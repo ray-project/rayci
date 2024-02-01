@@ -90,16 +90,15 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 
 	c := newConverter(config, info)
 
-	// Build steps for CI.
+	filter, err := newTagsStepFilter(config.SkipTags, config.TagFilterCommand)
+	if err != nil {
+		return nil, fmt.Errorf("run tag filter command: %w", err)
+	}
 
+	// Build steps for CI.
 	bkDirs := config.BuildkiteDirs
 	if len(bkDirs) == 0 {
 		bkDirs = []string{".buildkite"}
-	}
-
-	tagFilters, err := newTagsStepFilter(config.SkipTags, config.TagFilterCommand)
-	if err != nil {
-		return nil, fmt.Errorf("run tag filter command: %w", err)
 	}
 
 	var groups []*pipelineGroup
@@ -121,11 +120,10 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 			groups = append(groups, g)
 		}
 	}
-
 	sortPipelineGroups(groups)
 
 	// map each file into a group.
-	steps, err := c.convertGroups(groups, tagFilters)
+	steps, err := c.convertGroups(groups, filter)
 	if err != nil {
 		return nil, fmt.Errorf("convert pipeline groups: %w", err)
 	}
