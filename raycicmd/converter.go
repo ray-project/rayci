@@ -79,7 +79,7 @@ func (c *converter) convertGroup(n *stepNode) (
 	}
 
 	for _, step := range n.subSteps {
-		if !step.marked {
+		if !step.hit() {
 			continue
 		}
 
@@ -171,41 +171,43 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			}
 		}
 
-		var lastGate *stepNode
+		var lastBlockOrWait *stepNode
 		for _, step := range groupNode.subSteps {
 			// Track step dependencies.
 			if dependsOn, ok := step.src["depends_on"]; !ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
 					if depNode, ok := nodes.byName(dep); ok {
-						step.addDependsOn(depNode.id)
+						nodes.addDep(step.id, depNode.id)
 					}
 				}
-			} else if lastGate != nil {
-				step.addDependsOn(lastGate.id)
+			} else if lastBlockOrWait != nil {
+				nodes.addDep(step.id, lastBlockOrWait.id)
 			}
 
 			// Add all group common deps.
 			for dep := range commonDeps {
-				step.addDependsOn(dep)
+				nodes.addDep(step.id, dep)
 			}
 
 			if isBlockOrWait(step.src) {
-				lastGate = step
+				lastBlockOrWait = step
 			}
 		}
 	}
 
 	// Apply tags filter.
 	hits := make(map[string]struct{})
+	rejects := make(map[string]struct{})
 	for _, g := range groupNodes {
-		hitGroup := false
-		if filter.hit(g.selectKeys(), g.tags) {
-			hitGroup = true
-		}
+		rejectGroup := filter.reject(g)
+		hitGroup := filter.hit(g)
 
 		for _, step := range g.subSteps {
-			if filter.hit(step.selectKeys(), step.tags) {
+			if rejectGroup || filter.reject(step) {
+				// when the group is rejected, all steps are rejected.
+				rejects[step.id] = struct{}{}
+			} else if filter.hit(step) {
 				hits[step.id] = struct{}{}
 				hitGroup = true
 			}
@@ -215,12 +217,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			hits[g.id] = struct{}{}
 		}
 	}
+	nodes.rejectDeps(rejects)
 	nodes.markDeps(hits)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
 	for _, groupNode := range groupNodes {
-		if !groupNode.marked {
+		if !groupNode.hit() {
 			continue
 		}
 

@@ -66,7 +66,7 @@ func TestNewTagFilter(t *testing.T) {
 		cmd:  []string{"./local-not-exist.sh"},
 		want: &stepFilter{runAll: true},
 	}} {
-		got, err := newStepFilter(test.skipTags, test.cmd)
+		got, err := newTagsStepFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -98,7 +98,7 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hitTags(tags) {
+		if !filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -109,7 +109,7 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.hitTags(tags) {
+		if filter.accept(&stepNode{tags: tags}) {
 			t.Errorf("hit %+v", tags)
 		}
 	}
@@ -129,7 +129,7 @@ func TestStepFilter_runAll(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hit(nil, tags) {
+		if !filter.accept(&stepNode{tags: tags}) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -138,7 +138,7 @@ func TestStepFilter_runAll(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.hit(nil, tags) {
+		if filter.accept(&stepNode{tags: tags}) {
 			t.Errorf("hit %+v", tags)
 		}
 	}

@@ -10,67 +10,53 @@ import (
 type stepFilter struct {
 	skipTags []string
 
+	// when keys is set
+	keys map[string]bool
+
 	runAll bool
 	tags   []string
-
-	selects map[string]bool
 }
 
-func intersects(set1, set2 []string) bool {
-	set := make(map[string]struct{})
-	for _, s := range set1 {
-		set[s] = struct{}{}
-	}
-	for _, s := range set2 {
-		if _, hit := set[s]; hit {
-			return true
-		}
-	}
-	return false
+func (f *stepFilter) reject(step *stepNode) bool {
+	return step.hasAnyTag(f.skipTags)
 }
 
-func (f *stepFilter) hit(selects, tags []string) bool {
-	if f.hitSelects(selects) {
-		return true
-	}
-	return f.hitTags(tags)
-}
-
-func (f *stepFilter) hitSelects(selects []string) bool {
-	if f.selects != nil && len(selects) > 0 {
-		for _, k := range selects {
-			if f.selects[k] {
+func (f *stepFilter) hit(step *stepNode) bool {
+	if f.keys != nil {
+		// in key selection mode, hit when the step has any of the keys.
+		for _, k := range step.keys() {
+			if f.keys[k] {
 				return true
 			}
 		}
 	}
-	return false
-}
 
-func (f *stepFilter) hitTags(tags []string) bool {
-	if len(tags) == 0 {
-		return true
-	}
-	if intersects(f.skipTags, tags) {
-		return false
-	}
+	// in tags filtering mode
 	if f.runAll {
 		return true
 	}
-	return intersects(f.tags, tags)
+
+	// if not in run-all mode, hit when the step has any of the tags.
+	if !step.hasTags() {
+		return true // step does not have any tags: a step that always runs
+	}
+	return step.hasAnyTag(f.tags)
 }
 
-func (f *stepFilter) addSelects(selects []string) {
-	if f.selects == nil {
-		f.selects = make(map[string]bool)
-	}
-	for _, s := range selects {
-		f.selects[s] = true
-	}
+func (f *stepFilter) accept(step *stepNode) bool {
+	return !f.reject(step) && f.hit(step)
 }
 
-func newStepFilter(skips []string, filterCmd []string) (*stepFilter, error) {
-	filter := &stepFilter{skipTags: skips, runAll: true}
+func newKeysStepFilter(skipTags []string, keys []string) *stepFilter {
+	filter := &stepFilter{skipTags: skipTags, keys: make(map[string]bool)}
+	for _, k := range keys {
+		filter.keys[k] = true
+	}
+	return filter
+}
+
+func newTagsStepFilter(skipTags []string, filterCmd []string) (*stepFilter, error) {
+	filter := &stepFilter{skipTags: skipTags, runAll: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil
