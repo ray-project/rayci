@@ -32,7 +32,7 @@ func TestIntersects(t *testing.T) {
 		}
 	}
 }
-func TestNewTagFilter(t *testing.T) {
+func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
