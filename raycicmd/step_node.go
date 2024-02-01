@@ -30,6 +30,8 @@ type stepNode struct {
 	marked bool
 }
 
+func (n *stepNode) nodeKey() string { return n.key }
+
 func (n *stepNode) addDep(id string) {
 	if n.depSet == nil {
 		n.depSet = make(map[string]struct{})
@@ -65,7 +67,7 @@ func (n *stepNode) reject() { n.rejected = true }
 
 func (n *stepNode) hit() bool { return !n.rejected && n.marked }
 
-func (n *stepNode) keys() []string {
+func (n *stepNode) idAndKey() []string {
 	var keys []string
 	keys = append(keys, n.id)
 	if n.key != "" {

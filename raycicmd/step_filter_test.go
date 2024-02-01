@@ -98,7 +98,7 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hit(&stepNode{tags: tags}) {
+		if !filter.accept(&stepNode{tags: tags}) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -109,7 +109,7 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.accept(&stepNode{tags: tags}) {
+		if filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("hit %+v", tags)
 		}
 	}
@@ -129,7 +129,7 @@ func TestStepFilter_runAll(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.accept(&stepNode{tags: tags}) {
+		if !filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
@@ -138,7 +138,7 @@ func TestStepFilter_runAll(t *testing.T) {
 		{"tune", "disabled"},
 		{"disabled", "tune"},
 	} {
-		if filter.accept(&stepNode{tags: tags}) {
+		if filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("hit %+v", tags)
 		}
 	}

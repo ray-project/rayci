@@ -138,20 +138,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		nodes.add(node)
 	}
 
-	// check if we have duplicated user keys.
-	for _, groupNode := range groupNodes {
-		if k := groupNode.key; k != "" {
-			if err := nodes.addName(groupNode.id, k); err != nil {
-				return nil, fmt.Errorf("add group %q: %w", k, err)
-			}
-		}
-		for _, step := range groupNode.subSteps {
-			if k := step.key; k != "" {
-				if err := nodes.addName(step.id, k); err != nil {
-					return nil, fmt.Errorf("add node %q: %w", k, err)
-				}
-			}
-		}
+	if err := nodes.buildIndex(); err != nil {
+		return nil, fmt.Errorf("build index: %w", err)
 	}
 
 	// Populate dependsOn.
@@ -166,7 +154,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		// group.
 		commonDeps := make(map[string]struct{})
 		for _, dep := range groupNode.srcGroup.DependsOn {
-			if depNode, ok := nodes.byName(dep); ok {
+			if depNode, ok := nodes.byKey(dep); ok {
 				commonDeps[depNode.id] = struct{}{}
 			}
 		}
@@ -177,7 +165,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			if dependsOn, ok := step.src["depends_on"]; !ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
-					if depNode, ok := nodes.byName(dep); ok {
+					if depNode, ok := nodes.byKey(dep); ok {
 						nodes.addDep(step.id, depNode.id)
 					}
 				}
@@ -201,13 +189,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	rejects := make(map[string]struct{})
 	for _, g := range groupNodes {
 		rejectGroup := filter.reject(g)
-		hitGroup := filter.hit(g)
+		hitGroup := filter.accept(g)
 
 		for _, step := range g.subSteps {
 			if rejectGroup || filter.reject(step) {
 				// when the group is rejected, all steps are rejected.
 				rejects[step.id] = struct{}{}
-			} else if filter.hit(step) {
+			} else if filter.accept(step) {
 				hits[step.id] = struct{}{}
 				hitGroup = true
 			}

@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"sort"
 )
 
 type reverseStepNode struct {
@@ -22,14 +23,13 @@ func (s *reverseStepNodeSet) depNode(id string) depNode {
 }
 
 type stepNodeSet struct {
-	nodes   map[string]*stepNode
-	nameMap map[string]*stepNode
+	nodes    map[string]*stepNode
+	keyNodes map[string]*stepNode
 }
 
 func newStepNodeSet() *stepNodeSet {
 	return &stepNodeSet{
-		nodes:   make(map[string]*stepNode),
-		nameMap: make(map[string]*stepNode),
+		nodes: make(map[string]*stepNode),
 	}
 }
 
@@ -37,16 +37,32 @@ func (s *stepNodeSet) add(node *stepNode) {
 	s.nodes[node.id] = node
 }
 
-func (s *stepNodeSet) addName(id, name string) error {
-	if _, ok := s.nameMap[name]; ok {
-		return fmt.Errorf("duplicate node key %q", name)
+func (s *stepNodeSet) buildIndex() error {
+	var ids []string
+	for id := range s.nodes {
+		ids = append(ids, id)
 	}
-	s.nameMap[name] = s.nodes[id]
+	sort.Strings(ids)
+
+	s.keyNodes = make(map[string]*stepNode, len(s.nodes))
+	for _, id := range ids {
+		key := s.nodes[id].nodeKey()
+		if key == "" {
+			continue
+		}
+		if _, ok := s.keyNodes[key]; ok {
+			return fmt.Errorf("duplicate node key %q", key)
+		}
+		s.keyNodes[key] = s.nodes[id]
+	}
+
 	return nil
 }
 
-func (s *stepNodeSet) byName(name string) (*stepNode, bool) {
-	node, ok := s.nameMap[name]
+// byKey returns the node of the key. This only works after buildIndex
+// is called and succeeds.
+func (s *stepNodeSet) byKey(key string) (*stepNode, bool) {
+	node, ok := s.keyNodes[key]
 	return node, ok
 }
 
