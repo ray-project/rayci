@@ -51,7 +51,9 @@ func setToStringList(set map[string]struct{}) []string {
 	return list
 }
 
-func (n *stepNode) deps() []string { return setToStringList(n.depSet) }
+func (n *stepNode) deps() []string {
+	return setToStringList(n.depSet)
+}
 
 func (n *stepNode) reverseDeps() []string {
 	return setToStringList(n.reverseDepSet)
