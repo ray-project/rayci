@@ -156,12 +156,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 
 	// Apply tags filter.
 	for _, groupNode := range groupNodes {
-		if filter.hit(groupNode.tags) {
-			groupNode.marked = true
+		if !filter.hit(groupNode) {
+			continue // group is rejected
 		}
 
+		groupNode.marked = true
 		for _, step := range groupNode.subSteps {
-			if filter.hit(step.tags) {
+			if filter.hit(step) {
 				step.marked = true
 				groupNode.marked = true // include group if any step is included
 			}
