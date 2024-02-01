@@ -4,7 +4,8 @@ import (
 	"sort"
 )
 
-// stepNode is a node for a job node or a group in the pipeline.
+// stepNode is a node for a generic step. The step can be a group, a wait,
+// a block or a command step.
 type stepNode struct {
 	id string // Unique name of a step node.
 

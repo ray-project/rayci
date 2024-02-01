@@ -98,7 +98,7 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.accept(&stepNode{tags: tags}) {
+		if !filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("miss %+v", tags)
 		}
 	}
