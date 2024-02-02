@@ -14,30 +14,17 @@ type stepFilter struct {
 	tags   []string
 }
 
-func intersects(set1, set2 []string) bool {
-	set := make(map[string]struct{})
-	for _, s := range set1 {
-		set[s] = struct{}{}
-	}
-	for _, s := range set2 {
-		if _, hit := set[s]; hit {
-			return true
-		}
-	}
-	return false
-}
-
-func (f *stepFilter) hit(tags []string) bool {
-	if len(tags) == 0 {
+func (f *stepFilter) hit(node *stepNode) bool {
+	if !node.hasTags() {
 		return true
 	}
-	if intersects(f.skipTags, tags) {
+	if node.hasTagIn(f.skipTags) {
 		return false
 	}
 	if f.runAll {
 		return true
 	}
-	return intersects(f.tags, tags)
+	return node.hasTagIn(f.tags)
 }
 
 func newStepFilter(skips []string, filterCmd []string) (*stepFilter, error) {
