@@ -112,11 +112,11 @@ func stepTags(step map[string]any) []string {
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
-
+	set := newStepNodeSet()
 	var groupNodes []*stepNode
 
 	for i, g := range gs {
-		node := &stepNode{
+		groupNode := &stepNode{
 			id:       fmt.Sprintf("g%d", i),
 			key:      g.Key,
 			srcGroup: g,
@@ -124,34 +124,23 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		}
 
 		for j, step := range g.Steps {
-			node.subSteps = append(node.subSteps, &stepNode{
+			n := &stepNode{
 				id:   fmt.Sprintf("g%d_s%d", i, j),
 				key:  stepKey(step),
 				tags: stepTags(step),
 				src:  step,
-			})
+			}
+			set.add(n)
+			groupNode.subSteps = append(groupNode.subSteps, n)
 		}
 
-		groupNodes = append(groupNodes, node)
+		set.add(groupNode)
+		groupNodes = append(groupNodes, groupNode)
 	}
 
-	// Check if we have duplicated user keys.
-	nameNodes := make(map[string]bool)
-	for _, groupNode := range groupNodes {
-		if k := groupNode.key; k != "" {
-			if nameNodes[k] {
-				return nil, fmt.Errorf("duplicate node key %q", k)
-			}
-			nameNodes[groupNode.key] = true
-		}
-
-		for _, step := range groupNode.subSteps {
-			if k := step.key; k != "" {
-				if nameNodes[k] {
-					return nil, fmt.Errorf("duplicate node key %q", k)
-				}
-			}
-		}
+	// Build index and check if we have duplicated user keys.
+	if err := set.buildIndex(); err != nil {
+		return nil, fmt.Errorf("build index: %w", err)
 	}
 
 	// Apply tags filter.

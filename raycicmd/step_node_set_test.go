@@ -1,6 +1,8 @@
 package raycicmd
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestStepNodeSet(t *testing.T) {
 	set := newStepNodeSet()
