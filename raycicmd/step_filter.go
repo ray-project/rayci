@@ -14,20 +14,30 @@ type stepFilter struct {
 	tags   []string
 }
 
-func (f *stepFilter) hit(node *stepNode) bool {
-	if !node.hasTags() {
-		return true
-	}
-	if node.hasTagIn(f.skipTags) {
-		return false
-	}
+func (f *stepFilter) reject(step *stepNode) bool {
+	return step.hasTagIn(f.skipTags)
+}
+
+func (f *stepFilter) accept(step *stepNode) bool {
+	// in tags filtering mode
 	if f.runAll {
 		return true
 	}
-	return node.hasTagIn(f.tags)
+
+	// if not in run-all mode, hit when the step has any of the tags.
+	if !step.hasTags() {
+		return true // step does not have any tags: a step that always runs
+	}
+	return step.hasTagIn(f.tags)
 }
 
-func newStepFilter(skips []string, filterCmd []string) (*stepFilter, error) {
+func (f *stepFilter) hit(step *stepNode) bool {
+	return !f.reject(step) && f.accept(step)
+}
+
+func newTagsStepFilter(skips []string, filterCmd []string) (
+	*stepFilter, error,
+) {
 	filter := &stepFilter{skipTags: skips, runAll: true}
 
 	if len(filterCmd) == 0 {

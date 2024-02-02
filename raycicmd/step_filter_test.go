@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func TestNewStepFilter(t *testing.T) {
+func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
@@ -40,7 +40,7 @@ func TestNewStepFilter(t *testing.T) {
 		cmd:  []string{"./local-not-exist.sh"},
 		want: &stepFilter{runAll: true},
 	}} {
-		got, err := newStepFilter(test.skipTags, test.cmd)
+		got, err := newTagsStepFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -60,7 +60,7 @@ func TestNewStepFilter(t *testing.T) {
 	}
 }
 
-func TestStepFilter(t *testing.T) {
+func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
