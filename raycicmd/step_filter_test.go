@@ -89,6 +89,35 @@ func TestStepFilter_tags(t *testing.T) {
 	}
 }
 
+func TestStepFilter_tagsReject(t *testing.T) {
+	filter := &stepFilter{
+		skipTags: []string{"disabled"},
+		tags:     []string{"tune"},
+	}
+
+	for _, tags := range [][]string{
+		{},
+		{"tune"},
+		{"tune", "foo"},
+		{"bar", "tune"},
+		{"data"},
+	} {
+		if filter.reject(&stepNode{tags: tags}) {
+			t.Errorf("rejects %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		{"disabled"},
+		{"tune", "disabled"},
+		{"disabled", "tune"},
+	} {
+		if !filter.reject(&stepNode{tags: tags}) {
+			t.Errorf("does not reject %+v", tags)
+		}
+	}
+}
+
 func TestStepFilter_runAll(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
