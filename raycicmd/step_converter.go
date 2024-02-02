@@ -19,9 +19,13 @@ type basicStepConverter struct {
 	dropKeys    []string
 }
 
-func (c *basicStepConverter) match(step map[string]any) bool {
-	_, ok := step[c.signatureKey]
+func stepHasKey(step map[string]any, k string) bool {
+	_, ok := step[k]
 	return ok
+}
+
+func (c *basicStepConverter) match(step map[string]any) bool {
+	return stepHasKey(step, c.signatureKey)
 }
 
 func (c *basicStepConverter) convert(step map[string]any) (
@@ -43,4 +47,8 @@ var blockConverter = &basicStepConverter{
 	signatureKey: "block",
 	allowedKeys:  blockStepAllowedKeys,
 	dropKeys:     blockStepDropKeys,
+}
+
+func isBlockOrWait(step map[string]any) bool {
+	return stepHasKey(step, "wait") || stepHasKey(step, "block")
 }

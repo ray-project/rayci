@@ -4,6 +4,19 @@ import (
 	"sort"
 )
 
+func intersects(set1, set2 []string) bool {
+	set := make(map[string]struct{})
+	for _, s := range set1 {
+		set[s] = struct{}{}
+	}
+	for _, s := range set2 {
+		if _, hit := set[s]; hit {
+			return true
+		}
+	}
+	return false
+}
+
 // stepNode is a node for a generic step. The step can be a group, a wait,
 // a block or a command step.
 type stepNode struct {
@@ -26,6 +39,12 @@ type stepNode struct {
 
 	// Marked is set to true when the node will be included in a conversion.
 	marked bool
+}
+
+func (n *stepNode) hasTags() bool { return len(n.tags) > 0 }
+
+func (n *stepNode) hasTagIn(tags []string) bool {
+	return intersects(n.tags, tags)
 }
 
 func (n *stepNode) addDep(id string) {
