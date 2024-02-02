@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -41,6 +42,8 @@ type stepNode struct {
 	marked bool
 }
 
+func (n *stepNode) nodeKey() string { return n.key }
+
 func (n *stepNode) hasTags() bool { return len(n.tags) > 0 }
 
 func (n *stepNode) hasTagIn(tags []string) bool {
@@ -76,4 +79,11 @@ func (n *stepNode) deps() []string {
 
 func (n *stepNode) reverseDeps() []string {
 	return setToStringList(n.reverseDepSet)
+}
+
+func (n *stepNode) String() string {
+	if n.key != "" {
+		return fmt.Sprintf("node %q (key %q)", n.id, n.key)
+	}
+	return fmt.Sprintf("node %q", n.id)
 }
