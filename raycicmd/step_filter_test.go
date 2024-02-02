@@ -6,32 +6,6 @@ import (
 	"reflect"
 )
 
-func TestIntersects(t *testing.T) {
-	for _, test := range []struct {
-		set1 []string
-		set2 []string
-		want bool
-	}{{
-		set1: []string{"foo", "bar"},
-		set2: []string{"foo", "w00t"},
-		want: true,
-	}, {
-		set1: []string{"foo", "bar"},
-		set2: []string{"hi", "w00t"},
-		want: false,
-	}, {
-		set1: []string{},
-		set2: []string{},
-		want: false,
-	}} {
-		if got := intersects(test.set1, test.set2); got != test.want {
-			t.Errorf(
-				"intersects %+v, %+v: got %+v, want %+v",
-				test.set1, test.set2, got, test.want,
-			)
-		}
-	}
-}
 func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string

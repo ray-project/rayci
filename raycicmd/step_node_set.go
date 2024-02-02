@@ -96,5 +96,5 @@ func (s *stepNodeSet) addDep(from, to string) {
 	}
 
 	fromNode.addDep(to)
-	toNode.addRevDep(from)
+	toNode.addReverseDep(from)
 }

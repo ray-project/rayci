@@ -40,7 +40,7 @@ func (n *stepNode) addDep(id string) {
 	n.depSet[id] = struct{}{}
 }
 
-func (n *stepNode) addRevDep(id string) {
+func (n *stepNode) addReverseDep(id string) {
 	if n.reverseDepSet == nil {
 		n.reverseDepSet = make(map[string]struct{})
 	}
