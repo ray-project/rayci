@@ -95,3 +95,34 @@ func (n *stepNode) hasTags() bool { return len(n.tags) > 0 }
 func (n *stepNode) hasTagIn(tags []string) bool {
 	return intersects(n.tags, tags)
 }
+
+func (n *stepNode) addDep(id string) {
+	if n.depSet == nil {
+		n.depSet = make(map[string]struct{})
+	}
+	n.depSet[id] = struct{}{}
+}
+
+func (n *stepNode) addReverseDep(id string) {
+	if n.reverseDepSet == nil {
+		n.reverseDepSet = make(map[string]struct{})
+	}
+	n.reverseDepSet[id] = struct{}{}
+}
+
+func setToStringList(set map[string]struct{}) []string {
+	var list []string
+	for k := range set {
+		list = append(list, k)
+	}
+	sort.Strings(list)
+	return list
+}
+
+func (n *stepNode) deps() []string {
+	return setToStringList(n.depSet)
+}
+
+func (n *stepNode) reverseDeps() []string {
+	return setToStringList(n.reverseDepSet)
+}
