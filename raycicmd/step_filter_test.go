@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func TestNewStepFilter(t *testing.T) {
+func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		cmd      []string
 		skipTags []string
@@ -40,7 +40,7 @@ func TestNewStepFilter(t *testing.T) {
 		cmd:  []string{"./local-not-exist.sh"},
 		want: &stepFilter{runAll: true},
 	}} {
-		got, err := newStepFilter(test.skipTags, test.cmd)
+		got, err := newTagsStepFilter(test.skipTags, test.cmd)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("run %q: want error, got nil", test.cmd)
@@ -60,7 +60,7 @@ func TestNewStepFilter(t *testing.T) {
 	}
 }
 
-func TestStepFilter(t *testing.T) {
+func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
 		tags:     []string{"tune"},
@@ -85,6 +85,35 @@ func TestStepFilter(t *testing.T) {
 	} {
 		if filter.hit(&stepNode{tags: tags}) {
 			t.Errorf("hit %+v", tags)
+		}
+	}
+}
+
+func TestStepFilter_tagsReject(t *testing.T) {
+	filter := &stepFilter{
+		skipTags: []string{"disabled"},
+		tags:     []string{"tune"},
+	}
+
+	for _, tags := range [][]string{
+		{},
+		{"tune"},
+		{"tune", "foo"},
+		{"bar", "tune"},
+		{"data"},
+	} {
+		if filter.reject(&stepNode{tags: tags}) {
+			t.Errorf("rejects %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		{"disabled"},
+		{"tune", "disabled"},
+		{"disabled", "tune"},
+	} {
+		if !filter.reject(&stepNode{tags: tags}) {
+			t.Errorf("does not reject %+v", tags)
 		}
 	}
 }
