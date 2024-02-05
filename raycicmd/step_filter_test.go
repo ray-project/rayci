@@ -72,8 +72,33 @@ func TestStepFilter_tags(t *testing.T) {
 		{"tune", "foo"},
 		{"bar", "tune"},
 	} {
-		if !filter.hit(&stepNode{tags: tags}) {
+		node := &stepNode{tags: tags}
+
+		if !filter.hit(node) {
 			t.Errorf("miss %+v", tags)
+		}
+
+		if !filter.accept(node) {
+			t.Errorf("not accepting %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		// Even with "disabled" in the tags list, accept will return true, as it
+		// only checks for tags matching.
+		{"tune", "data", "disabled"},
+	} {
+		node := &stepNode{tags: tags}
+		if !filter.accept(node) {
+			t.Errorf("not accepting %+v", tags)
+		}
+	}
+
+	for _, tags := range [][]string{
+		{"data"},
+	} {
+		if filter.accept(&stepNode{tags: tags}) {
+			t.Errorf("accept %+v, should not", tags)
 		}
 	}
 
