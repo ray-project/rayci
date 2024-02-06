@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -94,4 +95,11 @@ func (n *stepNode) idAndKey() []string {
 		keys = append(keys, n.key)
 	}
 	return keys
+}
+
+func (n *stepNode) String() string {
+	if n.key != "" {
+		return fmt.Sprintf("node %q (key %q)", n.id, n.key)
+	}
+	return fmt.Sprintf("node %q", n.id)
 }
