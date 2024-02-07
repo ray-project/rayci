@@ -38,7 +38,10 @@ type stepNode struct {
 	depSet        map[string]struct{}
 	reverseDepSet map[string]struct{}
 
-	// Marked is set to true when the node will be included in a conversion.
+	// rejected means that this step will not be included in the conversion.
+	rejected bool
+
+	// marked is set to true when the node will be included in a conversion.
 	marked bool
 }
 
@@ -80,6 +83,10 @@ func (n *stepNode) deps() []string {
 func (n *stepNode) reverseDeps() []string {
 	return setToStringList(n.reverseDepSet)
 }
+
+func (n *stepNode) mark()     { n.marked = true }
+func (n *stepNode) reject()   { n.rejected = true }
+func (n *stepNode) hit() bool { return !n.rejected && n.marked }
 
 func (n *stepNode) String() string {
 	if n.key != "" {
