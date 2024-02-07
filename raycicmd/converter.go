@@ -112,7 +112,7 @@ func stepTags(step map[string]any) []string {
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
-	nodes := newStepNodeSet()
+	set := newStepNodeSet()
 
 	var groupNodes []*stepNode
 	for i, g := range gs {
@@ -131,14 +131,14 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 				tags: stepTags(step),
 			}
 			node.subSteps = append(node.subSteps, stepNode)
-			nodes.add(stepNode)
+			set.add(stepNode)
 		}
 
 		groupNodes = append(groupNodes, node)
-		nodes.add(node)
+		set.add(node)
 	}
 
-	if err := nodes.buildIndex(); err != nil {
+	if err := set.buildIndex(); err != nil {
 		return nil, fmt.Errorf("build index: %w", err)
 	}
 
@@ -154,7 +154,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		// group.
 		commonDeps := make(map[string]struct{})
 		for _, dep := range groupNode.srcGroup.DependsOn {
-			if depNode, ok := nodes.byKey(dep); ok {
+			if depNode, ok := set.byKey(dep); ok {
 				commonDeps[depNode.id] = struct{}{}
 			}
 		}
@@ -165,17 +165,17 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			if dependsOn, ok := step.src["depends_on"]; !ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
-					if depNode, ok := nodes.byKey(dep); ok {
-						nodes.addDep(step.id, depNode.id)
+					if depNode, ok := set.byKey(dep); ok {
+						set.addDep(step.id, depNode.id)
 					}
 				}
 			} else if lastBlockOrWait != nil {
-				nodes.addDep(step.id, lastBlockOrWait.id)
+				set.addDep(step.id, lastBlockOrWait.id)
 			}
 
 			// Add all group common deps.
 			for dep := range commonDeps {
-				nodes.addDep(step.id, dep)
+				set.addDep(step.id, dep)
 			}
 
 			if isBlockOrWait(step.src) {
@@ -205,8 +205,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			hits[g.id] = struct{}{}
 		}
 	}
-	nodes.rejectDeps(rejects)
-	nodes.markDeps(hits)
+	set.rejectDeps(rejects)
+	set.markDeps(hits)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
