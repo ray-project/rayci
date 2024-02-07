@@ -113,8 +113,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
 	set := newStepNodeSet()
-
 	var groupNodes []*stepNode
+
 	for i, g := range gs {
 		groupNode := &stepNode{
 			id:       fmt.Sprintf("g%d", i),
