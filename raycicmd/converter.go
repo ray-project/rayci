@@ -116,7 +116,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 
 	var groupNodes []*stepNode
 	for i, g := range gs {
-		node := &stepNode{
+		groupNode := &stepNode{
 			id:       fmt.Sprintf("g%d", i),
 			key:      g.Key,
 			srcGroup: g,
@@ -130,12 +130,12 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 				key:  stepKey(step),
 				tags: stepTags(step),
 			}
-			node.subSteps = append(node.subSteps, stepNode)
+			groupNode.subSteps = append(groupNode.subSteps, stepNode)
 			set.add(stepNode)
 		}
 
-		groupNodes = append(groupNodes, node)
-		set.add(node)
+		set.add(groupNode)
+		groupNodes = append(groupNodes, groupNode)
 	}
 
 	if err := set.buildIndex(); err != nil {
