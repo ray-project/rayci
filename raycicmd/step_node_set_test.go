@@ -46,3 +46,13 @@ func TestStepNodeSet_keyConflict(t *testing.T) {
 		t.Fatalf("buildIndex got no error, expected error")
 	}
 }
+
+func TestStepNodeSet_deps(t *testing.T) {
+	set := newStepNodeSet()
+
+	for _, node := range []string{
+		"a", "b", "c", "d", "e", "f",
+	} {
+		set.add(&stepNode{id: node})
+	}
+}
