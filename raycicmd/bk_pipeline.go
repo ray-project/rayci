@@ -136,22 +136,31 @@ func makeRayDockerPlugin(
 	return m
 }
 
+// makeAutomaticRetryConfig creates the retry configuration for rayci pipelines.
+// The retry configuration is to retry once for any unknown exit status, and
+// to retry 3 times for known exit statuses.
+func makeAutomaticRetryConfig(exitStatus []int) []any {
+	m := []any{
+		map[string]int{"exit_status": 1, "limit": 1},
+	}
+	for _, s := range exitStatus {
+		m = append(m, map[string]any{"exit_status": s, "limit": 3})
+	}
+	return m
+}
+
 var (
 	defaultRayRetry = map[string]any{
 		"manual": map[string]any{"permit_on_passed": true},
-		"automatic": []any{
-			map[string]any{"exit_status": 1, "limit": 1},
-			map[string]any{"exit_status": -1, "limit": 3},
-			map[string]any{"exit_status": 255, "limit": 3},
-			// elastic CI stack environment hook failure
-			map[string]any{"exit_status": 53, "limit": 3},
-			// container failed error
-			map[string]any{"exit_status": 125, "limit": 3},
-			// command not found error
-			map[string]any{"exit_status": 127, "limit": 3},
-			// spot instance termination on windows
-			map[string]any{"exit_status": 3221225786, "limit": 3},
-		},
+		"automatic": makeAutomaticRetryConfig([]int{
+			-1,
+			255,
+			53,         // elastic CI stack environment hook failure
+			125,        // container failed
+			126,        // windows wheel build errors
+			127,        // command not found
+			3221225786, // windows spot instance errors
+		}),
 	}
 	defaultBuilderRetry = map[string]any{
 		"automatic": map[string]any{"limit": 1},
