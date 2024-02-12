@@ -1,6 +1,9 @@
 package raycicmd
 
 import (
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -48,11 +51,128 @@ func TestStepNodeSet_keyConflict(t *testing.T) {
 }
 
 func TestStepNodeSet_deps(t *testing.T) {
-	set := newStepNodeSet()
+	makeSet := func(ids ...string) map[string]struct{} {
+		set := make(map[string]struct{})
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		return set
+	}
 
-	for _, node := range []string{
-		"a", "b", "c", "d", "e", "f",
-	} {
-		set.add(&stepNode{id: node})
+	for i, test := range []struct {
+		graph    map[string]string
+		includes string
+		excludes string
+
+		wantHits string
+	}{{
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+		},
+		includes: "a",
+		wantHits: "a",
+	}, {
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+		},
+		includes: "b",
+		wantHits: "a b",
+	}, {
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+			"c": "b",
+			"d": "a",
+			"e": "d",
+		},
+		includes: "c e",
+		wantHits: "a b c d e",
+	}, {
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+			"c": "b",
+			"d": "a",
+			"e": "d",
+		},
+		includes: "c e",
+		wantHits: "a b c d e",
+	}, {
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+			"c": "b",
+			"d": "a",
+			"e": "d",
+		},
+		includes: "c e",
+		excludes: "b", // c depends on b
+		wantHits: "a d e",
+	}, {
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+			"c": "b",
+			"d": "a",
+			"e": "d",
+		},
+		includes: "c e",
+		excludes: "a",
+		wantHits: "",
+	}, {
+		// This is a weird case. The target include is not really included
+		// in the graph. The graph calculation is correct, there should be
+		// extra checks on if the requested include nodes are picked.
+		graph: map[string]string{
+			"a": "",
+			"b": "a",
+			"c": "a",
+			"d": "b c",
+		},
+		includes: "d",
+		excludes: "b",
+		wantHits: "a c",
+	}} {
+		set := newStepNodeSet()
+
+		for id := range test.graph {
+			set.add(&stepNode{id: id})
+		}
+
+		for id, deps := range test.graph {
+			depsIDs := strings.Fields(deps)
+			for _, dep := range depsIDs {
+				set.addDep(id, dep)
+			}
+		}
+
+		if err := set.buildIndex(); err != nil {
+			t.Fatalf("buildIndex: %v", err)
+		}
+
+		set.markDeps(makeSet(strings.Fields(test.includes)...))
+		set.rejectDeps(makeSet(strings.Fields(test.excludes)...))
+
+		var hits []string
+		for id := range test.graph {
+			node, ok := set.byID(id)
+			if !ok {
+				t.Fatalf("case %d, byID(%s) failed", i, id)
+			}
+			if node.hit() {
+				hits = append(hits, id)
+			}
+		}
+		sort.Strings(hits)
+
+		var want []string
+		if test.wantHits != "" {
+			want = strings.Fields(test.wantHits)
+		}
+		if !reflect.DeepEqual(hits, want) {
+			t.Errorf("case %d, hits: got %v, want %v", i, hits, want)
+		}
 	}
 }
