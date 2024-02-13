@@ -79,7 +79,7 @@ func (c *converter) convertGroup(n *stepNode) (
 	}
 
 	for _, step := range n.subSteps {
-		if !step.marked {
+		if !step.hit() {
 			continue
 		}
 
@@ -138,31 +138,80 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		groupNodes = append(groupNodes, groupNode)
 	}
 
-	// Build index and check if we have duplicated user keys.
 	if err := set.buildIndex(); err != nil {
 		return nil, fmt.Errorf("build index: %w", err)
 	}
 
-	// Apply tags filter.
+	// Populate dependsOn.
 	for _, groupNode := range groupNodes {
-		if !filter.hit(groupNode) {
-			continue // group is rejected
+		// A group node is different from a step node.
+		//
+		// When a group is being depended on, all its steps are being depended
+		// on. The gating is equivalent to wait step at the end of the group.
+		//
+		// When a group depensd on a node, it means all its steps depend on the
+		// node. The gating is equivalent to wait step at the beginning of the
+		// group.
+		commonDeps := make(map[string]struct{})
+		for _, dep := range groupNode.srcGroup.DependsOn {
+			if depNode, ok := set.byKey(dep); ok {
+				commonDeps[depNode.id] = struct{}{}
+			}
 		}
 
-		groupNode.marked = true
+		var lastBlockOrWait *stepNode
 		for _, step := range groupNode.subSteps {
-			if filter.hit(step) {
-				step.marked = true
-				groupNode.marked = true // include group if any step is included
+			// Track step dependencies.
+			if dependsOn, ok := step.src["depends_on"]; ok {
+				deps := toStringList(dependsOn)
+				for _, dep := range deps {
+					if depNode, ok := set.byKey(dep); ok {
+						set.addDep(step.id, depNode.id)
+					}
+				}
+			} else if lastBlockOrWait != nil {
+				set.addDep(step.id, lastBlockOrWait.id)
+			}
+
+			// Add all group common deps.
+			for dep := range commonDeps {
+				set.addDep(step.id, dep)
+			}
+
+			if isBlockOrWait(step.src) {
+				lastBlockOrWait = step
 			}
 		}
 	}
 
-	// TODO(aslonnie): for any included node, also include its dependencies.
+	// Apply tags filter.
+	hits := make(map[string]struct{})
+	rejects := make(map[string]struct{})
+	for _, g := range groupNodes {
+		rejectGroup := filter.reject(g)
+		hitGroup := filter.accept(g)
 
+		for _, step := range g.subSteps {
+			if rejectGroup || filter.reject(step) {
+				// when the group is rejected, all steps are rejected.
+				rejects[step.id] = struct{}{}
+			} else if filter.accept(step) {
+				hits[step.id] = struct{}{}
+				hitGroup = true
+			}
+		}
+
+		if hitGroup {
+			hits[g.id] = struct{}{}
+		}
+	}
+	set.markDeps(hits)
+	set.rejectDeps(rejects)
+
+	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
 	for _, groupNode := range groupNodes {
-		if !groupNode.marked {
+		if !groupNode.hit() {
 			continue
 		}
 
