@@ -16,6 +16,14 @@ type bkPipeline struct {
 	Steps []*bkPipelineGroup `yaml:"steps,omitempty"`
 }
 
+func (p *bkPipeline) totalSteps() int {
+	total := 0
+	for _, group := range p.Steps {
+		total += len(group.Steps)
+	}
+	return total
+}
+
 func newBkAgents(queue string) map[string]any {
 	return map[string]any{"queue": queue}
 }

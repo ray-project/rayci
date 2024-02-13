@@ -205,8 +205,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			hits[g.id] = struct{}{}
 		}
 	}
-	set.rejectDeps(rejects)
 	set.markDeps(hits)
+	set.rejectDeps(rejects)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
