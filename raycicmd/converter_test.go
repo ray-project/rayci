@@ -666,6 +666,7 @@ func TestConvertPipelineGroups(t *testing.T) {
 		Tags:  []string{"disabled"},
 		Steps: []map[string]any{
 			{"commands": []string{"echo bad"}, "key": "bad"},
+			{"commands": []string{"echo innocent"}},
 		},
 	}, {
 		Group: "deps",
@@ -673,7 +674,7 @@ func TestConvertPipelineGroups(t *testing.T) {
 			{
 				"commands":   []string{"echo deps bad"},
 				"depends_on": []string{"bad"},
-				"tags":       []string{"foo"},
+				"tags":       []interface{}{"foo"},
 			},
 		},
 	}}
@@ -688,12 +689,6 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}
 
 	if len(bk) != 1 {
-		for _, g := range bk {
-			t.Log(g.Group)
-			for _, step := range g.Steps {
-				t.Log(" - ", step.(map[string]any)["commands"])
-			}
-		}
 		t.Fatalf("convertPipelineGroups: got %d groups, want 1", len(bk))
 	}
 

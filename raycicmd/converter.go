@@ -162,7 +162,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		var lastBlockOrWait *stepNode
 		for _, step := range groupNode.subSteps {
 			// Track step dependencies.
-			if dependsOn, ok := step.src["depends_on"]; !ok {
+			if dependsOn, ok := step.src["depends_on"]; ok {
 				deps := toStringList(dependsOn)
 				for _, dep := range deps {
 					if depNode, ok := set.byKey(dep); ok {
