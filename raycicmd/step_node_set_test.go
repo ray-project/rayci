@@ -1,10 +1,11 @@
 package raycicmd
 
 import (
+	"testing"
+
 	"reflect"
 	"sort"
 	"strings"
-	"testing"
 )
 
 func TestStepNodeSet(t *testing.T) {
