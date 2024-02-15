@@ -149,13 +149,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		// When a group is being depended on, all its steps are being depended
 		// on. The gating is equivalent to wait step at the end of the group.
 		//
-		// When a group depensd on a node, it means all its steps depend on the
+		// When a group depends on a node, it means all its steps depend on the
 		// node. The gating is equivalent to wait step at the beginning of the
 		// group.
-		commonDeps := make(map[string]struct{})
+		groupDeps := make(map[string]struct{})
 		for _, dep := range groupNode.srcGroup.DependsOn {
 			if depNode, ok := set.byKey(dep); ok {
-				commonDeps[depNode.id] = struct{}{}
+				groupDeps[depNode.id] = struct{}{}
 			}
 		}
 
@@ -174,7 +174,7 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			}
 
 			// Add all group common deps.
-			for dep := range commonDeps {
+			for dep := range groupDeps {
 				set.addDep(step.id, dep)
 			}
 
@@ -188,20 +188,28 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	hits := make(map[string]struct{})
 	rejects := make(map[string]struct{})
 	for _, g := range groupNodes {
-		rejectGroup := filter.reject(g)
-		hitGroup := filter.accept(g)
+		// If a group is rejected, everything in the group is rejected.
+		// and when all steps are rejected, the group will be removed.
+		// We still need to keep the group's structure to reject steps in other
+		// groups that depend on steps in this group.
+		groupRejected := filter.reject(g)
+
+		// If a group is accept, then steps in this group is marked as included.
+		// and all this groups dependencies will be included. Individual steps
+		// in this group can still be rejected.
+		groupAccepted := filter.accept(g)
 
 		for _, step := range g.subSteps {
-			if rejectGroup || filter.reject(step) {
+			if groupRejected || filter.reject(step) {
 				// when the group is rejected, all steps are rejected.
 				rejects[step.id] = struct{}{}
 			} else if filter.accept(step) {
 				hits[step.id] = struct{}{}
-				hitGroup = true
+				groupAccepted = true
 			}
 		}
 
-		if hitGroup {
+		if groupAccepted {
 			hits[g.id] = struct{}{}
 		}
 	}

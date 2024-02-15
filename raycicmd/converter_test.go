@@ -659,7 +659,8 @@ func TestConvertPipelineGroups(t *testing.T) {
 				"tags":  []interface{}{"bar"},
 			},
 			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
-			{"commands": []string{"exit 1"}, "tags": "disabled"},
+			{"commands": []string{"unreachable"}, "depends_on": "no"},
+			{"commands": []string{"exit 1"}, "tags": "disabled", "key": "no"},
 		},
 	}, {
 		Group: "failing",
