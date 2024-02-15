@@ -632,3 +632,79 @@ func TestConvertPipelineGroup(t *testing.T) {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
 	}
 }
+
+func TestConvertPipelineGroups(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group:     "fancy",
+		DependsOn: []string{"forge"},
+		Steps: []map[string]any{
+			{"commands": []string{"echo 1"}, "key": "fancy-init"},
+			{"wait": nil, "depends_on": "fancy-init"},
+			{"commands": []string{"echo 1"}, "tags": []interface{}{"foo"}},
+			{
+				"name":  "panda",
+				"wanda": "panda.yaml",
+				"tags":  []interface{}{"bar"},
+			},
+			{"commands": []string{"echo 2"}, "tags": []interface{}{"bar"}},
+			{"commands": []string{"unreachable"}, "depends_on": "no"},
+			{"commands": []string{"exit 1"}, "tags": "disabled", "key": "no"},
+		},
+	}, {
+		Group: "failing",
+		Tags:  []string{"disabled"},
+		Steps: []map[string]any{
+			{"commands": []string{"echo bad"}, "key": "bad"},
+			{"commands": []string{"echo innocent"}},
+		},
+	}, {
+		Group: "deps",
+		Steps: []map[string]any{
+			{
+				"commands":   []string{"echo deps bad"},
+				"depends_on": []string{"bad"},
+				"tags":       []interface{}{"foo"},
+			},
+		},
+	}}
+
+	filter := &stepFilter{
+		skipTags: []string{"disabled"},
+		tags:     []string{"foo"},
+	}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("convertPipelineGroups: got %d groups, want 1", len(bk))
+	}
+
+	bk0 := bk[0]
+
+	if bk0.Group != "fancy" {
+		t.Errorf("convertPipelineGroup: got group %s, want fancy", bk0.Group)
+	}
+	if want := []string{"forge"}; !reflect.DeepEqual(bk0.DependsOn, want) {
+		t.Errorf(
+			"convertPipelineGroup: got depends_on %+v, want %+v",
+			bk0.DependsOn, want,
+		)
+	}
+	if len(bk0.Steps) != 3 {
+		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk0.Steps))
+	}
+}
