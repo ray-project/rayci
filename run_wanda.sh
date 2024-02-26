@@ -8,7 +8,7 @@ TMP_DIR="$(mktemp -d)"
 
 echo "--- Install wanda ($HOSTTYPE)"
 
-readonly GO_VERSION=1.21.6
+readonly GO_VERSION=1.22.0
 
 if [[ "${OSTYPE}" == msys ]]; then
   curl -sfL "https://go.dev/dl/go${GO_VERSION}.windows-amd64.zip" > "$TMP_DIR/go.zip"
