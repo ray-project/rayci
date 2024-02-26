@@ -249,12 +249,11 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
-			"label":                   "windows job",
-			"key":                     "win",
-			"command":                 "echo windows",
-			"job_env":                 "WINDOWS",
-			"instance_type":           "windows",
-			"mount_windows_artifacts": true,
+			"label":         "windows job",
+			"key":           "win",
+			"command":       "echo windows",
+			"job_env":       "WINDOWS",
+			"instance_type": "windows",
 		},
 		out: map[string]any{
 			"label":   "windows job",
@@ -284,10 +283,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"instance_type": "windows",
 		},
 		out: map[string]any{
-			"label":   "windows job",
-			"key":     "win",
-			"command": "echo windows",
-			"agents":  newBkAgents("fakewinrunner"),
+			"label":          "windows job",
+			"key":            "win",
+			"command":        "echo windows",
+			"agents":         newBkAgents("fakewinrunner"),
+			"artifact_paths": []string{"C:\\tmp\\artifacts\\**\\*"},
 
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"retry":              defaultRayRetry,

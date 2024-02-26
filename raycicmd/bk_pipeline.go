@@ -63,11 +63,10 @@ var buildkiteEnvs = []string{
 }
 
 type stepDockerPluginConfig struct {
-	extraEnvs             []string
-	mountBuildkiteAgent   bool
-	mountWindowsArtifacts bool
-	publishTCPPorts       []string
-	network               string
+	extraEnvs           []string
+	mountBuildkiteAgent bool
+	publishTCPPorts     []string
+	network             string
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -87,9 +86,7 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 	}
 	volumes := []string{
 		`\\.\pipe\docker_engine:\\.\pipe\docker_engine`,
-	}
-	if config.mountWindowsArtifacts {
-		volumes = append(volumes, `C:\tmp\artifacts:C:\artifact-mount`)
+		`C:\tmp\artifacts:C:\artifact-mount`,
 	}
 
 	m := map[string]any{
