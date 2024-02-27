@@ -37,6 +37,12 @@ func (c *basicStepConverter) convert(step map[string]any) (
 	return cloneMapExcept(step, c.dropKeys), nil
 }
 
+var triggerConverter = &basicStepConverter{
+	signatureKey: "trigger",
+	allowedKeys:  triggerStepAllowedKeys,
+	dropKeys:     triggerStepDropKeys,
+}
+
 var waitConverter = &basicStepConverter{
 	signatureKey: "wait",
 	allowedKeys:  waitStepAllowedKeys,

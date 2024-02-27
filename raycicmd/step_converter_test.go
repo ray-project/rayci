@@ -84,6 +84,39 @@ func TestBlockConverter(t *testing.T) {
 	}
 }
 
+func TestTriggerConverter(t *testing.T) {
+	for _, test := range []struct {
+		step map[string]any
+		want map[string]any
+	}{{
+		step: map[string]any{"trigger": "me"},
+		want: map[string]any{"trigger": "me"},
+	}, {
+		step: map[string]any{"trigger": "me", "depends_on": "a"},
+		want: map[string]any{"trigger": "me", "depends_on": "a"},
+	}, {
+		step: map[string]any{
+			"trigger": "me", "build": map[string]string{"branch": "master"},
+			"tags": []string{"tag"},
+		},
+		want: map[string]any{
+			"trigger": "me", "build": map[string]string{"branch": "master"},
+		},
+	}} {
+		got, err := triggerConverter.convert(test.step)
+		if err != nil {
+			t.Errorf("convert %+v got error %v", test.step, err)
+			continue
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf(
+				"convert %+v, got %+v, want %+v",
+				test.step, got, test.want,
+			)
+		}
+	}
+}
+
 func TestIsBlockOrWait(t *testing.T) {
 	for _, test := range []map[string]any{
 		{"wait": "true"},
