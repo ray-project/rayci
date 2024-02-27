@@ -35,9 +35,9 @@ var (
 
 	triggerStepAllowedKeys = []string{
 		"trigger", "label", "async", "build", "depends_on",
-		"tags",
+		"tags", "matrix",
 	}
-	triggerStepDropKeys = []string{"tags"}
+	triggerStepDropKeys = []string{"tags", "matrix"}
 
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
