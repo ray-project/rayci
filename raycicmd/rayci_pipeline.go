@@ -33,6 +33,12 @@ var (
 	}
 	blockStepDropKeys = []string{"tags"}
 
+	triggerStepAllowedKeys = []string{
+		"trigger", "label", "async", "build", "depends_on",
+		"tags",
+	}
+	triggerStepDropKeys = []string{"tags"}
+
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",

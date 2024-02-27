@@ -107,6 +107,12 @@ type config struct {
 	// Optional.
 	SkipTags []string `yaml:"skip_tags"`
 
+	// AllowTriggerStep sets if it is allowed to have trigger steps in the pipeline,
+	// default is false.
+	//
+	// Optional.
+	AllowTriggerStep bool `yaml:"allow_trigger_step"`
+
 	// DockerPlugin contains additional docker plugin configs, to fine tune
 	// the docker plugin's behavior.
 	//
