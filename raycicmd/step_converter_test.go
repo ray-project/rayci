@@ -102,6 +102,22 @@ func TestTriggerConverter(t *testing.T) {
 		want: map[string]any{
 			"trigger": "me", "build": map[string]string{"branch": "master"},
 		},
+	}, {
+		step: map[string]any{
+			"trigger":                  "me",
+			"depends_on":               "a",
+			"if":                       1 < 2,
+			"soft_fail":                "true",
+			"allow_dependency_failure": "true",
+			"tags":                     []string{"tag"},
+		},
+		want: map[string]any{
+			"trigger":                  "me",
+			"depends_on":               "a",
+			"if":                       1 < 2,
+			"soft_fail":                "true",
+			"allow_dependency_failure": "true",
+		},
 	}} {
 		got, err := triggerConverter.convert(test.step)
 		if err != nil {
