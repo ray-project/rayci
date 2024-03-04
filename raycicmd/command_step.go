@@ -103,6 +103,9 @@ func (c *commandConverter) convert(step map[string]any) (
 	for _, k := range c.config.HookEnvKeys {
 		envKeys[k] = struct{}{}
 	}
+	for _, k := range c.config.BuildEnvKeys {
+		envKeys[k] = struct{}{}
+	}
 	var envKeyList []string
 	for k := range envKeys {
 		envKeyList = append(envKeyList, k)
@@ -110,9 +113,7 @@ func (c *commandConverter) convert(step map[string]any) (
 	sort.Strings(envKeyList)
 
 	jobEnv, _ := stringInMap(step, "job_env")
-	dockerPluginConfig := &stepDockerPluginConfig{
-		extraEnvs: envKeyList,
-	}
+	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
 	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
 		v, _ := boolInMap(step, "mount_buildkite_agent")
 		dockerPluginConfig.mountBuildkiteAgent = v
