@@ -188,16 +188,18 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
-			"label":      "say hello",
-			"key":        "key",
-			"command":    "echo hello",
-			"depends_on": "dep",
+			"label":                    "say hello",
+			"key":                      "key",
+			"command":                  "echo hello",
+			"depends_on":               "dep",
+			"allow_dependency_failure": true,
 		},
 		out: map[string]any{
-			"label":      "say hello",
-			"key":        "key",
-			"command":    "echo hello",
-			"depends_on": "dep",
+			"label":                    "say hello",
+			"key":                      "key",
+			"command":                  "echo hello",
+			"depends_on":               "dep",
+			"allow_dependency_failure": true,
 
 			"agents": newBkAgents("fakerunner"),
 

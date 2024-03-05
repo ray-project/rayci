@@ -45,6 +45,7 @@ var (
 		"instance_type", "queue", "job_env", "tags",
 		"docker_publish_tcp_ports", "docker_network",
 		"mount_buildkite_agent", "mount_windows_artifacts",
+		"allow_dependency_failure",
 	}
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
