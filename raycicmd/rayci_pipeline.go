@@ -42,6 +42,9 @@ var (
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
+		"allow_dependency_failure",
+
+		// The following keys will be processed by rayci and dropped.
 		"instance_type", "queue", "job_env", "tags",
 		"docker_publish_tcp_ports", "docker_network",
 		"mount_buildkite_agent", "mount_windows_artifacts",
