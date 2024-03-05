@@ -84,6 +84,12 @@ type config struct {
 	// Optional.
 	Env map[string]string `yaml:"env"`
 
+	// BuildEnvKeys is a list of environment variable keys to pass into
+	// build jobs from the buildkite build.
+	//
+	// Optional.
+	BuildEnvKeys []string `yaml:"build_env_keys"`
+
 	// HookEnvKeys is the list of environment variable keys to pass into
 	// build jobs from buildkite hooks.
 	//
@@ -194,7 +200,8 @@ var branchPipelineConfig = &config{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 	},
 
-	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+	BuildEnvKeys: []string{"RAYCI_SCHEDULE"},
+	HookEnvKeys:  []string{"RAYCI_CHECKOUT_DIR"},
 
 	SkipTags: []string{"disabled"},
 }
