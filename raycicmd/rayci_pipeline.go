@@ -36,6 +36,7 @@ var (
 	triggerStepAllowedKeys = []string{
 		"trigger", "label", "async", "build", "depends_on",
 		"tags", "if", "soft_fail", "allow_dependency_failure",
+		"key",
 	}
 	triggerStepDropKeys = []string{"tags"}
 

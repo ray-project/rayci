@@ -105,6 +105,7 @@ func TestTriggerConverter(t *testing.T) {
 	}, {
 		step: map[string]any{
 			"trigger":                  "me",
+			"key":                      "my_key",
 			"depends_on":               "a",
 			"if":                       1 < 2,
 			"soft_fail":                "true",
@@ -113,6 +114,7 @@ func TestTriggerConverter(t *testing.T) {
 		},
 		want: map[string]any{
 			"trigger":                  "me",
+			"key":                      "my_key",
 			"depends_on":               "a",
 			"if":                       1 < 2,
 			"soft_fail":                "true",
