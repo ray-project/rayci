@@ -24,12 +24,12 @@ func (g *pipelineGroup) lessThan(other *pipelineGroup) bool {
 var (
 	waitStepAllowedKeys = []string{
 		"wait", "continue_on_failure", "if", "depends_on",
-		"tags",
+		"tags", "key",
 	}
 	waitStepDropKeys = []string{"tags"}
 
 	blockStepAllowedKeys = []string{
-		"block", "if", "depends_on", "tags",
+		"block", "if", "depends_on", "tags", "key",
 	}
 	blockStepDropKeys = []string{"tags"}
 
