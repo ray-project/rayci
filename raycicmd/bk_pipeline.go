@@ -96,6 +96,7 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 		"mount-checkout": true,
 		"environment":    envs,
 		"volumes":        volumes,
+		"tty":            true,
 	}
 	if config.network != "" {
 		m["network"] = config.network
