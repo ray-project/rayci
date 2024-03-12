@@ -160,6 +160,7 @@ var (
 		"automatic": makeAutomaticRetryConfig([]int{
 			-1,
 			255,
+			3,          // java test failures
 			53,         // elastic CI stack environment hook failure
 			125,        // container failed
 			126,        // windows wheel build errors
