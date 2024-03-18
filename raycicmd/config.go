@@ -84,6 +84,12 @@ type config struct {
 	// Optional.
 	Env map[string]string `yaml:"env"`
 
+	// BuildEnvKeys is a list of environment variable keys to pass into
+	// build jobs from the buildkite build.
+	//
+	// Optional.
+	BuildEnvKeys []string `yaml:"build_env_keys"`
+
 	// HookEnvKeys is the list of environment variable keys to pass into
 	// build jobs from buildkite hooks.
 	//
@@ -106,6 +112,12 @@ type config struct {
 	//
 	// Optional.
 	SkipTags []string `yaml:"skip_tags"`
+
+	// AllowTriggerStep sets if it is allowed to have trigger steps in the pipeline,
+	// default is false.
+	//
+	// Optional.
+	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
 	// DockerPlugin contains additional docker plugin configs, to fine tune
 	// the docker plugin's behavior.
@@ -188,7 +200,8 @@ var branchPipelineConfig = &config{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 	},
 
-	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+	BuildEnvKeys: []string{"RAYCI_SCHEDULE"},
+	HookEnvKeys:  []string{"RAYCI_CHECKOUT_DIR"},
 
 	SkipTags: []string{"disabled"},
 }

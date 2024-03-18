@@ -104,7 +104,8 @@ func TestConvertPipelineStep(t *testing.T) {
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
 
-		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+		BuildEnvKeys: []string{"RAYCI_SCHEDULE"},
+		HookEnvKeys:  []string{"RAYCI_CHECKOUT_DIR"},
 	}, info)
 
 	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890"
@@ -187,16 +188,18 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
-			"label":      "say hello",
-			"key":        "key",
-			"command":    "echo hello",
-			"depends_on": "dep",
+			"label":                    "say hello",
+			"key":                      "key",
+			"command":                  "echo hello",
+			"depends_on":               "dep",
+			"allow_dependency_failure": true,
 		},
 		out: map[string]any{
-			"label":      "say hello",
-			"key":        "key",
-			"command":    "echo hello",
-			"depends_on": "dep",
+			"label":                    "say hello",
+			"key":                      "key",
+			"command":                  "echo hello",
+			"depends_on":               "dep",
+			"allow_dependency_failure": true,
 
 			"agents": newBkAgents("fakerunner"),
 
@@ -249,12 +252,11 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
-			"label":                   "windows job",
-			"key":                     "win",
-			"command":                 "echo windows",
-			"job_env":                 "WINDOWS",
-			"instance_type":           "windows",
-			"mount_windows_artifacts": true,
+			"label":         "windows job",
+			"key":           "win",
+			"command":       "echo windows",
+			"job_env":       "WINDOWS",
+			"instance_type": "windows",
 		},
 		out: map[string]any{
 			"label":   "windows job",
@@ -284,10 +286,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"instance_type": "windows",
 		},
 		out: map[string]any{
-			"label":   "windows job",
-			"key":     "win",
-			"command": "echo windows",
-			"agents":  newBkAgents("fakewinrunner"),
+			"label":          "windows job",
+			"key":            "win",
+			"command":        "echo windows",
+			"agents":         newBkAgents("fakewinrunner"),
+			"artifact_paths": []string{"C:\\tmp\\artifacts\\**\\*"},
 
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"retry":              defaultRayRetry,
@@ -436,6 +439,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"RAYCI_TEMP",
 			"RAYCI_WORK_REPO",
 			"BUILDKITE_BAZEL_CACHE_URL",
+			"RAYCI_SCHEDULE",
 			"RAYCI_CHECKOUT_DIR",
 		} {
 			if !findInSlice(envs, env) {

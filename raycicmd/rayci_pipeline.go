@@ -24,18 +24,28 @@ func (g *pipelineGroup) lessThan(other *pipelineGroup) bool {
 var (
 	waitStepAllowedKeys = []string{
 		"wait", "continue_on_failure", "if", "depends_on",
-		"tags",
+		"tags", "key",
 	}
 	waitStepDropKeys = []string{"tags"}
 
 	blockStepAllowedKeys = []string{
-		"block", "if", "depends_on", "tags",
+		"block", "if", "depends_on", "tags", "key",
 	}
 	blockStepDropKeys = []string{"tags"}
+
+	triggerStepAllowedKeys = []string{
+		"trigger", "label", "async", "build", "depends_on",
+		"tags", "if", "soft_fail", "allow_dependency_failure",
+		"key",
+	}
+	triggerStepDropKeys = []string{"tags"}
 
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
+		"allow_dependency_failure",
+
+		// The following keys will be processed by rayci and dropped.
 		"instance_type", "queue", "job_env", "tags",
 		"docker_publish_tcp_ports", "docker_network",
 		"mount_buildkite_agent", "mount_windows_artifacts",

@@ -51,6 +51,9 @@ func newConverter(config *config, info *buildInfo) *converter {
 		blockConverter,
 		newWandaConverter(config, info, envMap),
 	}
+	if c.config.AllowTriggerStep {
+		c.stepConverters = append(c.stepConverters, triggerConverter)
+	}
 	c.defaultConverter = newCommandConverter(config, info, envMap)
 
 	return c

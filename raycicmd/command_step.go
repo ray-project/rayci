@@ -103,6 +103,9 @@ func (c *commandConverter) convert(step map[string]any) (
 	for _, k := range c.config.HookEnvKeys {
 		envKeys[k] = struct{}{}
 	}
+	for _, k := range c.config.BuildEnvKeys {
+		envKeys[k] = struct{}{}
+	}
 	var envKeyList []string
 	for k := range envKeys {
 		envKeyList = append(envKeyList, k)
@@ -110,9 +113,7 @@ func (c *commandConverter) convert(step map[string]any) (
 	sort.Strings(envKeyList)
 
 	jobEnv, _ := stringInMap(step, "job_env")
-	dockerPluginConfig := &stepDockerPluginConfig{
-		extraEnvs: envKeyList,
-	}
+	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
 	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
 		v, _ := boolInMap(step, "mount_buildkite_agent")
 		dockerPluginConfig.mountBuildkiteAgent = v
@@ -128,17 +129,12 @@ func (c *commandConverter) convert(step map[string]any) (
 	if dockerNetwork != "" {
 		dockerPluginConfig.network = dockerNetwork
 	}
-	v, _ := boolInMap(step, "mount_windows_artifacts")
-	dockerPluginConfig.mountWindowsArtifacts = v
-
 	switch jobEnv {
 	case windowsJobEnv: // a special job env for windows
 		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
 		}}
-		if dockerPluginConfig.mountWindowsArtifacts {
-			result["artifact_paths"] = windowsArtifactPaths
-		}
+		result["artifact_paths"] = windowsArtifactPaths
 	case macosJobEnv: // a special job env for macos
 		result["plugins"] = []any{map[string]any{
 			macosSandboxPlugin: map[string]string{
