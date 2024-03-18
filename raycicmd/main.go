@@ -22,6 +22,7 @@ type Flags struct {
 	OutputFile     string // flag -output
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
+	Select         string // flag -select
 }
 
 func parseFlags(args []string) (*Flags, []string) {
@@ -46,6 +47,10 @@ func parseFlags(args []string) (*Flags, []string) {
 	set.StringVar(
 		&flags.BuildkiteAgent, "bkagent", "buildkite-agent",
 		"Path to the buildkite-agent binary.",
+	)
+	set.StringVar(
+		&flags.Select, "select", "",
+		"Select specific jobs to run, separated by commas.",
 	)
 
 	if len(args) == 0 {
@@ -92,10 +97,22 @@ func Main(args []string, envs Envs) error {
 	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
 	commit := gitCommit(envs)
 
+	selectStr := flags.Select
+	if selectStr == "" {
+		if v, ok := envs.Lookup("RAYCI_SELECT"); ok {
+			selectStr = v
+		}
+	}
+	selects, err := parseSelect(selectStr)
+	if err != nil {
+		return fmt.Errorf("parse select: %w", err)
+	}
+
 	info := &buildInfo{
 		buildID:        buildID,
 		launcherBranch: rayciBranch,
 		gitCommit:      commit,
+		selects:        selects,
 	}
 
 	pipeline, err := makePipeline(flags.RepoDir, config, info)
