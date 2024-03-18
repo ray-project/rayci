@@ -59,15 +59,15 @@ func newConverter(config *config, info *buildInfo) *converter {
 	return c
 }
 
-func (c *converter) convertStep(step map[string]any) (
+func (c *converter) convertStep(id string, step map[string]any) (
 	map[string]any, error,
 ) {
 	for _, stepConverter := range c.stepConverters {
 		if stepConverter.match(step) {
-			return stepConverter.convert(step)
+			return stepConverter.convert(id, step)
 		}
 	}
-	return c.defaultConverter.convert(step)
+	return c.defaultConverter.convert(id, step)
 }
 
 func (c *converter) convertGroup(n *stepNode) (
@@ -87,7 +87,7 @@ func (c *converter) convertGroup(n *stepNode) (
 		}
 
 		// convert step to buildkite step
-		bkStep, err := c.convertStep(step.src)
+		bkStep, err := c.convertStep(step.id, step.src)
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
