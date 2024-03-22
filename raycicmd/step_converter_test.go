@@ -32,7 +32,7 @@ func TestWaitConverter(t *testing.T) {
 			t.Errorf("cannot match wait step %+v", test.step)
 		}
 
-		got, err := waitConverter.convert(test.step)
+		got, err := waitConverter.convert("id", test.step)
 		if err != nil {
 			t.Errorf("convert %+v got error %v", test.step, err)
 			continue
@@ -70,7 +70,7 @@ func TestBlockConverter(t *testing.T) {
 			t.Errorf("cannot match wait step %+v", test.step)
 		}
 
-		got, err := blockConverter.convert(test.step)
+		got, err := blockConverter.convert("id", test.step)
 		if err != nil {
 			t.Errorf("convert %+v got error %v", test.step, err)
 			continue
@@ -121,7 +121,7 @@ func TestTriggerConverter(t *testing.T) {
 			"allow_dependency_failure": "true",
 		},
 	}} {
-		got, err := triggerConverter.convert(test.step)
+		got, err := triggerConverter.convert("id", test.step)
 		if err != nil {
 			t.Errorf("convert %+v got error %v", test.step, err)
 			continue

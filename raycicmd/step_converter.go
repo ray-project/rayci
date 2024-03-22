@@ -9,7 +9,7 @@ type stepConverter interface {
 	match(step map[string]any) bool
 
 	// convert converts a step from the rayci format to the buildkite format.
-	convert(step map[string]any) (map[string]any, error)
+	convert(id string, step map[string]any) (map[string]any, error)
 }
 
 type basicStepConverter struct {
@@ -28,7 +28,7 @@ func (c *basicStepConverter) match(step map[string]any) bool {
 	return stepHasKey(step, c.signatureKey)
 }
 
-func (c *basicStepConverter) convert(step map[string]any) (
+func (c *basicStepConverter) convert(id string, step map[string]any) (
 	map[string]any, error,
 ) {
 	if err := checkStepKeys(step, c.allowedKeys); err != nil {

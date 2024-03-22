@@ -88,6 +88,15 @@ func (n *stepNode) mark()     { n.marked = true }
 func (n *stepNode) reject()   { n.rejected = true }
 func (n *stepNode) hit() bool { return !n.rejected && n.marked }
 
+func (n *stepNode) idAndKey() []string {
+	var keys []string
+	keys = append(keys, n.id)
+	if n.key != "" {
+		keys = append(keys, n.key)
+	}
+	return keys
+}
+
 func (n *stepNode) String() string {
 	if n.key != "" {
 		return fmt.Sprintf("node %q (key %q)", n.id, n.key)

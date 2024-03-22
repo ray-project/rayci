@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 )
 
 type buildInfo struct {
 	buildID        string
 	launcherBranch string
 	gitCommit      string
+	selects        []string
 }
 
 func makeBuildID(envs Envs) (string, error) {
@@ -44,4 +46,20 @@ func gitCommit(envs Envs) string {
 		}
 	}
 	return commit
+}
+
+func parseSelect(s string) ([]string, error) {
+	if s == "" {
+		return nil, nil
+	}
+	fields := strings.Split(s, ",")
+	var selects []string
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			return nil, fmt.Errorf("empty field in select")
+		}
+		selects = append(selects, f)
+	}
+	return selects, nil
 }

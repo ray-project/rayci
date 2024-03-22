@@ -138,7 +138,9 @@ func parseStepEnvs(v any) ([]*envEntry, error) {
 	return entries, nil
 }
 
-func (c *wandaConverter) convert(step map[string]any) (map[string]any, error) {
+func (c *wandaConverter) convert(id string, step map[string]any) (
+	map[string]any, error,
+) {
 	if err := checkStepKeys(step, wandaStepAllowedKeys); err != nil {
 		return nil, fmt.Errorf("check wanda step keys: %w", err)
 	}
