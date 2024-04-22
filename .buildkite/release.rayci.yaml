@@ -1,7 +1,11 @@
 group: release
 steps:
-  - name: hello-release
+  # Use release queue to build rayci and wanda release binaries.
+  # This makes sure that the release queue is working and also
+  # builds the releases and save the binaries in build artifacts.
+  - name: rayci and wanda binaries
     instance_type: release
     commands:
-      - echo "Hello, Release!"
+      - bash release.sh
+      - cp _release/* /artifact-mount
     depends_on: forge
