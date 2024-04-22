@@ -14,6 +14,8 @@ if [[ -f .rayciverision ]]; then
   exit 1  # Unreachable; just for safe-guarding.
 fi
 
+# Legacy path; build from source.
+
 RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 echo "--- Install rayci"
