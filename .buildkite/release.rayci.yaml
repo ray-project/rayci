@@ -7,5 +7,5 @@ steps:
     instance_type: release
     commands:
       - bash release.sh
-      - cp _/release/* /artifact-mount
+      - cp _release/* /artifact-mount
     depends_on: forge
