@@ -5,8 +5,14 @@ set -euxo pipefail
 mkdir -p _release
 rm -f _release/*
 
-RAYCI_OS="$(go env GOOS)"
-RAYCI_ARCH="$(go env GOARCH)"
+function build {
+	RAYCI_OS="$1"
+	RAYCI_ARCH="$2"
 
-go build -trimpath -o "_release/rayci-${RAYCI_OS}-${RAYCI_ARCH}" .
-go build -trimpath -o "_release/wanda-${RAYCI_OS}-${RAYCI_ARCH}" ./wanda/wanda
+	GOOS="$RAYCI_OS" GOARCH="$RAYCI_ARCH" go build -trimpath -o "_release/rayci-${RAYCI_OS}-${RAYCI_ARCH}" .
+	GOOS="$RAYCI_OS" GOARCH="$RAYCI_ARCH" go build -trimpath -o "_release/wanda-${RAYCI_OS}-${RAYCI_ARCH}" ./wanda/wanda
+}
+
+build linux amd64
+build linux arm64
+build windows amd64
