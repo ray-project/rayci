@@ -2,9 +2,19 @@
 
 set -euo pipefail
 
-RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
-
 TMP_DIR="$(mktemp -d)"
+
+if [[ -f .rayciverision ]]; then
+  RAYCI_VERSION="$(cat .rayciversion)"
+  echo "--- Install rayci binary ${RAYCI_VERSION}"
+  curl -sfL "https://github.com/ray-project/rayci/releases/download/v${RAYCI_VERSION}/rayci-linux-amd64" -o "$TMP_DIR/rayci"A
+  chmod +x "$TMP_DIR/rayci"
+  exec "$TMP_DIR/rayci" "$@"
+
+  exit 1  # Unreachable; just for safe-guarding.
+fi
+
+RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 echo "--- Install rayci"
 
