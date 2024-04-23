@@ -95,7 +95,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 
 	envMap := copyEnvMap(c.envMap)
 	if id != "" {
-		envMap["RAYCI_JOB_ID"] = id
+		envMap["RAYCI_STEP_ID"] = id
 	}
 	result["env"] = envMap
 
