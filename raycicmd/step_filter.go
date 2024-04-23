@@ -24,11 +24,7 @@ func (f *stepFilter) reject(step *stepNode) bool {
 func (f *stepFilter) accept(step *stepNode) bool {
 	if f.selects != nil {
 		// in key selection mode, hit when the step has any of the keys.
-		for _, name := range step.idAndKey() {
-			if f.selects[name] {
-				return true
-			}
-		}
+		return step.selectHit(f.selects)
 	}
 
 	// in tags filtering mode

@@ -88,13 +88,18 @@ func (n *stepNode) mark()     { n.marked = true }
 func (n *stepNode) reject()   { n.rejected = true }
 func (n *stepNode) hit() bool { return !n.rejected && n.marked }
 
-func (n *stepNode) idAndKey() []string {
-	var keys []string
-	keys = append(keys, n.id)
-	if n.key != "" {
-		keys = append(keys, n.key)
+func (n *stepNode) selectHit(selects map[string]bool) bool {
+	if n.id != "" {
+		if _, ok := selects[n.id]; ok {
+			return true
+		}
 	}
-	return keys
+	if n.key != "" {
+		if _, ok := selects[n.key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (n *stepNode) String() string {
