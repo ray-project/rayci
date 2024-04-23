@@ -7,7 +7,7 @@ TMP_DIR="$(mktemp -d)"
 if [[ -f .rayciversion ]]; then
   RAYCI_VERSION="$(cat .rayciversion)"
   echo "--- Install rayci binary ${RAYCI_VERSION}"
-  curl -sfL "https://github.com/ray-project/rayci/releases/download/v${RAYCI_VERSION}/rayci-linux-amd64" -o "$TMP_DIR/rayci"A
+  curl -sfL "https://github.com/ray-project/rayci/releases/download/v${RAYCI_VERSION}/rayci-linux-amd64" -o "$TMP_DIR/rayci"
   chmod +x "$TMP_DIR/rayci"
   exec "$TMP_DIR/rayci" "$@"
 
