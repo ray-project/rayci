@@ -58,7 +58,7 @@ func (c *commandConverter) match(step map[string]any) bool {
 	return true
 }
 
-func (c *commandConverter) convert(step map[string]any) (
+func (c *commandConverter) convert(id string, step map[string]any) (
 	map[string]any, error,
 ) {
 	if err := checkStepKeys(step, commandStepAllowedKeys); err != nil {
@@ -94,6 +94,9 @@ func (c *commandConverter) convert(step map[string]any) (
 	}
 
 	envMap := copyEnvMap(c.envMap)
+	if id != "" {
+		envMap["RAYCI_JOB_ID"] = id
+	}
 	result["env"] = envMap
 
 	envKeys := make(map[string]struct{})
