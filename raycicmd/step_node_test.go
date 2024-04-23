@@ -144,3 +144,54 @@ func TestStepNodeReverseDeps(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestStepNodeSelectHit(t *testing.T) {
+	n := &stepNode{id: "step-id", key: "step-key"}
+
+	set := func(selects ...string) map[string]bool {
+		set := make(map[string]bool)
+		for _, s := range selects {
+			set[s] = true
+		}
+		return set
+	}
+
+	for _, test := range []struct {
+		selects map[string]bool
+		want    bool
+	}{
+		{selects: set("step-id"), want: true},
+		{selects: set("step-key"), want: true},
+		{selects: set("step-id", "step-key"), want: true},
+		{selects: set("step-id", "step-key", "other"), want: true},
+		{selects: set("other"), want: false},
+	} {
+		if got := n.selectHit(test.selects); got != test.want {
+			t.Errorf(
+				"selectHit %+v: got %+v, want %+v",
+				test.selects, got, test.want,
+			)
+		}
+	}
+
+	// a node with no key
+	n = &stepNode{id: "step-id"}
+
+	for _, test := range []struct {
+		selects map[string]bool
+		want    bool
+	}{
+		{selects: set("step-id"), want: true},
+		{selects: set("step-key"), want: false},
+		{selects: set("step-id", "step-key"), want: true},
+		{selects: set("step-id", "step-key", "other"), want: true},
+		{selects: set("other"), want: false},
+	} {
+		if got := n.selectHit(test.selects); got != test.want {
+			t.Errorf(
+				"selectHit %+v: got %+v, want %+v",
+				test.selects, got, test.want,
+			)
+		}
+	}
+}
