@@ -88,6 +88,8 @@ func TestConvertPipelineStep(t *testing.T) {
 		gitCommit:      "abcdefg1234567890",
 	}
 
+	const fakeStepID = "fakeid"
+
 	c := newConverter(&config{
 		ArtifactsBucket: "artifacts_bucket",
 		CITemp:          "s3://ci-temp/",
@@ -133,6 +135,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -160,6 +163,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -181,6 +185,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -212,6 +217,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -273,6 +279,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -300,6 +307,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
 
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 			},
@@ -322,11 +330,13 @@ func TestConvertPipelineStep(t *testing.T) {
 			"retry":              defaultRayRetry,
 			"env": map[string]string{
 				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://artifacts_bucket/abcdefg1234567890",
-				"BUILDKITE_BAZEL_CACHE_URL":             "https://bazel-build-cache",
-				"RAYCI_BRANCH":                          "beta",
-				"RAYCI_BUILD_ID":                        "abc123",
-				"RAYCI_TEMP":                            "s3://ci-temp/abc123/",
-				"RAYCI_WORK_REPO":                       "fakeecr",
+
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_BRANCH":              "beta",
+				"RAYCI_BUILD_ID":            "abc123",
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_STEP_ID":             fakeStepID,
 			},
 		},
 	}, {
@@ -353,7 +363,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"depends_on": "dep", "if": "false",
 		},
 	}} {
-		got, err := c.convertStep(test.in)
+		got, err := c.convertStep("fakeid", test.in)
 		if err != nil {
 			t.Errorf("convertPipelineStep %+v: %v", test.in, err)
 			continue
@@ -441,6 +451,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"BUILDKITE_BAZEL_CACHE_URL",
 			"RAYCI_SCHEDULE",
 			"RAYCI_CHECKOUT_DIR",
+			"RAYCI_STEP_ID",
 		} {
 			if !findInSlice(envs, env) {
 				t.Errorf("convertPipelineStep %+v: no %q", test.in, env)
