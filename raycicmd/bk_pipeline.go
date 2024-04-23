@@ -125,7 +125,7 @@ func makeRayDockerPlugin(
 	}
 
 	if config.mountBuildkiteAgent {
-		m["mount_buildkite_agent"] = true
+		m["mount-buildkite-agent"] = true
 	}
 	if len(config.publishTCPPorts) > 0 {
 		var publish []string

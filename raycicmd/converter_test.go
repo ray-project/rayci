@@ -579,7 +579,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 		t.Errorf("docker plugin not found in step 0")
 		return
 	}
-	v, ok := boolInMap(p0, "mount_buildkite_agent")
+	v, ok := boolInMap(p0, "mount-buildkite-agent")
 	if v != true || ok != true {
 		t.Errorf("step 0: got docker mount bk agent %v, %v, want true", v, ok)
 	}
@@ -589,7 +589,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 		t.Errorf("docker plugin not found in step 0")
 		return
 	}
-	v, ok = boolInMap(p1, "mount_buildkite_agnet")
+	v, ok = boolInMap(p1, "mount-buildkite-agnet")
 	if v != false || ok != false {
 		t.Errorf("step 1: got docker mount bk agent %v, %v, want false", v, ok)
 	}
