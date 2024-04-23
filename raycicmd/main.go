@@ -74,6 +74,21 @@ func execWithInput(bin string, args []string, pipeline []byte) error {
 	return cmd.Run()
 }
 
+func stepSelects(s string, envs Envs) []string {
+	if s == "" {
+		if v, ok := envs.Lookup("RAYCI_SELECT"); ok {
+			s = v
+		}
+	}
+	selects := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ','
+	})
+	if len(selects) == 0 {
+		return nil
+	}
+	return selects
+}
+
 // Main runs tha main function of rayci command.
 func Main(args []string, envs Envs) error {
 	flags, args := parseFlags(args)
@@ -97,16 +112,7 @@ func Main(args []string, envs Envs) error {
 
 	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
 	commit := gitCommit(envs)
-
-	selectStr := flags.Select
-	if selectStr == "" {
-		if v, ok := envs.Lookup("RAYCI_SELECT"); ok {
-			selectStr = v
-		}
-	}
-	selects := strings.FieldsFunc(selectStr, func(r rune) bool {
-		return r == ','
-	})
+	selects := stepSelects(flags.Select, envs)
 
 	info := &buildInfo{
 		buildID:        buildID,
