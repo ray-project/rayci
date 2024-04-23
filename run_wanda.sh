@@ -4,7 +4,7 @@ set -euo pipefail
 
 TMP_DIR="$(mktemp -d)"
 
-if [[ -f .rayciverision ]]; then
+if [[ -f .rayciversion ]]; then
   RAYCI_VERSION="$(cat .rayciversion)"
   echo "--- Install wanda binary ${RAYCI_VERSION}"
 
