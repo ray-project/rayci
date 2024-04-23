@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -103,10 +104,9 @@ func Main(args []string, envs Envs) error {
 			selectStr = v
 		}
 	}
-	selects, err := parseSelect(selectStr)
-	if err != nil {
-		return fmt.Errorf("parse select: %w", err)
-	}
+	selects := strings.FieldsFunc(selectStr, func(r rune) bool {
+		return r == ','
+	})
 
 	info := &buildInfo{
 		buildID:        buildID,
