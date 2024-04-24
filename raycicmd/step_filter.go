@@ -10,6 +10,9 @@ import (
 type stepFilter struct {
 	skipTags []string
 
+	// selecting steps based on ID or key
+	selects map[string]bool
+
 	runAll bool
 	tags   []string
 }
@@ -19,6 +22,11 @@ func (f *stepFilter) reject(step *stepNode) bool {
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
+	if f.selects != nil {
+		// in key selection mode, hit when the step has any of the keys.
+		return step.selectHit(f.selects)
+	}
+
 	// in tags filtering mode
 	if f.runAll {
 		return true
@@ -33,6 +41,14 @@ func (f *stepFilter) accept(step *stepNode) bool {
 
 func (f *stepFilter) hit(step *stepNode) bool {
 	return !f.reject(step) && f.accept(step)
+}
+
+func newSelectStepFilter(skipTags []string, selects []string) *stepFilter {
+	filter := &stepFilter{skipTags: skipTags, selects: make(map[string]bool)}
+	for _, k := range selects {
+		filter.selects[k] = true
+	}
+	return filter
 }
 
 func newTagsStepFilter(skips []string, filterCmd []string) (
