@@ -66,7 +66,10 @@ func execWithInput(
 	cmd := exec.Command(bin, args...)
 	cmd.Stdin = r
 	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	cmd.Stdout = stdout
 
 	return cmd.Run()
 }
@@ -128,7 +131,7 @@ func Main(args []string, envs Envs) error {
 
 		args := []string{"pipeline", "upload"}
 		agent := flags.BuildkiteAgent
-		if err := execWithInput(agent, args, bs, os.Stdout); err != nil {
+		if err := execWithInput(agent, args, bs, nil); err != nil {
 			return fmt.Errorf("upload pipeline: %w", err)
 		}
 	}
