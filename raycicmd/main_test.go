@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"testing"
 
+	"bytes"
 	"os"
 	"path/filepath"
 
@@ -36,5 +37,19 @@ func TestMainFunction(t *testing.T) {
 	if err := yaml.Unmarshal(bs, bk); err != nil {
 		t.Fatal("output is not a valid buildkite pipeline: ", err)
 		t.Log(bs)
+	}
+}
+
+func TestExecWithInput(t *testing.T) {
+	out := new(bytes.Buffer)
+	if err := execWithInput(
+		"cat", []string{"-"},
+		[]byte("hello"), out,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := out.String(), "hello"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
