@@ -171,3 +171,36 @@ func TestStepFilter_runAll(t *testing.T) {
 		}
 	}
 }
+
+func TestStepFilter_selects(t *testing.T) {
+	filter := newSelectStepFilter([]string{"disabled"}, []string{"foo", "bar"})
+	for _, node := range []*stepNode{
+		{key: "foo"},
+		{id: "foo"},
+		{id: "bar"},
+		{id: "foo", key: "k"},
+		{id: "id", key: "foo"},
+		{id: "disabled", key: "bar"},
+		{id: "foo", tags: []string{"bar"}},
+
+		// even disabled nodes can be selected
+		{id: "foo", tags: []string{"disabled"}},
+		{key: "bar", tags: []string{"disabled"}},
+	} {
+		if !filter.accept(node) {
+			t.Errorf("miss %+v", node)
+		}
+	}
+
+	filter = newSelectStepFilter([]string{"disabled"}, []string{"foo", "bar"})
+	for _, node := range []*stepNode{
+		{key: "f"},
+		{id: "f"},
+		{id: "f", tags: []string{"disabled"}},
+		{key: "b", tags: []string{"disabled"}},
+	} {
+		if filter.accept(node) {
+			t.Errorf("hit %+v", node)
+		}
+	}
+}
