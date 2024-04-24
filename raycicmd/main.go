@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -63,23 +64,30 @@ func parseFlags(args []string) (*Flags, []string) {
 	return flags, set.Args()
 }
 
-func execWithInput(bin string, args []string, pipeline []byte) error {
+func execWithInput(
+	bin string, args []string, pipeline []byte, stdout io.Writer,
+) error {
 	r := bytes.NewReader(pipeline)
 
 	cmd := exec.Command(bin, args...)
 	cmd.Stdin = r
 	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	cmd.Stdout = stdout
 
 	return cmd.Run()
 }
 
 func stepSelects(s string, envs Envs) []string {
+	s = strings.TrimSpace(s)
 	if s == "" {
 		if v, ok := envs.Lookup("RAYCI_SELECT"); ok {
-			s = v
+			s = strings.TrimSpace(v)
 		}
 	}
+
 	selects := strings.FieldsFunc(s, func(r rune) bool {
 		return r == ','
 	})
@@ -87,6 +95,24 @@ func stepSelects(s string, envs Envs) []string {
 		return nil
 	}
 	return selects
+}
+
+func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
+	buildID, err := makeBuildID(envs)
+	if err != nil {
+		return nil, fmt.Errorf("make build id: %w", err)
+	}
+
+	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
+	commit := gitCommit(envs)
+	selects := stepSelects(flags.Select, envs)
+
+	return &buildInfo{
+		buildID:        buildID,
+		launcherBranch: rayciBranch,
+		gitCommit:      commit,
+		selects:        selects,
+	}, nil
 }
 
 // Main runs tha main function of rayci command.
@@ -105,20 +131,9 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	buildID, err := makeBuildID(envs)
+	info, err := makeBuildInfo(flags, envs)
 	if err != nil {
-		return fmt.Errorf("make build id: %w", err)
-	}
-
-	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
-	commit := gitCommit(envs)
-	selects := stepSelects(flags.Select, envs)
-
-	info := &buildInfo{
-		buildID:        buildID,
-		launcherBranch: rayciBranch,
-		gitCommit:      commit,
-		selects:        selects,
+		return fmt.Errorf("make build info: %w", err)
 	}
 
 	pipeline, err := makePipeline(flags.RepoDir, config, info)
@@ -147,7 +162,9 @@ func Main(args []string, envs Envs) error {
 		log.Printf("%s", bs)
 
 		args := []string{"pipeline", "upload"}
-		if err := execWithInput(flags.BuildkiteAgent, args, bs); err != nil {
+		if err := execWithInput(
+			flags.BuildkiteAgent, args, bs, os.Stdout,
+		); err != nil {
 			return fmt.Errorf("upload pipeline: %w", err)
 		}
 	}
