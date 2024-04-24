@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -57,7 +58,9 @@ func parseFlags(args []string) (*Flags, []string) {
 	return flags, set.Args()
 }
 
-func execWithInput(bin string, args []string, pipeline []byte) error {
+func execWithInput(
+	bin string, args []string, pipeline []byte, stdout io.Writer,
+) error {
 	r := bytes.NewReader(pipeline)
 
 	cmd := exec.Command(bin, args...)
@@ -124,7 +127,8 @@ func Main(args []string, envs Envs) error {
 		log.Printf("%s", bs)
 
 		args := []string{"pipeline", "upload"}
-		if err := execWithInput(flags.BuildkiteAgent, args, bs); err != nil {
+		agent := flags.BuildkiteAgent
+		if err := execWithInput(agent, args, bs, os.Stdout); err != nil {
 			return fmt.Errorf("upload pipeline: %w", err)
 		}
 	}
