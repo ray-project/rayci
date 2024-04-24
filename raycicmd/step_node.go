@@ -88,6 +88,20 @@ func (n *stepNode) mark()     { n.marked = true }
 func (n *stepNode) reject()   { n.rejected = true }
 func (n *stepNode) hit() bool { return !n.rejected && n.marked }
 
+func (n *stepNode) selectHit(selects map[string]bool) bool {
+	if n.id != "" {
+		if _, ok := selects[n.id]; ok {
+			return true
+		}
+	}
+	if n.key != "" {
+		if _, ok := selects[n.key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (n *stepNode) String() string {
 	if n.key != "" {
 		return fmt.Sprintf("node %q (key %q)", n.id, n.key)
