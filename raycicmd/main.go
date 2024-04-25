@@ -52,7 +52,7 @@ func parseFlags(args []string) (*Flags, []string) {
 	)
 	set.StringVar(
 		&flags.Select, "select", "",
-		"Select specific jobs to run, separated by commas.",
+		"Select specific step IDs or keys to run, separated by commas.",
 	)
 
 	if len(args) == 0 {
