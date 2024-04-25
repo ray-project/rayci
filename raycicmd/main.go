@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -23,6 +24,7 @@ type Flags struct {
 	OutputFile     string // flag -output
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
+	Select         string // flag -select
 }
 
 func parseFlags(args []string) (*Flags, []string) {
@@ -47,6 +49,10 @@ func parseFlags(args []string) (*Flags, []string) {
 	set.StringVar(
 		&flags.BuildkiteAgent, "bkagent", "buildkite-agent",
 		"Path to the buildkite-agent binary.",
+	)
+	set.StringVar(
+		&flags.Select, "select", "",
+		"Select specific step IDs or keys to run, separated by commas.",
 	)
 
 	if len(args) == 0 {
@@ -74,6 +80,41 @@ func execWithInput(
 	return cmd.Run()
 }
 
+func stepSelects(s string, envs Envs) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		if v, ok := envs.Lookup("RAYCI_SELECT"); ok {
+			s = strings.TrimSpace(v)
+		}
+	}
+
+	selects := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ','
+	})
+	if len(selects) == 0 {
+		return nil
+	}
+	return selects
+}
+
+func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
+	buildID, err := makeBuildID(envs)
+	if err != nil {
+		return nil, fmt.Errorf("make build id: %w", err)
+	}
+
+	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
+	commit := gitCommit(envs)
+	selects := stepSelects(flags.Select, envs)
+
+	return &buildInfo{
+		buildID:        buildID,
+		launcherBranch: rayciBranch,
+		gitCommit:      commit,
+		selects:        selects,
+	}, nil
+}
+
 // Main runs tha main function of rayci command.
 func Main(args []string, envs Envs) error {
 	flags, args := parseFlags(args)
@@ -90,18 +131,9 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	buildID, err := makeBuildID(envs)
+	info, err := makeBuildInfo(flags, envs)
 	if err != nil {
-		return fmt.Errorf("make build id: %w", err)
-	}
-
-	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
-	commit := gitCommit(envs)
-
-	info := &buildInfo{
-		buildID:        buildID,
-		launcherBranch: rayciBranch,
-		gitCommit:      commit,
+		return fmt.Errorf("make build info: %w", err)
 	}
 
 	pipeline, err := makePipeline(flags.RepoDir, config, info)
