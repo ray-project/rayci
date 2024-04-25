@@ -162,9 +162,8 @@ func Main(args []string, envs Envs) error {
 		log.Printf("%s", bs)
 
 		args := []string{"pipeline", "upload"}
-		if err := execWithInput(
-			flags.BuildkiteAgent, args, bs, os.Stdout,
-		); err != nil {
+		agent := flags.BuildkiteAgent
+		if err := execWithInput(agent, args, bs, nil); err != nil {
 			return fmt.Errorf("upload pipeline: %w", err)
 		}
 	}
