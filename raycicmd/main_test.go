@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -51,5 +52,45 @@ func TestExecWithInput(t *testing.T) {
 
 	if got, want := out.String(), "hello"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestMakeBuildInfo(t *testing.T) {
+	flags := &Flags{}
+	envs := newEnvsMap(map[string]string{
+		"RAYCI_BUILD_ID":   "fake-build-id",
+		"BUILDKITE_COMMIT": "abc123",
+		"RAYCI_BRANCH":     "foobar",
+		"RAYCI_SELECT":     "foo,bar,taz",
+	})
+
+	info, err := makeBuildInfo(flags, envs)
+	if err != nil {
+		t.Fatal("make build info: ", err)
+	}
+
+	want := &buildInfo{
+		buildID:        "fake-build-id",
+		launcherBranch: "foobar",
+		gitCommit:      "abc123",
+		selects:        []string{"foo", "bar", "taz"},
+	}
+	if !reflect.DeepEqual(info, want) {
+		t.Errorf("got %+v, want %+v", info, want)
+	}
+
+	flags.Select = "gee,goo" // overwrites env var
+	info, err = makeBuildInfo(flags, envs)
+	if err != nil {
+		t.Fatal("make build info with selects overwrite: ", err)
+	}
+	want = &buildInfo{
+		buildID:        "fake-build-id",
+		launcherBranch: "foobar",
+		gitCommit:      "abc123",
+		selects:        []string{"gee", "goo"},
+	}
+	if !reflect.DeepEqual(info, want) {
+		t.Errorf("got %+v, want %+v", info, want)
 	}
 }

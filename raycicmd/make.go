@@ -90,6 +90,7 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 
 	c := newConverter(config, info)
 
+	// TODO(aslonnie): use select filter when selects is set.
 	filter, err := newTagsStepFilter(config.SkipTags, config.TagFilterCommand)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)
