@@ -162,14 +162,14 @@ func TestMakePipeline(t *testing.T) {
 		name: ".buildkite/test.rayci.yaml",
 		content: multi(
 			`group: g`,
-			`steps: `,
-			`  - label: "test1"`,
-			`    key: "test1"`,
-			`    commands: [ "echo test1" ]`,
+			`steps:`,
+			`  - name: "forge"`,
+			`    wanda: "fake-forge.wanda.yaml"`,
 			`  - label: "tagged test2"`,
 			`    key: "test2"`,
 			`    tags: "enabled"`,
 			`    commands: [ "echo test2" ]`,
+			`    depends_on: forge2`,
 			`  - label: "disabled"`,
 			`    tags: disabled`,
 			`    commands: [ "exit 1" ]`,
@@ -178,17 +178,25 @@ func TestMakePipeline(t *testing.T) {
 		name: "private/buildkite/private.rayci.yaml",
 		content: multi(
 			`group: private`,
-			`steps: `,
+			`steps:`,
 			`  - label: "private test"`,
 			`    key: "private-test"`,
 			`    commands: [ "echo a private test" ]`,
+		),
+	}, {
+		name: "private/buildkite/forge.rayci.yaml",
+		content: multi(
+			`group: forge`,
+			`steps:`,
+			`  - name: forge2`,
+			`    wanda: "fake-forge2.wanda.yaml"`,
 		),
 	}, {
 		name: ".buildkite/disabled.rayci.yaml",
 		content: multi(
 			`group: g`,
 			`tags: ["disabled"]`,
-			`steps: `,
+			`steps:`,
 			`  - label: "test3"`,
 			`    key: "test3"`,
 			`    commands: [ "echo test3" ]`,
@@ -205,12 +213,11 @@ func TestMakePipeline(t *testing.T) {
 		}
 	}
 
-	config := &config{
+	commonConfig := &config{
 		ArtifactsBucket: "artifacts",
 		CITemp:          "s3://ci-temp",
 		CIWorkRepo:      "fakeecr",
 
-		TagFilterCommand: []string{"echo", "enabled"},
 		BuilderQueues: map[string]string{
 			"builder": "builder_queue",
 		},
@@ -219,32 +226,73 @@ func TestMakePipeline(t *testing.T) {
 		BuildkiteDirs: []string{".buildkite", "private/buildkite"},
 	}
 
-	buildID := "fakebuild"
-	info := &buildInfo{
-		buildID: buildID,
-	}
+	t.Run("filter", func(t *testing.T) {
+		config := *commonConfig
+		config.TagFilterCommand = []string{"echo", "enabled"}
 
-	got, err := makePipeline(tmp, config, info)
-	if err != nil {
-		t.Fatalf("makePipeline: %v", err)
-	}
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
 
-	if len(got.Steps) != 2 { // all steps are groups.
-		t.Errorf("got %d groups, want 1", len(got.Steps))
-	}
+		got, err := makePipeline(tmp, &config, info)
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
 
-	// sub funtions are already tested in their unit tests.
-	// so we only check the total number of groups here.
-	// we also have an e2e test at the repo level.
+		if want := 3; len(got.Steps) != want { // all steps are groups.
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
 
-	totalSteps := 0
-	for _, g := range got.Steps {
-		totalSteps += len(g.Steps)
-	}
+		// sub funtions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
 
-	if totalSteps != 3 {
-		t.Fatalf("got %d steps, want 1", totalSteps)
-	}
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+
+		if want := 4; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
+	t.Run("selector", func(t *testing.T) {
+		config := *commonConfig
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+			selects: []string{"test2"},
+		}
+
+		got, err := makePipeline(tmp, &config, info)
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+		if want := 2; len(got.Steps) != want { // all steps are groups.
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		totalSteps := 0
+		var keys []string
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+			for _, s := range g.Steps {
+				step := s.(map[string]any)
+				keys = append(keys, stepKey(step))
+			}
+		}
+
+		if want := 2; totalSteps != want {
+			t.Errorf("got %d steps, want %d", totalSteps, want)
+		}
+
+		if want := []string{"forge2", "test2"}; !reflect.DeepEqual(keys, want) {
+			t.Errorf("got step keys %v, want %v", keys, want)
+		}
+	})
 }
 
 func TestSortPipelineGroups(t *testing.T) {
