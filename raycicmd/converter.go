@@ -222,10 +222,6 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
 	for _, groupNode := range groupNodes {
-		if !groupNode.hit() {
-			continue
-		}
-
 		bkGroup, err := c.convertGroup(groupNode)
 		if err != nil {
 			return nil, err
