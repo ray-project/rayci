@@ -163,14 +163,13 @@ func TestMakePipeline(t *testing.T) {
 		content: multi(
 			`group: g`,
 			`steps:`,
-			`  - label: "test1"`,
-			`    key: "test1"`,
-			`    commands: [ "echo test1" ]`,
+			`  - name: "forge"`,
+			`    wanda: "fake-forge.wanda.yaml"`,
 			`  - label: "tagged test2"`,
 			`    key: "test2"`,
 			`    tags: "enabled"`,
 			`    commands: [ "echo test2" ]`,
-			`    depends_on: test1`,
+			`    depends_on: forge2`,
 			`  - label: "disabled"`,
 			`    tags: disabled`,
 			`    commands: [ "exit 1" ]`,
@@ -183,6 +182,14 @@ func TestMakePipeline(t *testing.T) {
 			`  - label: "private test"`,
 			`    key: "private-test"`,
 			`    commands: [ "echo a private test" ]`,
+		),
+	}, {
+		name: "private/buildkite/forge.rayci.yaml",
+		content: multi(
+			`group: forge`,
+			`steps:`,
+			`  - name: forge2`,
+			`    wanda: "fake-forge2.wanda.yaml"`,
 		),
 	}, {
 		name: ".buildkite/disabled.rayci.yaml",
@@ -233,7 +240,7 @@ func TestMakePipeline(t *testing.T) {
 			t.Fatalf("makePipeline: %v", err)
 		}
 
-		if want := 2; len(got.Steps) != want { // all steps are groups.
+		if want := 3; len(got.Steps) != want { // all steps are groups.
 			t.Errorf("got %d groups, want %d", len(got.Steps), want)
 		}
 
@@ -246,7 +253,7 @@ func TestMakePipeline(t *testing.T) {
 			totalSteps += len(g.Steps)
 		}
 
-		if want := 3; totalSteps != want {
+		if want := 4; totalSteps != want {
 			t.Fatalf("got %d steps, want %d", totalSteps, want)
 		}
 	})
@@ -264,7 +271,7 @@ func TestMakePipeline(t *testing.T) {
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
-		if want := 1; len(got.Steps) != want { // all steps are groups.
+		if want := 2; len(got.Steps) != want { // all steps are groups.
 			t.Errorf("got %d groups, want %d", len(got.Steps), want)
 		}
 
@@ -274,8 +281,7 @@ func TestMakePipeline(t *testing.T) {
 			totalSteps += len(g.Steps)
 			for _, s := range g.Steps {
 				step := s.(map[string]any)
-				k, _ := stringInMap(step, "key")
-				keys = append(keys, k)
+				keys = append(keys, stepKey(step))
 			}
 		}
 
@@ -283,7 +289,7 @@ func TestMakePipeline(t *testing.T) {
 			t.Errorf("got %d steps, want %d", totalSteps, want)
 		}
 
-		if want := []string{"test1", "test2"}; !reflect.DeepEqual(keys, want) {
+		if want := []string{"forge2", "test2"}; !reflect.DeepEqual(keys, want) {
 			t.Errorf("got step keys %v, want %v", keys, want)
 		}
 	})
