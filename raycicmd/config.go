@@ -148,8 +148,9 @@ const (
 	rayPRPipeline     = "0183465f-a222-467a-b122-3b9ea3e68094"
 
 	// v2 pipelines
-	rayV2PostmergePipeline = "0189e759-8c96-4302-b6b5-b4274406bf89"
-	rayV2PremergePipeline  = "0189942e-0876-4b8f-80a4-617f988ec59b"
+	rayV2PostmergePipeline  = "0189e759-8c96-4302-b6b5-b4274406bf89"
+	rayV2PremergePipeline   = "0189942e-0876-4b8f-80a4-617f988ec59b"
+	rayV2MicrocheckPipeline = "018f4f1e-1b73-4906-9802-92422e3badaa"
 
 	// dev only
 	rayDevPipeline = "5b097a97-ad35-4443-9552-f5c413ead11c"
@@ -206,49 +207,55 @@ var branchPipelineConfig = &config{
 	SkipTags: []string{"disabled"},
 }
 
-var prPipelineConfig = &config{
-	name: "ray-pr",
+func prPipelineConfig(name string, extraEnv map[string]string) *config {
+	config := &config{
+		name: name,
 
-	ArtifactsBucket: "ray-ci-artifact-pr-public",
+		ArtifactsBucket: "ray-ci-artifact-pr-public",
 
-	CITemp:      "s3://ray-ci-artifact-pr-public/ci-temp/",
-	CIWorkRepo:  rayCIECR + "/rayproject/citemp",
-	ForgePrefix: defaultForgePrefix,
+		CITemp:      "s3://ray-ci-artifact-pr-public/ci-temp/",
+		CIWorkRepo:  rayCIECR + "/rayproject/citemp",
+		ForgePrefix: defaultForgePrefix,
 
-	BuilderQueues: map[string]string{
-		"builder":         "builder_queue_pr",
-		"builder-arm64":   "builder_queue_arm64_pr",
-		"builder-windows": "builder_queue_windows_pr",
-	},
+		BuilderQueues: map[string]string{
+			"builder":         "builder_queue_pr",
+			"builder-arm64":   "builder_queue_arm64_pr",
+			"builder-windows": "builder_queue_windows_pr",
+		},
 
-	RunnerQueues: map[string]string{
-		"default":     "runner_queue_small_pr",
-		"small":       "runner_queue_small_pr",
-		"medium":      "runner_queue_medium_pr",
-		"large":       "runner_queue_pr",
-		"gpu":         "gpu_runner_queue_pr",
-		"gpu-large":   "gpu_large_runner_queue_pr",
-		"trainium":    "trainium_runner_queue_pr",
-		"windows":     "windows_queue_pr",
-		"macos":       "macos",
-		"macos-arm64": "macos-pr-arm64",
+		RunnerQueues: map[string]string{
+			"default":     "runner_queue_small_pr",
+			"small":       "runner_queue_small_pr",
+			"medium":      "runner_queue_medium_pr",
+			"large":       "runner_queue_pr",
+			"gpu":         "gpu_runner_queue_pr",
+			"gpu-large":   "gpu_large_runner_queue_pr",
+			"trainium":    "trainium_runner_queue_pr",
+			"windows":     "windows_queue_pr",
+			"macos":       "macos",
+			"macos-arm64": "macos-pr-arm64",
 
-		"medium-arm64": "runner_queue_arm64_medium_pr",
-	},
+			"medium-arm64": "runner_queue_arm64_medium_pr",
+		},
 
-	BuilderPriority: 1,
-	RunnerPriority:  1,
+		BuilderPriority: 1,
+		RunnerPriority:  1,
 
-	Env: map[string]string{
-		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
-		"BUILDKITE_CACHE_READONLY":  "true",
-	},
+		Env: map[string]string{
+			"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
+			"BUILDKITE_CACHE_READONLY":  "true",
+		},
 
-	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
+		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
-	TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
+		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 
-	SkipTags: []string{"disabled", "skip-on-premerge"},
+		SkipTags: []string{"disabled", "skip-on-premerge"},
+	}
+	for k, v := range extraEnv {
+		config.Env[k] = v
+	}
+	return config
 }
 
 func ciDefaultConfig(envs Envs) *config {
@@ -257,11 +264,16 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
-		return prPipelineConfig
+		return prPipelineConfig("ray-pr", nil)
+	case rayV2MicrocheckPipeline:
+		return prPipelineConfig(
+			"ray-pr-microcheck",
+			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
+		)
 	}
 
 	// By default, assume it is less privileged.
-	return prPipelineConfig
+	return prPipelineConfig("ray-pr", nil)
 }
 
 func defaultConfig(envs Envs) *config {
