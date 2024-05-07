@@ -450,6 +450,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"RAYCI_WORK_REPO",
 			"BUILDKITE_BAZEL_CACHE_URL",
 			"RAYCI_SCHEDULE",
+			"RAYCI_BISECT_TEST_TARGET",
 			"RAYCI_CHECKOUT_DIR",
 			"RAYCI_STEP_ID",
 		} {
