@@ -119,11 +119,12 @@ type config struct {
 	// Optional.
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
-	// DisableParallelism sets if it is allowed to have parallel steps in the
-	// pipeline, default is false.
+	// MaxParallelism is the maximum number of parallel jobs that can be run in the
+	// pipeline. If a bigger number of parallelism is requested, it will be capped to
+	// this number.
 	//
 	// Optional.
-	DisableParallelism bool `yaml:"diable_parallelism"`
+	MaxParallelism int `yaml:"max_parallelism"`
 
 	// DockerPlugin contains additional docker plugin configs, to fine tune
 	// the docker plugin's behavior.
@@ -216,7 +217,11 @@ var branchPipelineConfig = &config{
 	SkipTags: []string{"disabled"},
 }
 
-func prPipelineConfig(name string, extraEnv map[string]string, disableParralelism bool) *config {
+func prPipelineConfig(
+	name string,
+	extraEnv map[string]string,
+	maxParralelism int,
+) *config {
 	config := &config{
 		name: name,
 
@@ -260,11 +265,12 @@ func prPipelineConfig(name string, extraEnv map[string]string, disableParralelis
 		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 
 		SkipTags: []string{"disabled", "skip-on-premerge"},
-
-		DisableParallelism: disableParralelism,
 	}
 	for k, v := range extraEnv {
 		config.Env[k] = v
+	}
+	if maxParralelism > 0 {
+		config.MaxParallelism = maxParralelism
 	}
 	return config
 }
@@ -275,17 +281,17 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
-		return prPipelineConfig("ray-pr", nil, false)
+		return prPipelineConfig("ray-pr", nil, -1)
 	case rayV2MicrocheckPipeline:
 		return prPipelineConfig(
 			"ray-pr-microcheck",
 			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
-			true,
+			1,
 		)
 	}
 
 	// By default, assume it is less privileged.
-	return prPipelineConfig("ray-pr", nil, false)
+	return prPipelineConfig("ray-pr", nil, -1)
 }
 
 func defaultConfig(envs Envs) *config {

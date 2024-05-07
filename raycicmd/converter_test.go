@@ -106,8 +106,9 @@ func TestConvertPipelineStep(t *testing.T) {
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
 
-		BuildEnvKeys: []string{"RAYCI_SCHEDULE"},
-		HookEnvKeys:  []string{"RAYCI_CHECKOUT_DIR"},
+		BuildEnvKeys:   []string{"RAYCI_SCHEDULE"},
+		HookEnvKeys:    []string{"RAYCI_CHECKOUT_DIR"},
+		MaxParallelism: 5,
 	}, info)
 
 	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890"
@@ -319,6 +320,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"command":       "echo mac",
 			"job_env":       "MACOS",
 			"instance_type": "macos",
+			"parallelism":   4,
 		},
 		out: map[string]any{
 			"label":   "mac job",
@@ -338,6 +340,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_STEP_ID":             fakeStepID,
 			},
+			"parallelism": 4,
 		},
 	}, {
 		in: map[string]any{
@@ -361,6 +364,30 @@ func TestConvertPipelineStep(t *testing.T) {
 		out: map[string]any{
 			"wait": nil, "continue_on_failure": true,
 			"depends_on": "dep", "if": "false",
+		},
+	}, {
+		in: map[string]any{
+			"label":       "say hello",
+			"command":     "echo hello",
+			"parallelism": 200,
+		},
+		out: map[string]any{
+			"agents":             newBkAgents("fakerunner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://artifacts_bucket/abcdefg1234567890",
+				"BUILDKITE_BAZEL_CACHE_URL":             "https://bazel-build-cache",
+				"RAYCI_BRANCH":                          "beta",
+				"RAYCI_BUILD_ID":                        "abc123",
+				"RAYCI_STEP_ID":                         "fakeid",
+				"RAYCI_TEMP":                            "s3://ci-temp/abc123/",
+				"RAYCI_WORK_REPO":                       "fakeecr",
+			},
+			"label":       "say hello",
+			"command":     "echo hello",
+			"parallelism": 5,
 		},
 	}} {
 		got, err := c.convertStep("fakeid", test.in)
