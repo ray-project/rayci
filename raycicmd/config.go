@@ -119,6 +119,12 @@ type config struct {
 	// Optional.
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
+	// DisableParallelism sets if it is allowed to have parallel steps in the
+	// pipeline, default is false.
+	//
+	// Optional.
+	DisableParallelism bool `yaml:"diable_parallelism"`
+
 	// DockerPlugin contains additional docker plugin configs, to fine tune
 	// the docker plugin's behavior.
 	//
@@ -210,7 +216,7 @@ var branchPipelineConfig = &config{
 	SkipTags: []string{"disabled"},
 }
 
-func prPipelineConfig(name string, extraEnv map[string]string) *config {
+func prPipelineConfig(name string, extraEnv map[string]string, disableParralelism bool) *config {
 	config := &config{
 		name: name,
 
@@ -254,6 +260,8 @@ func prPipelineConfig(name string, extraEnv map[string]string) *config {
 		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 
 		SkipTags: []string{"disabled", "skip-on-premerge"},
+
+		DisableParallelism: disableParralelism,
 	}
 	for k, v := range extraEnv {
 		config.Env[k] = v
@@ -267,16 +275,17 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
-		return prPipelineConfig("ray-pr", nil)
+		return prPipelineConfig("ray-pr", nil, false)
 	case rayV2MicrocheckPipeline:
 		return prPipelineConfig(
 			"ray-pr-microcheck",
 			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
+			true,
 		)
 	}
 
 	// By default, assume it is less privileged.
-	return prPipelineConfig("ray-pr", nil)
+	return prPipelineConfig("ray-pr", nil, false)
 }
 
 func defaultConfig(envs Envs) *config {

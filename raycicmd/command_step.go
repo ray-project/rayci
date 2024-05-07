@@ -93,6 +93,10 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		result["priority"] = priority
 	}
 
+	if _, ok := step["parallelism"]; ok && c.config.DisableParallelism {
+		result["parallelism"] = 1
+	}
+
 	envMap := copyEnvMap(c.envMap)
 	if id != "" {
 		envMap["RAYCI_STEP_ID"] = id
