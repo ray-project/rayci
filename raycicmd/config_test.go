@@ -21,6 +21,15 @@ func TestLoadConfig(t *testing.T) {
 		if want := "ray-branch"; config.name != want {
 			t.Errorf("config got %q, want %q", config.name, want)
 		}
+		envHasKey := false
+		for _, value := range config.BuildEnvKeys {
+			if value == "RAYCI_BISECT_TEST_TARGET" {
+				envHasKey = true
+			}
+		}
+		if !envHasKey {
+			t.Errorf("config does not have key RAYCI_BISECT_TEST_TARGET")
+		}
 	})
 
 	t.Run("load ray PR CI config", func(t *testing.T) {

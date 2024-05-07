@@ -200,8 +200,11 @@ var branchPipelineConfig = &config{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 	},
 
-	BuildEnvKeys: []string{"RAYCI_SCHEDULE"},
-	HookEnvKeys:  []string{"RAYCI_CHECKOUT_DIR"},
+	BuildEnvKeys: []string{
+		"RAYCI_SCHEDULE",
+		"RAYCI_BISECT_TEST_TARGET",
+	},
+	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
 	SkipTags: []string{"disabled"},
 }
