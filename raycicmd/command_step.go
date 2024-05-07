@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -91,6 +92,18 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 	if priority != 0 {
 		result["priority"] = priority
+	}
+
+	parallelism, ok := step["parallelism"]
+	if ok && c.config.MaxParallelism > 0 {
+		maxParallelism := c.config.MaxParallelism
+		parallelism, err := strconv.Atoi(fmt.Sprintf("%v", parallelism))
+		if err != nil {
+			return nil, fmt.Errorf("convert parallelism: %w", err)
+		}
+		if parallelism > maxParallelism {
+			result["parallelism"] = maxParallelism
+		}
 	}
 
 	envMap := copyEnvMap(c.envMap)
