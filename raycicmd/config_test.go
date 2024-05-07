@@ -32,6 +32,25 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("load ray microcheck CI config", func(t *testing.T) {
+		envs := newEnvsMap(map[string]string{
+			"CI":                    "true",
+			"BUILDKITE_PIPELINE_ID": rayV2MicrocheckPipeline,
+		})
+
+		config, err := loadConfig("", envs)
+		if err != nil {
+			t.Fatalf("load config: %v", err)
+		}
+		if want := "ray-pr-microcheck"; config.name != want {
+			t.Errorf("config got %q, want %q", config.name, want)
+		}
+		val, ok := config.Env["RAYCI_MICROCHECK_RUN"]
+		if !ok || val != "1" {
+			t.Errorf("config.Env.RAYCI_MICROCHECK_RUN got %q, want `1`", val)
+		}
+	})
+
 	t.Run("load ray PR CI config", func(t *testing.T) {
 		envs := newEnvsMap(map[string]string{
 			"CI":                    "true",
@@ -44,6 +63,10 @@ func TestLoadConfig(t *testing.T) {
 		}
 		if want := "ray-pr"; config.name != want {
 			t.Errorf("config got %q, want %q", config.name, want)
+		}
+		val, ok := config.Env["RAYCI_MICROCHECK_RUN"]
+		if ok || val == "1" {
+			t.Errorf("config.Env.RAYCI_MICROCHECK_RUN got %q, want not `1`", val)
 		}
 	})
 
