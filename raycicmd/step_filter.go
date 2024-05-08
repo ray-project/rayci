@@ -22,12 +22,29 @@ func (f *stepFilter) reject(step *stepNode) bool {
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
+	if f.selects != nil && f.tags != nil {
+		// in both key selection mode, hit when the step has both keys and tags
+		return f.acceptSelectHit(step) && f.acceptTagHit(step)
+	}
+
 	if f.selects != nil {
-		// in key selection mode, hit when the step has any of the keys.
-		return step.selectHit(f.selects)
+		// in only key selection mode, hit when the step has keys
+		return f.acceptSelectHit(step)
 	}
 
 	// in tags filtering mode
+	return f.acceptTagHit(step)
+}
+
+func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
+	if f.selects != nil {
+		return step.selectHit(f.selects)
+	}
+
+	return true
+}
+
+func (f *stepFilter) acceptTagHit(step *stepNode) bool {
 	if f.runAll {
 		return true
 	}
@@ -41,6 +58,20 @@ func (f *stepFilter) accept(step *stepNode) bool {
 
 func (f *stepFilter) hit(step *stepNode) bool {
 	return !f.reject(step) && f.accept(step)
+}
+
+func newSelectAndTagsStepFilter(
+	skipTags []string, selects []string, filterCmd []string,
+) (*stepFilter, error) {
+	select_filter := newSelectStepFilter(skipTags, selects)
+	tag_filter, err := newTagsStepFilter(skipTags, filterCmd)
+
+	return &stepFilter{
+		skipTags: skipTags,
+		selects:  select_filter.selects,
+		runAll:   tag_filter.runAll,
+		tags:     tag_filter.tags,
+	}, err
 }
 
 func newSelectStepFilter(skipTags []string, selects []string) *stepFilter {

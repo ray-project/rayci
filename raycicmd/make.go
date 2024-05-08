@@ -91,7 +91,13 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 	c := newConverter(config, info)
 
 	var filter *stepFilter
-	if len(info.selects) > 0 {
+	if len(info.selects) > 0 && len(config.TagFilterCommand) > 0 {
+		f, err := newSelectAndTagsStepFilter(config.SkipTags, info.selects, config.TagFilterCommand)
+		if err != nil {
+			return nil, fmt.Errorf("run tag filter command: %w", err)
+		}
+		filter = f
+	} else if len(info.selects) > 0 {
 		filter = newSelectStepFilter(config.SkipTags, info.selects)
 	} else {
 		f, err := newTagsStepFilter(config.SkipTags, config.TagFilterCommand)
