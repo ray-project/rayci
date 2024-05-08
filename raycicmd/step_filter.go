@@ -13,8 +13,8 @@ type stepFilter struct {
 	// selecting steps based on ID or key
 	selects map[string]bool
 
-	runAll bool
-	tags   []string
+	runAllTags bool
+	tags       []string
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
@@ -22,18 +22,7 @@ func (f *stepFilter) reject(step *stepNode) bool {
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
-	if f.selects != nil && f.tags != nil {
-		// in both key selection mode, hit when the step has both keys and tags
-		return f.acceptSelectHit(step) && f.acceptTagHit(step)
-	}
-
-	if f.selects != nil {
-		// in only key selection mode, hit when the step has keys
-		return f.acceptSelectHit(step)
-	}
-
-	// in tags filtering mode
-	return f.acceptTagHit(step)
+	return f.acceptSelectHit(step) && f.acceptTagHit(step)
 }
 
 func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
@@ -45,7 +34,7 @@ func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
 }
 
 func (f *stepFilter) acceptTagHit(step *stepNode) bool {
-	if f.runAll {
+	if f.runAllTags {
 		return true
 	}
 
@@ -60,32 +49,24 @@ func (f *stepFilter) hit(step *stepNode) bool {
 	return !f.reject(step) && f.accept(step)
 }
 
-func newSelectAndTagsStepFilter(
+func newStepFilter(
 	skipTags []string, selects []string, filterCmd []string,
 ) (*stepFilter, error) {
-	select_filter := newSelectStepFilter(skipTags, selects)
-	tag_filter, err := newTagsStepFilter(skipTags, filterCmd)
-
-	return &stepFilter{
-		skipTags: skipTags,
-		selects:  select_filter.selects,
-		runAll:   tag_filter.runAll,
-		tags:     tag_filter.tags,
-	}, err
-}
-
-func newSelectStepFilter(skipTags []string, selects []string) *stepFilter {
-	filter := &stepFilter{skipTags: skipTags, selects: make(map[string]bool)}
-	for _, k := range selects {
-		filter.selects[k] = true
+	filter, err := stepFilterFromCmd(skipTags, filterCmd)
+	if selects != nil && err == nil {
+		filter.selects = make(map[string]bool)
+		for _, k := range selects {
+			filter.selects[k] = true
+		}
 	}
-	return filter
+
+	return filter, err
 }
 
-func newTagsStepFilter(skips []string, filterCmd []string) (
+func stepFilterFromCmd(skips []string, filterCmd []string) (
 	*stepFilter, error,
 ) {
-	filter := &stepFilter{skipTags: skips, runAll: true}
+	filter := &stepFilter{skipTags: skips, runAllTags: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil
@@ -119,7 +100,7 @@ func newTagsStepFilter(skips []string, filterCmd []string) (
 	if len(tags) == 0 {
 		tags = nil
 	}
-	filter.runAll = false
+	filter.runAllTags = false
 	filter.tags = tags
 
 	return filter, nil
