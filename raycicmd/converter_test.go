@@ -540,7 +540,7 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	filter := &stepFilter{tags: []string{}, runAll: true}
+	filter := &stepFilter{tags: []string{}, runAllTags: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -589,7 +589,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 			"mount_buildkite_agent": false,
 		}},
 	}
-	filter := &stepFilter{tags: []string{}, runAll: true}
+	filter := &stepFilter{tags: []string{}, runAllTags: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)

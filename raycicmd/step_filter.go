@@ -13,8 +13,8 @@ type stepFilter struct {
 	// selecting steps based on ID or key
 	selects map[string]bool
 
-	runAll bool
-	tags   []string
+	runAllTags bool
+	tags       []string
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
@@ -22,13 +22,19 @@ func (f *stepFilter) reject(step *stepNode) bool {
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
+	return f.acceptSelectHit(step) && f.acceptTagHit(step)
+}
+
+func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
 	if f.selects != nil {
-		// in key selection mode, hit when the step has any of the keys.
 		return step.selectHit(f.selects)
 	}
 
-	// in tags filtering mode
-	if f.runAll {
+	return true
+}
+
+func (f *stepFilter) acceptTagHit(step *stepNode) bool {
+	if f.runAllTags {
 		return true
 	}
 
@@ -43,18 +49,24 @@ func (f *stepFilter) hit(step *stepNode) bool {
 	return !f.reject(step) && f.accept(step)
 }
 
-func newSelectStepFilter(skipTags []string, selects []string) *stepFilter {
-	filter := &stepFilter{skipTags: skipTags, selects: make(map[string]bool)}
-	for _, k := range selects {
-		filter.selects[k] = true
+func newStepFilter(
+	skipTags []string, selects []string, filterCmd []string,
+) (*stepFilter, error) {
+	filter, err := stepFilterFromCmd(skipTags, filterCmd)
+	if selects != nil && err == nil {
+		filter.selects = make(map[string]bool)
+		for _, k := range selects {
+			filter.selects[k] = true
+		}
 	}
-	return filter
+
+	return filter, err
 }
 
-func newTagsStepFilter(skips []string, filterCmd []string) (
+func stepFilterFromCmd(skips []string, filterCmd []string) (
 	*stepFilter, error,
 ) {
-	filter := &stepFilter{skipTags: skips, runAll: true}
+	filter := &stepFilter{skipTags: skips, runAllTags: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil
@@ -88,7 +100,7 @@ func newTagsStepFilter(skips []string, filterCmd []string) (
 	if len(tags) == 0 {
 		tags = nil
 	}
-	filter.runAll = false
+	filter.runAllTags = false
 	filter.tags = tags
 
 	return filter, nil
