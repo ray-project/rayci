@@ -143,11 +143,12 @@ func makeRayDockerPlugin(
 }
 
 // makeAutomaticRetryConfig creates the retry configuration for rayci pipelines.
-// The retry configuration is to retry once for any unknown exit status, and
-// to retry 3 times for known exit statuses.
+// The retry configuration is to retry once for any unknown exit status or test failures,
+// and to retry 3 times for known exit statuses.
 func makeAutomaticRetryConfig(exitStatus []int) []any {
 	m := []any{
-		map[string]int{"exit_status": 1, "limit": 1},
+		map[string]int{"exit_status": 1, "limit": 1},  // unknown exist status
+		map[string]int{"exit_status": 42, "limit": 1}, // test failures
 	}
 	for _, s := range exitStatus {
 		m = append(m, map[string]any{"exit_status": s, "limit": 3})
