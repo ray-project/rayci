@@ -2,7 +2,7 @@ module github.com/ray-project/rayci
 
 go 1.21
 
-toolchain go1.22.2
+toolchain go1.22.3
 
 require (
 	github.com/google/go-containerregistry v0.19.1
