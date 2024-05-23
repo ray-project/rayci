@@ -119,9 +119,9 @@ type config struct {
 	// Optional.
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
-	// MaxParallelism is the maximum number of parallel jobs that can be run in the
-	// pipeline. If a bigger number of parallelism is requested, it will be capped to
-	// this number.
+	// MaxParallelism is the maximum number of parallel jobs that can be run in
+	// the pipeline. If a bigger number of parallelism is requested, it will be
+	// capped to this number.
 	//
 	// Optional.
 	MaxParallelism int `yaml:"max_parallelism"`
