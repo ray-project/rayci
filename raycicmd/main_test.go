@@ -58,10 +58,11 @@ func TestExecWithInput(t *testing.T) {
 func TestMakeBuildInfo(t *testing.T) {
 	flags := &Flags{}
 	envs := newEnvsMap(map[string]string{
-		"RAYCI_BUILD_ID":   "fake-build-id",
-		"BUILDKITE_COMMIT": "abc123",
-		"RAYCI_BRANCH":     "foobar",
-		"RAYCI_SELECT":     "foo,bar,taz",
+		"RAYCI_BUILD_ID":                "fake-build-id",
+		"BUILDKITE_COMMIT":              "abc123",
+		"BUILDKITE_BUILD_CREATOR_EMAIL": "reef@anyscale.com",
+		"RAYCI_BRANCH":                  "foobar",
+		"RAYCI_SELECT":                  "foo,bar,taz",
 	})
 
 	info, err := makeBuildInfo(flags, envs)
@@ -70,10 +71,11 @@ func TestMakeBuildInfo(t *testing.T) {
 	}
 
 	want := &buildInfo{
-		buildID:        "fake-build-id",
-		launcherBranch: "foobar",
-		gitCommit:      "abc123",
-		selects:        []string{"foo", "bar", "taz"},
+		buildID:          "fake-build-id",
+		buildAuthorEmail: "reef@anyscale.com",
+		launcherBranch:   "foobar",
+		gitCommit:        "abc123",
+		selects:          []string{"foo", "bar", "taz"},
 	}
 	if !reflect.DeepEqual(info, want) {
 		t.Errorf("got %+v, want %+v", info, want)
@@ -85,10 +87,11 @@ func TestMakeBuildInfo(t *testing.T) {
 		t.Fatal("make build info with selects overwrite: ", err)
 	}
 	want = &buildInfo{
-		buildID:        "fake-build-id",
-		launcherBranch: "foobar",
-		gitCommit:      "abc123",
-		selects:        []string{"gee", "goo"},
+		buildID:          "fake-build-id",
+		buildAuthorEmail: "reef@anyscale.com",
+		launcherBranch:   "foobar",
+		gitCommit:        "abc123",
+		selects:          []string{"gee", "goo"},
 	}
 	if !reflect.DeepEqual(info, want) {
 		t.Errorf("got %+v, want %+v", info, want)

@@ -293,6 +293,38 @@ func TestMakePipeline(t *testing.T) {
 			t.Errorf("got step keys %v, want %v", keys, want)
 		}
 	})
+
+	t.Run("notify", func(t *testing.T) {
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		config := *commonConfig
+		config.NotifyOwnerOnFailure = false
+
+		got, err := makePipeline(tmp, &config, info)
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+		if len(got.Notify) != 0 {
+			t.Errorf("got %d notify, want 0", len(got.Notify))
+		}
+
+		const email = "reef@anyscale.com"
+		infoWithEmail := &buildInfo{
+			buildID:          buildID,
+			buildAuthorEmail: email,
+		}
+		config.NotifyOwnerOnFailure = true
+		got, err = makePipeline(tmp, &config, infoWithEmail)
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+		if len(got.Notify) == 0 || got.Notify[0].Email != email || got.Notify[0].If != `build.state == "failing"` {
+			t.Errorf(`got %v, want email %v, want if build.state == "failing"`, got.Notify, email)
+		}
+	})
 }
 
 func TestSortPipelineGroups(t *testing.T) {

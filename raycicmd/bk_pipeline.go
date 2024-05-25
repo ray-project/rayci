@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+type bkNotify struct {
+	Email string `yaml:"email,omitempty"`
+	If    string `yaml:"if,omitempty"`
+}
+
 type bkPipelineGroup struct {
 	Group     string   `yaml:"group,omitempty"`
 	Key       string   `yaml:"key,omitempty"`
@@ -13,7 +18,8 @@ type bkPipelineGroup struct {
 }
 
 type bkPipeline struct {
-	Steps []*bkPipelineGroup `yaml:"steps,omitempty"`
+	Steps  []*bkPipelineGroup `yaml:"steps,omitempty"`
+	Notify []*bkNotify        `yaml:"notify,omitempty"`
 }
 
 func (p *bkPipeline) totalSteps() int {
@@ -26,6 +32,13 @@ func (p *bkPipeline) totalSteps() int {
 
 func newBkAgents(queue string) map[string]any {
 	return map[string]any{"queue": queue}
+}
+
+func makeBuildFailureBkNotify(email string) *bkNotify {
+	return &bkNotify{
+		Email: email,
+		If:    `build.state == "failing"`,
+	}
 }
 
 func makeNoopBkPipeline(q string) *bkPipeline {
