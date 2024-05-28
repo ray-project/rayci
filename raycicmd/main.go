@@ -104,14 +104,19 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	}
 
 	rayciBranch, _ := envs.Lookup("RAYCI_BRANCH")
+
+	// buildAuthorEmail is the email of the user who triggered the buildkite webhook
+	// event; for most parts, it is the same as the github author email.
+	buildAuthorEmail, _ := envs.Lookup("BUILDKITE_BUILD_CREATOR_EMAIL")
 	commit := gitCommit(envs)
 	selects := stepSelects(flags.Select, envs)
 
 	return &buildInfo{
-		buildID:        buildID,
-		launcherBranch: rayciBranch,
-		gitCommit:      commit,
-		selects:        selects,
+		buildID:          buildID,
+		buildAuthorEmail: buildAuthorEmail,
+		launcherBranch:   rayciBranch,
+		gitCommit:        commit,
+		selects:          selects,
 	}, nil
 }
 

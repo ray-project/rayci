@@ -126,6 +126,12 @@ type config struct {
 	// Optional.
 	MaxParallelism int `yaml:"max_parallelism"`
 
+	// NotifyOwnerOnFailure sets if the owner of the build should be notified
+	// when a build fails.
+	//
+	// Optional.
+	NotifyOwnerOnFailure bool `yaml:"notify_owner_on_failure"`
+
 	// DockerPlugin contains additional docker plugin configs, to fine tune
 	// the docker plugin's behavior.
 	//
@@ -283,11 +289,14 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
 		return prPipelineConfig("ray-pr", nil, -1)
 	case rayV2MicrocheckPipeline:
-		return prPipelineConfig(
+		mcPipelineConfig := prPipelineConfig(
 			"ray-pr-microcheck",
 			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
 			1,
 		)
+		mcPipelineConfig.NotifyOwnerOnFailure = true
+
+		return mcPipelineConfig
 	}
 
 	// By default, assume it is less privileged.

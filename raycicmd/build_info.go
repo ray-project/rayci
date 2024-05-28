@@ -10,10 +10,11 @@ import (
 )
 
 type buildInfo struct {
-	buildID        string
-	launcherBranch string
-	gitCommit      string
-	selects        []string
+	buildID          string
+	buildAuthorEmail string
+	launcherBranch   string
+	gitCommit        string
+	selects          []string
 }
 
 func makeBuildID(envs Envs) (string, error) {
