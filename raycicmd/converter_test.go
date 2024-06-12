@@ -225,6 +225,39 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
+			"label":             "say hello",
+			"key":               "key",
+			"command":           "echo hello",
+			"depends_on":        "dep",
+			"concurrency":       2,
+			"concurrency_group": "group",
+		},
+		out: map[string]any{
+			"label":             "say hello",
+			"key":               "key",
+			"command":           "echo hello",
+			"depends_on":        "dep",
+			"concurrency":       2,
+			"concurrency_group": "group",
+
+			"agents": newBkAgents("fakerunner"),
+
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+	}, {
+		in: map[string]any{
 			"name":       "forge",
 			"label":      "my forge",
 			"wanda":      "ci/forge.wanda.yaml",
