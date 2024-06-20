@@ -233,8 +233,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"concurrency_group": "group",
 		},
 		out: map[string]any{
-			"label": "say hello",
-
+			"label":             "say hello",
 			"key":               "key",
 			"command":           "echo hello",
 			"depends_on":        "dep",
