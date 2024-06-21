@@ -74,6 +74,19 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
+	concurrency_group, _ := stringInMap(step, "concurrency_group")
+	allowed_concurrency_group := c.config.AllowConcurrencyGroup
+	if concurrency_group != "" && allowed_concurrency_group != nil {
+		allowed_group := false
+		for _, group := range allowed_concurrency_group {
+			if group == concurrency_group {
+				allowed_group = true
+			}
+		}
+		if !allowed_group {
+			return nil, fmt.Errorf("concurrency group %q is not allowed", concurrency_group)
+		}
+	}
 
 	result := cloneMapExcept(step, commandStepDropKeys)
 

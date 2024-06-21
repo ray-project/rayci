@@ -120,7 +120,7 @@ type config struct {
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
 	// AllowConcurrencyGroup is the list of concurrency group names that are
-	// allowed for the pipeline.
+	// allowed for the pipeline. If not set, all concurrency groups are allowed.
 	//
 	// Optional.
 	AllowConcurrencyGroup []string `yaml:"allow_concurrency_group"`
