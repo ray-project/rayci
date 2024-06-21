@@ -43,7 +43,7 @@ var (
 	commandStepAllowedKeys = []string{
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
-		"allow_dependency_failure",
+		"allow_dependency_failure", "concurrency", "concurrency_group",
 
 		// The following keys will be processed by rayci and dropped.
 		"instance_type", "queue", "job_env", "tags",
