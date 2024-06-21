@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"strings"
 )
 
 func boolInMap(m map[string]any, key string) (bool, bool) {
@@ -11,6 +12,15 @@ func boolInMap(m map[string]any, key string) (bool, bool) {
 	}
 	b, ok := v.(bool)
 	return b, ok
+}
+
+func stringHasPrefix(s string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func stringInMap(m map[string]any, key string) (string, bool) {

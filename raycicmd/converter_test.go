@@ -95,7 +95,7 @@ func TestConvertPipelineStep_concurrency_group(t *testing.T) {
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
 		},
-		AllowConcurrencyGroup: []string{},
+		AllowConcurrencyGroupPrefixes: []string{"not_group"},
 	}, info)
 
 	step := map[string]any{
@@ -105,8 +105,7 @@ func TestConvertPipelineStep_concurrency_group(t *testing.T) {
 		"concurrency":       2,
 		"concurrency_group": "group",
 	}
-	_, err := c.convertStep("fakeid", step)
-	if err == nil {
+	if _, err := c.convertStep("fakeid", step); err == nil {
 		t.Errorf("TestConvertPipelineStep_concurrency_group %+v: step concurrent group should not be allowed", step)
 	}
 }

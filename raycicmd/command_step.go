@@ -74,20 +74,16 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
-	concurrency_group, _ := stringInMap(step, "concurrency_group")
-	allowed_concurrency_group := c.config.AllowConcurrencyGroup
-	if concurrency_group != "" && allowed_concurrency_group != nil {
-		allowed_group := false
-		for _, group := range allowed_concurrency_group {
-			if group == concurrency_group {
-				allowed_group = true
+	// We treat nil and empty allowConcurrencyGroupPrefixes differently. A nil value
+	// means that we don't have any restrictions on the concurrency group. An empty
+	// value means that we don't allow any concurrency group.
+	if group, ok := stringInMap(step, "concurrency_group"); ok {
+		if prefixes := c.config.AllowConcurrencyGroupPrefixes; prefixes != nil {
+			if !stringHasPrefix(group, prefixes) {
+				return nil, fmt.Errorf("concurrency group %q is not allowed", group)
 			}
 		}
-		if !allowed_group {
-			return nil, fmt.Errorf("concurrency group %q is not allowed", concurrency_group)
-		}
 	}
-
 	result := cloneMapExcept(step, commandStepDropKeys)
 
 	if agentQueue != skipQueue { // queue type not supported, skip.
