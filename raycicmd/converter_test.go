@@ -80,6 +80,36 @@ func findInSlice(s []string, v string) bool {
 	return false
 }
 
+func TestConvertPipelineStep_concurrency_group(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+		RunnerQueues: map[string]string{
+			"default": "fakerunner",
+		},
+		AllowConcurrencyGroupPrefixes: []string{"not_group"},
+	}, info)
+
+	step := map[string]any{
+		"label":             "say hello",
+		"key":               "key",
+		"command":           "echo hello",
+		"concurrency":       2,
+		"concurrency_group": "group",
+	}
+	if _, err := c.convertStep("fakeid", step); err == nil {
+		t.Errorf("TestConvertPipelineStep_concurrency_group %+v: step concurrent group should not be allowed", step)
+	}
+}
+
 func TestConvertPipelineStep(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{

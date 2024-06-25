@@ -43,6 +43,38 @@ func TestBoolInMap(t *testing.T) {
 	}
 }
 
+func TestStringHasPrefix(t *testing.T) {
+	for _, test := range []struct {
+		str      string
+		prefixes []string
+		want     bool
+	}{{
+		str:      "abc",
+		prefixes: []string{"a"},
+		want:     true,
+	}, {
+		str:      "",
+		prefixes: []string{},
+		want:     false,
+	}, {
+		str:      "abc",
+		prefixes: []string{""},
+		want:     true,
+	}, {
+		str:      "def",
+		prefixes: []string{"a"},
+		want:     false,
+	}} {
+		got := stringHasPrefix(test.str, test.prefixes)
+		if got != test.want {
+			t.Errorf(
+				"stringHasPrefix(%q, %v): got %v, want %v",
+				test.str, test.prefixes, got, test.want,
+			)
+		}
+	}
+}
+
 func TestStringInMap(t *testing.T) {
 	for _, test := range []struct {
 		m    map[string]any

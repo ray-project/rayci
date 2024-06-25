@@ -119,6 +119,13 @@ type config struct {
 	// Optional.
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
+	// AllowConcurrencyGroup is the list of concurrency group name prefixes that are
+	// allowed for the pipeline. If not set or set to NULL, all concurrency group names
+	// are allowed.
+	//
+	// Optional.
+	AllowConcurrencyGroupPrefixes []string `yaml:"allow_concurrency_group_prefixes"`
+
 	// MaxParallelism is the maximum number of parallel jobs that can be run in
 	// the pipeline. If a bigger number of parallelism is requested, it will be
 	// capped to this number.
@@ -272,6 +279,8 @@ func prPipelineConfig(
 		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
 
 		SkipTags: []string{"disabled", "skip-on-premerge"},
+
+		AllowConcurrencyGroupPrefixes: []string{},
 	}
 	for k, v := range extraEnv {
 		config.Env[k] = v
