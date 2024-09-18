@@ -35,7 +35,7 @@ RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 echo "--- Install wanda ($HOSTTYPE)"
 
-readonly GO_VERSION=1.22.5
+readonly GO_VERSION=1.23.1
 
 if [[ "$OSTYPE" == msys ]]; then
   curl -sfL "https://go.dev/dl/go${GO_VERSION}.windows-amd64.zip" > "$TMP_DIR/go.zip"
