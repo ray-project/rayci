@@ -20,7 +20,8 @@ RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
 echo "--- Install rayci"
 
-curl -sfL 'https://go.dev/dl/go1.23.1.linux-amd64.tar.gz' | tar -xzf - -C "$TMP_DIR"
+readonly GO_VERSION=1.23.2
+curl -sfL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
