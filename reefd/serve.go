@@ -1,3 +1,4 @@
+// Package reefd contains the main logic of the REEf CI service.
 package reefd
 
 import (
@@ -7,7 +8,6 @@ import (
 
 // Config contains the configuration for the running the server.
 type Config struct {
-	Addr string
 }
 
 type server struct {
