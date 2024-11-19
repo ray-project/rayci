@@ -12,7 +12,6 @@ import (
 )
 
 func main() {
-    // add support to specify RAY_VERSION and RAY_COMMIT and PYTHON_VERSION
     RAY_VERSION := flag.String("ray_version", "", "The version of Ray to install")
     RAY_COMMIT := flag.String("ray_commit", "", "The commit of Ray to install")
     PYTHON_VERSION := flag.String("python_version", "", "The version of Python to install")
@@ -25,6 +24,9 @@ func main() {
     sess, err := session.NewSession(&aws.Config{
         Region: aws.String("us-west-2")},
     )
+    if err != nil {
+        log.Fatalf("Failed to create session: %v", err)
+    }
 	userDataScript := fmt.Sprintf(`#!/bin/bash
     mkdir -p ~/miniconda3
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
@@ -68,8 +70,7 @@ func main() {
     })
 
     if err != nil {
-        fmt.Println("Could not create instance", err)
-        return
+        log.Fatalf("Failed to launch instance: %v", err)
     }
 	instanceID := *runResult.Instances[0].InstanceId
     fmt.Println("Created instance", instanceID)
