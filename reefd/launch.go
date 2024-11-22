@@ -12,12 +12,12 @@ import (
 )
 
 func main() {
-    RAY_VERSION := flag.String("ray_version", "", "The version of Ray to install")
-    RAY_COMMIT := flag.String("ray_commit", "", "The commit of Ray to install")
-    PYTHON_VERSION := flag.String("python_version", "", "The version of Python to install")
-    ENDPOINT := flag.String("endpoint", "", "The endpoint to send the status to")
+    rayVersion := flag.String("ray_version", "", "The version of Ray to install")
+    rayCommit := flag.String("ray_commit", "", "The commit of Ray to install")
+    pythonVersion := flag.String("python_version", "", "The version of Python to install")
+    endpoint := flag.String("endpoint", "", "The endpoint to send the status to")
     flag.Parse()
-    if *RAY_VERSION == "" || *RAY_COMMIT == "" || *PYTHON_VERSION == "" || *ENDPOINT == "" {
+    if *rayVersion == "" || *rayCommit == "" || *pythonVersion == "" || *endpoint == "" {
         log.Fatal("All flags are required")
     }
 
@@ -49,7 +49,7 @@ func main() {
     python sanity_check.py --ray_version="${RAY_VERSION}" --ray_commit="${RAY_COMMIT}" > sanity_check.log
 
     curl -X POST -d @sanity_check.log "%s"
-`, *RAY_VERSION, *RAY_COMMIT, *PYTHON_VERSION, *ENDPOINT)
+`, *rayVersion, *rayCommit, *pythonVersion, *endpoint)
     encodedScript := base64.StdEncoding.EncodeToString([]byte(userDataScript))
 
     svc := ec2.New(sess)
