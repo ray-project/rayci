@@ -62,6 +62,8 @@ func main() {
 	}
 }
 
+// handleLaunchRequest retrieves the desired state from the request body and inserts it into the database
+// then starts a goroutine to process the launch requests
 func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	var desiredState instanceInfo
 	if err := json.NewDecoder(r.Body).Decode(&desiredState); err != nil {
@@ -85,6 +87,7 @@ func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	go processLaunchRequests(db)
 }
 
+// launchInstance launches an instance with the given instance type and AMI
 func launchInstance(instanceType, ami string) string {
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
 	if err != nil {
@@ -118,6 +121,7 @@ func launchInstance(instanceType, ami string) string {
 	return instanceID
 }
 
+// getInstanceState retrieves the current state of the instance from AWS with the given instance ID
 func getInstanceState(instanceID string) *instanceInfo {
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
 	if err != nil {
@@ -146,6 +150,39 @@ func getInstanceState(instanceID string) *instanceInfo {
 	}
 }
 
+// updateCurrentState updates the current state of the existing instances in the database table
+func updateCurrentState(db *sql.DB) {
+	rows, err := db.Query("SELECT id, instance_id FROM launch_requests WHERE instance_id IS NOT NULL")
+	if err != nil {
+		log.Printf("Error querying database: %s", err)
+		return
+	}
+	defer rows.Close()
+
+	currentStateMap := make(map[string]string)
+	for rows.Next() {
+		var id, instanceID string
+		if err := rows.Scan(&id, &instanceID); err != nil {
+			log.Printf("Error scanning row: %s", err)
+			continue
+		}
+
+		if state := getInstanceState(instanceID); state != nil {
+			if currentStateJSON, err := json.Marshal(state); err == nil {
+				currentStateMap[id] = string(currentStateJSON)
+			}
+		}
+	}
+
+	for id, currentStateJSON := range currentStateMap {
+		log.Printf("Updating current state for request %s: %s", id, currentStateJSON)
+		if _, err := db.Exec(`UPDATE launch_requests SET current_state = ? WHERE id = ?`, currentStateJSON, id); err != nil {
+			log.Printf("Error updating current state for request %s: %s", id, err)
+		}
+	}
+}
+
+// processLaunchRequests updates the current state of the existing instances and launches new instances for the launch requests that have not been launched yet
 func processLaunchRequests(db *sql.DB) {
 	// update the current state of the existing instances
 	updateCurrentState(db)
@@ -186,37 +223,6 @@ func processLaunchRequests(db *sql.DB) {
 		log.Printf("Updating instance ID for request %s: %s", id, instanceID)
 		if _, err := db.Exec(`UPDATE launch_requests SET instance_id = ? WHERE id = ?`, instanceID, id); err != nil {
 			log.Printf("Error updating instance ID for request %s: %s", id, err)
-		}
-	}
-}
-
-func updateCurrentState(db *sql.DB) {
-	rows, err := db.Query("SELECT id, instance_id FROM launch_requests WHERE instance_id IS NOT NULL")
-	if err != nil {
-		log.Printf("Error querying database: %s", err)
-		return
-	}
-	defer rows.Close()
-
-	currentStateMap := make(map[string]string)
-	for rows.Next() {
-		var id, instanceID string
-		if err := rows.Scan(&id, &instanceID); err != nil {
-			log.Printf("Error scanning row: %s", err)
-			continue
-		}
-
-		if state := getInstanceState(instanceID); state != nil {
-			if currentStateJSON, err := json.Marshal(state); err == nil {
-				currentStateMap[id] = string(currentStateJSON)
-			}
-		}
-	}
-
-	for id, currentStateJSON := range currentStateMap {
-		log.Printf("Updating current state for request %s: %s", id, currentStateJSON)
-		if _, err := db.Exec(`UPDATE launch_requests SET current_state = ? WHERE id = ?`, currentStateJSON, id); err != nil {
-			log.Printf("Error updating current state for request %s: %s", id, err)
 		}
 	}
 }
