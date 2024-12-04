@@ -6,16 +6,19 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-
 type mockEC2Client struct {
 	describeInstancesOutput *ec2.DescribeInstancesOutput
-	runInstancesOutput *ec2.Reservation
-	err error
+	runInstancesOutput     *ec2.Reservation
+	err                    error
 }
 
 func (m *mockEC2Client) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
@@ -35,8 +38,14 @@ func setupTestDB(t *testing.T) (*sql.DB, string) {
 		t.Fatalf("Error opening test database: %s", err)
 	}
 
-	// create a test launch_requests table
-	_, err = db.Exec(`CREATE TABLE launch_requests (id TEXT PRIMARY KEY, instance_id TEXT, desired_state TEXT, current_state TEXT)`)
+	_, err = db.Exec(`
+		CREATE TABLE launch_requests (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			instance_id TEXT,
+			desired_state TEXT,
+			current_state TEXT
+		)
+	`)
 	if err != nil {
 		t.Fatalf("Error creating test launch_requests table: %s", err)
 	}
@@ -45,74 +54,87 @@ func setupTestDB(t *testing.T) (*sql.DB, string) {
 }
 
 func TestGetInstanceState(t *testing.T) {
-	ec2Svc := &mockEC2Client{
-		describeInstancesOutput: &ec2.DescribeInstancesOutput{
-			Reservations: []*ec2.Reservation{{
-				Instances: []*ec2.Instance{{
-					InstanceType: aws.String("t3.micro"),
-					ImageId:      aws.String("ami-1234567890abcdef0"),
-					State: &ec2.InstanceState{
-						Name: aws.String("running"),
-					},
+	testInstanceStateManager := &InstanceStateManager{
+		db: nil,
+		ec2Client: &mockEC2Client{
+			describeInstancesOutput: &ec2.DescribeInstancesOutput{
+				Reservations: []*ec2.Reservation{{
+					Instances: []*ec2.Instance{{
+						InstanceType: aws.String("t3.micro"),
+						ImageId:      aws.String("ami-1234567890abcdef0"),
+						State: &ec2.InstanceState{
+							Name: aws.String("running"),
+						},
+					}},
 				}},
-			}},
+			},
 		},
-		err: nil,
 	}
-	getEC2Client = func() EC2Client {
-		return ec2Svc
-	}
-	instanceInfo := getInstanceState("i-1234567890abcdef0")
+
+	instanceInfo := testInstanceStateManager.getInstanceState("i-1234567890abcdef0")
 	want := &InstanceInfo{
 		InstanceType: "t3.micro",
-		AMI:          "ami-1234567890abcdef0",
-		State:        "running",
+		AMI:         "ami-1234567890abcdef0",
+		State:       "running",
 	}
+
 	if !reflect.DeepEqual(instanceInfo, want) {
 		t.Errorf("got %v, want %v", instanceInfo, want)
 	}
 }
 
 func TestLaunchInstance(t *testing.T) {
-	ec2Svc := &mockEC2Client{
-		runInstancesOutput: &ec2.Reservation{
-			Instances: []*ec2.Instance{{
-				InstanceId: aws.String("i-1234567890abcdef0"),
-			}},
+	testInstanceStateManager := &InstanceStateManager{
+		db: nil,
+		ec2Client: &mockEC2Client{
+			runInstancesOutput: &ec2.Reservation{
+				Instances: []*ec2.Instance{{
+					InstanceId: aws.String("i-1234567890abcdef0"),
+				}},
+			},
 		},
 	}
-	getEC2Client = func() EC2Client {
-		return ec2Svc
-	}
-	instanceID := launchInstance("t3.micro", "ami-1234567890abcdef0")
+
+	instanceID := testInstanceStateManager.launchInstance("t3.micro", "ami-1234567890abcdef0")
 	want := "i-1234567890abcdef0"
+
 	if instanceID != want {
 		t.Errorf("got %q, want %q", instanceID, want)
 	}
 }
 
 func TestUpdateCurrentState(t *testing.T) {
-	getInstanceState = func(instanceID string) *InstanceInfo {
-		return &InstanceInfo{
-			InstanceType: "t3.micro",
-			AMI:          "ami-1234567890abcdef0",
-			State:        "running",
-		}
-	}
-
 	db, dbPath := setupTestDB(t)
 	defer db.Close()
 	defer os.Remove(dbPath)
 
-	// insert a test launch_requests row without current_state set
-	_, err := db.Exec(`INSERT INTO launch_requests (id, instance_id, desired_state,	 current_state) VALUES (?, ?, ?, ?)`, "1", "i-1234567890abcdef0", sampleDesiredState, nil)
+	testInstanceStateManager := &InstanceStateManager{
+		db: db,
+		ec2Client: &mockEC2Client{
+			describeInstancesOutput: &ec2.DescribeInstancesOutput{
+				Reservations: []*ec2.Reservation{{
+					Instances: []*ec2.Instance{{
+						InstanceType: aws.String("t3.micro"),
+						ImageId:      aws.String("ami-1234567890abcdef0"),
+						State: &ec2.InstanceState{
+							Name: aws.String("running"),
+						},
+					}},
+				}},
+			},
+		},
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO launch_requests (id, instance_id, desired_state, current_state) VALUES (?, ?, ?, ?)`,
+		"1", "i-1234567890abcdef0", sampleDesiredState, nil,
+	)
 	if err != nil {
 		t.Fatalf("Error inserting test launch_requests row: %s", err)
 	}
 
-	updateCurrentState(db)
+	testInstanceStateManager.updateCurrentState()
 
-	// check that the current_state column has been updated
 	var currentState string
 	err = db.QueryRow(`SELECT current_state FROM launch_requests WHERE id = ?`, "1").Scan(&currentState)
 	if err != nil {
@@ -126,26 +148,31 @@ func TestUpdateCurrentState(t *testing.T) {
 }
 
 func TestProcessLaunchRequests(t *testing.T) {
-	updateCurrentState = func(db *sql.DB) {
-		// do nothing
-	}
-	launchInstance = func(instanceType, ami string) string {
-		return "i-1234567890abcdef1"
-	}
-
 	db, dbPath := setupTestDB(t)
 	defer db.Close()
 	defer os.Remove(dbPath)
 
-	// insert a test launch_requests row without current_state set
-	_, err := db.Exec(`INSERT INTO launch_requests (id, instance_id, desired_state, current_state) VALUES (?, ?, ?, ?)`, "1", "i-1234567890abcdef0", sampleDesiredState, nil)
+	testInstanceStateManager := &InstanceStateManager{
+		db: db,
+		ec2Client: &mockEC2Client{
+			runInstancesOutput: &ec2.Reservation{
+				Instances: []*ec2.Instance{{
+					InstanceId: aws.String("i-1234567890abcdef1"),
+				}},
+			},
+		},
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO launch_requests (id, instance_id, desired_state, current_state) VALUES (?, ?, ?, ?)`,
+		"1", nil, sampleDesiredState, nil,
+	)
 	if err != nil {
 		t.Fatalf("Error inserting test launch_requests row: %s", err)
 	}
 
-	processLaunchRequests(db)
+	processLaunchRequests(testInstanceStateManager)
 
-	// check that the instance_id column has been updated correctly
 	var instanceID string
 	err = db.QueryRow(`SELECT instance_id FROM launch_requests WHERE id = ?`, "1").Scan(&instanceID)
 	if err != nil {
@@ -155,5 +182,51 @@ func TestProcessLaunchRequests(t *testing.T) {
 	want := "i-1234567890abcdef1"
 	if instanceID != want {
 		t.Errorf("got %q, want %q", instanceID, want)
+	}
+}
+
+func TestHandleLaunchRequest(t *testing.T) {
+	db, dbPath := setupTestDB(t)
+	defer db.Close()
+	defer os.Remove(dbPath)
+
+	getEC2Client = func() EC2Client {
+		return &mockEC2Client{
+			runInstancesOutput: &ec2.Reservation{
+				Instances: []*ec2.Instance{{
+					InstanceId: aws.String("i-1234567890abcdef1"),
+				}},
+			},
+		}
+	}
+
+	handleLaunchRequest(db, nil, &http.Request{
+		Body: io.NopCloser(strings.NewReader(sampleDesiredState)),
+	})
+
+	// wait for the goroutine to finish
+	time.Sleep(5 * time.Second)
+
+	// check how many rows are in the launch_requests table
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM launch_requests`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Error querying launch_requests table: %s", err)
+	}
+
+	want_count := 1
+	if count != want_count {
+		t.Errorf("got %d, want %d", count, want_count)
+	}
+
+	// check that instance_id is set on that row
+	var instanceID string
+	err = db.QueryRow(`SELECT instance_id FROM launch_requests WHERE id = ?`, "1").Scan(&instanceID)
+	if err != nil {
+		t.Fatalf("Error querying instance_id column: %s", err)
+	}
+	want_instanceID := "i-1234567890abcdef1"
+	if instanceID != want_instanceID {
+		t.Errorf("got %q, want %q", instanceID, want_instanceID)
 	}
 }

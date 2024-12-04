@@ -31,6 +31,121 @@ const (
 	region = "us-west-2"
 )
 
+type InstanceStateManager struct {
+	db         *sql.DB
+	ec2Client  EC2Client
+}
+
+// InstanceStateManager methods
+// launchInstance launches an instance with the given instance type and AMI
+func (m *InstanceStateManager) launchInstance(instanceType, ami string) string {
+	svc := m.ec2Client
+	if svc == nil {
+		log.Printf("Failed to get EC2 client")
+		return ""
+	}
+	log.Printf("Launching instance with type: %s, AMI: %s", instanceType, ami)
+
+	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
+		ImageId:      aws.String(ami),
+		InstanceType: aws.String(instanceType),
+		MinCount:     aws.Int64(1),
+		MaxCount:     aws.Int64(1),
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String("instance"),
+			Tags: []*ec2.Tag{{
+				Key:   aws.String("Name"),
+				Value: aws.String("Kevin-launch"),
+			}},
+		}},
+	})
+
+	if err != nil {
+		log.Printf("Failed to launch instance: %v", err)
+		return ""
+	}
+	instanceID := *runResult.Instances[0].InstanceId
+	log.Printf("Created instance: %s", instanceID)
+	return instanceID
+}
+
+// getInstanceState retrieves the current state of the instance from AWS with the given instance ID
+func (m *InstanceStateManager) getInstanceState(instanceID string) *InstanceInfo {
+	log.Printf("Getting instance state for %s", instanceID)
+	svc := m.ec2Client
+	if svc == nil {
+		return nil
+	}
+
+	result, err := svc.DescribeInstances(&ec2.DescribeInstancesInput{
+		InstanceIds: []*string{aws.String(instanceID)},
+	})
+	if err != nil {
+		log.Printf("Error describing instance %s: %s", instanceID, err)
+		return nil
+	}
+
+	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
+		return nil
+	}
+
+	instance := result.Reservations[0].Instances[0]
+	return &InstanceInfo{
+		InstanceType: *instance.InstanceType,
+		AMI:          *instance.ImageId,
+		State:        *instance.State.Name,
+	}
+}
+
+// updateCurrentState updates the current state of the existing instances in the database table
+func (m *InstanceStateManager) updateCurrentState() {
+	log.Printf("Updating current state of existing instances")
+	rows, err := m.db.Query("SELECT id, instance_id FROM launch_requests WHERE instance_id IS NOT NULL")
+	if err != nil {
+		log.Printf("Error querying database: %s", err)
+		return
+	}
+	defer rows.Close()
+
+	currentStateMap := make(map[string]string)
+	for rows.Next() {
+		var id, instanceID string
+		if err := rows.Scan(&id, &instanceID); err != nil {
+			log.Printf("Error scanning row: %s", err)
+			continue
+		}
+
+		if state := m.getInstanceState(instanceID); state != nil {
+			log.Printf("Got instance state for %s: %v", instanceID, state)
+			if currentStateJSON, err := json.Marshal(state); err == nil {
+				currentStateMap[id] = string(currentStateJSON)
+			}
+		}
+	}
+
+	for id, currentStateJSON := range currentStateMap {
+		log.Printf("Updating current state for request %s: %s", id, currentStateJSON)
+		if _, err := m.db.Exec(`UPDATE launch_requests SET current_state = ? WHERE id = ?`, currentStateJSON, id); err != nil {
+			log.Printf("Error updating current state for request %s: %s", id, err)
+		}
+	}
+}
+
+type EC2Client interface {
+	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
+	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
+}
+
+// function to get ec2 client, can be overridden for testing
+var getEC2Client = func() EC2Client {
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
+	if err != nil {
+		log.Printf("Error creating session: %s", err)
+		return nil
+	}
+	return ec2.New(sess)
+}
+
 func main() {
 	dbPath := flag.String("db", "", "Path to .db file")
 	flag.Parse()
@@ -84,126 +199,18 @@ func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// start a goroutine to scan the database for launch requests with different desired and current states
-	go processLaunchRequests(db)
-}
-
-type EC2Client interface {
-	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
-	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
-}
-
-// function to get ec2 client, can be overridden for testing
-var getEC2Client = func() EC2Client {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
-	if err != nil {
-		log.Printf("Error creating session: %s", err)
-		return nil
-	}
-	return ec2.New(sess)
-}
-
-// launchInstance launches an instance with the given instance type and AMI
-var launchInstance = func(instanceType, ami string) string {
-	svc := getEC2Client()
-	if svc == nil {
-		log.Printf("Failed to get EC2 client")
-		return ""
-	}
-	log.Printf("Launching instance with type: %s, AMI: %s", instanceType, ami)
-
-	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
-		ImageId:      aws.String(ami),
-		InstanceType: aws.String(instanceType),
-		MinCount:     aws.Int64(1),
-		MaxCount:     aws.Int64(1),
-		TagSpecifications: []*ec2.TagSpecification{{
-			ResourceType: aws.String("instance"),
-			Tags: []*ec2.Tag{{
-				Key:   aws.String("Name"),
-				Value: aws.String("Kevin-launch"),
-			}},
-		}},
-	})
-
-	if err != nil {
-		log.Printf("Failed to launch instance: %v", err)
-		return ""
-	}
-	instanceID := *runResult.Instances[0].InstanceId
-	log.Printf("Created instance: %s", instanceID)
-	return instanceID
-}
-
-// getInstanceState retrieves the current state of the instance from AWS with the given instance ID
-var getInstanceState = func(instanceID string) *InstanceInfo {
-	log.Printf("Getting instance state for %s", instanceID)
-	svc := getEC2Client()
-	if svc == nil {
-		return nil
-	}
-
-	result, err := svc.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(instanceID)},
-	})
-	if err != nil {
-		log.Printf("Error describing instance %s: %s", instanceID, err)
-		return nil
-	}
-
-	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
-		return nil
-	}
-
-	instance := result.Reservations[0].Instances[0]
-	return &InstanceInfo{
-		InstanceType: *instance.InstanceType,
-		AMI:          *instance.ImageId,
-		State:        *instance.State.Name,
-	}
-}
-
-// updateCurrentState updates the current state of the existing instances in the database table
-var updateCurrentState = func(db *sql.DB) {
-	log.Printf("Updating current state of existing instances")
-	rows, err := db.Query("SELECT id, instance_id FROM launch_requests WHERE instance_id IS NOT NULL")
-	if err != nil {
-		log.Printf("Error querying database: %s", err)
-		return
-	}
-	defer rows.Close()
-
-	currentStateMap := make(map[string]string)
-	for rows.Next() {
-		var id, instanceID string
-		if err := rows.Scan(&id, &instanceID); err != nil {
-			log.Printf("Error scanning row: %s", err)
-			continue
-		}
-
-		if state := getInstanceState(instanceID); state != nil {
-			log.Printf("Got instance state for %s: %v", instanceID, state)
-			if currentStateJSON, err := json.Marshal(state); err == nil {
-				currentStateMap[id] = string(currentStateJSON)
-			}
-		}
-	}
-
-	for id, currentStateJSON := range currentStateMap {
-		log.Printf("Updating current state for request %s: %s", id, currentStateJSON)
-		if _, err := db.Exec(`UPDATE launch_requests SET current_state = ? WHERE id = ?`, currentStateJSON, id); err != nil {
-			log.Printf("Error updating current state for request %s: %s", id, err)
-		}
-	}
+	instanceStateManager := &InstanceStateManager{db: db, ec2Client: getEC2Client()}
+	go processLaunchRequests(instanceStateManager)
 }
 
 // processLaunchRequests updates the current state of the existing instances and launches new instances for the launch requests that have not been launched yet
-func processLaunchRequests(db *sql.DB) {
+func processLaunchRequests(instanceStateManager *InstanceStateManager) {
 	// update the current state of the existing instances
-	updateCurrentState(db)
+	instanceStateManager.updateCurrentState()
 
 	// query all launch requests where the instance has not been launched yet
 	log.Printf("Scanning for launch requests with different desired and current states")
-	rows, err := db.Query("SELECT id, desired_state FROM launch_requests WHERE current_state IS NULL OR instance_id IS NULL")
+	rows, err := instanceStateManager.db.Query("SELECT id, desired_state FROM launch_requests WHERE current_state IS NULL OR instance_id IS NULL")
 	if err != nil {
 		log.Printf("Error querying database: %s", err)
 		return
@@ -227,7 +234,7 @@ func processLaunchRequests(db *sql.DB) {
 		}
 
 		// launch instance
-		if instanceID := launchInstance(desiredState.InstanceType, desiredState.AMI); instanceID != "" {
+		if instanceID := instanceStateManager.launchInstance(desiredState.InstanceType, desiredState.AMI); instanceID != "" {
 			instanceIDMap[id] = instanceID // map the id to the instance id to update on the db later
 		}
 	}
@@ -235,7 +242,7 @@ func processLaunchRequests(db *sql.DB) {
 	// update the launch requests with the instance id
 	for id, instanceID := range instanceIDMap {
 		log.Printf("Updating instance ID for request %s: %s", id, instanceID)
-		if _, err := db.Exec(`UPDATE launch_requests SET instance_id = ? WHERE id = ?`, instanceID, id); err != nil {
+		if _, err := instanceStateManager.db.Exec(`UPDATE launch_requests SET instance_id = ? WHERE id = ?`, instanceID, id); err != nil {
 			log.Printf("Error updating instance ID for request %s: %s", id, err)
 		}
 	}
