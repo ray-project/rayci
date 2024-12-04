@@ -1,4 +1,4 @@
-package main
+package reefd
 
 import (
 	"database/sql"
@@ -14,7 +14,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type instanceInfo struct {
+type InstanceInfo struct {
 	InstanceType string `json:"instance_type"`
 	AMI          string `json:"ami"`
 	State        string `json:"state"`
@@ -22,8 +22,8 @@ type instanceInfo struct {
 
 type launchRequest struct {
 	Id           string        `json:"id"`
-	DesiredState instanceInfo  `json:"desired_state"`
-	CurrentState *instanceInfo `json:"current_state"`
+	DesiredState InstanceInfo  `json:"desired_state"`
+	CurrentState *InstanceInfo `json:"current_state"`
 	InstanceId   *string       `json:"instance_id,omitempty"`
 }
 
@@ -65,7 +65,7 @@ func main() {
 // handleLaunchRequest retrieves the desired state from the request body and inserts it into the database
 // then starts a goroutine to process the launch requests
 func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	var desiredState instanceInfo
+	var desiredState InstanceInfo
 	if err := json.NewDecoder(r.Body).Decode(&desiredState); err != nil {
 		http.Error(w, "Invalid JSON format: "+err.Error(), http.StatusBadRequest)
 		return
@@ -87,15 +87,28 @@ func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	go processLaunchRequests(db)
 }
 
-// launchInstance launches an instance with the given instance type and AMI
-func launchInstance(instanceType, ami string) string {
+type EC2Client interface {
+	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
+	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
+}
+
+// function to get ec2 client, can be overridden for testing
+var getEC2Client = func() EC2Client {
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
 	if err != nil {
-		log.Printf("Failed to create session: %v", err)
+		log.Printf("Error creating session: %s", err)
+		return nil
+	}
+	return ec2.New(sess)
+}
+
+// launchInstance launches an instance with the given instance type and AMI
+var launchInstance = func(instanceType, ami string) string {
+	svc := getEC2Client()
+	if svc == nil {
+		log.Printf("Failed to get EC2 client")
 		return ""
 	}
-
-	svc := ec2.New(sess)
 	log.Printf("Launching instance with type: %s, AMI: %s", instanceType, ami)
 
 	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
@@ -122,14 +135,13 @@ func launchInstance(instanceType, ami string) string {
 }
 
 // getInstanceState retrieves the current state of the instance from AWS with the given instance ID
-func getInstanceState(instanceID string) *instanceInfo {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})
-	if err != nil {
-		log.Printf("Error creating session: %s", err)
+var getInstanceState = func(instanceID string) *InstanceInfo {
+	log.Printf("Getting instance state for %s", instanceID)
+	svc := getEC2Client()
+	if svc == nil {
 		return nil
 	}
 
-	svc := ec2.New(sess)
 	result, err := svc.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(instanceID)},
 	})
@@ -143,7 +155,7 @@ func getInstanceState(instanceID string) *instanceInfo {
 	}
 
 	instance := result.Reservations[0].Instances[0]
-	return &instanceInfo{
+	return &InstanceInfo{
 		InstanceType: *instance.InstanceType,
 		AMI:          *instance.ImageId,
 		State:        *instance.State.Name,
@@ -151,7 +163,8 @@ func getInstanceState(instanceID string) *instanceInfo {
 }
 
 // updateCurrentState updates the current state of the existing instances in the database table
-func updateCurrentState(db *sql.DB) {
+var updateCurrentState = func(db *sql.DB) {
+	log.Printf("Updating current state of existing instances")
 	rows, err := db.Query("SELECT id, instance_id FROM launch_requests WHERE instance_id IS NOT NULL")
 	if err != nil {
 		log.Printf("Error querying database: %s", err)
@@ -168,6 +181,7 @@ func updateCurrentState(db *sql.DB) {
 		}
 
 		if state := getInstanceState(instanceID); state != nil {
+			log.Printf("Got instance state for %s: %v", instanceID, state)
 			if currentStateJSON, err := json.Marshal(state); err == nil {
 				currentStateMap[id] = string(currentStateJSON)
 			}
@@ -206,7 +220,7 @@ func processLaunchRequests(db *sql.DB) {
 			continue
 		}
 
-		var desiredState instanceInfo
+		var desiredState InstanceInfo
 		if err := json.Unmarshal([]byte(desiredStateJSON), &desiredState); err != nil {
 			log.Printf("Error unmarshalling desired state: %s", err)
 			continue
