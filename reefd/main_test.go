@@ -54,7 +54,7 @@ func setupTestDB(t *testing.T) (*sql.DB, string) {
 }
 
 func TestGetInstanceState(t *testing.T) {
-	testInstanceStateManager := &InstanceStateManager{
+	testInstanceManager := &instanceManager{
 		db: nil,
 		ec2Client: &mockEC2Client{
 			describeInstancesOutput: &ec2.DescribeInstancesOutput{
@@ -71,7 +71,10 @@ func TestGetInstanceState(t *testing.T) {
 		},
 	}
 
-	instanceInfo := testInstanceStateManager.getInstanceState("i-1234567890abcdef0")
+	instanceInfo, err := testInstanceManager.getInstanceState("i-1234567890abcdef0")
+	if err != nil {
+		t.Fatalf("Error getting instance state: %v", err)
+	}
 	want := &InstanceInfo{
 		InstanceType: "t3.micro",
 		AMI:         "ami-1234567890abcdef0",
@@ -84,7 +87,7 @@ func TestGetInstanceState(t *testing.T) {
 }
 
 func TestLaunchInstance(t *testing.T) {
-	testInstanceStateManager := &InstanceStateManager{
+	testInstanceManager := &instanceManager{
 		db: nil,
 		ec2Client: &mockEC2Client{
 			runInstancesOutput: &ec2.Reservation{
@@ -95,9 +98,12 @@ func TestLaunchInstance(t *testing.T) {
 		},
 	}
 
-	instanceID := testInstanceStateManager.launchInstance("t3.micro", "ami-1234567890abcdef0")
-	want := "i-1234567890abcdef0"
+	instanceID, err := testInstanceManager.launchInstance("t3.micro", "ami-1234567890abcdef0")
+	if err != nil {
+		t.Fatalf("Error launching instance: %v", err)
+	}
 
+	want := "i-1234567890abcdef0"
 	if instanceID != want {
 		t.Errorf("got %q, want %q", instanceID, want)
 	}
@@ -108,7 +114,7 @@ func TestUpdateCurrentState(t *testing.T) {
 	defer db.Close()
 	defer os.Remove(dbPath)
 
-	testInstanceStateManager := &InstanceStateManager{
+	testInstanceManager := &instanceManager{
 		db: db,
 		ec2Client: &mockEC2Client{
 			describeInstancesOutput: &ec2.DescribeInstancesOutput{
@@ -133,7 +139,7 @@ func TestUpdateCurrentState(t *testing.T) {
 		t.Fatalf("Error inserting test launch_requests row: %s", err)
 	}
 
-	testInstanceStateManager.updateCurrentState()
+	testInstanceManager.updateCurrentState()
 
 	var currentState string
 	err = db.QueryRow(`SELECT current_state FROM launch_requests WHERE id = ?`, "1").Scan(&currentState)
@@ -152,7 +158,7 @@ func TestProcessLaunchRequests(t *testing.T) {
 	defer db.Close()
 	defer os.Remove(dbPath)
 
-	testInstanceStateManager := &InstanceStateManager{
+	testInstanceManager := &instanceManager{
 		db: db,
 		ec2Client: &mockEC2Client{
 			runInstancesOutput: &ec2.Reservation{
@@ -171,7 +177,7 @@ func TestProcessLaunchRequests(t *testing.T) {
 		t.Fatalf("Error inserting test launch_requests row: %s", err)
 	}
 
-	processLaunchRequests(testInstanceStateManager)
+	processLaunchRequests(testInstanceManager)
 
 	var instanceID string
 	err = db.QueryRow(`SELECT instance_id FROM launch_requests WHERE id = ?`, "1").Scan(&instanceID)
@@ -190,19 +196,17 @@ func TestHandleLaunchRequest(t *testing.T) {
 	defer db.Close()
 	defer os.Remove(dbPath)
 
-	getEC2Client = func() EC2Client {
-		return &mockEC2Client{
-			runInstancesOutput: &ec2.Reservation{
-				Instances: []*ec2.Instance{{
-					InstanceId: aws.String("i-1234567890abcdef1"),
-				}},
-			},
-		}
+	ec2Client := &mockEC2Client{
+		runInstancesOutput: &ec2.Reservation{
+			Instances: []*ec2.Instance{{
+				InstanceId: aws.String("i-1234567890abcdef1"),
+			}},
+		},
 	}
 
 	handleLaunchRequest(db, nil, &http.Request{
 		Body: io.NopCloser(strings.NewReader(sampleDesiredState)),
-	})
+	}, ec2Client)
 
 	// wait for the goroutine to finish
 	time.Sleep(5 * time.Second)
