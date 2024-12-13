@@ -19,7 +19,7 @@ func newServer(c *Config) *server {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, World!")
+	io.WriteString(w, "Hello, this is rayci service!")
 }
 
 // Serve runs the server.
