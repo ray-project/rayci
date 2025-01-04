@@ -5,7 +5,9 @@ go 1.22
 toolchain go1.23.3
 
 require (
+	github.com/aws/aws-sdk-go v1.55.5
 	github.com/google/go-containerregistry v0.20.2
+	github.com/mattn/go-sqlite3 v1.14.24
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -25,6 +27,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.17.10 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
