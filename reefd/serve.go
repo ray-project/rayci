@@ -30,20 +30,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // handleLaunchRequest retrieves the desired state from the request body and inserts it into the database
 // then starts a goroutine to process the launch requests
 func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request, ec2Client EC2Client) {
-	var desiredState InstanceInfo
-	if err := json.NewDecoder(r.Body).Decode(&desiredState); err != nil {
-		http.Error(w, "Invalid JSON format: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	// marshal the desired state to a json string
-	desiredJSON, err := json.Marshal(desiredState)
-	fmt.Println("desiredJSON", string(desiredJSON))
-	if err != nil {
-		http.Error(w, "Error marshaling desired state: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	instanceConfigName := r.URL.Query().Get("instanceConfigName")
+
 	// insert the desired state into the database
-	if _, err := db.Exec(`INSERT INTO launch_requests (desired_state) VALUES (?)`, string(desiredJSON)); err != nil {
+	if _, err := db.Exec(`INSERT INTO launch_requests (instance_config_name, desired_state) VALUES (?, ?)`, instanceConfigName, "running"); err != nil {
 		http.Error(w, "Error inserting into database: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -51,6 +41,38 @@ func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request, ec2
 	// start a goroutine to scan the database for launch requests with different desired and current states
 	instanceManager := &instanceManager{db: db, ec2Client: ec2Client}
 	go processLaunchRequests(instanceManager)
+}
+
+func handleInstanceConfigAdd(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	// read instanceConfig from the request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading body: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// to parse request body into name and instance config
+	var requestBody struct {
+		Name string `json:"name"`
+		InstanceConfig InstanceConfiguration `json:"instance_config"`
+	}
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		http.Error(w, "Error unmarshalling request body: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	instanceConfig := requestBody.InstanceConfig
+	instanceType := instanceConfig.InstanceType
+	ami := instanceConfig.AMI
+	name := requestBody.Name
+
+	// insert the instance config into the database
+	if _, err := db.Exec(`INSERT INTO instance_configs (name, instance_type, ami) VALUES (?, ?, ?)`, name, instanceType, ami); err != nil {
+		http.Error(w, "Error inserting into database: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// send OK response
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleJobLogs handles job logs sent from the agent
@@ -62,7 +84,7 @@ func handleJobLogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Println("log ", jobId, "-", sequence, ": ", string(body))
+	fmt.Println("log ", jobId, "-", sequence, ": ", string(body))
 	// TODO: figure out how to store and display logs in order and a nice way
 }
 
@@ -136,8 +158,11 @@ func handleJobAdd(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 func Serve(addr string, c *Config) error {
 	mux := http.NewServeMux()
 	ec2Client := getEC2Client()
-	mux.HandleFunc("/instances/launch", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/instance/launch", func(w http.ResponseWriter, r *http.Request) {
 		handleLaunchRequest(c.DB, w, r, ec2Client)
+	})
+	mux.HandleFunc("/instance_config/add", func(w http.ResponseWriter, r *http.Request) {
+		handleInstanceConfigAdd(c.DB, w, r)
 	})
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		handlePing(c.DB, w, r)

@@ -66,7 +66,7 @@ func (a *Agent) AcquireAndRunJob(job *Job) {
 }
 
 func (a *Agent) RunJob() {
-	jr := NewJobRunner(a.Job)
+	jr := NewJobRunner(a.Job, a.ServiceHost)
 	jr.Run()
 }
 

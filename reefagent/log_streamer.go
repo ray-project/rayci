@@ -42,6 +42,7 @@ type LogStreamer struct {
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
+	serviceHost string
 }
 
 func NewLogStreamer(jobId string) *LogStreamer {
@@ -132,7 +133,7 @@ func (ls *LogStreamer) WriteToFile(logChunk LogChunk) {
 
 func (ls *LogStreamer) UploadChunk(logChunk LogChunk) {
 	// send the chunk to server
-	url := fmt.Sprintf("http://localhost:1235/job/logs?jobId=%s&sequence=%d", ls.jobId, logChunk.Sequence)
+	url := fmt.Sprintf("%s/job/logs?jobId=%s&sequence=%d", ls.serviceHost, ls.jobId, logChunk.Sequence)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(logChunk.Data))
 	if err != nil {
 		fmt.Println("Error creating request", err)

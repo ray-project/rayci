@@ -27,10 +27,10 @@ func (jr *JobRunner) Run() {
 	jr.logStreamer.Stop()
 }
 
-func NewJobRunner(job *Job) *JobRunner {
+func NewJobRunner(job *Job, serviceHost string) *JobRunner {
 	jr := &JobRunner{
 		job:         job,
-		logStreamer: NewLogStreamer(job.Id),
+		logStreamer: NewLogStreamer(job.Id, serviceHost),
 	}
 	jr.logStreamer.logsWriter = io.MultiWriter(jr.logStreamer.logs, os.Stdout)
 	return jr
