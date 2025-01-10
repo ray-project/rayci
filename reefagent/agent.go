@@ -12,6 +12,7 @@ type Agent struct {
 	Id    string
 	Queue string
 	Job   *Job
+	ServiceHost string
 }
 
 func (a *Agent) Start() {
@@ -28,7 +29,7 @@ func (a *Agent) Start() {
 
 func (a *Agent) Ping() (bool, *Job) {
 	// call POST /ping endpoint with agent ID and queue
-	url := fmt.Sprintf("http://localhost:1235/ping?agentId=%s&queue=%s", a.Id, a.Queue)
+	url := fmt.Sprintf("%s/ping?agentId=%s&queue=%s", a.ServiceHost, a.Id, a.Queue)
 	resp, err := http.Get(url)
 
 	if err != nil {
@@ -71,7 +72,7 @@ func (a *Agent) RunJob() {
 
 func (a *Agent) AcquireJob(jobId string) bool {
 	// Send POST request to acquire the job
-	url := fmt.Sprintf("http://localhost:1235/job/acquire?jobId=%s&agentId=%s", jobId, a.Id)
+	url := fmt.Sprintf("%s/job/acquire?jobId=%s&agentId=%s", a.ServiceHost, jobId, a.Id)
 	resp, err := http.Post(url, "application/json", nil)
 	if err != nil {
 		log.Printf("Error acquiring job: %v", err)

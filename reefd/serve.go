@@ -24,7 +24,7 @@ func newServer(c *Config) *server {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, World!")
+	io.WriteString(w, "Hello, Kevin!")
 }
 
 // handleLaunchRequest retrieves the desired state from the request body and inserts it into the database
@@ -37,6 +37,7 @@ func handleLaunchRequest(db *sql.DB, w http.ResponseWriter, r *http.Request, ec2
 	}
 	// marshal the desired state to a json string
 	desiredJSON, err := json.Marshal(desiredState)
+	fmt.Println("desiredJSON", string(desiredJSON))
 	if err != nil {
 		http.Error(w, "Error marshaling desired state: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -61,7 +62,7 @@ func handleJobLogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("log ", jobId, "-", sequence, ": ", string(body))
+	log.Println("log ", jobId, "-", sequence, ": ", string(body))
 	// TODO: figure out how to store and display logs in order and a nice way
 }
 
@@ -71,7 +72,15 @@ func handlePing(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	queue := r.URL.Query().Get("queue")
 	// Look into database to see if there's any job that is in the queue
 	// If there's any job, send it to the agent
-	job := getJob(db, queue)
+	job, err := getJob(db, queue)
+	if err != nil {
+		http.Error(w, "Error getting job: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if job == nil {
+		http.Error(w, "No job found", http.StatusNotFound)
+		return
+	}
 	// send the jobId and job commands back in response
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"jobId":    job.Id,
@@ -79,17 +88,17 @@ func handlePing(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleAcquireJob handles requests from the agent to acquire a job
+// handleAcquireJob handles request from the agent to acquire a job
 func handleAcquireJob(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	// get agentId and jobId from the request
 	agentId := r.URL.Query().Get("agentId")
 	jobId := r.URL.Query().Get("jobId")
+
 	// update the job with the agent ID
 	if _, err := db.Exec(`UPDATE jobs SET agent_id = ? WHERE id = ?`, agentId, jobId); err != nil {
 		http.Error(w, "Error updating job: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// send a 200 response
+
 	fmt.Println("Agent", agentId, "acquired job", jobId)
 	w.WriteHeader(http.StatusOK)
 }
@@ -101,24 +110,25 @@ func handleJobAdd(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// decompose body into job
+
+	// decompose request body into job
 	var job Job
 	if err := json.Unmarshal(body, &job); err != nil {
 		http.Error(w, "Error unmarshalling job: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	job.CreatedAt = time.Now()
-	// insert the job into the database
+
+	// insert the job into the jobs db table
 	commandsJson, err := json.Marshal(job.Commands)
 	if err != nil {
 		http.Error(w, "Error marshalling commands: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if _, err := db.Exec(`INSERT INTO jobs (commands, queue, created_at) VALUES (?, ?, ?)`, string(commandsJson), job.Queue, job.CreatedAt); err != nil {
+	if _, err := db.Exec(`INSERT INTO jobs (commands, queue, created_at) VALUES (?, ?, ?)`, string(commandsJson), job.Queue, time.Now()); err != nil {
 		http.Error(w, "Error inserting into database: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// send a 200 response
+	// send OK response
 	w.WriteHeader(http.StatusOK)
 }
 

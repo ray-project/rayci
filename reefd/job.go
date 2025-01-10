@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-type Command struct {
-	Cmd  string
-	Args []string
-}
-
 type Job struct {
 	Id        string
 	Queue     string
@@ -19,17 +14,31 @@ type Job struct {
 	CreatedAt time.Time
 }
 
-func getJob(db *sql.DB, queue string) *Job {
+/*
+Add jobs table to database:
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    queue TEXT NOT NULL,
+    commands TEXT NOT NULL,
+    agent_id TEXT,
+    created_at TIMESTAMP NOT NULL
+);
+*/
+
+func getJob(db *sql.DB, queue string) (*Job, error) {
 	job := &Job{}
 	var commandsJSON string
 	err := db.QueryRow(`SELECT id, queue, commands, created_at FROM jobs WHERE queue = ? AND agent_id IS NULL ORDER BY created_at ASC LIMIT 1`, queue).Scan(&job.Id, &job.Queue, &commandsJSON, &job.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil
+			return nil, nil
 		}
-		return nil // Also return nil on other DB errors
+		return nil, err
 	}
-	// unmarshal the commandsJSON into job.Commands
-	json.Unmarshal([]byte(commandsJSON), &job.Commands)
-	return job
+
+	if err := json.Unmarshal([]byte(commandsJSON), &job.Commands); err != nil {
+		return nil, err
+	}
+	return job, nil
 }

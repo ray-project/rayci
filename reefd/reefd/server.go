@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -35,7 +36,7 @@ func main() {
 		DB: db,
 	}
 
-	addr := flag.String("addr", "localhost:1235", "address to listen on")
+	addr := flag.String("addr", "0.0.0.0:1235", "address to listen on")
 	flag.Parse()
 
 	log.Println("serving at:", *addr)
