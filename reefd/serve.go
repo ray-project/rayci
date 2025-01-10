@@ -156,29 +156,26 @@ func handleJobAdd(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 // Serve runs the server.
 func Serve(addr string, c *Config) error {
-	mux := http.NewServeMux()
 	ec2Client := getEC2Client()
-	mux.HandleFunc("/instance/launch", func(w http.ResponseWriter, r *http.Request) {
+	
+	http.HandleFunc("/instance/launch", func(w http.ResponseWriter, r *http.Request) {
 		handleLaunchRequest(c.DB, w, r, ec2Client)
 	})
-	mux.HandleFunc("/instance_config/add", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/instance_config/add", func(w http.ResponseWriter, r *http.Request) {
 		handleInstanceConfigAdd(c.DB, w, r)
 	})
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		handlePing(c.DB, w, r)
 	})
-	mux.HandleFunc("/job/logs", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/job/logs", func(w http.ResponseWriter, r *http.Request) {
 		handleJobLogs(w, r)
 	})
-	mux.HandleFunc("/job/acquire", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/job/acquire", func(w http.ResponseWriter, r *http.Request) {
 		handleAcquireJob(c.DB, w, r)
 	})
-	mux.HandleFunc("/job/add", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/job/add", func(w http.ResponseWriter, r *http.Request) {
 		handleJobAdd(c.DB, w, r)
 	})
-	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: mux,
-	}
-	return httpServer.ListenAndServe()
+	
+	return http.ListenAndServe(addr, nil)
 }
