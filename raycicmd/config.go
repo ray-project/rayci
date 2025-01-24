@@ -299,14 +299,15 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
 		return prPipelineConfig("ray-pr", nil, -1)
 	case rayV2MicrocheckPipeline:
-		mcPipelineConfig := prPipelineConfig(
+		c := prPipelineConfig(
 			"ray-pr-microcheck",
 			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
 			1,
 		)
-		mcPipelineConfig.NotifyOwnerOnFailure = true
+		c.NotifyOwnerOnFailure = true
+		c.SkipTags = append(c.SkipTags, "skip-on-microcheck")
 
-		return mcPipelineConfig
+		return c
 	}
 
 	// By default, assume it is less privileged.
