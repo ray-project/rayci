@@ -67,5 +67,6 @@
 	"commands": [
 		"ls -alp /workdir"
 	],
+	"artifact_paths": ["/tmp/artifacts/**/*"],
 	"notify": ["github_commit_status"]
 }
