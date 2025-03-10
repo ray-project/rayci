@@ -1,6 +1,6 @@
 module github.com/ray-project/rayci
 
-go 1.24
+go 1.24.1
 
 require (
 	github.com/google/go-containerregistry v0.20.3
