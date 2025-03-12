@@ -26,7 +26,7 @@ echo \
 apt-get update
 apt-get install -y docker-ce-cli
 
-readonly GO_VERSION=1.24.0
+readonly GO_VERSION=1.24.1
 
 if [[ "$HOSTTYPE" == "aarch64" || "$HOSTTYPE" == "arm64" ]]; then
   curl -sSfL "https://golang.org/dl/go${GO_VERSION}.linux-arm64.tar.gz" -o "/tmp/golang.tar.gz"
