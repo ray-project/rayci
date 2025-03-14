@@ -22,6 +22,14 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, World!")
 }
 
+func (s *server) background() {
+
+}
+
+func (s *server) Close() error {
+	return nil
+}
+
 // Serve runs the server.
 func Serve(addr string, c *Config) error {
 	s := newServer(c)
@@ -29,5 +37,7 @@ func Serve(addr string, c *Config) error {
 		Addr:    addr,
 		Handler: s,
 	}
+
+	defer s.Close()
 	return httpServer.ListenAndServe()
 }
