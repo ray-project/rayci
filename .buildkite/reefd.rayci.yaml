@@ -1,0 +1,6 @@
+group: reefd
+steps:
+  - name: build reefd container
+    commands:
+      - (cd reefd; bash build.sh)
+    depends_on: forge

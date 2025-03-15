@@ -12,6 +12,7 @@ func main() {
 	addr := flag.String("addr", "localhost:8000", "address to listen on")
 	flag.Parse()
 
+	log.Printf("serving at %s", *addr)
 	if err := reefd.Serve(*addr, config); err != nil {
 		log.Fatal(err)
 	}
