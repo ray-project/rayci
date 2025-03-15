@@ -10,7 +10,7 @@ set -x
 
 apt-get update -y
 apt-get upgrade -y
-apt-get install tzdata
+apt-get install -y tzdata ca-certificates
 
 useradd -d /home/app -u 1001 app
 mkdir -p /opt/app/bin /opt/app/etc /opt/app/var
@@ -20,8 +20,8 @@ chown -R app:app /home/app
 
 EOF
 
-USER app
-
 COPY reefd /opt/app/bin/reefd
 
+USER app
+WORKDIR /opt/app
 CMD ["/opt/app/bin/reefd"]
