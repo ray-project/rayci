@@ -8,8 +8,6 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 )
 
 // Config contains the configuration for the running the server.
@@ -21,17 +19,13 @@ type server struct {
 	config *Config
 }
 
-const awsRegion = "us-west-2"
-
 func newServer(ctx context.Context, config *Config) (*server, error) {
-	awsConfig, err := awsconfig.LoadDefaultConfig(
-		ctx, awsconfig.WithRegion(awsRegion),
-	)
+	awsClients, err := newAWSClients(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("load aws config: %w", err)
+		return nil, fmt.Errorf("new aws clients: %w", err)
 	}
 
-	reaper := newReaper(awsConfig)
+	reaper := newReaper(awsClients.ec2())
 	return &server{
 		reaper: reaper,
 		config: config,
@@ -43,20 +37,24 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) background(ctx context.Context) {
-	ticker := time.NewTicker(20 * time.Minute)
+	log.Println("background process started")
 
-	for t := range ticker.C {
-		log.Print("Tick: ", t)
+	if err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
+		log.Println("listAndReapDeadWindowsInstances: ", err)
+	}
 
+	const period = 20 * time.Minute
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+
+	for range ticker.C {
 		if err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
-			log.Println("terminateDeadWindowsMachines: ", err)
+			log.Println("listAndReapDeadWindowsInstances: ", err)
 		}
 	}
 }
 
-func (s *server) Close() error {
-	return nil
-}
+func (s *server) Close() error { return nil }
 
 // Serve runs the server.
 func Serve(ctx context.Context, addr string, config *Config) error {

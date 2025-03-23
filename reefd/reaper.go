@@ -12,26 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-type ec2API interface {
-	DescribeInstances(
-		ctx context.Context,
-		params *ec2.DescribeInstancesInput,
-		optFns ...func(*ec2.Options),
-	) (*ec2.DescribeInstancesOutput, error)
-
-	TerminateInstances(
-		ctx context.Context,
-		params *ec2.TerminateInstancesInput,
-		optFns ...func(*ec2.Options),
-	) (*ec2.TerminateInstancesOutput, error)
-}
-
 type reaper struct {
-	ec2 ec2API
+	ec2 ec2Client
 }
 
-func newReaper(cfg aws.Config) *reaper {
-	ec2 := ec2.NewFromConfig(cfg)
+func newReaper(ec2 ec2Client) *reaper {
 	return &reaper{ec2: ec2}
 }
 
@@ -100,6 +85,7 @@ func ReapDeadWindowsInstances(ctx context.Context) error {
 		return fmt.Errorf("load aws config: %w", err)
 	}
 
-	r := newReaper(awsConfig)
+	clients := newAWSClientsFromConfig(&awsConfig)
+	r := newReaper(clients.ec2())
 	return r.listAndReapDeadWindowsInstances(ctx)
 }
