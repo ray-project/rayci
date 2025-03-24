@@ -95,7 +95,7 @@ func TestConvertPipelineStep_concurrency_group(t *testing.T) {
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
 		},
-		AllowConcurrencyGroupPrefixes: []string{"not_group"},
+		ConcurrencyGroupPrefixes: []string{"not_group"},
 	}, info)
 
 	step := map[string]any{
