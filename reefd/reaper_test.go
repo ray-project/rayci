@@ -245,3 +245,49 @@ func TestTerminateInsta(t *testing.T) {
 		t.Fatalf("got instances %v, want %v", got, want)
 	}
 }
+
+func TestListAndReapDeadWindowsInstances(t *testing.T) {
+	now := time.Now()
+
+	// Setup
+	ec2 := newFakeEC2()
+	ec2.add("i-w1", "bk-windows-pr", "0", now.Add(-8*time.Hour))
+	ec2.add("i-w2", "bk-windows-branch", "16", now.Add(-8*time.Hour))
+	ec2.add("i-w3", "bk-windows-branch", "48", now.Add(-8*time.Hour))
+	ec2.add("i-w4", "bk-windows-pr", "0", now.Add(-3*time.Hour))
+	ec2.add("i-l1", "linux", "0", now.Add(-8*time.Hour))
+
+	r := newReaper(ec2)
+	r.setNowFunc(func() time.Time { return now })
+
+	ctx := context.Background()
+	n, err := r.listAndReapDeadWindowsInstances(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("got %d instance reaped, want %d", n, 2)
+	}
+
+	// Verify
+	ids := ec2.ids()
+	wantIDs := []string{"i-l1", "i-w3", "i-w4"}
+	if !reflect.DeepEqual(ids, wantIDs) {
+		t.Fatalf("got %v left, want %v", ids, wantIDs)
+	}
+
+	// Reap again.
+	n, err = r.listAndReapDeadWindowsInstances(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("got %d instance reaped the 2nd time, want none", n)
+	}
+
+	// Verify again.
+	ids = ec2.ids()
+	if !reflect.DeepEqual(ids, wantIDs) {
+		t.Fatalf("got %v left, want %v", ids, wantIDs)
+	}
+}

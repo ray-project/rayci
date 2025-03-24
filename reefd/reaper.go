@@ -72,7 +72,6 @@ func (r *reaper) terminateInstances(ctx context.Context, ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
-
 	input := &ec2.TerminateInstancesInput{InstanceIds: ids}
 	_, err := r.ec2.TerminateInstances(ctx, input)
 	return err
