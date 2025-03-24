@@ -29,7 +29,7 @@ func TestServer(t *testing.T) {
 		t.Errorf("got status code %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
-	want := "Hello, World!"
+	want := "Ray CI"
 	got, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read response: %v", err)

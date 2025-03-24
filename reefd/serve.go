@@ -39,7 +39,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *server) background(ctx context.Context) {
 	log.Println("background process started")
 
-	if err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
+	if _, err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
 		log.Println("listAndReapDeadWindowsInstances: ", err)
 	}
 
@@ -48,7 +48,7 @@ func (s *server) background(ctx context.Context) {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
+		if _, err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
 			log.Println("listAndReapDeadWindowsInstances: ", err)
 		}
 	}

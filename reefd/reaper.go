@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,11 +14,23 @@ import (
 )
 
 type reaper struct {
-	ec2 ec2Client
+	ec2     ec2Client
+	nowFunc func() time.Time
 }
 
 func newReaper(ec2 ec2Client) *reaper {
 	return &reaper{ec2: ec2}
+}
+
+func (r *reaper) now() time.Time {
+	if r.nowFunc != nil {
+		return r.nowFunc()
+	}
+	return time.Now()
+}
+
+func (r *reaper) setNowFunc(f func() time.Time) {
+	r.nowFunc = f
 }
 
 func (r *reaper) listDeadWindowsInstances(ctx context.Context) ([]string, error) {
@@ -39,41 +52,47 @@ func (r *reaper) listDeadWindowsInstances(ctx context.Context) ([]string, error)
 
 	const instanceAgeLimit = -4 * time.Hour
 
-	cut := time.Now().Add(instanceAgeLimit)
+	cut := r.now().Add(instanceAgeLimit)
 
 	var instances []string
 	for _, r := range result.Reservations {
-		for _, instance := range r.Instances {
-			if instance.LaunchTime.Before(cut) {
-				instances = append(instances, *instance.InstanceId)
+		for _, i := range r.Instances {
+			if i.LaunchTime.Before(cut) {
+				instances = append(instances, *i.InstanceId)
 			}
 		}
 	}
 
+	sort.Strings(instances)
+
 	return instances, nil
 }
 
-func (r *reaper) reapDeadWindowsInstances(ctx context.Context, ids []string) error {
+func (r *reaper) terminateInstances(ctx context.Context, ids []string) error {
 	if len(ids) == 0 {
-		log.Print("no dead windows instances to reap")
 		return nil
 	}
 
-	log.Printf("reaping %d dead windows instances: %v", len(ids), ids)
 	input := &ec2.TerminateInstancesInput{InstanceIds: ids}
 	_, err := r.ec2.TerminateInstances(ctx, input)
-	if err == nil {
-		log.Printf("terminated %d dead windows instances: %v", len(ids), ids)
-	}
 	return err
 }
 
-func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) error {
-	instances, err := r.listDeadWindowsInstances(ctx)
+func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (int, error) {
+	ids, err := r.listDeadWindowsInstances(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return r.reapDeadWindowsInstances(ctx, instances)
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	log.Printf("terminating %d instances: %v", len(ids), ids)
+	if err := r.terminateInstances(ctx, ids); err != nil {
+		return 0, err
+	}
+
+	return len(ids), nil
 }
 
 // ReapDeadWindowsInstances lists and terminates dead Windows CI instances.
@@ -87,5 +106,8 @@ func ReapDeadWindowsInstances(ctx context.Context) error {
 
 	clients := newAWSClientsFromConfig(&awsConfig)
 	r := newReaper(clients.ec2())
-	return r.listAndReapDeadWindowsInstances(ctx)
+	if _, err := r.listAndReapDeadWindowsInstances(ctx); err != nil {
+		return err
+	}
+	return nil
 }
