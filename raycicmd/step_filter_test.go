@@ -23,22 +23,22 @@ func TestNewTagsStepFilter(t *testing.T) {
 		want: &stepFilter{},
 	}, {
 		cmd:  []string{},
-		want: &stepFilter{runAllTags: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  nil,
-		want: &stepFilter{runAllTags: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		cmd:  []string{"echo", "*"},
-		want: &stepFilter{runAllTags: true},
+		want: &stepFilter{runAll: true},
 	}, {
 		skipTags: []string{"disabled"},
-		want:     &stepFilter{skipTags: stringSet("disabled"), runAllTags: true},
+		want:     &stepFilter{skipTags: stringSet("disabled"), runAll: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
 	}, {
 		cmd:  []string{"./local-not-exist.sh"},
-		want: &stepFilter{runAllTags: true},
+		want: &stepFilter{runAll: true},
 	}} {
 		got, err := newStepFilter(test.skipTags, nil, test.cmd)
 		if test.wantErr {
@@ -145,8 +145,8 @@ func TestStepFilter_tagsReject(t *testing.T) {
 
 func TestStepFilter_runAll(t *testing.T) {
 	filter := &stepFilter{
-		skipTags:   stringSet("disabled"),
-		runAllTags: true,
+		skipTags: stringSet("disabled"),
+		runAll:   true,
 	}
 
 	for _, tags := range [][]string{

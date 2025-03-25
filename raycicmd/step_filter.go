@@ -12,8 +12,8 @@ type stepFilter struct {
 	skipTags map[string]bool
 
 	// second pass: tag selection filters
-	runAllTags bool
-	tags       map[string]bool
+	runAll bool // Run all the steps; do not filter by tags.
+	tags   map[string]bool
 
 	// third pass: selecting steps
 	selects    map[string]bool // based on ID or key
@@ -38,7 +38,7 @@ func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
 }
 
 func (f *stepFilter) acceptTagHit(step *stepNode) bool {
-	if f.runAllTags {
+	if f.runAll {
 		return true
 	}
 
@@ -81,7 +81,7 @@ func newStepFilter(
 func stepFilterFromCmd(skips []string, filterCmd []string) (
 	*stepFilter, error,
 ) {
-	filter := &stepFilter{skipTags: stringSet(skips...), runAllTags: true}
+	filter := &stepFilter{skipTags: stringSet(skips...), runAll: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil
@@ -112,7 +112,7 @@ func stepFilterFromCmd(skips []string, filterCmd []string) (
 	}
 
 	tags := strings.Fields(filtersStr)
-	filter.runAllTags = false
+	filter.runAll = false
 	if len(tags) != 0 {
 		filter.tags = stringSet(tags...)
 	}
