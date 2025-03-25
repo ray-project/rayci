@@ -175,5 +175,16 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		result["artifact_paths"] = defaultArtifactPaths
 	}
 
+	// add step ID into label
+	if id != "" {
+		label := result["label"]
+		if label == nil {
+			label = fmt.Sprintf("[%s]", id)
+		} else {
+			label = fmt.Sprintf("%s [%s]", label, id)
+		}
+		result["label"] = label
+	}
+
 	return result, nil
 }
