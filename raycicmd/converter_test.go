@@ -749,7 +749,7 @@ func TestConvertPipelineGroup(t *testing.T) {
 	}
 
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
+		skipTags: stringSet("disabled"),
 		tags:     stringSet("foo"),
 	}
 	bk, err := convertSingleGroup(c, g, filter)
@@ -819,7 +819,7 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}}
 
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
+		skipTags: stringSet("disabled"),
 		tags:     stringSet("foo"),
 	}
 	bk, err := c.convertGroups(groups, filter)

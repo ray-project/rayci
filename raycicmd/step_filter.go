@@ -9,7 +9,7 @@ import (
 
 type stepFilter struct {
 	// first pass: skip tags
-	skipTags []string
+	skipTags map[string]bool
 
 	// second pass: tag selection filters
 	runAllTags bool
@@ -21,7 +21,7 @@ type stepFilter struct {
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
-	return step.hasTagIn(f.skipTags)
+	return step.hasTagInMap(f.skipTags)
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
@@ -81,7 +81,7 @@ func newStepFilter(
 func stepFilterFromCmd(skips []string, filterCmd []string) (
 	*stepFilter, error,
 ) {
-	filter := &stepFilter{skipTags: skips, runAllTags: true}
+	filter := &stepFilter{skipTags: stringSet(skips...), runAllTags: true}
 
 	if len(filterCmd) == 0 {
 		return filter, nil

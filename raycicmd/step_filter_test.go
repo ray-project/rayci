@@ -32,7 +32,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 		want: &stepFilter{runAllTags: true},
 	}, {
 		skipTags: []string{"disabled"},
-		want:     &stepFilter{skipTags: []string{"disabled"}, runAllTags: true},
+		want:     &stepFilter{skipTags: stringSet("disabled"), runAllTags: true},
 	}, {
 		cmd:     []string{"exit", "1"},
 		wantErr: true,
@@ -62,7 +62,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 
 func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
+		skipTags: stringSet("disabled"),
 		tags:     stringSet("tune"),
 	}
 
@@ -116,7 +116,7 @@ func TestStepFilter_tags(t *testing.T) {
 
 func TestStepFilter_tagsReject(t *testing.T) {
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
+		skipTags: stringSet("disabled"),
 		tags:     stringSet("tune"),
 	}
 
@@ -145,7 +145,7 @@ func TestStepFilter_tagsReject(t *testing.T) {
 
 func TestStepFilter_runAll(t *testing.T) {
 	filter := &stepFilter{
-		skipTags:   []string{"disabled"},
+		skipTags:   stringSet("disabled"),
 		runAllTags: true,
 	}
 
