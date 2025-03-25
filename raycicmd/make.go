@@ -141,8 +141,10 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		return makeNoopBkPipeline(q), nil
 	}
 
-	if email := info.buildAuthorEmail; email != "" && config.NotifyOwnerOnFailure {
-		pl.Notify = append(pl.Notify, makeBuildFailureBkNotify(email))
+	if config.NotifyOwnerOnFailure {
+		if email := info.buildAuthorEmail; email != "" {
+			pl.Notify = append(pl.Notify, makeBuildFailureBkNotify(email))
+		}
 	}
 
 	return pl, nil

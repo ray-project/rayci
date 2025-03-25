@@ -74,13 +74,16 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
-	// We treat nil and empty allowConcurrencyGroupPrefixes differently. A nil value
-	// means that we don't have any restrictions on the concurrency group. An empty
-	// value means that we don't allow any concurrency group.
-	if group, ok := stringInMap(step, "concurrency_group"); ok {
-		if prefixes := c.config.AllowConcurrencyGroupPrefixes; prefixes != nil {
-			if !stringHasPrefix(group, prefixes) {
-				return nil, fmt.Errorf("concurrency group %q is not allowed", group)
+	// We treat nil and empty allowConcurrencyGroupPrefixes differently.
+	// A nil value means that we don't have any restrictions on the
+	// concurrency cg. An empty value means that we don't allow any
+	// concurrency cg.
+	if cg, ok := stringInMap(step, "concurrency_group"); ok {
+		if allow := c.config.ConcurrencyGroupPrefixes; allow != nil {
+			if !stringHasPrefix(cg, allow) {
+				return nil, fmt.Errorf(
+					"concurrency group %q is not allowed", cg,
+				)
 			}
 		}
 	}
