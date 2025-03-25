@@ -291,3 +291,21 @@ func TestCopyEnvMap(t *testing.T) {
 		t.Errorf("copyEnvMap(%v): got %v", m, cp)
 	}
 }
+
+func TestStringSet(t *testing.T) {
+	for _, test := range []struct {
+		slice []string
+		want  map[string]bool
+	}{
+		{slice: nil, want: nil},
+		{slice: []string{"a"}, want: map[string]bool{"a": true}},
+		{slice: []string{"a", "b"}, want: map[string]bool{"a": true, "b": true}},
+	} {
+		got := stringSet(test.slice...)
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("stringSet(%v): got %v, want %v",
+				test.slice, got, test.want,
+			)
+		}
+	}
+}

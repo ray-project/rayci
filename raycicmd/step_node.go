@@ -53,6 +53,18 @@ func (n *stepNode) hasTagIn(tags []string) bool {
 	return intersects(n.tags, tags)
 }
 
+func (n *stepNode) hasTagInMap(tags map[string]bool) bool {
+	if tags == nil {
+		return false
+	}
+	for _, tag := range n.tags {
+		if tags[tag] {
+			return true
+		}
+	}
+	return false
+}
+
 func (n *stepNode) addDep(id string) {
 	if n.depSet == nil {
 		n.depSet = make(map[string]struct{})

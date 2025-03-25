@@ -14,10 +14,10 @@ func TestNewTagsStepFilter(t *testing.T) {
 		wantErr  bool
 	}{{
 		cmd:  []string{"echo", "RAYCI_COVERAGE"},
-		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
-		want: &stepFilter{tags: []string{"RAYCI_COVERAGE"}},
+		want: &stepFilter{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd:  []string{"echo", "\t  \n  \t"},
 		want: &stepFilter{},
@@ -63,7 +63,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
-		tags:     []string{"tune"},
+		tags:     stringSet("tune"),
 	}
 
 	for _, tags := range [][]string{
@@ -117,7 +117,7 @@ func TestStepFilter_tags(t *testing.T) {
 func TestStepFilter_tagsReject(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: []string{"disabled"},
-		tags:     []string{"tune"},
+		tags:     stringSet("tune"),
 	}
 
 	for _, tags := range [][]string{
@@ -201,6 +201,18 @@ func TestStepFilter_selects(t *testing.T) {
 	} {
 		if filter.accept(node) {
 			t.Errorf("hit %+v", node)
+		}
+	}
+}
+
+func TestStepFilter_tagSelects(t *testing.T) {
+	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil)
+	for _, node := range []*stepNode{
+		{key: "bar"},
+		{id: "id", tags: []string{"foo"}},
+	} {
+		if !filter.accept(node) {
+			t.Errorf("tag select miss %+v", node)
 		}
 	}
 }

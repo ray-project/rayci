@@ -8,13 +8,16 @@ import (
 )
 
 type stepFilter struct {
+	// first pass: skip tags
 	skipTags []string
 
-	// selecting steps based on ID or key
-	selects map[string]bool
-
+	// second pass: tag selection filters
 	runAllTags bool
-	tags       []string
+	tags       map[string]bool
+
+	// third pass: selecting steps
+	selects    map[string]bool // based on ID or key
+	tagSelects map[string]bool // or based on tags
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
@@ -26,11 +29,12 @@ func (f *stepFilter) accept(step *stepNode) bool {
 }
 
 func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
-	if f.selects != nil {
-		return step.selectHit(f.selects)
+	if f.selects == nil && f.tagSelects == nil {
+		// no select filters, accept everything.
+		return true
 	}
 
-	return true
+	return step.selectHit(f.selects) || step.hasTagInMap(f.tagSelects)
 }
 
 func (f *stepFilter) acceptTagHit(step *stepNode) bool {
@@ -42,7 +46,7 @@ func (f *stepFilter) acceptTagHit(step *stepNode) bool {
 	if !step.hasTags() {
 		return true // step does not have any tags: a step that always runs
 	}
-	return step.hasTagIn(f.tags)
+	return step.hasTagInMap(f.tags)
 }
 
 func (f *stepFilter) hit(step *stepNode) bool {
@@ -53,10 +57,21 @@ func newStepFilter(
 	skipTags []string, selects []string, filterCmd []string,
 ) (*stepFilter, error) {
 	filter, err := stepFilterFromCmd(skipTags, filterCmd)
-	if selects != nil && err == nil {
+	if err != nil {
+		return filter, err
+	}
+
+	if selects != nil {
 		filter.selects = make(map[string]bool)
+		filter.tagSelects = make(map[string]bool)
+
 		for _, k := range selects {
-			filter.selects[k] = true
+			if strings.HasPrefix(k, "tag:") {
+				name := strings.TrimPrefix(k, "tag:")
+				filter.tagSelects[name] = true
+			} else {
+				filter.selects[k] = true
+			}
 		}
 	}
 
@@ -97,11 +112,10 @@ func stepFilterFromCmd(skips []string, filterCmd []string) (
 	}
 
 	tags := strings.Fields(filtersStr)
-	if len(tags) == 0 {
-		tags = nil
-	}
 	filter.runAllTags = false
-	filter.tags = tags
+	if len(tags) != 0 {
+		filter.tags = stringSet(tags...)
+	}
 
 	return filter, nil
 }
