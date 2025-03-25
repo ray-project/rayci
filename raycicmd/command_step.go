@@ -178,5 +178,27 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		result["artifact_paths"] = defaultArtifactPaths
 	}
 
+	// add step ID into label
+	if id != "" {
+		// Buildkite supports both "name" and "label".
+		// Although "label" is the official key, "name" actually takes precedence...
+		// So to be consistency with buildkite, we do the same here.
+
+		label := result["name"]
+		if label == nil {
+			label = result["label"]
+		}
+
+		delete(result, "name")
+		// "label" will be overwritten by the following code.
+
+		if label == nil {
+			label = fmt.Sprintf("[%s]", id)
+		} else {
+			label = fmt.Sprintf("%s [%s]", label, id)
+		}
+		result["label"] = label
+	}
+
 	return result, nil
 }
