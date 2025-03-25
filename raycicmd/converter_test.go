@@ -179,6 +179,36 @@ func TestConvertPipelineStep(t *testing.T) {
 		},
 	}, {
 		in: map[string]any{
+			"name":                     "myname",
+			"commands":                 []string{"echo 1", "echo 2"},
+			"docker_publish_tcp_ports": "5555,5556",
+		},
+		out: map[string]any{
+			"label":              "myname [fakeid]",
+			"commands":           []string{"echo 1", "echo 2"},
+			"agents":             newBkAgents("fakerunner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+		dockerPluginOut: map[string]any{
+			"publish": []string{
+				"127.0.0.1:5555:5555/tcp", "127.0.0.1:5556:5556/tcp",
+			},
+		},
+	}, {
+		in: map[string]any{
 			"commands":       []string{"echo 1", "echo 2"},
 			"docker_network": "host",
 		},
