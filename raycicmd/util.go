@@ -116,3 +116,14 @@ func copyEnvMap(m map[string]string) map[string]string {
 	}
 	return cp
 }
+
+func stringSet(slice ...string) map[string]bool {
+	if len(slice) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(slice))
+	for _, s := range slice {
+		set[s] = true
+	}
+	return set
+}
