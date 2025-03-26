@@ -146,6 +146,11 @@ type config struct {
 	//
 	// Optional.
 	DockerPlugin *dockerPluginConfig `yaml:"docker_plugin"`
+
+	// NoTagMeansAlways sets if a step without any tags should be treated as
+	// a step with a magic "always" tag, that will always be picked during the
+	// conditional testing tag picking phase.
+	NoTagMeansAlways bool `yaml:"no_tag_means_always"`
 }
 
 func builderAgent(config *config, instanceType string) string {

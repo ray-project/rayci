@@ -751,6 +751,8 @@ func TestConvertPipelineGroup(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: stringSet("disabled"),
 		tags:     stringSet("foo"),
+
+		noTagMeansAlways: true,
 	}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
