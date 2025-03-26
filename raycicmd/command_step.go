@@ -181,8 +181,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	// add step ID into label
 	if id != "" {
 		// Buildkite supports both "name" and "label".
-		// Although "label" is the official key, "name" actually takes precedence...
-		// So to be consistency with buildkite, we do the same here.
+		// Although "label" is the official key, "name" actually takes
+		// precedence...  So to be consistency with buildkite, we do the same
+		// here.
 
 		label := result["name"]
 		if label == nil {

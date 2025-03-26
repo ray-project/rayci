@@ -220,12 +220,14 @@ func TestStepFilter_tagSelects(t *testing.T) {
 func TestStepFilter_selectsAndTags(t *testing.T) {
 	filter, _ := newStepFilter(
 		[]string{"disabled"},
-		[]string{"foo", "bar"},
+		[]string{"foo", "bar", "tag:pick"},
 		[]string{"echo", "tune"},
 	)
+
 	for _, node := range []*stepNode{
 		{key: "foo"},
 		{id: "foo", tags: []string{"tune"}},
+		{id: "other", tags: []string{"pick", "tune"}},
 		{id: "bar"},
 	} {
 		if !filter.accept(node) {
@@ -239,7 +241,47 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 		{key: "w00t"},
 	} {
 		if filter.accept(node) {
-			t.Errorf("miss %+v", node)
+			t.Errorf("hit %+v", node)
+		}
+	}
+}
+
+func TestRunFilterCmd(t *testing.T) {
+	for _, test := range []struct {
+		cmd []string
+		res *filterCmdResult
+	}{{
+		cmd: []string{"echo", "RAYCI_COVERAGE"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "\t  \n  \t"},
+		res: &filterCmdResult{cmdExists: true},
+	}, {
+		cmd: []string{},
+		res: &filterCmdResult{},
+	}, {
+		cmd: nil,
+		res: &filterCmdResult{},
+	}, {
+		cmd: []string{"echo", "*"},
+		res: &filterCmdResult{cmdExists: true, runAll: true},
+	}, {
+		cmd: []string{"./not-exist"},
+		res: &filterCmdResult{},
+	}} {
+		got, err := runFilterCmd(test.cmd)
+		if err != nil {
+			t.Fatalf("run %q: %s", test.cmd, err)
+		}
+
+		if !reflect.DeepEqual(got, test.res) {
+			t.Errorf(
+				"run %q: got %+v, want %+v",
+				test.cmd, got, test.res,
+			)
 		}
 	}
 }
