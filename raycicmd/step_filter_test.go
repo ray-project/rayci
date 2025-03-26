@@ -220,12 +220,14 @@ func TestStepFilter_tagSelects(t *testing.T) {
 func TestStepFilter_selectsAndTags(t *testing.T) {
 	filter, _ := newStepFilter(
 		[]string{"disabled"},
-		[]string{"foo", "bar"},
+		[]string{"foo", "bar", "tag:pick"},
 		[]string{"echo", "tune"},
 	)
+
 	for _, node := range []*stepNode{
 		{key: "foo"},
 		{id: "foo", tags: []string{"tune"}},
+		{id: "other", tags: []string{"pick", "tune"}},
 		{id: "bar"},
 	} {
 		if !filter.accept(node) {
@@ -239,7 +241,7 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 		{key: "w00t"},
 	} {
 		if filter.accept(node) {
-			t.Errorf("miss %+v", node)
+			t.Errorf("hit %+v", node)
 		}
 	}
 }
