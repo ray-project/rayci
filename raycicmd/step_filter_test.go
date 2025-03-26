@@ -245,3 +245,43 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 		}
 	}
 }
+
+func TestRunFilterCmd(t *testing.T) {
+	for _, test := range []struct {
+		cmd []string
+		res *filterCmdResult
+	}{{
+		cmd: []string{"echo", "RAYCI_COVERAGE"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "\t  \n  \t"},
+		res: &filterCmdResult{cmdExists: true},
+	}, {
+		cmd: []string{},
+		res: &filterCmdResult{},
+	}, {
+		cmd: nil,
+		res: &filterCmdResult{},
+	}, {
+		cmd: []string{"echo", "*"},
+		res: &filterCmdResult{cmdExists: true, runAll: true},
+	}, {
+		cmd: []string{"./not-exist"},
+		res: &filterCmdResult{},
+	}} {
+		got, err := runFilterCmd(test.cmd)
+		if err != nil {
+			t.Fatalf("run %q: %s", test.cmd, err)
+		}
+
+		if !reflect.DeepEqual(got, test.res) {
+			t.Errorf(
+				"run %q: got %+v, want %+v",
+				test.cmd, got, test.res,
+			)
+		}
+	}
+}
