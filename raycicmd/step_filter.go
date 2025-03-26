@@ -54,11 +54,20 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags []string, selects []string, filterCmd []string,
+	skipTags, selects []string, filterCmd []string,
 ) (*stepFilter, error) {
-	filter, err := stepFilterFromCmd(skipTags, filterCmd)
+	filterCmdRes, err := runFilterCmd(filterCmd)
 	if err != nil {
-		return filter, err
+		return nil, err
+	}
+
+	filter := &stepFilter{
+		skipTags: stringSet(skipTags...),
+	}
+	if !filterCmdRes.cmdExists || filterCmdRes.runAll {
+		filter.runAll = true
+	} else {
+		filter.tags = filterCmdRes.tags
 	}
 
 	if selects != nil {
@@ -79,9 +88,9 @@ func newStepFilter(
 }
 
 type filterCmdResult struct {
-	exists bool
-	runAll bool
-	tags   map[string]bool
+	cmdExists bool
+	runAll    bool
+	tags      map[string]bool
 }
 
 func runFilterCmd(cmd []string) (*filterCmdResult, error) {
@@ -106,7 +115,7 @@ func runFilterCmd(cmd []string) (*filterCmdResult, error) {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	res.exists = true
+	res.cmdExists = true
 
 	tags := strings.Fields(string(output))
 	if len(tags) == 1 && tags[0] == "*" {
@@ -118,24 +127,4 @@ func runFilterCmd(cmd []string) (*filterCmdResult, error) {
 
 	res.tags = stringSet(tags...)
 	return res, nil
-}
-
-func stepFilterFromCmd(skips []string, filterCmd []string) (
-	*stepFilter, error,
-) {
-	res, err := runFilterCmd(filterCmd)
-	if err != nil {
-		return nil, err
-	}
-
-	filter := &stepFilter{skipTags: stringSet(skips...), runAll: true}
-
-	if !res.exists || res.runAll {
-		return filter, nil
-	}
-
-	filter.runAll = false
-	filter.tags = res.tags
-
-	return filter, nil
 }
