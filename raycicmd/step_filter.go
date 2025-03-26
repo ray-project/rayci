@@ -18,6 +18,8 @@ type stepFilter struct {
 	// third pass: selecting steps
 	selects    map[string]bool // based on ID or key
 	tagSelects map[string]bool // or based on tags
+
+	noTagMeansAlways bool
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
@@ -42,9 +44,11 @@ func (f *stepFilter) acceptTagHit(step *stepNode) bool {
 		return true
 	}
 
-	// if not in run-all mode, hit when the step has any of the tags.
-	if !step.hasTags() {
-		return true // step does not have any tags: a step that always runs
+	if f.noTagMeansAlways {
+		// if noTagMeansAlways is set, hit when the step has any of the tags.
+		if !step.hasTags() {
+			return true // step does not have any tags: a step that always runs
+		}
 	}
 	return step.hasTagInMap(f.tags)
 }

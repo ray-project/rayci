@@ -64,6 +64,8 @@ func TestStepFilter_tags(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: stringSet("disabled"),
 		tags:     stringSet("tune"),
+
+		noTagMeansAlways: true,
 	}
 
 	for _, tags := range [][]string{
@@ -217,12 +219,13 @@ func TestStepFilter_tagSelects(t *testing.T) {
 	}
 }
 
-func TestStepFilter_selectsAndTags(t *testing.T) {
+func TestStepFilter_selectsAndTags_noTagMeansAlways(t *testing.T) {
 	filter, _ := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar", "tag:pick"},
 		[]string{"echo", "tune"},
 	)
+	filter.noTagMeansAlways = true
 
 	for _, node := range []*stepNode{
 		{key: "foo"},
@@ -236,6 +239,35 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 	}
 
 	for _, node := range []*stepNode{
+		{id: "foo", tags: []string{"not_tune"}},
+		{id: "bar", tags: []string{"tune_not"}},
+		{key: "w00t"},
+	} {
+		if filter.accept(node) {
+			t.Errorf("hit %+v", node)
+		}
+	}
+}
+
+func TestStepFilter_selectsAndTags(t *testing.T) {
+	filter, _ := newStepFilter(
+		[]string{"disabled"},
+		[]string{"foo", "bar", "tag:pick"},
+		[]string{"echo", "tune"},
+	)
+
+	for _, node := range []*stepNode{
+		{id: "foo", tags: []string{"tune"}},
+		{id: "other", tags: []string{"pick", "tune"}},
+	} {
+		if !filter.accept(node) {
+			t.Errorf("miss %+v", node)
+		}
+	}
+
+	for _, node := range []*stepNode{
+		{key: "foo"}, // need to have tags
+		{id: "bar"},  // need to have tags
 		{id: "foo", tags: []string{"not_tune"}},
 		{id: "bar", tags: []string{"tune_not"}},
 		{key: "w00t"},
