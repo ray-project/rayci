@@ -36,10 +36,24 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Ray CI")
 }
 
+func (s *server) listAndReapDeadWindowsInstances(ctx context.Context) error {
+	for {
+		n, err := s.reaper.listAndReapDeadWindowsInstances(ctx)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return nil
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func (s *server) background(ctx context.Context) {
 	log.Println("background process started")
 
-	if _, err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
+	if err := s.listAndReapDeadWindowsInstances(ctx); err != nil {
 		log.Println("listAndReapDeadWindowsInstances: ", err)
 	}
 
@@ -48,7 +62,7 @@ func (s *server) background(ctx context.Context) {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if _, err := s.reaper.listAndReapDeadWindowsInstances(ctx); err != nil {
+		if err := s.listAndReapDeadWindowsInstances(ctx); err != nil {
 			log.Println("listAndReapDeadWindowsInstances: ", err)
 		}
 	}
