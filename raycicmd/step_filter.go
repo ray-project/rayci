@@ -8,17 +8,22 @@ import (
 )
 
 type stepFilter struct {
-	skipTags []string
+	// first pass: skip tags
+	skipTags map[string]bool
 
-	// selecting steps based on ID or key
-	selects map[string]bool
+	// second pass: tag selection filters
+	runAll bool // Run all the steps; do not filter by tags.
+	tags   map[string]bool
 
-	runAllTags bool
-	tags       []string
+	// third pass: selecting steps
+	selects    map[string]bool // based on ID or key
+	tagSelects map[string]bool // or based on tags
+
+	noTagMeansAlways bool
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
-	return step.hasTagIn(f.skipTags)
+	return step.hasTagInMap(f.skipTags)
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
@@ -26,23 +31,26 @@ func (f *stepFilter) accept(step *stepNode) bool {
 }
 
 func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
-	if f.selects != nil {
-		return step.selectHit(f.selects)
-	}
-
-	return true
-}
-
-func (f *stepFilter) acceptTagHit(step *stepNode) bool {
-	if f.runAllTags {
+	if f.selects == nil && f.tagSelects == nil {
+		// no select filters, accept everything.
 		return true
 	}
 
-	// if not in run-all mode, hit when the step has any of the tags.
-	if !step.hasTags() {
-		return true // step does not have any tags: a step that always runs
+	return step.selectHit(f.selects) || step.hasTagInMap(f.tagSelects)
+}
+
+func (f *stepFilter) acceptTagHit(step *stepNode) bool {
+	if f.runAll {
+		return true
 	}
-	return step.hasTagIn(f.tags)
+
+	if f.noTagMeansAlways {
+		// if noTagMeansAlways is set, hit when the step has any of the tags.
+		if !step.hasTags() {
+			return true // step does not have any tags: a step that always runs
+		}
+	}
+	return step.hasTagInMap(f.tags)
 }
 
 func (f *stepFilter) hit(step *stepNode) bool {
@@ -50,58 +58,77 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags []string, selects []string, filterCmd []string,
+	skipTags, selects []string, filterCmd []string,
 ) (*stepFilter, error) {
-	filter, err := stepFilterFromCmd(skipTags, filterCmd)
-	if selects != nil && err == nil {
+	filterCmdRes, err := runFilterCmd(filterCmd)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := &stepFilter{
+		skipTags: stringSet(skipTags...),
+	}
+	if !filterCmdRes.cmdExists || filterCmdRes.runAll {
+		filter.runAll = true
+	} else {
+		filter.tags = filterCmdRes.tags
+	}
+
+	if selects != nil {
 		filter.selects = make(map[string]bool)
+		filter.tagSelects = make(map[string]bool)
+
 		for _, k := range selects {
-			filter.selects[k] = true
+			if strings.HasPrefix(k, "tag:") {
+				name := strings.TrimPrefix(k, "tag:")
+				filter.tagSelects[name] = true
+			} else {
+				filter.selects[k] = true
+			}
 		}
 	}
 
 	return filter, err
 }
 
-func stepFilterFromCmd(skips []string, filterCmd []string) (
-	*stepFilter, error,
-) {
-	filter := &stepFilter{skipTags: skips, runAllTags: true}
+type filterCmdResult struct {
+	cmdExists bool
+	runAll    bool
+	tags      map[string]bool
+}
 
-	if len(filterCmd) == 0 {
-		return filter, nil
+func runFilterCmd(cmd []string) (*filterCmdResult, error) {
+	res := &filterCmdResult{}
+	if len(cmd) == 0 {
+		return res, nil
 	}
 
-	bin := filterCmd[0]
+	bin := cmd[0]
 	if strings.HasPrefix(bin, "./") {
 		// A local in repo launcher, and the file does not exist yet.
 		// Run all tags in this case.
 		if _, err := os.Lstat(bin); os.IsNotExist(err) {
-			return filter, nil
+			return res, nil
 		}
 	}
 
-	// TODO: put the execution in an unprivileged sandbox
-	cmd := exec.Command(filterCmd[0], filterCmd[1:]...)
-	cmd.Stderr = os.Stderr
-	filters, err := cmd.Output()
+	c := exec.Command(cmd[0], cmd[1:]...)
+	c.Stderr = os.Stderr
+	output, err := c.Output()
 	if err != nil {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	filtersStr := strings.TrimSpace(string(filters))
-	if filtersStr == "*" {
+	res.cmdExists = true
+
+	tags := strings.Fields(string(output))
+	if len(tags) == 1 && tags[0] == "*" {
 		// '*" means run everything (except the skips).
-		// It is equivalent to having no tag filters configured.
-		return filter, nil
+		// It is often equivalent to having no tag filters configured.
+		res.runAll = true
+		return res, nil
 	}
 
-	tags := strings.Fields(filtersStr)
-	if len(tags) == 0 {
-		tags = nil
-	}
-	filter.runAllTags = false
-	filter.tags = tags
-
-	return filter, nil
+	res.tags = stringSet(tags...)
+	return res, nil
 }

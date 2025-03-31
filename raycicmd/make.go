@@ -99,6 +99,8 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 		return nil, fmt.Errorf("run tag filter command: %w", err)
 	}
 
+	filter.noTagMeansAlways = config.NoTagMeansAlways
+
 	// Build steps for CI.
 	bkDirs := config.BuildkiteDirs
 	if len(bkDirs) == 0 {
