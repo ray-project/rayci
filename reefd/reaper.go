@@ -44,7 +44,11 @@ func (r *reaper) listDeadWindowsInstances(ctx context.Context) ([]string, error)
 			"16", // running
 		},
 	}}
-	input := &ec2.DescribeInstancesInput{Filters: filters}
+	const maxResults = 500
+	input := &ec2.DescribeInstancesInput{
+		Filters:    filters,
+		MaxResults: aws.Int32(maxResults),
+	}
 	result, err := r.ec2.DescribeInstances(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("describe instances: %w", err)
