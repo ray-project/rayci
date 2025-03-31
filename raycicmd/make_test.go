@@ -225,10 +225,44 @@ func TestMakePipeline(t *testing.T) {
 		SkipTags:      []string{"disabled"},
 		BuildkiteDirs: []string{".buildkite", "private/buildkite"},
 	}
-
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
 		config.TagFilterCommand = []string{"echo", "enabled"}
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		got, err := makePipeline(tmp, &config, info)
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+
+		// Should only select the enabled steps and its dependencies.
+		// which are 2 steps in 2 different groups.
+		if want := 2; len(got.Steps) != want {
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		// sub funtions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
+
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+
+		if want := 2; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
+	t.Run("filter_noTagMeansAlways", func(t *testing.T) {
+		config := *commonConfig
+		config.TagFilterCommand = []string{"echo", "enabled"}
+		config.NoTagMeansAlways = true
 
 		buildID := "fakebuild"
 		info := &buildInfo{

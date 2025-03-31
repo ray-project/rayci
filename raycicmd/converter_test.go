@@ -95,7 +95,7 @@ func TestConvertPipelineStep_concurrency_group(t *testing.T) {
 		RunnerQueues: map[string]string{
 			"default": "fakerunner",
 		},
-		AllowConcurrencyGroupPrefixes: []string{"not_group"},
+		ConcurrencyGroupPrefixes: []string{"not_group"},
 	}, info)
 
 	step := map[string]any{
@@ -154,6 +154,37 @@ func TestConvertPipelineStep(t *testing.T) {
 			"docker_publish_tcp_ports": "5555,5556",
 		},
 		out: map[string]any{
+			"label":              "[fakeid]",
+			"commands":           []string{"echo 1", "echo 2"},
+			"agents":             newBkAgents("fakerunner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+				"RAYCI_STEP_ID":             fakeStepID,
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+		},
+		dockerPluginOut: map[string]any{
+			"publish": []string{
+				"127.0.0.1:5555:5555/tcp", "127.0.0.1:5556:5556/tcp",
+			},
+		},
+	}, {
+		in: map[string]any{
+			"name":                     "myname",
+			"commands":                 []string{"echo 1", "echo 2"},
+			"docker_publish_tcp_ports": "5555,5556",
+		},
+		out: map[string]any{
+			"label":              "myname [fakeid]",
 			"commands":           []string{"echo 1", "echo 2"},
 			"agents":             newBkAgents("fakerunner"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
@@ -182,6 +213,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"docker_network": "host",
 		},
 		out: map[string]any{
+			"label":              "[fakeid]",
 			"commands":           []string{"echo 1", "echo 2"},
 			"agents":             newBkAgents("fakerunner"),
 			"timeout_in_minutes": defaultTimeoutInMinutes,
@@ -206,6 +238,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"instance_type": "broken",
 		},
 		out: map[string]any{
+			"label":              "[fakeid]",
 			"commands":           []string{"echo 1"},
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"artifact_paths":     defaultArtifactPaths,
@@ -231,7 +264,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"allow_dependency_failure": true,
 		},
 		out: map[string]any{
-			"label":                    "say hello",
+			"label":                    "say hello [fakeid]",
 			"key":                      "key",
 			"command":                  "echo hello",
 			"depends_on":               "dep",
@@ -263,7 +296,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"concurrency_group": "group",
 		},
 		out: map[string]any{
-			"label":             "say hello",
+			"label":             "say hello [fakeid]",
 			"key":               "key",
 			"command":           "echo hello",
 			"depends_on":        "dep",
@@ -329,7 +362,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"instance_type": "windows",
 		},
 		out: map[string]any{
-			"label":   "windows job",
+			"label":   "windows job [fakeid]",
 			"key":     "win",
 			"command": "echo windows",
 			"agents":  newBkAgents("fakewinrunner"),
@@ -357,7 +390,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"instance_type": "windows",
 		},
 		out: map[string]any{
-			"label":          "windows job",
+			"label":          "windows job [fakeid]",
 			"key":            "win",
 			"command":        "echo windows",
 			"agents":         newBkAgents("fakewinrunner"),
@@ -386,7 +419,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"parallelism":   4,
 		},
 		out: map[string]any{
-			"label":   "mac job",
+			"label":   "mac job [fakeid]",
 			"key":     "mac",
 			"command": "echo mac",
 			"agents":  newBkAgents("fakemacrunner"),
@@ -448,7 +481,7 @@ func TestConvertPipelineStep(t *testing.T) {
 				"RAYCI_TEMP":                            "s3://ci-temp/abc123/",
 				"RAYCI_WORK_REPO":                       "fakeecr",
 			},
-			"label":       "say hello",
+			"label":       "say hello [fakeid]",
 			"command":     "echo hello",
 			"parallelism": 5,
 		},
@@ -603,7 +636,7 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 			{"commands": []string{"default priority"}},
 		},
 	}
-	filter := &stepFilter{tags: []string{}, runAllTags: true}
+	filter := &stepFilter{runAll: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -652,7 +685,7 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 			"mount_buildkite_agent": false,
 		}},
 	}
-	filter := &stepFilter{tags: []string{}, runAllTags: true}
+	filter := &stepFilter{runAll: true}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -716,8 +749,10 @@ func TestConvertPipelineGroup(t *testing.T) {
 	}
 
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
-		tags:     []string{"foo"},
+		skipTags: stringSet("disabled"),
+		tags:     stringSet("foo"),
+
+		noTagMeansAlways: true,
 	}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
@@ -786,8 +821,8 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}}
 
 	filter := &stepFilter{
-		skipTags: []string{"disabled"},
-		tags:     []string{"foo"},
+		skipTags: stringSet("disabled"),
+		tags:     stringSet("foo"),
 	}
 	bk, err := c.convertGroups(groups, filter)
 	if err != nil {

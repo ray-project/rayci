@@ -119,12 +119,14 @@ type config struct {
 	// Optional.
 	AllowTriggerStep bool `yaml:"allow_trigger_step"`
 
-	// AllowConcurrencyGroup is the list of concurrency group name prefixes that are
-	// allowed for the pipeline. If not set or set to NULL, all concurrency group names
-	// are allowed.
+	// ConcurrencyGroupPrefixes is the list of concurrency group name prefixes
+	// that are allowed for the pipeline. If not set or set to NULL, all
+	// concurrency group names are allowed.
+	//
+	// Note that yaml key name is "allow_concurrency_group_prefixes".
 	//
 	// Optional.
-	AllowConcurrencyGroupPrefixes []string `yaml:"allow_concurrency_group_prefixes"`
+	ConcurrencyGroupPrefixes []string `yaml:"allow_concurrency_group_prefixes"`
 
 	// MaxParallelism is the maximum number of parallel jobs that can be run in
 	// the pipeline. If a bigger number of parallelism is requested, it will be
@@ -144,6 +146,11 @@ type config struct {
 	//
 	// Optional.
 	DockerPlugin *dockerPluginConfig `yaml:"docker_plugin"`
+
+	// NoTagMeansAlways sets if a step without any tags should be treated as
+	// a step with a magic "always" tag, that will always be picked during the
+	// conditional testing tag picking phase.
+	NoTagMeansAlways bool `yaml:"no_tag_means_always"`
 }
 
 func builderAgent(config *config, instanceType string) string {
@@ -280,7 +287,7 @@ func prPipelineConfig(
 
 		SkipTags: []string{"disabled", "skip-on-premerge"},
 
-		AllowConcurrencyGroupPrefixes: []string{},
+		ConcurrencyGroupPrefixes: []string{},
 	}
 	for k, v := range extraEnv {
 		config.Env[k] = v

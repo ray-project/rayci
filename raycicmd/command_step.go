@@ -74,13 +74,16 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("map agent: %w", err)
 	}
-	// We treat nil and empty allowConcurrencyGroupPrefixes differently. A nil value
-	// means that we don't have any restrictions on the concurrency group. An empty
-	// value means that we don't allow any concurrency group.
-	if group, ok := stringInMap(step, "concurrency_group"); ok {
-		if prefixes := c.config.AllowConcurrencyGroupPrefixes; prefixes != nil {
-			if !stringHasPrefix(group, prefixes) {
-				return nil, fmt.Errorf("concurrency group %q is not allowed", group)
+	// We treat nil and empty allowConcurrencyGroupPrefixes differently.
+	// A nil value means that we don't have any restrictions on the
+	// concurrency cg. An empty value means that we don't allow any
+	// concurrency cg.
+	if cg, ok := stringInMap(step, "concurrency_group"); ok {
+		if allow := c.config.ConcurrencyGroupPrefixes; allow != nil {
+			if !stringHasPrefix(cg, allow) {
+				return nil, fmt.Errorf(
+					"concurrency group %q is not allowed", cg,
+				)
 			}
 		}
 	}
@@ -173,6 +176,29 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 			dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
 		}}
 		result["artifact_paths"] = defaultArtifactPaths
+	}
+
+	// add step ID into label
+	if id != "" {
+		// Buildkite supports both "name" and "label".
+		// Although "label" is the official key, "name" actually takes
+		// precedence...  So to be consistency with buildkite, we do the same
+		// here.
+
+		label := result["name"]
+		if label == nil {
+			label = result["label"]
+		}
+
+		delete(result, "name")
+		// "label" will be overwritten by the following code.
+
+		if label == nil {
+			label = fmt.Sprintf("[%s]", id)
+		} else {
+			label = fmt.Sprintf("%s [%s]", label, id)
+		}
+		result["label"] = label
 	}
 
 	return result, nil
