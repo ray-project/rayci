@@ -12,11 +12,16 @@ import (
 
 // Config contains the configuration for the running the server.
 type Config struct {
+	DisableBackground bool
+
+	UserKeys map[string]string
 }
 
 type server struct {
 	reaper *reaper
 	config *Config
+
+	mux *http.ServeMux
 }
 
 func newServer(ctx context.Context, config *Config) (*server, error) {
@@ -25,7 +30,13 @@ func newServer(ctx context.Context, config *Config) (*server, error) {
 		return nil, fmt.Errorf("new aws clients: %w", err)
 	}
 
+	authGate := newAuthGate(config.UserKeys)
 	reaper := newReaper(awsClients.ec2())
+
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/login", jsonAPI(authGate.apiLogin))
+	mux.Handle("/api/v1/logout", jsonAPI(authGate.apiLogout))
+
 	return &server{
 		reaper: reaper,
 		config: config,
@@ -81,7 +92,10 @@ func Serve(ctx context.Context, addr string, config *Config) error {
 		Addr:    addr,
 		Handler: s,
 	}
-	go s.background(ctx)
+
+	if !config.DisableBackground {
+		go s.background(ctx)
+	}
 
 	defer s.Close()
 	return httpServer.ListenAndServe()

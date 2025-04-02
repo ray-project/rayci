@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.9
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.210.1
 	github.com/google/go-containerregistry v0.20.3
+	github.com/tailscale/hujson v0.0.0-20250226034555-ec1d1c113d33
 	golang.org/x/crypto v0.32.0
 	gopkg.in/yaml.v3 v3.0.1
 )
