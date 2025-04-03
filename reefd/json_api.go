@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+
+	"github.com/ray-project/rayci/reefd/reefclient"
 )
 
-func jsonAPI[R, S any](f func(ctx context.Context, req *R) (*S, error)) http.Handler {
+func jsonAPI[R, S any](
+	f func(ctx context.Context, req *R) (*S, error),
+) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -14,13 +18,19 @@ func jsonAPI[R, S any](f func(ctx context.Context, req *R) (*S, error)) http.Han
 		}
 
 		if r.Header.Get("Accept") != "application/json" {
-			http.Error(w, "must use application/json", http.StatusUnsupportedMediaType)
+			http.Error(
+				w, "must accept application/json",
+				http.StatusUnsupportedMediaType,
+			)
 			return
 		}
 
-		const jsonContentType = "application/json"
-		if r.Header.Get("Content-Type") != jsonContentType {
-			http.Error(w, "must use application/json", http.StatusUnsupportedMediaType)
+		const contentType = reefclient.JSONContentType
+		if r.Header.Get("Content-Type") != contentType {
+			http.Error(
+				w, "must use application/json",
+				http.StatusUnsupportedMediaType,
+			)
 		}
 
 		req := new(R)
@@ -42,7 +52,7 @@ func jsonAPI[R, S any](f func(ctx context.Context, req *R) (*S, error)) http.Han
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set("Content-Type", contentType)
 
 		enc := json.NewEncoder(w)
 		if err := enc.Encode(resp); err != nil {

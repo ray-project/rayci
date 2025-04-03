@@ -31,7 +31,9 @@ func readConfig(path string) (*reefd.Config, error) {
 
 func main() {
 	addr := flag.String("addr", "localhost:8000", "address to listen on")
-	configFile := flag.String("config", "config.hujson", "path to the config file")
+	configFile := flag.String(
+		"config", "config.hujson", "path to the config file",
+	)
 	flag.Parse()
 
 	args := flag.Args()

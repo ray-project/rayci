@@ -87,7 +87,9 @@ func (c *JSONCaller) call(ctx context.Context, p string, req []byte) (
 		}
 
 		if buf.Len() > 0 {
-			return nil, fmt.Errorf("http error %s: %s", resp.Status, buf.String())
+			return nil, fmt.Errorf(
+				"http error %s: %s", resp.Status, buf.String(),
+			)
 		}
 		return nil, fmt.Errorf("http error %s", resp.Status)
 	}

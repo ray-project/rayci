@@ -33,7 +33,9 @@ func (r *reaper) setNowFunc(f func() time.Time) {
 	r.nowFunc = f
 }
 
-func (r *reaper) listDeadWindowsInstances(ctx context.Context) ([]string, error) {
+func (r *reaper) listDeadWindowsInstances(ctx context.Context) (
+	[]string, error,
+) {
 	filters := []types.Filter{{
 		Name:   aws.String("tag:BuildkiteQueue"),
 		Values: []string{"*windows*"},
@@ -81,7 +83,9 @@ func (r *reaper) terminateInstances(ctx context.Context, ids []string) error {
 	return err
 }
 
-func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (int, error) {
+func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (
+	int, error,
+) {
 	ids, err := r.listDeadWindowsInstances(ctx)
 	if err != nil {
 		return 0, err

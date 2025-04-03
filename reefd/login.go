@@ -85,7 +85,10 @@ func (g *authGate) apiLogin(_ context.Context, req *reefapi.LoginRequest) (
 	}
 
 	if req.SigningMethod != "ssh-ed25519" {
-		return nil, fmt.Errorf("unsupported signing method %q", req.SigningMethod)
+		return nil, fmt.Errorf(
+			"unsupported signing method %q",
+			req.SigningMethod,
+		)
 	}
 
 	sig := new(reefapi.SSHSignature)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ray-project/rayci/reefd/reefclient"
@@ -26,8 +27,10 @@ func TestJSONAPI(t *testing.T) {
 		return &response{Echo: req.Message}, nil
 	}
 
+	const callPath = "/api/v1/test"
+
 	mux := http.NewServeMux()
-	mux.Handle("/api/v1/test", jsonAPI(h))
+	mux.Handle(callPath, jsonAPI(h))
 
 	s := httptest.NewServer(mux)
 	defer s.Close()
@@ -41,7 +44,9 @@ func TestJSONAPI(t *testing.T) {
 	req := &request{Message: "hi"}
 	resp := new(response)
 
-	if err := reefclient.JSONCall(ctx, c, "api/v1/test", req, resp); err != nil {
+	if err := reefclient.JSONCall(
+		ctx, c, string(callPath), req, resp,
+	); err != nil {
 		t.Fatalf("failed to call: %v", err)
 	}
 
@@ -52,7 +57,11 @@ func TestJSONAPI(t *testing.T) {
 	emptyReq := &request{}
 	resp = new(response)
 
-	if err := reefclient.JSONCall(ctx, c, "api/v1/test", emptyReq, resp); err == nil {
+	if err := reefclient.JSONCall(
+		ctx, c, string(callPath), emptyReq, resp,
+	); err == nil {
 		t.Fatalf("want error, got nil")
+	} else if !strings.Contains(err.Error(), "empty message") {
+		t.Fatalf("got unexpected error: %v", err)
 	}
 }

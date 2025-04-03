@@ -24,7 +24,9 @@ func newClient(server string) (*client, error) {
 	return &client{caller: caller}, nil
 }
 
-func (c *client) callLogin(ctx context.Context, req *reefapi.LoginRequest) (*reefapi.LoginResponse, error) {
+func (c *client) callLogin(ctx context.Context, req *reefapi.LoginRequest) (
+	*reefapi.LoginResponse, error,
+) {
 	resp := &reefapi.LoginResponse{}
 	if err := JSONCall(ctx, c.caller, "api/v1/login", req, resp); err != nil {
 		return nil, err
@@ -32,7 +34,9 @@ func (c *client) callLogin(ctx context.Context, req *reefapi.LoginRequest) (*ree
 	return resp, nil
 }
 
-func (c *client) callLogout(ctx context.Context, req *reefapi.LogoutRequest) (*reefapi.LogoutResponse, error) {
+func (c *client) callLogout(ctx context.Context, req *reefapi.LogoutRequest) (
+	*reefapi.LogoutResponse, error,
+) {
 	resp := &reefapi.LogoutResponse{}
 	if err := JSONCall(ctx, c.caller, "api/v1/logout", req, resp); err != nil {
 		return nil, err
