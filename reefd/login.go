@@ -12,11 +12,12 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/ray-project/rayci/reefapi"
+	"github.com/ray-project/rayci/reefd/reefapi"
 )
 
 type session struct {
 	user   string
+	token  string
 	expire time.Time
 }
 
@@ -57,6 +58,7 @@ func (g *authGate) newSessionToken(req *reefapi.TokenRequest) (string, error) {
 
 	g.sessions[token] = &session{
 		user:   req.User,
+		token:  token,
 		expire: now.Add(ttl),
 	}
 
@@ -120,6 +122,24 @@ func (g *authGate) apiLogin(_ context.Context, req *reefapi.LoginRequest) (
 
 	resp := &reefapi.LoginResponse{SessionToken: sessionToken}
 	return resp, nil
+}
+
+func (g *authGate) check(sessionToken string) (string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	// TODO(aslonnie): this is going to be a performance bottleneck.
+	ses, ok := g.sessions[sessionToken]
+	if !ok {
+		return "", fmt.Errorf("session %q not found", sessionToken)
+	}
+
+	if g.nowFunc().After(ses.expire) {
+		delete(g.sessions, sessionToken)
+		return "", fmt.Errorf("session %q expired", sessionToken)
+	}
+
+	return ses.user, nil
 }
 
 func (g *authGate) apiLogout(_ context.Context, req *reefapi.LogoutRequest) (
