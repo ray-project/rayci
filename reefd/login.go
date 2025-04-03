@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,21 +31,30 @@ type authGate struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+
+	unauth map[string]struct{}
 }
 
-func newAuthGate(userKeys map[string]string) *authGate {
+func newAuthGate(userKeys map[string]string, unauth []string) *authGate {
+	unauthMap := make(map[string]struct{}, len(unauth))
+	for _, u := range unauth {
+		unauthMap[u] = struct{}{}
+	}
+
 	return &authGate{
 		rand:     rand.Reader,
 		nowFunc:  time.Now,
 		sessions: make(map[string]*session),
 		userKeys: userKeys,
+		unauth:   unauthMap,
 	}
 }
 
 const sessionTokenPrefix = "ses_"
 
 func (g *authGate) newSessionToken(req *reefapi.TokenRequest) (string, error) {
-	rand := make([]byte, 32)
+	const tokenSize = 24
+	rand := make([]byte, tokenSize)
 	if _, err := io.ReadFull(g.rand, rand); err != nil {
 		return "", fmt.Errorf("generate random token: %w", err)
 	}
@@ -143,6 +154,39 @@ func (g *authGate) check(sessionToken string) (string, error) {
 	}
 
 	return ses.user, nil
+}
+
+func (g *authGate) gate(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := g.unauth[r.URL.Path]; ok {
+			// unauth endpoints are not protected.
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "authorization header is empty", http.StatusUnauthorized)
+			return
+		}
+
+		const bearerPrefix = "Bearer "
+
+		if !strings.HasPrefix(authHeader, bearerPrefix) {
+			http.Error(w, "authorization header must be Bearer", http.StatusUnauthorized)
+			return
+		}
+
+		token := strings.TrimPrefix(authHeader, bearerPrefix)
+		user, err := g.check(token)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := contextWithUser(r.Context(), user)
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func (g *authGate) apiLogout(_ context.Context, req *reefapi.LogoutRequest) (

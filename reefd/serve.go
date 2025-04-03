@@ -22,7 +22,7 @@ type server struct {
 	reaper *reaper
 	config *Config
 
-	mux *http.ServeMux
+	apiV1 http.Handler
 }
 
 func newServer(ctx context.Context, config *Config) (*server, error) {
@@ -31,23 +31,27 @@ func newServer(ctx context.Context, config *Config) (*server, error) {
 		return nil, fmt.Errorf("new aws clients: %w", err)
 	}
 
-	authGate := newAuthGate(config.UserKeys)
+	authGate := newAuthGate(config.UserKeys, []string{
+		"/api/v1/login",
+		"/api/v1/logout",
+	})
+
 	reaper := newReaper(awsClients.ec2())
 
-	mux := http.NewServeMux()
-	mux.Handle("/api/v1/login", jsonAPI(authGate.apiLogin))
-	mux.Handle("/api/v1/logout", jsonAPI(authGate.apiLogout))
+	apiMux := http.NewServeMux()
+	apiMux.Handle("/api/v1/login", jsonAPI(authGate.apiLogin))
+	apiMux.Handle("/api/v1/logout", jsonAPI(authGate.apiLogout))
 
 	return &server{
 		reaper: reaper,
 		config: config,
-		mux:    mux,
+		apiV1:  authGate.gate(apiMux),
 	}, nil
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/api/v1/") {
-		s.mux.ServeHTTP(w, r)
+		s.apiV1.ServeHTTP(w, r)
 		return
 	}
 
