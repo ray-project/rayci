@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -40,10 +41,16 @@ func newServer(ctx context.Context, config *Config) (*server, error) {
 	return &server{
 		reaper: reaper,
 		config: config,
+		mux:    mux,
 	}, nil
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+		s.mux.ServeHTTP(w, r)
+		return
+	}
+
 	io.WriteString(w, "Ray CI")
 }
 
