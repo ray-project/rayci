@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -32,7 +33,9 @@ func (r *reaper) setNowFunc(f func() time.Time) {
 	r.nowFunc = f
 }
 
-func (r *reaper) listDeadWindowsInstances(ctx context.Context) ([]string, error) {
+func (r *reaper) listDeadWindowsInstances(ctx context.Context) (
+	[]string, error,
+) {
 	filters := []types.Filter{{
 		Name:   aws.String("tag:BuildkiteQueue"),
 		Values: []string{"*windows*"},
@@ -80,7 +83,9 @@ func (r *reaper) terminateInstances(ctx context.Context, ids []string) error {
 	return err
 }
 
-func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (int, error) {
+func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (
+	int, error,
+) {
 	ids, err := r.listDeadWindowsInstances(ctx)
 	if err != nil {
 		return 0, err
@@ -95,4 +100,21 @@ func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (int, erro
 	}
 
 	return len(ids), nil
+}
+
+// ReapDeadWindowsInstances lists and terminates dead Windows CI instances.
+func ReapDeadWindowsInstances(ctx context.Context) error {
+	awsConfig, err := awsconfig.LoadDefaultConfig(
+		ctx, awsconfig.WithRegion(awsRegion),
+	)
+	if err != nil {
+		return fmt.Errorf("load aws config: %w", err)
+	}
+
+	clients := newAWSClientsFromConfig(&awsConfig)
+	r := newReaper(clients.ec2())
+	if _, err := r.listAndReapDeadWindowsInstances(ctx); err != nil {
+		return err
+	}
+	return nil
 }

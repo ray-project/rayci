@@ -142,11 +142,12 @@ func instanceMatchFilters(i *fakeEC2Instance, filters []types.Filter) bool {
 	return true
 }
 
-func (c *fakeEC2) DescribeInstances(
-	ctx context.Context, in *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options),
+func (e *fakeEC2) DescribeInstances(
+	ctx context.Context, in *ec2.DescribeInstancesInput,
+	optFns ...func(*ec2.Options),
 ) (*ec2.DescribeInstancesOutput, error) {
 	out := &ec2.DescribeInstancesOutput{}
-	for _, i := range c.instances {
+	for _, i := range e.instances {
 		if instanceMatchFilters(i, in.Filters) {
 			out.Reservations = append(out.Reservations, ec2types.Reservation{
 				Instances: []ec2types.Instance{{
@@ -159,24 +160,28 @@ func (c *fakeEC2) DescribeInstances(
 	return out, nil
 }
 
-func (c *fakeEC2) TerminateInstances(
-	ctx context.Context, in *ec2.TerminateInstancesInput, optFns ...func(*ec2.Options),
+func (e *fakeEC2) TerminateInstances(
+	ctx context.Context, in *ec2.TerminateInstancesInput,
+	optFns ...func(*ec2.Options),
 ) (*ec2.TerminateInstancesOutput, error) {
 	out := &ec2.TerminateInstancesOutput{}
 	for _, id := range in.InstanceIds {
-		if i := c.instance(id); i != nil {
-			out.TerminatingInstances = append(out.TerminatingInstances, ec2types.InstanceStateChange{
-				InstanceId: aws.String(id),
-				CurrentState: &ec2types.InstanceState{
-					Name: types.InstanceStateNameShuttingDown,
+		if i := e.instance(id); i != nil {
+			out.TerminatingInstances = append(
+				out.TerminatingInstances,
+				ec2types.InstanceStateChange{
+					InstanceId: aws.String(id),
+					CurrentState: &ec2types.InstanceState{
+						Name: types.InstanceStateNameShuttingDown,
+					},
 				},
-			})
+			)
 		}
 	}
 
 	// remove instances
 	for _, id := range in.InstanceIds {
-		c.remove(id)
+		e.remove(id)
 	}
 
 	return out, nil
