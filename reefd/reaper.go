@@ -101,20 +101,3 @@ func (r *reaper) listAndReapDeadWindowsInstances(ctx context.Context) (
 
 	return len(ids), nil
 }
-
-// ReapDeadWindowsInstances lists and terminates dead Windows CI instances.
-func ReapDeadWindowsInstances(ctx context.Context) error {
-	awsConfig, err := awsconfig.LoadDefaultConfig(
-		ctx, awsconfig.WithRegion(awsRegion),
-	)
-	if err != nil {
-		return fmt.Errorf("load aws config: %w", err)
-	}
-
-	clients := newAWSClientsFromConfig(&awsConfig)
-	r := newReaper(clients.ec2())
-	if _, err := r.listAndReapDeadWindowsInstances(ctx); err != nil {
-		return err
-	}
-	return nil
-}
