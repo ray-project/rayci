@@ -9,19 +9,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
 	"github.com/ray-project/rayci/reefd/reefapi"
 )
-
-type session struct {
-	user   string
-	token  string
-	expire time.Time
-}
 
 type authGate struct {
 	sessionStore *sessionStore
@@ -30,9 +23,6 @@ type authGate struct {
 
 	nowFunc  func() time.Time
 	userKeys map[string]string
-
-	mu       sync.Mutex
-	sessions map[string]*session
 
 	unauth map[string]struct{}
 }
@@ -51,7 +41,6 @@ func newAuthGate(
 
 		rand:     rand.Reader,
 		nowFunc:  time.Now,
-		sessions: make(map[string]*session),
 		userKeys: userKeys,
 		unauth:   unauthMap,
 	}
@@ -59,7 +48,9 @@ func newAuthGate(
 
 const sessionTokenPrefix = "ses_"
 
-func (g *authGate) newSessionToken(req *reefapi.TokenRequest) (string, error) {
+func (g *authGate) newSessionToken(
+	ctx context.Context, req *reefapi.TokenRequest,
+) (string, error) {
 	const tokenSize = 24
 	rand := make([]byte, tokenSize)
 	if _, err := io.ReadFull(g.rand, rand); err != nil {
@@ -71,19 +62,20 @@ func (g *authGate) newSessionToken(req *reefapi.TokenRequest) (string, error) {
 	now := g.nowFunc()
 	const ttl = 10 * time.Hour
 
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.sessions[token] = &session{
+	session := &session{
 		user:   req.User,
 		token:  token,
 		expire: now.Add(ttl),
 	}
 
+	if err := g.sessionStore.insert(ctx, session); err != nil {
+		return "", fmt.Errorf("save session: %w", err)
+	}
+
 	return token, nil
 }
 
-func (g *authGate) apiLogin(_ context.Context, req *reefapi.LoginRequest) (
+func (g *authGate) apiLogin(ctx context.Context, req *reefapi.LoginRequest) (
 	*reefapi.LoginResponse, error,
 ) {
 	if req.User == "" {
@@ -136,7 +128,7 @@ func (g *authGate) apiLogin(_ context.Context, req *reefapi.LoginRequest) (
 		)
 	}
 
-	sessionToken, err := g.newSessionToken(tokenReq)
+	sessionToken, err := g.newSessionToken(ctx, tokenReq)
 	if err != nil {
 		return nil, fmt.Errorf("new session token: %w", err)
 	}
@@ -145,21 +137,14 @@ func (g *authGate) apiLogin(_ context.Context, req *reefapi.LoginRequest) (
 	return resp, nil
 }
 
-func (g *authGate) check(sessionToken string) (string, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	// TODO(aslonnie): this is going to be a performance bottleneck.
-	ses, ok := g.sessions[sessionToken]
-	if !ok {
-		return "", fmt.Errorf("session %q not found", sessionToken)
+func (g *authGate) check(ctx context.Context, token string) (string, error) {
+	ses, err := g.sessionStore.get(ctx, token)
+	if err != nil {
+		return "", fmt.Errorf("get session: %w", err)
 	}
-
 	if g.nowFunc().After(ses.expire) {
-		delete(g.sessions, sessionToken)
-		return "", fmt.Errorf("session %q expired", sessionToken)
+		return "", fmt.Errorf("session %q has expired", token)
 	}
-
 	return ses.user, nil
 }
 
@@ -173,39 +158,44 @@ func (g *authGate) gate(h http.Handler) http.Handler {
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "authorization header is empty", http.StatusUnauthorized)
+			http.Error(
+				w, "authorization header is empty",
+				http.StatusUnauthorized,
+			)
 			return
 		}
 
 		const bearerPrefix = "Bearer "
 
 		if !strings.HasPrefix(authHeader, bearerPrefix) {
-			http.Error(w, "authorization header must be Bearer", http.StatusUnauthorized)
+			http.Error(
+				w, "authorization header must be Bearer",
+				http.StatusUnauthorized,
+			)
 			return
 		}
 
+		ctx := r.Context()
 		token := strings.TrimPrefix(authHeader, bearerPrefix)
-		user, err := g.check(token)
+		user, err := g.check(ctx, token)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		ctx := contextWithUser(r.Context(), user)
+		ctx = contextWithUser(ctx, user)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (g *authGate) apiLogout(_ context.Context, req *reefapi.LogoutRequest) (
+func (g *authGate) apiLogout(ctx context.Context, req *reefapi.LogoutRequest) (
 	*reefapi.LogoutResponse, error,
 ) {
 	if req.SessionToken == "" {
 		return nil, fmt.Errorf("session token is empty")
 	}
-
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.sessions, req.SessionToken)
-
+	if err := g.sessionStore.delete(ctx, req.SessionToken); err != nil {
+		return nil, fmt.Errorf("delete session: %w", err)
+	}
 	return &reefapi.LogoutResponse{}, nil
 }

@@ -21,15 +21,6 @@ func createAll(ctx context.Context, stores []store) error {
 	return nil
 }
 
-func destroyAll(ctx context.Context, stores []store) error {
-	for _, s := range stores {
-		if err := s.destroy(ctx); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type database struct {
 	driver string
 	db     *sql.DB
@@ -45,9 +36,7 @@ func newSqliteDB(f string) (*database, error) {
 	return &database{db: db}, nil
 }
 
-func (d *database) DB() *sql.DB {
-	return d.db
-}
+func (d *database) DB() *sql.DB { return d.db }
 
 func (d *database) Close() error {
 	return d.db.Close()
