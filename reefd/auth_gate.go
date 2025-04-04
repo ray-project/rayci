@@ -24,6 +24,8 @@ type session struct {
 }
 
 type authGate struct {
+	sessionStore *sessionStore
+
 	rand io.Reader
 
 	nowFunc  func() time.Time
@@ -35,13 +37,18 @@ type authGate struct {
 	unauth map[string]struct{}
 }
 
-func newAuthGate(userKeys map[string]string, unauth []string) *authGate {
+func newAuthGate(
+	sessions *sessionStore, userKeys map[string]string,
+	unauth []string,
+) *authGate {
 	unauthMap := make(map[string]struct{}, len(unauth))
 	for _, u := range unauth {
 		unauthMap[u] = struct{}{}
 	}
 
 	return &authGate{
+		sessionStore: sessions,
+
 		rand:     rand.Reader,
 		nowFunc:  time.Now,
 		sessions: make(map[string]*session),
