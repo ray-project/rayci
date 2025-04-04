@@ -2,6 +2,7 @@ package reefd
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 )
@@ -23,10 +24,10 @@ func newSessionStore(db *database) *sessionStore {
 // create the session tables if it doesn't exist.
 func (s *sessionStore) create(ctx context.Context) error {
 	_, err := s.db.X(ctx, `
-		create table if not exists sessions (
-			token text not null primary key,
-			user text not null,
-			expire integer not null)`,
+		CREATE TABLE IF NOT EXISTS sessions (
+			token text NOT NULL PRIMARY KEY,
+			user text NOT NULL,
+			expire integer NOT NULL)`,
 	)
 	return err
 }
@@ -42,7 +43,7 @@ func (s *sessionStore) insert(
 	ctx context.Context, session *session,
 ) error {
 	_, err := s.db.X(
-		ctx, `insert into sessions (token, user, expire) values (?, ?, ?)`,
+		ctx, `INSERT INTO sessions (token, user, expire) VALUES (?, ?, ?)`,
 		session.token, session.user, session.expire.Unix(),
 	)
 	return err
@@ -52,34 +53,29 @@ var errSessionNotFound = errors.New("session not found")
 
 // get a session from the database by token.
 func (s *sessionStore) get(ctx context.Context, token string) (*session, error) {
-	row, err := s.db.Q(
-		ctx, `select user, expire from sessions where token = ?`, token,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer row.Close()
-
-	if !row.Next() {
-		return nil, errSessionNotFound
-	}
-
 	var user string
 	var expire int64
-	if err := row.Scan(&user, &expire); err != nil {
+
+	if err := s.db.Q1(
+		ctx, `SELECT user, expire FROM sessions WHERE token = ?`, token,
+	).Scan(&user, &expire); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errSessionNotFound
+		}
 		return nil, err
 	}
+
 	return &session{user: user, token: token, expire: time.Unix(expire, 0)}, nil
 }
 
 // delete a session from the database by token.
 func (s *sessionStore) delete(ctx context.Context, token string) error {
-	_, err := s.db.X(ctx, `delete from sessions where token = ?`, token)
+	_, err := s.db.X(ctx, `DELETE FROM sessions WHERE token = ?`, token)
 	return err
 }
 
 // delete expired sessions from the database.
 func (s *sessionStore) deleteExpired(ctx context.Context, t time.Time) error {
-	_, err := s.db.X(ctx, `delete from sessions where expire < ?`, t.Unix())
+	_, err := s.db.X(ctx, `DELETE FROM sessions WHERE expire < ?`, t.Unix())
 	return err
 }

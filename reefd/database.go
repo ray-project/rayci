@@ -21,12 +21,25 @@ func createAll(ctx context.Context, stores []store) error {
 	return nil
 }
 
+func destroyAll(ctx context.Context, stores []store) error {
+	for _, s := range stores {
+		if err := s.destroy(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type database struct {
 	driver string
 	db     *sql.DB
 }
 
 func newSqliteDB(f string) (*database, error) {
+	if f == "" {
+		f = ":memory:"
+	}
+
 	const driver = "sqlite"
 	db, err := sql.Open(driver, f)
 	if err != nil {
@@ -54,4 +67,9 @@ func (d *database) Q(ctx context.Context, q string, args ...any) (
 	*sql.Rows, error,
 ) {
 	return d.db.QueryContext(ctx, q, args...)
+}
+
+// Q1 is a shortcut for QueryRowContext.
+func (d *database) Q1(ctx context.Context, q string, args ...any) *sql.Row {
+	return d.db.QueryRowContext(ctx, q, args...)
 }

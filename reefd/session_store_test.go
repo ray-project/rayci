@@ -6,14 +6,11 @@ import (
 	"time"
 
 	"context"
-	"path/filepath"
 )
 
 func TestSessionStore_lifecycle(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	ctx := context.Background()
-	db, err := newSqliteDB(filepath.Join(tmpDir, "test.db"))
+	db, err := newSqliteDB("")
 	if err != nil {
 		t.Fatalf("new sqlite db: %v", err)
 	}
@@ -29,10 +26,8 @@ func TestSessionStore_lifecycle(t *testing.T) {
 }
 
 func TestSessionStore_insert(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	ctx := context.Background()
-	db, err := newSqliteDB(filepath.Join(tmpDir, "test.db"))
+	db, err := newSqliteDB("")
 	if err != nil {
 		t.Fatalf("new sqlite db: %v", err)
 	}
@@ -76,6 +71,60 @@ func TestSessionStore_insert(t *testing.T) {
 	if err == nil {
 		t.Errorf("got nil error after delete, want %v", errSessionNotFound)
 	} else if !errors.Is(err, errSessionNotFound) {
-		t.Fatalf("got error %v, want %v", err, errSessionNotFound)
+		t.Fatalf("got error %q, want %q", err, errSessionNotFound)
+	}
+}
+
+func TestSessionStore_deleteExpired(t *testing.T) {
+	ctx := context.Background()
+	db, err := newSqliteDB("")
+	if err != nil {
+		t.Fatalf("new sqlite db: %v", err)
+	}
+
+	s := newSessionStore(db)
+	if err := s.create(ctx); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	now := time.Now().Truncate(time.Second)
+
+	session1 := &session{
+		user:   "testuser",
+		token:  "testtoken1",
+		expire: now.Add(1 * time.Hour),
+	}
+	if err := s.insert(ctx, session1); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	session2 := &session{
+		user:   "testuser",
+		token:  "testtoken2",
+		expire: now.Add(3 * time.Hour),
+	}
+	if err := s.insert(ctx, session2); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	if err := s.deleteExpired(ctx, now.Add(2*time.Hour)); err != nil {
+		t.Fatalf("delete expired: %v", err)
+	}
+
+	got, err := s.get(ctx, session1.token)
+	if !errors.Is(err, errSessionNotFound) {
+		if err != nil {
+			t.Errorf("got error %q, want %q", err, errSessionNotFound)
+		} else {
+			t.Errorf("got session %+v, want nil", got)
+		}
+	}
+
+	got, err = s.get(ctx, session2.token)
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	if got.user != session2.user {
+		t.Errorf("got user %q, want %q", got.user, session2.user)
 	}
 }
