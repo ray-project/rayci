@@ -1,16 +1,17 @@
 package reefd
 
 import (
+	"testing"
+
 	"context"
 	"path/filepath"
-	"testing"
 )
 
 func TestSessionStore_lifecycle(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
-	db, err := newSqliteDB(filepath.Join(tmpDir, "/test.db"))
+	db, err := newSqliteDB(filepath.Join(tmpDir, "test.db"))
 	if err != nil {
 		t.Fatalf("new sqlite db: %v", err)
 	}
