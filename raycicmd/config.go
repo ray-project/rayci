@@ -238,11 +238,7 @@ var branchPipelineConfig = &config{
 	SkipTags: []string{"disabled"},
 }
 
-func prPipelineConfig(
-	name string,
-	extraEnv map[string]string,
-	maxParralelism int,
-) *config {
+func makePRPipelineConfig(name string) *config {
 	config := &config{
 		name: name,
 
@@ -289,14 +285,10 @@ func prPipelineConfig(
 
 		ConcurrencyGroupPrefixes: []string{},
 	}
-	for k, v := range extraEnv {
-		config.Env[k] = v
-	}
-	if maxParralelism > 0 {
-		config.MaxParallelism = maxParralelism
-	}
 	return config
 }
+
+var prPipelineConfig = makePRPipelineConfig("ray-pr")
 
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
@@ -304,13 +296,11 @@ func ciDefaultConfig(envs Envs) *config {
 	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
-		return prPipelineConfig("ray-pr", nil, -1)
+		return prPipelineConfig
 	case rayV2MicrocheckPipeline:
-		c := prPipelineConfig(
-			"ray-pr-microcheck",
-			map[string]string{"RAYCI_MICROCHECK_RUN": "1"},
-			1,
-		)
+		c := makePRPipelineConfig("ray-pr-microcheck")
+		c.Env["RAYCI_MICROCHECK_RUN"] = "1"
+		c.MaxParallelism = 1
 		c.NotifyOwnerOnFailure = true
 		c.SkipTags = append(c.SkipTags, "skip-on-microcheck")
 
@@ -318,7 +308,7 @@ func ciDefaultConfig(envs Envs) *config {
 	}
 
 	// By default, assume it is less privileged.
-	return prPipelineConfig("ray-pr", nil, -1)
+	return prPipelineConfig
 }
 
 func defaultConfig(envs Envs) *config {
