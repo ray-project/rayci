@@ -105,7 +105,7 @@ func ciDefaultConfig(envs Envs) *config {
 		return prPipelineConfig
 	case rayV2MicrocheckPipeline:
 		c := makePRPipelineConfig("ray-pr-microcheck")
-		c.Env["RAYCI_MICROCHECK_RUN"] = "1"
+		c.BuildEnvKeys = append(c.BuildEnvKeys, "RAYCI_MICROCHECK_RUN")
 		c.MaxParallelism = 1
 		c.NotifyOwnerOnFailure = true
 		c.SkipTags = append(c.SkipTags, "skip-on-microcheck")
