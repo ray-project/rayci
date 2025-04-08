@@ -39,7 +39,6 @@ var branchPipelineConfig = &config{
 		"RAYCI_SCHEDULE",
 		"RAYCI_BISECT_TEST_TARGET",
 		"RAYCI_DISABLE_TEST_DB",
-		"RAYCI_MICROCHECK_RUN",
 	},
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
