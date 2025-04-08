@@ -38,6 +38,8 @@ type Build struct {
 
 func (b *Build) branchName() string {
 	if b.PR != "" {
+		// When PR is set, we use the PR to reference the branch.
+		// This is required for working with pull requests from forks.
 		return fmt.Sprintf("refs/pull/%s/head", b.PR)
 	}
 	return b.Branch
