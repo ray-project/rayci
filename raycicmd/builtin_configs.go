@@ -38,6 +38,8 @@ var branchPipelineConfig = &config{
 	BuildEnvKeys: []string{
 		"RAYCI_SCHEDULE",
 		"RAYCI_BISECT_TEST_TARGET",
+		"RAYCI_DISABLE_TEST_DB",
+		"RAYCI_MICROCHECK_RUN",
 	},
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
@@ -83,6 +85,10 @@ func makePRPipelineConfig(name string) *config {
 			"BUILDKITE_CACHE_READONLY":  "true",
 		},
 
+		BuildEnvKeys: []string{
+			"RAYCI_DISABLE_TEST_DB",
+			"RAYCI_MICROCHECK_RUN",
+		},
 		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
 		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
@@ -105,7 +111,6 @@ func ciDefaultConfig(envs Envs) *config {
 		return prPipelineConfig
 	case rayV2MicrocheckPipeline:
 		c := makePRPipelineConfig("ray-pr-microcheck")
-		c.BuildEnvKeys = append(c.BuildEnvKeys, "RAYCI_MICROCHECK_RUN")
 		c.MaxParallelism = 1
 		c.NotifyOwnerOnFailure = true
 		c.SkipTags = append(c.SkipTags, "skip-on-microcheck")
