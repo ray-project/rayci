@@ -121,6 +121,13 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	}, nil
 }
 
+func loadConfig(configFile string, envs Envs) (*config, error) {
+	if configFile == "" {
+		return defaultConfig(envs), nil
+	}
+	return loadConfigFromFile(configFile)
+}
+
 // Main runs tha main function of rayci command.
 func Main(args []string, envs Envs) error {
 	flags, args := parseFlags(args)
