@@ -36,9 +36,12 @@ func TestDefaultConfig(t *testing.T) {
 		if want := "ray-pr-microcheck"; config.name != want {
 			t.Errorf("config got %q, want %q", config.name, want)
 		}
-		val, ok := config.Env["RAYCI_MICROCHECK_RUN"]
-		if !ok || val != "1" {
-			t.Errorf("config.Env.RAYCI_MICROCHECK_RUN got %q, want `1`", val)
+		val, ok := config.Env["BUILDKITE_BAZEL_CACHE_URL"]
+		if !ok || val != rayBazelBuildCache {
+			t.Errorf(
+				"config.Env.BUILDKITE_BAZEL_CACHE_URL got %q, want %q",
+				val, rayBazelBuildCache,
+			)
 		}
 	})
 
@@ -53,8 +56,8 @@ func TestDefaultConfig(t *testing.T) {
 			t.Errorf("config got %q, want %q", config.name, want)
 		}
 		val, ok := config.Env["RAYCI_MICROCHECK_RUN"]
-		if ok || val == "1" {
-			t.Errorf("config.Env.RAYCI_MICROCHECK_RUN got %q, want not `1`", val)
+		if ok {
+			t.Errorf("config.Env.RAYCI_MICROCHECK_RUN got %q, want missing", val)
 		}
 	})
 
