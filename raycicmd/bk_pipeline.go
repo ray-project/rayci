@@ -77,10 +77,14 @@ var buildkiteEnvs = []string{
 }
 
 type stepDockerPluginConfig struct {
-	extraEnvs           []string
+	workDir   string
+	addCaps   []string
+	extraEnvs []string
+	network   string
+
+	publishTCPPorts []string
+
 	mountBuildkiteAgent bool
-	publishTCPPorts     []string
-	network             string
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -123,11 +127,21 @@ func makeRayDockerPlugin(
 ) map[string]any {
 	envs := dockerPluginEnvList(config)
 
+	workDir := config.workDir
+	if workDir == "" {
+		workDir = "/ray"
+	}
+
+	addCaps := config.addCaps
+	if addCaps == nil {
+		addCaps = []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"}
+	}
+
 	m := map[string]any{
 		"image":         image,
 		"shell":         []string{"/bin/bash", "-elic"},
-		"workdir":       "/ray",
-		"add-caps":      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
+		"workdir":       workDir,
+		"add-caps":      addCaps,
 		"security-opts": []string{"apparmor=unconfined"},
 
 		"volumes": []string{

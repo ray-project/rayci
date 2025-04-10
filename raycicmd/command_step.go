@@ -142,10 +142,17 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 
 	jobEnv, _ := stringInMap(step, "job_env")
 	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
-	if d := c.config.DockerPlugin; d != nil && d.AllowMountBuildkiteAgent {
-		v, _ := boolInMap(step, "mount_buildkite_agent")
-		dockerPluginConfig.mountBuildkiteAgent = v
+	if d := c.config.DockerPlugin; d != nil {
+		if d.AllowMountBuildkiteAgent {
+			v, _ := boolInMap(step, "mount_buildkite_agent")
+			dockerPluginConfig.mountBuildkiteAgent = v
+		}
+		if d.WorkDir != "" {
+			dockerPluginConfig.workDir = d.WorkDir
+		}
+		dockerPluginConfig.addCaps = d.AddCaps
 	}
+
 	publishPortsStr, _ := stringInMap(step, "docker_publish_tcp_ports")
 	if publishPortsStr != "" {
 		publishPorts := strings.Split(publishPortsStr, ",")
