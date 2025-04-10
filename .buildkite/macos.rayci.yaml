@@ -3,6 +3,7 @@ sort_key: "~macos"
 steps:
   - block: "Run Apple Silicon MacOS Tests"
     key: "macos-apple-silicon-block"
+    depends_on: ~
 
   - name: ":macos: apple silicon macos example"
     job_env: MACOS
@@ -13,6 +14,7 @@ steps:
 
   - block: "Run Intel MacOS Tests"
     key: "macos-intel-block"
+    depends_on: ~
 
   - name: ":macos: intel silicon macos example"
     job_env: MACOS
