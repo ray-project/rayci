@@ -16,6 +16,12 @@ type dockerPluginConfig struct {
 	// buildkite agent. This should only be set for pipelines where all builds
 	// on the pipeline are trusted.
 	AllowMountBuildkiteAgent bool `yaml:"allow_mount_buildkite_agent"`
+
+	// WorkDir is the working directory for the docker plugin to use.
+	WorkDir string `yaml:"work_dir"`
+
+	// AddCaps is the list of capabilities to add to the docker container.
+	AddCaps []string `yaml:"add_caps"`
 }
 
 type config struct {
