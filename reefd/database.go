@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // for sqlite3 driver
 )
 
 type store interface {
