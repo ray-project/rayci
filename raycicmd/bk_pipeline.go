@@ -85,6 +85,8 @@ type stepDockerPluginConfig struct {
 	publishTCPPorts []string
 
 	mountBuildkiteAgent bool
+
+	propogateAWSAuthTokens bool
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -117,6 +119,9 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 	}
 	if config.network != "" {
 		m["network"] = config.network
+	}
+	if config.propogateAWSAuthTokens {
+		m["propogate-aws-auth-tokens"] = true
 	}
 
 	return m
@@ -164,6 +169,9 @@ func makeRayDockerPlugin(
 	}
 	if config.network != "" {
 		m["network"] = config.network
+	}
+	if config.propogateAWSAuthTokens {
+		m["propogate-aws-auth-tokens"] = true
 	}
 
 	return m
