@@ -156,7 +156,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		dockerPluginConfig.addCaps = d.AddCaps
 	}
 	if assumeRole != "" {
-		dockerPluginConfig.propogateAWSAuthTokens = true
+		dockerPluginConfig.propagateAWSAuthTokens = true
 	}
 
 	publishPortsStr, _ := stringInMap(step, "docker_publish_tcp_ports")

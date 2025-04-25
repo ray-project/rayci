@@ -771,8 +771,8 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	}
 
 	docker, ok := findDockerPlugin(plugins)
-	if v, _ := boolInMap(docker, "propogate-aws-auth-tokens"); !v {
-		t.Errorf("step 0: docker plugin does not have propogate-aws-auth-tokens set")
+	if v, _ := boolInMap(docker, "propagate-aws-auth-tokens"); !v {
+		t.Errorf("step 0: docker plugin does not have propagate-aws-auth-tokens set")
 	}
 }
 
