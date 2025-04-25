@@ -127,7 +127,7 @@ func TestIntInMap(t *testing.T) {
 		m:   map[string]any{"b": "a"},
 		key: "a",
 	}, {
-		m:   map[string]any{"a": 1},
+		m:   map[string]any{"a": "1"},
 		key: "a",
 	}, {
 		m:   nil,

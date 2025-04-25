@@ -62,7 +62,7 @@ func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	return findPlugin(plugins, dockerPlugin)
 }
 
-func findAwsAssumeRolePlugin(plugins []any) (map[string]any, bool) {
+func findAWSAssumeRolePlugin(plugins []any) (map[string]any, bool) {
 	return findPlugin(plugins, awsAssumeRolePlugin)
 }
 
@@ -758,20 +758,22 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	}
 
 	plugins := bk.Steps[0].(map[string]any)["plugins"].([]any)
-	assumeRole, ok := findAwsAssumeRolePlugin(plugins)
+	assumeRole, ok := findAWSAssumeRolePlugin(plugins)
 	if !ok {
 		t.Errorf("aws assume role plugin not found in step 0")
 	} else {
 		if v, _ := stringInMap(assumeRole, "role"); v != role {
 			t.Errorf("step 0: got aws assume role %q, want %q", v, role)
 		}
-		if v, _ := stringInMap(assumeRole, "duration"); v != "3600" {
+		if v, _ := intInMap(assumeRole, "duration"); v != 3600 {
 			t.Errorf("step 0: got aws assume role duration %q, want 3600", v)
 		}
 	}
 
 	docker, ok := findDockerPlugin(plugins)
-	if v, _ := boolInMap(docker, "propagate-aws-auth-tokens"); !v {
+	if !ok {
+		t.Errorf("docker plugin not found in step 0")
+	} else if v, _ := boolInMap(docker, "propagate-aws-auth-tokens"); !v {
 		t.Errorf("step 0: docker plugin does not have propagate-aws-auth-tokens set")
 	}
 }

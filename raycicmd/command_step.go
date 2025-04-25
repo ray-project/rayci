@@ -187,9 +187,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		jobEnvImage := c.jobEnvImage(jobEnv)
 		var plugins []any
 		if assumeRole != "" {
-			duration, ok := stringInMap(step, "aws_assume_role_duration_seconds")
+			duration, ok := intInMap(step, "aws_assume_role_duration_seconds")
 			if !ok {
-				duration = "900" // min value to assume role
+				duration = 900 // min value to assume role
 			}
 			plugins = append(plugins, map[string]any{
 				awsAssumeRolePlugin: map[string]any{
