@@ -112,6 +112,37 @@ func TestStringInMap(t *testing.T) {
 	}
 }
 
+func TestIntInMap(t *testing.T) {
+	for _, test := range []struct {
+		m    map[string]any
+		key  string
+		want int
+		ok   bool
+	}{{
+		m:    map[string]any{"a": 10},
+		key:  "a",
+		want: 10,
+		ok:   true,
+	}, {
+		m:   map[string]any{"b": "a"},
+		key: "a",
+	}, {
+		m:   map[string]any{"a": 1},
+		key: "a",
+	}, {
+		m:   nil,
+		key: "a",
+	}} {
+		got, ok := intInMap(test.m, test.key)
+		if got != test.want {
+			t.Errorf("intInMap(%v, %q): got %v, want %v", test.m, test.key, got, test.want)
+		}
+		if ok != test.ok {
+			t.Errorf("intInMap(%v, %q): got ok %v, want %v", test.m, test.key, ok, test.ok)
+		}
+	}
+}
+
 func TestStringInMapAnyKey(t *testing.T) {
 	for _, test := range []struct {
 		m    map[string]any

@@ -747,7 +747,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 			"commands": []string{"echo 1"},
 
 			"aws_assume_role":                  role,
-			"aws_assume_role_duration_seconds": "3600",
+			"aws_assume_role_duration_seconds": 3600,
 		}},
 	}
 
