@@ -32,6 +32,15 @@ func stringInMap(m map[string]any, key string) (string, bool) {
 	return s, ok
 }
 
+func intInMap(m map[string]any, key string) (int, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	i, ok := v.(int)
+	return i, ok
+}
+
 func stringInMapAnyKey(m map[string]any, keys ...string) (string, bool) {
 	for _, k := range keys {
 		if s, ok := stringInMap(m, k); ok {
