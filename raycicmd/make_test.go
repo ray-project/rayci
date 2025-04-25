@@ -15,6 +15,8 @@ func TestIsRayCIYaml(t *testing.T) {
 	for _, f := range []string{
 		"foo.rayci.yaml",
 		"foo.rayci.yml",
+		"foo.ci.yaml",
+		"foo.ci.yml",
 		"dir/foo.rayci.yml",
 	} {
 		if !isRayCIYaml(f) {
@@ -24,6 +26,8 @@ func TestIsRayCIYaml(t *testing.T) {
 
 	for _, f := range []string{
 		"rayci.yaml",
+		"ci.yaml",
+		"ci.yml",
 		"pipeline.build.yaml",
 		"pipeline.tests.yml",
 	} {
@@ -42,6 +46,10 @@ func TestListCIYamlFiles(t *testing.T) {
 		"foo.rayci.yml",
 		"dir/foo.rayci.yml",
 		"pipeline.build.yaml",
+		"foo.ci.yaml",
+		"bar.ci.yaml",
+		"foo.ci.yml",
+		"dir/foo.ci.yml",
 	} {
 		dir := filepath.Join(tmp, filepath.Dir(f))
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -59,7 +67,10 @@ func TestListCIYamlFiles(t *testing.T) {
 	}
 
 	want := []string{
+		"bar.ci.yaml",
 		"bar.rayci.yaml",
+		"foo.ci.yaml",
+		"foo.ci.yml",
 		"foo.rayci.yaml",
 		"foo.rayci.yml",
 	}
