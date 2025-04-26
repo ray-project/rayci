@@ -21,6 +21,7 @@ import (
 type Flags struct {
 	RepoDir        string // flag -repo
 	ConfigFile     string // flag -config
+	BuildkiteDir   string // flag -buildkite-dir
 	OutputFile     string // flag -output
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
@@ -53,6 +54,11 @@ func parseFlags(args []string) (*Flags, []string) {
 	set.StringVar(
 		&flags.Select, "select", "",
 		"Select specific step IDs or keys to run, separated by commas.",
+	)
+	set.StringVar(
+		&flags.BuildkiteDir, "buildkite-dir", "",
+		"Path to the buildkite pipeline files; "+
+			"if empty, will use the directory from the config file.",
 	)
 
 	if len(args) == 0 {
@@ -121,11 +127,23 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	}, nil
 }
 
-func loadConfig(configFile string, envs Envs) (*config, error) {
+func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
+	var config *config
 	if configFile == "" {
-		return defaultConfig(envs), nil
+		config = defaultConfig(envs)
+	} else {
+		c, err := loadConfigFromFile(configFile)
+		if err != nil {
+			return nil, fmt.Errorf("load config from file: %w", err)
+		}
+		config = c
 	}
-	return loadConfigFromFile(configFile)
+
+	if buildkiteDir != "" {
+		config.BuildkiteDirs = strings.Split(buildkiteDir, ":")
+	}
+
+	return config, nil
 }
 
 // Main runs tha main function of rayci command.
@@ -139,7 +157,7 @@ func Main(args []string, envs Envs) error {
 		envs = &osEnvs{}
 	}
 
-	config, err := loadConfig(flags.ConfigFile, envs)
+	config, err := loadConfig(flags.ConfigFile, flags.BuildkiteDir, envs)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
