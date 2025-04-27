@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -38,6 +39,48 @@ func TestMainFunction(t *testing.T) {
 	if err := yaml.Unmarshal(bs, bk); err != nil {
 		t.Fatal("output is not a valid buildkite pipeline: ", err)
 		t.Log(bs)
+	}
+}
+
+func TestLoadConfig_fromFile(t *testing.T) {
+	tmp := t.TempDir()
+	envs := newEnvsMap(map[string]string{})
+
+	configFile := filepath.Join(tmp, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(strings.Join([]string{
+		"ci_temp: /tmp/rayci",
+		"ci_work_repo: ray-project/rayci",
+	}, "\n")), 0644); err != nil {
+		t.Fatal("write config file: ", err)
+	}
+
+	c, err := loadConfig(configFile, "", envs)
+	if err != nil {
+		t.Fatal("load config: ", err)
+	}
+
+	want := &config{
+		CIWorkRepo: "ray-project/rayci",
+		CITemp:     "/tmp/rayci",
+	}
+	if !reflect.DeepEqual(c, want) {
+		t.Errorf("got %+v, want %+v", c, want)
+	}
+}
+
+func TestLoadConfig_customBuildkiteDirs(t *testing.T) {
+	envs := newEnvsMap(map[string]string{})
+	c, err := loadConfig("", ".buildkite/premerge:.buildkite/common", envs)
+	if err != nil {
+		t.Fatal("load config: ", err)
+	}
+
+	want := []string{
+		".buildkite/premerge",
+		".buildkite/common",
+	}
+	if !reflect.DeepEqual(c.BuildkiteDirs, want) {
+		t.Errorf("got %v, want %v", c.BuildkiteDirs, want)
 	}
 }
 
