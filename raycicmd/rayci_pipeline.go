@@ -44,6 +44,7 @@ var (
 		"command", "commands", "priority", "parallelism", "if",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"allow_dependency_failure", "concurrency", "concurrency_group",
+		"timeout_in_minutes",
 
 		// The following keys will be processed by rayci and dropped.
 		"instance_type", "queue", "job_env", "tags",
@@ -56,6 +57,9 @@ var (
 		"docker_publish_tcp_ports", "docker_network",
 		"mount_buildkite_agent", "mount_windows_artifacts",
 		"aws_assume_role", "aws_assume_role_duration_seconds",
+
+		// The following keys are processed by rayci.
+		"timeout_in_minutes",
 	}
 
 	wandaStepAllowedKeys = []string{
