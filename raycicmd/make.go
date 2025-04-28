@@ -11,22 +11,25 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+var ciYamlSuffixes = []string{
+	".rayci.yaml", ".rayci.yml",
+	".ci.yaml", ".ci.yml",
+}
+
 func isRayCIYaml(p string) bool {
-	if strings.HasSuffix(p, ".rayci.yaml") {
-		return true
-	}
-	if strings.HasSuffix(p, ".rayci.yml") {
-		return true
+	for _, suffix := range ciYamlSuffixes {
+		if strings.HasSuffix(p, suffix) {
+			return true
+		}
 	}
 	return false
 }
 
 func stripRayCIYamlSuffix(p string) string {
-	if strings.HasSuffix(p, ".rayci.yaml") {
-		return strings.TrimSuffix(p, ".rayci.yaml")
-	}
-	if strings.HasSuffix(p, ".rayci.yml") {
-		return strings.TrimSuffix(p, ".rayci.yml")
+	for _, suffix := range ciYamlSuffixes {
+		if strings.HasSuffix(p, suffix) {
+			return strings.TrimSuffix(p, suffix)
+		}
 	}
 	return p
 }
