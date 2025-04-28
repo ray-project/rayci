@@ -77,10 +77,16 @@ var buildkiteEnvs = []string{
 }
 
 type stepDockerPluginConfig struct {
-	extraEnvs           []string
+	workDir   string
+	addCaps   []string
+	extraEnvs []string
+	network   string
+
+	publishTCPPorts []string
+
 	mountBuildkiteAgent bool
-	publishTCPPorts     []string
-	network             string
+
+	propagateAWSAuthTokens bool
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -114,6 +120,9 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 	if config.network != "" {
 		m["network"] = config.network
 	}
+	if config.propagateAWSAuthTokens {
+		m["propagate-aws-auth-tokens"] = true
+	}
 
 	return m
 }
@@ -123,11 +132,21 @@ func makeRayDockerPlugin(
 ) map[string]any {
 	envs := dockerPluginEnvList(config)
 
+	workDir := config.workDir
+	if workDir == "" {
+		workDir = "/ray"
+	}
+
+	addCaps := config.addCaps
+	if addCaps == nil {
+		addCaps = []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"}
+	}
+
 	m := map[string]any{
 		"image":         image,
 		"shell":         []string{"/bin/bash", "-elic"},
-		"workdir":       "/ray",
-		"add-caps":      []string{"SYS_PTRACE", "SYS_ADMIN", "NET_ADMIN"},
+		"workdir":       workDir,
+		"add-caps":      addCaps,
 		"security-opts": []string{"apparmor=unconfined"},
 
 		"volumes": []string{
@@ -150,6 +169,9 @@ func makeRayDockerPlugin(
 	}
 	if config.network != "" {
 		m["network"] = config.network
+	}
+	if config.propagateAWSAuthTokens {
+		m["propagate-aws-auth-tokens"] = true
 	}
 
 	return m

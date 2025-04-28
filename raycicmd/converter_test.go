@@ -46,17 +46,24 @@ func TestParseStepEnvs(t *testing.T) {
 	}
 }
 
-func findDockerPlugin(plugins []any) (map[string]any, bool) {
+func findPlugin(plugins []any, name string) (map[string]any, bool) {
 	for _, p := range plugins {
 		if m, ok := p.(map[string]any); ok {
-			v, ok := m[dockerPlugin]
+			v, ok := m[name]
 			if ok {
 				return v.(map[string]any), true
 			}
 		}
 	}
-
 	return nil, false
+}
+
+func findDockerPlugin(plugins []any) (map[string]any, bool) {
+	return findPlugin(plugins, dockerPlugin)
+}
+
+func findAWSAssumeRolePlugin(plugins []any) (map[string]any, bool) {
+	return findPlugin(plugins, awsAssumeRolePlugin)
 }
 
 func findMacosSandboxPlugin(plugins []any) bool {
@@ -715,6 +722,59 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 	v, ok = boolInMap(p1, "mount-buildkite-agnet")
 	if v != false || ok != false {
 		t.Errorf("step 1: got docker mount bk agent %v, %v, want false", v, ok)
+	}
+}
+
+func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+	}, info)
+
+	const role = "arn:aws:iam::123456789012:role/test-role"
+
+	g := &pipelineGroup{
+		Group: "fancy",
+		Steps: []map[string]any{{
+			"commands": []string{"echo 1"},
+
+			"aws_assume_role":                  role,
+			"aws_assume_role_duration_seconds": 3600,
+		}},
+	}
+
+	filter := &stepFilter{runAll: true}
+	bk, err := convertSingleGroup(c, g, filter)
+	if err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+
+	plugins := bk.Steps[0].(map[string]any)["plugins"].([]any)
+	assumeRole, ok := findAWSAssumeRolePlugin(plugins)
+	if !ok {
+		t.Errorf("aws assume role plugin not found in step 0")
+	} else {
+		if v, _ := stringInMap(assumeRole, "role"); v != role {
+			t.Errorf("step 0: got aws assume role %q, want %q", v, role)
+		}
+		if v, _ := intInMap(assumeRole, "duration"); v != 3600 {
+			t.Errorf("step 0: got aws assume role duration %q, want 3600", v)
+		}
+	}
+
+	docker, ok := findDockerPlugin(plugins)
+	if !ok {
+		t.Errorf("docker plugin not found in step 0")
+	} else if v, _ := boolInMap(docker, "propagate-aws-auth-tokens"); !v {
+		t.Errorf("step 0: docker plugin does not have propagate-aws-auth-tokens set")
 	}
 }
 
