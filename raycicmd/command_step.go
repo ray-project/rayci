@@ -88,6 +88,18 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 			}
 		}
 	}
+
+	timeoutInMinutes := defaultTimeoutInMinutes
+	if v, ok := intInMap(step, "timeout_in_minutes"); ok {
+		if v < 0 {
+			return nil, fmt.Errorf("timeout_in_minutes cannot be negative")
+		}
+		if v > defaultTimeoutInMinutes {
+			v = defaultTimeoutInMinutes
+		}
+		timeoutInMinutes = v
+	}
+
 	result := cloneMapExcept(step, commandStepDropKeys)
 
 	if agentQueue != skipQueue { // queue type not supported, skip.
@@ -97,7 +109,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 
 	result["retry"] = defaultRayRetry
-	result["timeout_in_minutes"] = defaultTimeoutInMinutes
+	result["timeout_in_minutes"] = timeoutInMinutes
 
 	priority, ok := step["priority"]
 	if !ok {
