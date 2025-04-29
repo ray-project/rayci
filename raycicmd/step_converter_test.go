@@ -64,6 +64,23 @@ func TestBlockConverter(t *testing.T) {
 		want: map[string]any{
 			"block": "me", "if": "false", "depends_on": []string{"dep"},
 		},
+	}, {
+		step: map[string]any{
+			"block": "me", "blocked_state": "running",
+			"prompt": "Please enter your name",
+			"fields": []any{
+				map[string]any{"text": "name", "key": "name-input"},
+			},
+			"allow_dependency_failure": true,
+		},
+		want: map[string]any{
+			"block": "me", "blocked_state": "running",
+			"prompt": "Please enter your name",
+			"fields": []any{
+				map[string]any{"text": "name", "key": "name-input"},
+			},
+			"allow_dependency_failure": true,
+		},
 	}} {
 		match := blockConverter.match(test.step)
 		if !match {

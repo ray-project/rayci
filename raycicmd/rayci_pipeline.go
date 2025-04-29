@@ -30,6 +30,7 @@ var (
 
 	blockStepAllowedKeys = []string{
 		"block", "if", "depends_on", "tags", "key",
+		"fields", "prompt", "blocked_state", "allow_dependency_failure",
 	}
 	blockStepDropKeys = []string{"tags"}
 
