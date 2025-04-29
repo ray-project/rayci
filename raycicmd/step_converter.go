@@ -32,7 +32,7 @@ func (c *basicStepConverter) convert(id string, step map[string]any) (
 	map[string]any, error,
 ) {
 	if err := checkStepKeys(step, c.allowedKeys); err != nil {
-		return nil, fmt.Errorf("check wait step keys: %w", err)
+		return nil, fmt.Errorf("check %s step keys: %w", c.signatureKey, err)
 	}
 	return cloneMapExcept(step, c.dropKeys), nil
 }
