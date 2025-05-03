@@ -11,7 +11,7 @@ type converter struct {
 
 	stepConverters []stepConverter
 
-	defaultConverter stepConverter
+	commandConverter *commandConverter
 }
 
 func newConverter(config *config, info *buildInfo) *converter {
@@ -54,7 +54,7 @@ func newConverter(config *config, info *buildInfo) *converter {
 	if c.config.AllowTriggerStep {
 		c.stepConverters = append(c.stepConverters, triggerConverter)
 	}
-	c.defaultConverter = newCommandConverter(config, info, envMap)
+	c.commandConverter = newCommandConverter(config, info, envMap)
 
 	return c
 }
@@ -67,7 +67,7 @@ func (c *converter) convertStep(id string, step map[string]any) (
 			return stepConverter.convert(id, step)
 		}
 	}
-	return c.defaultConverter.convert(id, step)
+	return c.commandConverter.convert(id, step)
 }
 
 func (c *converter) convertGroup(n *stepNode) (
@@ -80,6 +80,8 @@ func (c *converter) convertGroup(n *stepNode) (
 		Key:       g.Key,
 		DependsOn: g.DependsOn,
 	}
+
+	c.commandConverter.setDefaultJobEnv(g.DefaultJobEnv)
 
 	for _, step := range n.subSteps {
 		if !step.hit() {

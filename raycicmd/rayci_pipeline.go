@@ -11,6 +11,10 @@ type pipelineGroup struct {
 
 	DependsOn []string `yaml:"depends_on"`
 
+	// DefaultJobEnv is the default job environment variables for all the
+	// command steps in the group.
+	DefaultJobEnv string `yaml:"default_job_env"`
+
 	Steps []map[string]any `yaml:"steps"`
 }
 
