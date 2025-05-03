@@ -702,7 +702,10 @@ func TestConvertPipelineGroup_defaultJobEnv(t *testing.T) {
 		Steps: []map[string]any{
 			{"commands": []string{"high priority"}, "priority": 10},
 			{"wait": nil},
-			{"commands": []string{"default priority"}},
+			{
+				"commands": []string{"default priority"},
+				"job_env":  "postmerge",
+			},
 		},
 	}
 	filter := &stepFilter{runAll: true}
@@ -712,7 +715,7 @@ func TestConvertPipelineGroup_defaultJobEnv(t *testing.T) {
 	}
 
 	premergeImage := fmt.Sprintf("fakeecr:%s-premerge", buildID)
-
+	postmergeImage := fmt.Sprintf("fakeecr:%s-postmerge", buildID)
 	steps := bk.Steps
 	p0, ok := findDockerPlugin(steps[0].(map[string]any)["plugins"].([]any))
 	if !ok {
@@ -722,12 +725,12 @@ func TestConvertPipelineGroup_defaultJobEnv(t *testing.T) {
 		t.Errorf("step 0: got job-env %q, %v, want %q", v, ok, premergeImage)
 	}
 
-	p2, ok := findDockerPlugin(steps[0].(map[string]any)["plugins"].([]any))
+	p2, ok := findDockerPlugin(steps[2].(map[string]any)["plugins"].([]any))
 	if !ok {
-		t.Errorf("docker plugin not found in step 0")
+		t.Errorf("docker plugin not found in step 2")
 	}
-	if v, ok := stringInMap(p2, "image"); v != premergeImage || !ok {
-		t.Errorf("step 0: got job-env %q, %v, want %q", v, ok, premergeImage)
+	if v, ok := stringInMap(p2, "image"); v != postmergeImage || !ok {
+		t.Errorf("step 2: got job-env %q, %v, want %q", v, ok, postmergeImage)
 	}
 }
 
