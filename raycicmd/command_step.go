@@ -12,6 +12,8 @@ type commandConverter struct {
 	info   *buildInfo
 
 	envMap map[string]string
+
+	defaultJobEnv string
 }
 
 func newCommandConverter(
@@ -21,6 +23,8 @@ func newCommandConverter(
 		config: config,
 		info:   info,
 		envMap: envMap,
+
+		defaultJobEnv: "forge",
 	}
 }
 
@@ -34,9 +38,16 @@ func (c *commandConverter) mapAgent(instanceType string) (string, error) {
 	return "", fmt.Errorf("unknown instance type %q", instanceType)
 }
 
-func (c *commandConverter) jobEnvImage(name string) string {
+func (c *commandConverter) setDefaultJobEnv(name string) {
 	if name == "" {
 		name = "forge"
+	}
+	c.defaultJobEnv = name
+}
+
+func (c *commandConverter) jobEnvImage(name string) string {
+	if name == "" {
+		name = c.defaultJobEnv
 	}
 
 	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)

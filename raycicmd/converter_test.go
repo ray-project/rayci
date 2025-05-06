@@ -676,6 +676,64 @@ func TestConvertPipelineGroup_priority(t *testing.T) {
 	}
 }
 
+func TestConvertPipelineGroup_defaultJobEnv(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+
+		Env: map[string]string{
+			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+		},
+	}, info)
+
+	g := &pipelineGroup{
+		Group:         "fancy",
+		DefaultJobEnv: "premerge",
+		Steps: []map[string]any{
+			{"commands": []string{"high priority"}, "priority": 10},
+			{"wait": nil},
+			{
+				"commands": []string{"default priority"},
+				"job_env":  "postmerge",
+			},
+		},
+	}
+	filter := &stepFilter{runAll: true}
+	bk, err := convertSingleGroup(c, g, filter)
+	if err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+
+	premergeImage := fmt.Sprintf("fakeecr:%s-premerge", buildID)
+	postmergeImage := fmt.Sprintf("fakeecr:%s-postmerge", buildID)
+	steps := bk.Steps
+	p0, ok := findDockerPlugin(steps[0].(map[string]any)["plugins"].([]any))
+	if !ok {
+		t.Errorf("docker plugin not found in step 0")
+	}
+	if v, ok := stringInMap(p0, "image"); v != premergeImage || !ok {
+		t.Errorf("step 0: got job-env %q, %v, want %q", v, ok, premergeImage)
+	}
+
+	p2, ok := findDockerPlugin(steps[2].(map[string]any)["plugins"].([]any))
+	if !ok {
+		t.Errorf("docker plugin not found in step 2")
+	}
+	if v, ok := stringInMap(p2, "image"); v != postmergeImage || !ok {
+		t.Errorf("step 2: got job-env %q, %v, want %q", v, ok, postmergeImage)
+	}
+}
+
 func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
