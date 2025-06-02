@@ -6,26 +6,30 @@ import (
 )
 
 func TestDefaultCacheEpoch(t *testing.T) {
+	date := func(year int, month time.Month, day int) time.Time {
+		return time.Date(year, month, day, 8, 0, 0, 0, sfoAround)
+	}
+
 	tests := []struct {
 		name     string
 		now      time.Time
 		expected string
 	}{{
 		name:     "saturday",
-		now:      time.Date(2025, 5, 31, 8, 0, 0, 0, sfoAround), // Saturday
+		now:      date(2025, time.May, 31), // Saturday
 		expected: "202522",
 	}, {
 		name:     "sunday",
-		now:      time.Date(2025, 6, 1, 8, 0, 0, 0, sfoAround), // Sunday
-		expected: "202522",
+		now:      date(2025, time.June, 1), // Sunday
+		expected: "202523",
 	}, {
 		name:     "monday",
-		now:      time.Date(2023, 6, 2, 12, 0, 0, 0, sfoAround), // Monday
-		expected: "202522",
+		now:      date(2025, time.June, 2), // Monday
+		expected: "202523",
 	}, {
 		name:     "year boundary",
-		now:      time.Date(2023, 12, 31, 12, 0, 0, 0, sfoAround), // Sunday
-		expected: "202402",                                        // First full week of 2024
+		now:      date(2023, time.December, 31), // Sunday
+		expected: "202401",                      // First full week of 2024
 	}}
 
 	for _, test := range tests {
