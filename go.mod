@@ -8,6 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.210.1
 	github.com/buildkite/go-buildkite/v4 v4.1.0
 	github.com/google/go-containerregistry v0.20.3
+	github.com/tailscale/hujson v0.0.0-20250226034555-ec1d1c113d33
+	golang.org/x/crypto v0.32.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.37.0
 )
@@ -65,6 +67,7 @@ require (
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/grpc v1.68.1 // indirect

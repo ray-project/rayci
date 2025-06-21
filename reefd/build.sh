@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+set -x
 
 CGO_ENABLED=0 go build -trimpath -o _build/reefd ./reefd
 (

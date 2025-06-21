@@ -1,6 +1,7 @@
 package reefd
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,12 +9,19 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	s := httptest.NewServer(newServer(&Config{}))
-	defer s.Close()
-
-	resp, err := s.Client().Get(s.URL)
+	ctx := context.Background()
+	s, err := newServer(ctx, &Config{})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("new server: ", err)
+	}
+
+	httpServer := httptest.NewServer(s)
+	defer httpServer.Close()
+
+	client := httpServer.Client()
+	resp, err := client.Get(httpServer.URL)
+	if err != nil {
+		t.Fatal("get url: ", err)
 	}
 	defer resp.Body.Close()
 
@@ -21,7 +29,7 @@ func TestServer(t *testing.T) {
 		t.Errorf("got status code %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
-	want := "Hello, World!"
+	want := "Ray CI"
 	got, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read response: %v", err)
