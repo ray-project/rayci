@@ -17,35 +17,35 @@ func TestDefaultCacheEpoch(t *testing.T) {
 	}{{
 		name:     "saturday",
 		now:      morningOf(2025, time.May, 31), // Saturday
-		expected: "202522B",
+		expected: "202522b",
 	}, {
 		name:     "sunday",
 		now:      morningOf(2025, time.June, 1), // Sunday
-		expected: "202523A",
+		expected: "202523a",
 	}, {
 		name:     "monday",
 		now:      morningOf(2025, time.June, 2), // Monday
-		expected: "202523A",
+		expected: "202523a",
 	}, {
 		name:     "tuesday",
 		now:      morningOf(2025, time.June, 3), // Tuesday
-		expected: "202523A",
+		expected: "202523a",
 	}, {
 		name:     "wednesday",
 		now:      morningOf(2025, time.June, 4), // Wednesday
-		expected: "202523A",
+		expected: "202523a",
 	}, {
 		name:     "thursday",
 		now:      morningOf(2025, time.June, 5), // Thursday
-		expected: "202523B",
+		expected: "202523b",
 	}, {
 		name:     "friday",
 		now:      morningOf(2025, time.June, 6), // Friday
-		expected: "202523B",
+		expected: "202523b",
 	}, {
 		name:     "year boundary",
 		now:      morningOf(2023, time.December, 31), // Sunday
-		expected: "202401A",                          // First full week of 2024
+		expected: "202401a",                          // First full week of 2024
 	}}
 
 	for _, test := range tests {

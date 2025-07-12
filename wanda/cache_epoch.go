@@ -11,9 +11,9 @@ func defaultCacheEpoch(nowFunc func() time.Time) string {
 	now := nowFunc().In(sfoAround)
 	var group string
 	if now.Weekday() < time.Thursday {
-		group = "A"
+		group = "a"
 	} else {
-		group = "B"
+		group = "b"
 	}
 
 	year, week := now.Add(24 * time.Hour).ISOWeek()
