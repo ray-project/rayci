@@ -9,6 +9,7 @@ var sfoAround = time.FixedZone("SFO", -7*60*60)
 
 func defaultCacheEpoch(nowFunc func() time.Time) string {
 	now := nowFunc().In(sfoAround)
+	// splitting the week into 2 groups to prevent exceeding Container Registry's 1000 tag limit
 	var group string
 	if now.Weekday() < time.Thursday {
 		group = "a"
