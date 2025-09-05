@@ -8,6 +8,21 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
+func resolveDockerImage(d *dockerCmd, name, ref string) (*imageSource, error) {
+	info, err := d.inspectImage(ref)
+	if err != nil {
+		return nil, fmt.Errorf("inspect image %s: %w", ref, err)
+	}
+	if info == nil {
+		return nil, fmt.Errorf("image %s not found", ref)
+	}
+	return &imageSource{
+		name:  name,
+		id:    info.Id,
+		local: ref,
+	}, nil
+}
+
 func resolveLocalImage(name, ref string) (*imageSource, error) {
 	parsed, err := cranename.ParseReference(ref)
 	if err != nil {

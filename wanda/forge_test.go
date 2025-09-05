@@ -237,6 +237,7 @@ func TestForgeWithWorkRepo(t *testing.T) {
 		WorkRepo:   fmt.Sprintf("%s/work", crAddr),
 		BuildID:    "abc123",
 		RayCI:      true,
+		Remote:     true,
 		Epoch:      "1",
 	}
 
