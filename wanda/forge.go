@@ -35,21 +35,6 @@ func Build(specFile string, config *ForgeConfig) error {
 	return forge.Build(spec)
 }
 
-// ForgeConfig is a configuration for a forge to build container images.
-type ForgeConfig struct {
-	WorkDir    string
-	DockerBin  string
-	WorkRepo   string
-	NamePrefix string
-	BuildID    string
-	Epoch      string
-
-	RayCI   bool
-	Rebuild bool
-
-	ReadOnlyCache bool
-}
-
 // Forge is a forge to build container images.
 type Forge struct {
 	config *ForgeConfig
@@ -92,26 +77,10 @@ func (f *Forge) addSrcFile(ts *tarStream, src string) {
 	ts.addFile(src, nil, filepath.Join(f.workDir, src))
 }
 
-func (f *Forge) workRepo() string {
-	if f.config.WorkRepo != "" {
-		return f.config.WorkRepo
-	}
-	return "localhost:5000/rayci-work"
-}
-
-func (f *Forge) workTag(name string) string {
-	workRepo := f.workRepo()
-	if f.config.BuildID != "" {
-		return fmt.Sprintf("%s:%s-%s", workRepo, f.config.BuildID, name)
-	}
-	return fmt.Sprintf("%s:%s", workRepo, name)
-}
-
-func (f *Forge) cacheTag(inputDigest string) string {
-	if _, d, ok := strings.Cut(inputDigest, ":"); ok {
-		inputDigest = d
-	}
-	return fmt.Sprintf("%s:z-%s", f.workRepo(), inputDigest)
+func (f *Forge) isRemote() bool             { return f.config.isRemote() }
+func (f *Forge) workTag(name string) string { return f.config.workTag(name) }
+func (f *Forge) cacheTag(digest string) string {
+	return f.config.cacheTag(digest)
 }
 
 func (f *Forge) newDockerCmd() *dockerCmd {
@@ -174,8 +143,6 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	return m, nil
 }
 
-func (f *Forge) isRemote() bool { return f.config.WorkRepo != "" }
-
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
@@ -229,8 +196,7 @@ func (f *Forge) Build(spec *Spec) error {
 			nameTag := f.config.NamePrefix + spec.Name
 			in.addTag(nameTag)
 		}
-		// And add any extra tags.
-		for _, tag := range spec.Tags {
+		for _, tag := range spec.Tags { // And add extra tags.
 			in.addTag(tag)
 		}
 	}
@@ -241,7 +207,6 @@ func (f *Forge) Build(spec *Spec) error {
 			if err != nil {
 				return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
 			}
-
 			wt, err := cranename.NewTag(workTag)
 			if err != nil {
 				return fmt.Errorf("parse work tag %q: %w", workTag, err)
@@ -251,7 +216,6 @@ func (f *Forge) Build(spec *Spec) error {
 			if err != nil {
 				log.Printf("Cache image miss: %v", err)
 			} else {
-				// Cache hit!
 				log.Printf("cache hit: %s", desc.Digest)
 				f.cacheHitCount++
 
@@ -268,17 +232,15 @@ func (f *Forge) Build(spec *Spec) error {
 				return fmt.Errorf("check cache image: %w", err)
 			}
 			if info != nil {
-				// Cache hit!
 				log.Printf("cache hit: %s", info.Id)
 				f.cacheHitCount++
 
 				for _, tag := range in.tagList() {
 					log.Printf("tag output as %s", tag)
-					if tag == cacheTag {
-						continue
-					}
-					if err := f.docker.tag(cacheTag, tag); err != nil {
-						return fmt.Errorf("tag cache image: %w", err)
+					if tag != cacheTag {
+						if err := f.docker.tag(cacheTag, tag); err != nil {
+							return fmt.Errorf("tag cache image: %w", err)
+						}
 					}
 				}
 				return nil // and we are done.
@@ -295,7 +257,7 @@ func (f *Forge) Build(spec *Spec) error {
 		return fmt.Errorf("build docker: %w", err)
 	}
 
-	// Push the image to the work repo.
+	// Push the image to the work repo with workTag and cacheTag if needed.
 	if f.isRemote() {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
