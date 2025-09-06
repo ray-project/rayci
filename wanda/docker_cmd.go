@@ -103,7 +103,7 @@ type dockerImageInfo struct {
 }
 
 func (c *dockerCmd) inspectImage(tag string) (*dockerImageInfo, error) {
-	cmd := c.cmd("image", "inspect", "-f", "json", tag)
+	cmd := c.cmd("image", "inspect", tag)
 	buf := new(bytes.Buffer)
 	cmd.Stdout = buf
 	if err := cmd.Run(); err != nil {
