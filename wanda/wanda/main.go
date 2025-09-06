@@ -33,6 +33,10 @@ func main() {
 
 		// When in rayci mode, run in remote mode by default.
 		*remote = os.Getenv("RAYCI_REMOTE") != "false"
+
+		if *epoch == "" {
+			*epoch = wanda.DefaultCacheEpoch()
+		}
 	}
 
 	args := flag.Args()
@@ -45,10 +49,6 @@ func main() {
 		input = args[0]
 	} else {
 		input = os.Getenv("RAYCI_WANDA_FILE")
-	}
-
-	if *epoch == "" {
-		*epoch = wanda.DefaultCacheEpoch()
 	}
 
 	config := &wanda.ForgeConfig{
