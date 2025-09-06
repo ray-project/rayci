@@ -18,7 +18,7 @@ func resolveDockerImage(d *dockerCmd, name, ref string) (*imageSource, error) {
 	}
 	return &imageSource{
 		name:  name,
-		id:    info.Id,
+		id:    info.ID,
 		local: ref,
 	}, nil
 }

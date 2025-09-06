@@ -97,7 +97,7 @@ func (c *dockerCmd) pull(src, asTag string) error {
 }
 
 type dockerImageInfo struct {
-	Id          string
+	ID          string `json:"Id"`
 	RepoDigests []string
 	RepoTags    []string
 }

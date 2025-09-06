@@ -232,7 +232,7 @@ func (f *Forge) Build(spec *Spec) error {
 				return fmt.Errorf("check cache image: %w", err)
 			}
 			if info != nil {
-				log.Printf("cache hit: %s", info.Id)
+				log.Printf("cache hit: %s", info.ID)
 				f.cacheHitCount++
 
 				for _, tag := range in.tagList() {
