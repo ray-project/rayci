@@ -262,7 +262,6 @@ func (f *Forge) Build(spec *Spec) error {
 				f.cacheHitCount++
 
 				log.Printf("tag output as %s", workTag)
-
 				if err := remote.Tag(wt, desc, f.remoteOpts...); err != nil {
 					return fmt.Errorf("tag cache image: %w", err)
 				}
@@ -288,7 +287,6 @@ func (f *Forge) Build(spec *Spec) error {
 						return fmt.Errorf("tag cache image: %w", err)
 					}
 				}
-
 				return nil // and we are done.
 			}
 		}
@@ -304,7 +302,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	// Push the image to the work repo.
-	if f.config.RayCI {
+	if f.config.Remote {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}

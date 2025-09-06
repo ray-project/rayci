@@ -16,12 +16,15 @@ func main() {
 		"takes RAYCI_ env vars for input and run in remote mode",
 	)
 	workRepo := flag.String("work_repo", "", "cache container repository")
-	namePrefix := flag.String("name_prefix", "cr.ray.io/rayproject/", "prefix for the image name")
+	namePrefix := flag.String(
+		"name_prefix", "cr.ray.io/rayproject/",
+		"prefix for the image name",
+	)
 	buildID := flag.String("build_id", "", "build ID for the image tag")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	epoch := flag.String("epoch", "", "epoch for the image tag")
 	remote := flag.Bool("remote", false, "run in remote mode")
-	rebuild := flag.Bool("rebuild", false, "rebuild the image even if it exists")
+	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
 
 	flag.Parse()
 

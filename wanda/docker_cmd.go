@@ -117,7 +117,7 @@ func (c *dockerCmd) inspectImage(tag string) (*dockerImageInfo, error) {
 		return nil, fmt.Errorf("unmarshal image info: %w", err)
 	}
 	if len(info) != 1 {
-		return nil, fmt.Errorf("unexpected number (%d) of image info", len(info))
+		return nil, fmt.Errorf("%d image(s) found, expect 1", len(info))
 	}
 	return info[0], nil
 }
