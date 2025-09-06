@@ -23,7 +23,6 @@ func main() {
 	buildID := flag.String("build_id", "", "build ID for the image tag")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	epoch := flag.String("epoch", "", "epoch for the image tag")
-	remote := flag.Bool("remote", false, "run in remote mode")
 	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
 
 	flag.Parse()
@@ -33,9 +32,6 @@ func main() {
 		*readOnly = os.Getenv("BUILDKITE_CACHE_READONLY") == "true"
 		*buildID = os.Getenv("RAYCI_BUILD_ID")
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
-
-		// When in rayci mode, run in remote mode by default.
-		*remote = os.Getenv("RAYCI_REMOTE") != "false"
 
 		if *epoch == "" {
 			*epoch = wanda.DefaultCacheEpoch()
@@ -63,7 +59,6 @@ func main() {
 		Epoch:      *epoch,
 
 		RayCI:   *rayCI,
-		Remote:  *remote,
 		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,

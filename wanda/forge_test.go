@@ -56,7 +56,7 @@ func filesInLayer(layer cranev1.Layer) (map[string]string, error) {
 
 const worldDotTxt = "This is my world!"
 
-func TestForgeLocal(t *testing.T) {
+func TestForgeLocal_noNamePrefix(t *testing.T) {
 	config := &ForgeConfig{WorkDir: "testdata"}
 
 	if err := Build("testdata/localbase.wanda.yaml", config); err != nil {
@@ -235,7 +235,6 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		WorkRepo:   fmt.Sprintf("%s/work", crAddr),
 		BuildID:    "abc123",
 		RayCI:      true,
-		Remote:     true,
 		Epoch:      "1",
 	}
 
@@ -330,7 +329,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	}
 }
 
-func TestForgeWithLocalWorkRepo(t *testing.T) {
+func TestForgeLocal_withNamePrefix(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("skipping test on non-linux")
 		return

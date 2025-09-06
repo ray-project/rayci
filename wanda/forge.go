@@ -45,7 +45,6 @@ type ForgeConfig struct {
 	Epoch      string
 
 	RayCI   bool
-	Remote  bool
 	Rebuild bool
 
 	ReadOnlyCache bool
@@ -122,13 +121,6 @@ func (f *Forge) newDockerCmd() *dockerCmd {
 	})
 }
 
-func (f *Forge) resolveLocalImage(name, ref string) (*imageSource, error) {
-	if f.config.Remote {
-		return resolveLocalImage(name, ref)
-	}
-	return resolveDockerImage(f.docker, name, ref)
-}
-
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	m := make(map[string]*imageSource)
 	namePrefix := f.config.NamePrefix
@@ -136,7 +128,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	for _, from := range froms {
 		if strings.HasPrefix(from, "@") { // A local image.
 			name := strings.TrimPrefix(from, "@")
-			src, err := f.resolveLocalImage(from, name)
+			src, err := resolveDockerImage(f.docker, from, name)
 			if err != nil {
 				return nil, fmt.Errorf("resolve local image %s: %w", from, err)
 			}
@@ -145,9 +137,9 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		}
 
 		if namePrefix != "" && strings.HasPrefix(from, namePrefix) {
-			if f.config.WorkRepo == "" {
+			if !f.isRemote() {
 				// Treat it as a local image.
-				src, err := f.resolveLocalImage(from, from)
+				src, err := resolveDockerImage(f.docker, from, from)
 				if err != nil {
 					return nil, fmt.Errorf(
 						"resolve prefixed local image %s: %w", from, err,
@@ -181,6 +173,8 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	}
 	return m, nil
 }
+
+func (f *Forge) isRemote() bool { return f.config.WorkRepo != "" }
 
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
@@ -242,7 +236,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	if cachable && !f.config.Rebuild {
-		if f.config.Remote {
+		if f.isRemote() {
 			ct, err := cranename.NewTag(cacheTag)
 			if err != nil {
 				return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
@@ -302,7 +296,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	// Push the image to the work repo.
-	if f.config.Remote {
+	if f.isRemote() {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
