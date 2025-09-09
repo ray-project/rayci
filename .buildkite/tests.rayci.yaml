@@ -19,6 +19,13 @@ steps:
     queue: small
     depends_on: forge    
 
+  - label: Go lint
+    commands: 
+      - golangci-lint --version
+      - golangci-lint run ./...
+    queue: small
+    depends_on: forge
+
   - label: Python {{matrix}} tests
     command:
       - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 029272617770.dkr.ecr.us-west-2.amazonaws.com
