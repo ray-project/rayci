@@ -11,12 +11,19 @@ import (
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
-	rayCI := flag.Bool("rayci", false, "takes RAYCI_ env vars for input")
+	rayCI := flag.Bool(
+		"rayci", false,
+		"takes RAYCI_ env vars for input and run in remote mode",
+	)
 	workRepo := flag.String("work_repo", "", "cache container repository")
-	namePrefix := flag.String("name_prefix", "", "prefix for the image name")
+	namePrefix := flag.String(
+		"name_prefix", "cr.ray.io/rayproject/",
+		"prefix for the image name",
+	)
 	buildID := flag.String("build_id", "", "build ID for the image tag")
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	epoch := flag.String("epoch", "", "epoch for the image tag")
+	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
 
 	flag.Parse()
 
@@ -25,6 +32,10 @@ func main() {
 		*readOnly = os.Getenv("BUILDKITE_CACHE_READONLY") == "true"
 		*buildID = os.Getenv("RAYCI_BUILD_ID")
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
+
+		if *epoch == "" {
+			*epoch = wanda.DefaultCacheEpoch()
+		}
 	}
 
 	args := flag.Args()
@@ -39,10 +50,6 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
-	if *epoch == "" {
-		*epoch = wanda.DefaultCacheEpoch()
-	}
-
 	config := &wanda.ForgeConfig{
 		WorkDir:    *workDir,
 		DockerBin:  *docker,
@@ -51,7 +58,8 @@ func main() {
 		BuildID:    *buildID,
 		Epoch:      *epoch,
 
-		RayCI: *rayCI,
+		RayCI:   *rayCI,
+		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,
 	}

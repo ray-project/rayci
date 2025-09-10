@@ -4,4 +4,4 @@ ARG MESSAGE=hello
 ENV MESSAGE=${MESSAGE}
 COPY Dockerfile.hello /opt/Dockerfile
 
-CMD "echo ${MESSAGE}"
+CMD ["echo", "${MESSAGE}"]

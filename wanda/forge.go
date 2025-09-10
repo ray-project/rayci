@@ -35,20 +35,6 @@ func Build(specFile string, config *ForgeConfig) error {
 	return forge.Build(spec)
 }
 
-// ForgeConfig is a configuration for a forge to build container images.
-type ForgeConfig struct {
-	WorkDir    string
-	DockerBin  string
-	WorkRepo   string
-	NamePrefix string
-	BuildID    string
-	Epoch      string
-
-	RayCI bool
-
-	ReadOnlyCache bool
-}
-
 // Forge is a forge to build container images.
 type Forge struct {
 	config *ForgeConfig
@@ -58,6 +44,8 @@ type Forge struct {
 	remoteOpts []remote.Option
 
 	cacheHitCount int
+
+	docker *dockerCmd
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -67,7 +55,7 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
 
-	return &Forge{
+	f := &Forge{
 		config:  config,
 		workDir: absWorkDir,
 		remoteOpts: []remote.Option{
@@ -77,7 +65,10 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 				Architecture: runtime.GOARCH,
 			}),
 		},
-	}, nil
+	}
+	f.docker = f.newDockerCmd()
+
+	return f, nil
 }
 
 func (f *Forge) cacheHit() int { return f.cacheHitCount }
@@ -86,26 +77,17 @@ func (f *Forge) addSrcFile(ts *tarStream, src string) {
 	ts.addFile(src, nil, filepath.Join(f.workDir, src))
 }
 
-func (f *Forge) workRepo() string {
-	if f.config.WorkRepo != "" {
-		return f.config.WorkRepo
-	}
-	return "localhost:5000/rayci"
+func (f *Forge) isRemote() bool             { return f.config.isRemote() }
+func (f *Forge) workTag(name string) string { return f.config.workTag(name) }
+func (f *Forge) cacheTag(digest string) string {
+	return f.config.cacheTag(digest)
 }
 
-func (f *Forge) workTag(name string) string {
-	workRepo := f.workRepo()
-	if f.config.BuildID != "" {
-		return fmt.Sprintf("%s:%s-%s", workRepo, f.config.BuildID, name)
-	}
-	return fmt.Sprintf("%s:%s", workRepo, name)
-}
-
-func (f *Forge) cacheTag(inputDigest string) string {
-	if _, d, ok := strings.Cut(inputDigest, ":"); ok {
-		inputDigest = d
-	}
-	return fmt.Sprintf("%s:z-%s", f.workRepo(), inputDigest)
+func (f *Forge) newDockerCmd() *dockerCmd {
+	return newDockerCmd(&dockerCmdConfig{
+		bin:             f.config.DockerBin,
+		useLegacyEngine: runtime.GOOS == "windows",
+	})
 }
 
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
@@ -115,7 +97,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	for _, from := range froms {
 		if strings.HasPrefix(from, "@") { // A local image.
 			name := strings.TrimPrefix(from, "@")
-			src, err := resolveLocalImage(from, name)
+			src, err := resolveDockerImage(f.docker, from, name)
 			if err != nil {
 				return nil, fmt.Errorf("resolve local image %s: %w", from, err)
 			}
@@ -124,9 +106,9 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		}
 
 		if namePrefix != "" && strings.HasPrefix(from, namePrefix) {
-			if f.config.WorkRepo == "" {
+			if !f.isRemote() {
 				// Treat it as a local image.
-				src, err := resolveLocalImage(from, from)
+				src, err := resolveDockerImage(f.docker, from, from)
 				if err != nil {
 					return nil, fmt.Errorf(
 						"resolve prefixed local image %s: %w", from, err,
@@ -191,81 +173,92 @@ func (f *Forge) Build(spec *Spec) error {
 	if err != nil {
 		return fmt.Errorf("compute build input digest: %w", err)
 	}
-	log.Println("build input digest: ", inputDigest)
+	log.Println("build input digest:", inputDigest)
 
 	cacheTag := f.cacheTag(inputDigest)
 	workTag := f.workTag(spec.Name)
-	cachable := f.config.RayCI && f.config.WorkRepo != "" &&
-		!spec.CopyEverything
-
-	if cachable {
-		ct, err := cranename.NewTag(cacheTag)
-		if err != nil {
-			return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
-		}
-
-		wt, err := cranename.NewTag(workTag)
-		if err != nil {
-			return fmt.Errorf("parse work tag %q: %w", workTag, err)
-		}
-
-		desc, err := remote.Get(ct, f.remoteOpts...)
-		if err != nil {
-			log.Printf("Cache image miss: %v", err)
-		} else {
-			// Cache hit!
-			log.Printf("cache hit: %s", desc.Digest)
-			f.cacheHitCount++
-
-			if err := remote.Tag(wt, desc, f.remoteOpts...); err != nil {
-				return fmt.Errorf("tag cache image: %w", err)
-			}
-
-			return nil // and we are done.
-		}
-	}
+	cachable := !spec.CopyEverything
 
 	// Add all the tags.
 
 	// Work tag is the tag we use to save the image in the work repo.
-	if f.config.WorkRepo != "" {
-		in.addTag(workTag)
+	in.addTag(workTag)
+	if cachable {
+		in.addTag(cacheTag)
 	}
 
 	// When running on rayCI, we only need the workTag and the cacheTag.
 	// Otherwise, add extra tags.
-	if f.config.RayCI {
-		if cachable {
-			in.addTag(cacheTag)
-		}
-	} else {
+	if !f.config.RayCI {
 		// Name tag is the tag we use to reference the image locally.
 		// It is also what can be referenced by following steps.
 		if f.config.NamePrefix != "" {
 			nameTag := f.config.NamePrefix + spec.Name
 			in.addTag(nameTag)
 		}
-		// And add any extra tags.
-		for _, tag := range spec.Tags {
+		for _, tag := range spec.Tags { // And add extra tags.
 			in.addTag(tag)
 		}
 	}
 
-	// Now we can build the image.
-	d := newDockerCmd(&dockerCmdConfig{
-		bin: f.config.DockerBin,
+	if cachable && !f.config.Rebuild {
+		if f.isRemote() {
+			ct, err := cranename.NewTag(cacheTag)
+			if err != nil {
+				return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
+			}
+			wt, err := cranename.NewTag(workTag)
+			if err != nil {
+				return fmt.Errorf("parse work tag %q: %w", workTag, err)
+			}
 
-		// BuildKit is not supported on Windows.
-		useLegacyEngine: runtime.GOOS == "windows",
-	})
+			desc, err := remote.Get(ct, f.remoteOpts...)
+			if err != nil {
+				log.Printf("Cache image miss: %v", err)
+			} else {
+				log.Printf("cache hit: %s", desc.Digest)
+				f.cacheHitCount++
+
+				log.Printf("tag output as %s", workTag)
+				if err := remote.Tag(wt, desc, f.remoteOpts...); err != nil {
+					return fmt.Errorf("tag cache image: %w", err)
+				}
+
+				return nil // and we are done.
+			}
+		} else {
+			info, err := f.docker.inspectImage(cacheTag)
+			if err != nil {
+				return fmt.Errorf("check cache image: %w", err)
+			}
+			if info != nil {
+				log.Printf("cache hit: %s", info.ID)
+				f.cacheHitCount++
+
+				for _, tag := range in.tagList() {
+					log.Printf("tag output as %s", tag)
+					if tag != cacheTag {
+						if err := f.docker.tag(cacheTag, tag); err != nil {
+							return fmt.Errorf("tag cache image: %w", err)
+						}
+					}
+				}
+				return nil // and we are done.
+			}
+		}
+	}
+
+	// Now we can build the image.
+	// Always use a new dockerCmd so that it can run in its own environment.
+	d := f.newDockerCmd()
 	d.setWorkDir(f.workDir)
 
 	if err := d.build(in, inputCore); err != nil {
 		return fmt.Errorf("build docker: %w", err)
 	}
 
-	// Push the image to the work repo.
-	if f.config.WorkRepo != "" {
+	// Push the image to the work repo with workTag and cacheTag if needed.
+	if f.isRemote() {
 		if err := d.run("push", workTag); err != nil {
 			return fmt.Errorf("push docker: %w", err)
 		}
