@@ -1,6 +1,8 @@
 package wanda
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -92,6 +94,32 @@ func (c *dockerCmd) pull(src, asTag string) error {
 	}
 
 	return nil
+}
+
+type dockerImageInfo struct {
+	ID          string `json:"Id"`
+	RepoDigests []string
+	RepoTags    []string
+}
+
+func (c *dockerCmd) inspectImage(tag string) (*dockerImageInfo, error) {
+	cmd := c.cmd("image", "inspect", tag)
+	buf := new(bytes.Buffer)
+	cmd.Stdout = buf
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var info []*dockerImageInfo
+	if err := json.Unmarshal(buf.Bytes(), &info); err != nil {
+		return nil, fmt.Errorf("unmarshal image info: %w", err)
+	}
+	if len(info) != 1 {
+		return nil, fmt.Errorf("%d image(s) found, expect 1", len(info))
+	}
+	return info[0], nil
 }
 
 func (c *dockerCmd) tag(src, asTag string) error {
