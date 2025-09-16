@@ -72,10 +72,6 @@ func cleanPath(s string) string {
 //
 // The returned files are relative to the work directory.
 func listSrcFilesSingle(workDir, src string) ([]string, error) {
-	if src == "" {
-		return nil, fmt.Errorf("src %q is empty", src)
-	}
-
 	if strings.HasSuffix(src, "/") { // a directory
 		dir := cleanPath(strings.TrimSuffix(src, "/"))
 		dir = filepath.Join(workDir, dir)
@@ -131,6 +127,9 @@ func listSrcFilesSingle(workDir, src string) ([]string, error) {
 	return files, nil
 }
 
+// listSrcFiles lists the files in the given sources.
+// It goes through all the sources, run them with listSrcFilesSingle,
+// and then merge the results.
 func listSrcFiles(
 	workDir string, srcs []string, dockerFile string,
 ) ([]string, error) {
