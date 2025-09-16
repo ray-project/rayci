@@ -28,7 +28,7 @@ func walkFilesInDir(dir string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return files, err
+	return files, nil
 }
 
 // listFileNamesInDir lists the files in the given directory.
