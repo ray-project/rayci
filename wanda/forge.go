@@ -148,7 +148,7 @@ func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
 	ts := newTarStream()
 
-	files, err := listSrcFiles(spec.Srcs, spec.Dockerfile)
+	files, err := listSrcFiles(f.workDir, spec.Srcs, spec.Dockerfile)
 	if err != nil {
 		return fmt.Errorf("list src files: %w", err)
 	}

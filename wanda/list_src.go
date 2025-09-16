@@ -62,13 +62,36 @@ func cleanPath(s string) string {
 	return strings.TrimPrefix(path.Clean(path.Join("/", s)), "/")
 }
 
-func listSrcFilesSingle(src string) ([]string, error) {
+// listSrcFilesSingle lists the files in the given source.
+//   - if src ends with a '/', it is treated as a directory, and
+//     will select all the files in the directory.
+//   - if src's basename contains a '*' or '?', it is treated as a glob pattern,
+//     and will select all the files that match the pattern in the directory.
+//     it only matches files in a single directory.
+//   - otherwise, it is treated as a single file.
+//
+// The returned files are relative to the work directory.
+func listSrcFilesSingle(workDir, src string) ([]string, error) {
+	if src == "" {
+		return nil, fmt.Errorf("src %q is empty", src)
+	}
+
 	if strings.HasSuffix(src, "/") { // a directory
 		dir := cleanPath(strings.TrimSuffix(src, "/"))
-		if dir == "" {
-			dir = "."
+		dir = filepath.Join(workDir, dir)
+		files, err := walkFilesInDir(filepath.FromSlash(dir))
+		if err != nil {
+			return nil, fmt.Errorf("walk files in dir %q: %w", dir, err)
 		}
-		return walkFilesInDir(filepath.FromSlash(dir))
+		relFiles := make([]string, len(files))
+		for i, file := range files {
+			rel, err := filepath.Rel(workDir, file)
+			if err != nil {
+				return nil, fmt.Errorf("rel file %q: %w", file, err)
+			}
+			relFiles[i] = filepath.ToSlash(rel)
+		}
+		return relFiles, nil
 	}
 
 	// This might be a file or a pattern.
@@ -81,14 +104,14 @@ func listSrcFilesSingle(src string) ([]string, error) {
 	dir := path.Dir(srcClean)
 
 	if !isFilePathGlob(base) {
-		// Treat it as a file.
-		return []string{filepath.FromSlash(srcClean)}, nil
+		// Treat it as a single file.
+		return []string{srcClean}, nil
 	}
 
 	// This is a glob pattern.
 	osDir := filepath.FromSlash(dir)
 
-	names, err := listFileNamesInDir(osDir)
+	names, err := listFileNamesInDir(filepath.Join(workDir, osDir))
 	if err != nil {
 		return nil, fmt.Errorf("list files in dir %q: %w", dir, err)
 	}
@@ -102,18 +125,20 @@ func listSrcFilesSingle(src string) ([]string, error) {
 			return nil, fmt.Errorf("match file %q for %q: %w", osName, src, err)
 		}
 		if match {
-			files = append(files, osName)
+			files = append(files, filepath.ToSlash(osName))
 		}
 	}
 	return files, nil
 }
 
-func listSrcFiles(srcs []string, dockerFile string) ([]string, error) {
+func listSrcFiles(
+	workDir string, srcs []string, dockerFile string,
+) ([]string, error) {
 	fileMap := make(map[string]struct{})
 	fileMap[dockerFile] = struct{}{}
 
 	for _, src := range srcs {
-		files, err := listSrcFilesSingle(src)
+		files, err := listSrcFilesSingle(workDir, src)
 		if err != nil {
 			return nil, fmt.Errorf("list src files for %q: %w", src, err)
 		}
