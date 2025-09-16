@@ -50,7 +50,7 @@ type Forge struct {
 
 // NewForge creates a new forge with the given configuration.
 func NewForge(config *ForgeConfig) (*Forge, error) {
-	absWorkDir, err := filepath.Abs(config.WorkDir)
+	absWorkDir, err := filepath.Abs(filepath.FromSlash(config.WorkDir))
 	if err != nil {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
@@ -74,7 +74,7 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 func (f *Forge) cacheHit() int { return f.cacheHitCount }
 
 func (f *Forge) addSrcFile(ts *tarStream, src string) {
-	ts.addFile(src, nil, filepath.Join(f.workDir, src))
+	ts.addFile(src, nil, filepath.Join(f.workDir, filepath.FromSlash(src)))
 }
 
 func (f *Forge) isRemote() bool             { return f.config.isRemote() }
