@@ -31,7 +31,7 @@ func destroyAll(ctx context.Context, stores []store) error {
 }
 
 type database struct {
-	db     *sql.DB
+	db *sql.DB
 }
 
 func newSqliteDB(f string) (*database, error) {
