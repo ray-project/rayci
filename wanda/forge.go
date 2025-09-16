@@ -146,13 +146,10 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 // Build builds a container image from the given specification.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
-	var ts *tarStream
-	if !spec.CopyEverything {
-		ts = newTarStream()
-		f.addSrcFile(ts, spec.Dockerfile)
-		for _, src := range spec.Srcs {
-			f.addSrcFile(ts, src)
-		}
+	ts := newTarStream()
+	f.addSrcFile(ts, spec.Dockerfile)
+	for _, src := range spec.Srcs {
+		f.addSrcFile(ts, src)
 	}
 
 	in := newBuildInput(ts, spec.BuildArgs)
@@ -177,15 +174,12 @@ func (f *Forge) Build(spec *Spec) error {
 
 	cacheTag := f.cacheTag(inputDigest)
 	workTag := f.workTag(spec.Name)
-	cachable := !spec.CopyEverything
 
 	// Add all the tags.
 
 	// Work tag is the tag we use to save the image in the work repo.
 	in.addTag(workTag)
-	if cachable {
-		in.addTag(cacheTag)
-	}
+	in.addTag(cacheTag)
 
 	// When running on rayCI, we only need the workTag and the cacheTag.
 	// Otherwise, add extra tags.
@@ -201,7 +195,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
-	if cachable && !f.config.Rebuild {
+	if !f.config.Rebuild {
 		if f.isRemote() {
 			ct, err := cranename.NewTag(cacheTag)
 			if err != nil {
@@ -264,7 +258,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 
 		// Save cache result too.
-		if cachable && !f.config.ReadOnlyCache {
+		if !f.config.ReadOnlyCache {
 			if err := d.run("push", cacheTag); err != nil {
 				return fmt.Errorf("push cache: %w", err)
 			}

@@ -20,9 +20,6 @@ type Spec struct {
 	Dockerfile string   `yaml:"dockerfile"`
 
 	BuildArgs []string `yaml:"build_args,omitempty"`
-
-	// Wastefully include everything on work directory into the image.
-	CopyEverything bool `yaml:"copy_everything,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
