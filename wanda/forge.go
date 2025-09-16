@@ -50,7 +50,7 @@ type Forge struct {
 
 // NewForge creates a new forge with the given configuration.
 func NewForge(config *ForgeConfig) (*Forge, error) {
-	absWorkDir, err := filepath.Abs(config.WorkDir)
+	absWorkDir, err := filepath.Abs(filepath.FromSlash(config.WorkDir))
 	if err != nil {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
@@ -74,7 +74,7 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 func (f *Forge) cacheHit() int { return f.cacheHitCount }
 
 func (f *Forge) addSrcFile(ts *tarStream, src string) {
-	ts.addFile(src, nil, filepath.Join(f.workDir, src))
+	ts.addFile(src, nil, filepath.Join(f.workDir, filepath.FromSlash(src)))
 }
 
 func (f *Forge) isRemote() bool             { return f.config.isRemote() }
@@ -147,9 +147,13 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
 	ts := newTarStream()
-	f.addSrcFile(ts, spec.Dockerfile)
-	for _, src := range spec.Srcs {
-		f.addSrcFile(ts, src)
+
+	files, err := listSrcFiles(spec.Srcs, spec.Dockerfile)
+	if err != nil {
+		return fmt.Errorf("list src files: %w", err)
+	}
+	for _, file := range files {
+		f.addSrcFile(ts, file)
 	}
 
 	in := newBuildInput(ts, spec.BuildArgs)
