@@ -27,7 +27,10 @@ func TestJSONCaller(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", JSONContentType)
-		io.WriteString(w, `{"message":"hello"}`)
+		_, err := io.WriteString(w, `{"message":"hello"}`)
+		if err != nil {
+			t.Fatalf("write string: %v", err)
+		}
 	}
 
 	s := httptest.NewServer(http.HandlerFunc(h))

@@ -16,7 +16,10 @@ func newWriterToReader(writerTo io.WriterTo) *writerToReader {
 			w.CloseWithError(err)
 			return
 		}
-		w.Close()
+		err := w.Close()
+		if err != nil {
+			return
+		}
 	}()
 
 	return &writerToReader{

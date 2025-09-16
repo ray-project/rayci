@@ -24,7 +24,11 @@ func filesInLayer(layer cranev1.Layer) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("uncompress layer: %w", err)
 	}
-	defer rc.Close()
+	defer func() {
+		if err := rc.Close(); err != nil {
+			return
+		}
+	}()
 
 	tr := tar.NewReader(rc)
 

@@ -44,7 +44,12 @@ func jsonAPI[R, S any](
 			http.Error(w, "extra data after request", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		defer func() {
+			if err := r.Body.Close(); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}()
 
 		ctx := r.Context()
 		resp, err := f(ctx, req)

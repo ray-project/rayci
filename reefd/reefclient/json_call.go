@@ -74,7 +74,11 @@ func (c *JSONCaller) call(ctx context.Context, p string, req []byte) (
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				return
+			}
+		}()
 
 		buf := new(bytes.Buffer)
 		const maxErrBodySize = 1024
@@ -95,7 +99,11 @@ func (c *JSONCaller) call(ctx context.Context, p string, req []byte) (
 	}
 
 	if t := resp.Header.Get("Content-Type"); t != contentType {
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				return
+			}
+		}()
 		return nil, fmt.Errorf("got content type %q, want %q", t, contentType)
 	}
 
