@@ -29,7 +29,7 @@ func walkFilesInDir(dir string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return files, err
+	return files, nil
 }
 
 // listFileNamesInDir lists the files in the given directory.
@@ -50,7 +50,7 @@ func listFileNamesInDir(dir string) ([]string, error) {
 	return names, nil
 }
 
-// isFilePathGlob checks if the path looks like a glob patterh.
+// isFilePathGlob checks if the path looks like a glob pattern.
 // The input is treated as a glob pattern if it contains a '*' or '?'.
 func isFilePathGlob(s string) bool {
 	return strings.Contains(s, "*") || strings.Contains(s, "?")
