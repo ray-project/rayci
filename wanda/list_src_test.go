@@ -152,3 +152,91 @@ func TestCleanPath(t *testing.T) {
 		}
 	}
 }
+
+func TestListSrcFilesSingle_empty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	got, err := listSrcFilesSingle(tmpDir, "")
+	if err == nil {
+		t.Fatalf("listSrcFilesSingle should fail")
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+func TestListSrcFilesSingle_file(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	const fileName = "file.txt"
+
+	file := filepath.Join(tmpDir, fileName)
+	if err := os.WriteFile(file, []byte("content"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	got, err := listSrcFilesSingle(tmpDir, fileName)
+	if err != nil {
+		t.Fatalf("listSrcFilesSingle failed: %v", err)
+	}
+
+	want := []string{fileName}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestListSrcFilesSingle_dir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	subdir := filepath.Join(tmpDir, "subdir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	subsubdir := filepath.Join(subdir, "subsubdir")
+	if err := os.MkdirAll(subsubdir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	list := []string{
+		"subdir/1.txt",
+		"subdir/2.txt",
+		"subdir/3.txt",
+		"subdir/subsubdir/4.txt",
+		"subdir/subsubdir/5.txt",
+	}
+
+	for _, file := range list {
+		if err := os.WriteFile(
+			filepath.Join(tmpDir, filepath.FromSlash(file)),
+			[]byte(file), 0644,
+		); err != nil {
+			t.Fatalf("write file: %v", err)
+		}
+	}
+
+	got, err := listSrcFilesSingle(tmpDir, "subdir/")
+	if err != nil {
+		t.Fatalf("listSrcFilesSingle failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(got, list) {
+		t.Errorf("got %v, want %v", got, list)
+	}
+
+	// Test with globbing.
+	gotGlob, err := listSrcFilesSingle(tmpDir, "subdir/*.txt")
+	if err != nil {
+		t.Fatalf("listSrcFilesSingle failed: %v", err)
+	}
+
+	want := []string{
+		"subdir/1.txt",
+		"subdir/2.txt",
+		"subdir/3.txt",
+	}
+	if !reflect.DeepEqual(gotGlob, want) {
+		t.Errorf("got %v, want %v", gotGlob, want)
+	}
+}
