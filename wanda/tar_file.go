@@ -23,7 +23,11 @@ func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 	if err != nil {
 		return fmt.Errorf("open file %q: %w", t.srcFile, err)
 	}
-	defer src.Close()
+	defer func() {
+		if err := src.Close(); err != nil {
+			return
+		}
+	}()
 
 	stat, err := src.Stat()
 	if err != nil {
@@ -74,7 +78,11 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open file %q: %w", t.srcFile, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			return
+		}
+	}()
 
 	stat, err := f.Stat()
 	if err != nil {

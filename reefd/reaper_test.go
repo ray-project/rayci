@@ -10,7 +10,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
@@ -125,7 +124,7 @@ func (e *fakeEC2) ids() []string {
 	return ids
 }
 
-func instanceMatchFilters(i *fakeEC2Instance, filters []types.Filter) bool {
+func instanceMatchFilters(i *fakeEC2Instance, filters []ec2types.Filter) bool {
 	for _, filter := range filters {
 		// Needs to match all filters.
 		if *filter.Name == "instance-state-code" {
@@ -172,7 +171,7 @@ func (e *fakeEC2) TerminateInstances(
 				ec2types.InstanceStateChange{
 					InstanceId: aws.String(id),
 					CurrentState: &ec2types.InstanceState{
-						Name: types.InstanceStateNameShuttingDown,
+						Name: ec2types.InstanceStateNameShuttingDown,
 					},
 				},
 			)

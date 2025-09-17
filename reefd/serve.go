@@ -19,7 +19,11 @@ func newServer(c *Config) *server {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, World!")
+	_, err := io.WriteString(w, "Hello, World!")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 // Serve runs the server.

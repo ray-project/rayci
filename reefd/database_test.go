@@ -24,7 +24,11 @@ func TestDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("failed to close database: %v", err)
+		}
+	}()
 
 	stores := []store{
 		&dummyStore{db: db},
@@ -46,7 +50,11 @@ func TestDatabase(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to query dummy: %v", err)
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				t.Fatalf("failed to close rows: %v", err)
+			}
+		}()
 
 		var id int
 		var name string

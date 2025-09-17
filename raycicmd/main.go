@@ -28,7 +28,7 @@ type Flags struct {
 	Select         string // flag -select
 }
 
-func parseFlags(args []string) (*Flags, []string) {
+func parseFlags(args []string) (*Flags, []string, error) {
 	set := flag.NewFlagSet("rayci", flag.ExitOnError)
 	flags := new(Flags)
 	set.StringVar(
@@ -62,12 +62,18 @@ func parseFlags(args []string) (*Flags, []string) {
 	)
 
 	if len(args) == 0 {
-		set.Parse(nil)
+		err := set.Parse(nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parse flags: %w", err)
+		}
 	} else {
-		set.Parse(args[1:])
+		err := set.Parse(args[1:])
+		if err != nil {
+			return nil, nil, fmt.Errorf("parse flags: %w", err)
+		}
 	}
 
-	return flags, set.Args()
+	return flags, set.Args(), nil
 }
 
 func execWithInput(
@@ -148,7 +154,10 @@ func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
 
 // Main runs tha main function of rayci command.
 func Main(args []string, envs Envs) error {
-	flags, args := parseFlags(args)
+	flags, args, err := parseFlags(args)
+	if err != nil {
+		return fmt.Errorf("parse flags: %w", err)
+	}
 	if len(args) != 0 {
 		return fmt.Errorf("unexpected arguments: %v", args)
 	}

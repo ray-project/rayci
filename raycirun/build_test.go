@@ -70,7 +70,10 @@ func TestBuild(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(jsonResp)
+			_, err = w.Write(jsonResp)
+			if err != nil {
+				t.Fatalf("write build response: %v", err)
+			}
 
 		default:
 			log.Printf("unexpected request: %s %s", r.Method, r.URL.String())
