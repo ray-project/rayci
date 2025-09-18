@@ -70,18 +70,16 @@ func cleanPath(s string) string {
 //     it only matches files in a single directory.
 //   - otherwise, it is treated as a single file.
 //
+// workDir is an OS filepath; src is a source path.
+//
 // The returned files are relative to the work directory.
 func listSrcFilesSingle(workDir, src string) ([]string, error) {
-	if src == "" {
-		return nil, fmt.Errorf("src %q is empty", src)
-	}
-
 	if strings.HasSuffix(src, "/") { // a directory
-		dir := cleanPath(strings.TrimSuffix(src, "/"))
-		dir = filepath.Join(workDir, dir)
-		files, err := walkFilesInDir(filepath.FromSlash(dir))
+		cleanSrc := cleanPath(strings.TrimSuffix(src, "/"))
+		dir := filepath.Join(workDir, filepath.FromSlash(cleanSrc))
+		files, err := walkFilesInDir(dir)
 		if err != nil {
-			return nil, fmt.Errorf("walk files in dir %q: %w", dir, err)
+			return nil, fmt.Errorf("walk files in dir %q: %w", src, err)
 		}
 		relFiles := make([]string, len(files))
 		for i, file := range files {
@@ -109,16 +107,16 @@ func listSrcFilesSingle(workDir, src string) ([]string, error) {
 	}
 
 	// This is a glob pattern.
-	osDir := filepath.FromSlash(dir)
+	dirFilePath := filepath.FromSlash(dir)
 
-	names, err := listFileNamesInDir(filepath.Join(workDir, osDir))
+	names, err := listFileNamesInDir(filepath.Join(workDir, dirFilePath))
 	if err != nil {
 		return nil, fmt.Errorf("list files in dir %q: %w", dir, err)
 	}
 
 	var files []string
 	for _, name := range names {
-		osName := filepath.Join(osDir, name)
+		osName := filepath.Join(dirFilePath, name)
 
 		match, err := filepath.Match(base, name)
 		if err != nil {
@@ -131,6 +129,9 @@ func listSrcFilesSingle(workDir, src string) ([]string, error) {
 	return files, nil
 }
 
+// listSrcFiles lists the files in the given sources.
+// It goes through all the sources, run them with listSrcFilesSingle,
+// and then merge the results.
 func listSrcFiles(
 	workDir string, srcs []string, dockerFile string,
 ) ([]string, error) {
