@@ -1,0 +1,5 @@
+name: glob
+dockerfile: Dockerfile.glob
+srcs:
+  - "*.txt"
+  - src/
