@@ -147,9 +147,13 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
 	ts := newTarStream()
-	f.addSrcFile(ts, spec.Dockerfile)
-	for _, src := range spec.Srcs {
-		f.addSrcFile(ts, src)
+
+	files, err := listSrcFiles(f.workDir, spec.Srcs, spec.Dockerfile)
+	if err != nil {
+		return fmt.Errorf("list src files: %w", err)
+	}
+	for _, file := range files {
+		f.addSrcFile(ts, file)
 	}
 
 	in := newBuildInput(ts, spec.BuildArgs)
