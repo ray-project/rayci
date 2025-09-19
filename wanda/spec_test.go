@@ -15,6 +15,8 @@ func TestParseSpecFile(t *testing.T) {
 		Dockerfile: "ci/docker/hello.Dockerfile",
 		Tags:       []string{"cr.ray.io/rayproject/hello"},
 		BuildArgs:  []string{"RAYCI_BUILDID"},
+
+		BuildHintArgs: []string{"REMOTE_CACHE_URL"},
 	}
 
 	bs, err := yaml.Marshal(spec)
