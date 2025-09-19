@@ -96,17 +96,18 @@ func TestForgeLocal_noNamePrefix(t *testing.T) {
 		t.Errorf("Dockerfile not in image")
 	}
 }
-func TestForge_copyEverything(t *testing.T) {
+
+func TestForge_globFiles(t *testing.T) {
 	config := &ForgeConfig{
 		WorkDir:    "testdata",
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/copyall.wanda.yaml", config); err != nil {
-		t.Fatalf("build base: %v", err)
+	if err := Build("testdata/glob.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
 	}
 
-	const resultRef = "cr.ray.io/rayproject/hello"
+	const resultRef = "cr.ray.io/rayproject/glob"
 	ref, err := name.ParseReference(resultRef)
 	if err != nil {
 		t.Fatalf("parse reference: %v", err)
@@ -131,8 +132,14 @@ func TestForge_copyEverything(t *testing.T) {
 		t.Fatalf("read layer: %v", err)
 	}
 
-	if _, ok := files["opt/Dockerfile"]; !ok {
-		t.Errorf("Dockerfile not in image")
+	for _, file := range []string{
+		"src/foo.cpp",
+		"src/foo.h",
+		"world.txt",
+	} {
+		if _, ok := files[file]; !ok {
+			t.Errorf("%q not in image", file)
+		}
 	}
 }
 
