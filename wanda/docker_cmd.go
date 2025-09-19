@@ -170,12 +170,8 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
 
-	if in.context != nil {
-		args = append(args, "-") // read context from stdin
-	} else {
-		// copy everything
-		args = append(args, ".")
-	}
+	// read context from stdin
+	args = append(args, "-")
 
 	log.Printf("docker %s", strings.Join(args, " "))
 
