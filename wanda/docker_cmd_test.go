@@ -26,7 +26,7 @@ func TestDockerCmdBuild(t *testing.T) {
 		t.Fatalf("make build input core: %v", err)
 	}
 
-	if err := cmd.build(input, core); err != nil {
+	if err := cmd.build(input, core, nil); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -84,7 +84,7 @@ func TestDockerCmdBuild_copyEverything(t *testing.T) {
 		t.Fatalf("make build input core: %v", err)
 	}
 
-	if err := cmd.build(input, core); err != nil {
+	if err := cmd.build(input, core, nil); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 

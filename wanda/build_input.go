@@ -119,3 +119,13 @@ func (c *buildInputCore) digest() (string, error) {
 	}
 	return sha256Digest(bs), nil
 }
+
+type buildInputHints struct {
+	BuildArgs map[string]string
+}
+
+func newBuildInputHints(buildArgs []string) *buildInputHints {
+	return &buildInputHints{
+		BuildArgs: resolveBuildArgs(buildArgs),
+	}
+}

@@ -242,12 +242,14 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
+	inputHints := newBuildInputHints(spec.BuildHintArgs)
+
 	// Now we can build the image.
 	// Always use a new dockerCmd so that it can run in its own environment.
 	d := f.newDockerCmd()
 	d.setWorkDir(f.workDir)
 
-	if err := d.build(in, inputCore); err != nil {
+	if err := d.build(in, inputCore, inputHints); err != nil {
 		return fmt.Errorf("build docker: %w", err)
 	}
 
