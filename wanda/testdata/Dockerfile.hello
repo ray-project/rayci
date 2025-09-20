@@ -4,4 +4,6 @@ ARG MESSAGE=hello
 ENV MESSAGE=${MESSAGE}
 COPY Dockerfile.hello /opt/Dockerfile
 
+LABEL io.ray.wanda.message=${MESSAGE}
+
 CMD ["echo", "${MESSAGE}"]

@@ -20,6 +20,11 @@ type Spec struct {
 	Dockerfile string   `yaml:"dockerfile"`
 
 	BuildArgs []string `yaml:"build_args,omitempty"`
+
+	// BuildHintArgs are build args which values do not participate
+	// in cache input compute. The value of these build args should not
+	// change the output of the build.
+	BuildHintArgs []string `yaml:"build_hint_args,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
@@ -117,6 +122,7 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result.Srcs = stringsExpanVar(s.Srcs, lookup)
 	result.Dockerfile = expandVar(s.Dockerfile, lookup)
 	result.BuildArgs = stringsExpanVar(s.BuildArgs, lookup)
+	result.BuildHintArgs = stringsExpanVar(s.BuildHintArgs, lookup)
 
 	return result
 }

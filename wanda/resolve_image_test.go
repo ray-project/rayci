@@ -2,7 +2,6 @@ package wanda
 
 import (
 	"fmt"
-	"log"
 	"net/http/httptest"
 	"testing"
 
@@ -35,7 +34,7 @@ func TestResolveLocalImage(t *testing.T) {
 		t.Fatal("save image to daemon: ", err)
 	}
 
-	log.Println("image id: ", resp)
+	t.Log("image id: ", resp)
 
 	src, err := resolveLocalImage("test-img", tagStr)
 	if err != nil {
