@@ -122,6 +122,7 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result.Srcs = stringsExpanVar(s.Srcs, lookup)
 	result.Dockerfile = expandVar(s.Dockerfile, lookup)
 	result.BuildArgs = stringsExpanVar(s.BuildArgs, lookup)
+	result.BuildHintArgs = stringsExpanVar(s.BuildHintArgs, lookup)
 
 	return result
 }

@@ -212,7 +212,7 @@ func (f *Forge) Build(spec *Spec) error {
 
 			desc, err := remote.Get(ct, f.remoteOpts...)
 			if err != nil {
-				log.Printf("Cache image miss: %v", err)
+				log.Printf("cache image miss: %v", err)
 			} else {
 				log.Printf("cache hit: %s", desc.Digest)
 				f.cacheHitCount++

@@ -143,6 +143,53 @@ func TestForge_globFiles(t *testing.T) {
 	}
 }
 
+func TestForge_withHints(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		Rebuild:    true,
+	}
+
+	if err := Build("testdata/hello-hint.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	const tag = "cr.ray.io/rayproject/hello"
+
+	ref, err := name.ParseReference(tag)
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+	if len(layers) != 1 {
+		t.Fatalf("expected 1 layer, got %d", len(layers))
+	}
+
+	imgConfig, err := img.ConfigFile()
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+
+	// Check message env value, this is set by the build args.
+	t.Log(imgConfig.Config.Cmd)
+	t.Log(imgConfig.Config.Labels)
+
+	labelGot := imgConfig.Config.Labels["io.ray.wanda.message"]
+	const labelWant = "hint message"
+	if labelGot != labelWant {
+		t.Errorf("label got %v, want %v", labelGot, labelWant)
+	}
+}
+
 func TestForge(t *testing.T) {
 	config := &ForgeConfig{
 		WorkDir:    "testdata",
@@ -292,6 +339,8 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
+	// Apply a hint, and it should still be cache hit.
+	helloSpec.BuildHintArgs = []string{"REMOTE_CACHE_URL=http://localhost:5000"}
 
 	if err := forge.Build(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
