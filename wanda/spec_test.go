@@ -1,12 +1,12 @@
 package wanda
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
