@@ -33,6 +33,7 @@ var branchPipelineConfig = &config{
 
 	Env: map[string]string{
 		"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
+		"RAYCI_STAGE":               "postmerge",
 	},
 
 	BuildEnvKeys: []string{
@@ -42,7 +43,7 @@ var branchPipelineConfig = &config{
 	},
 	HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
-	SkipTags: []string{"disabled"},
+	SkipTags: []string{"disabled", "only-on-premerge"},
 }
 
 func makePRPipelineConfig(name string) *config {
@@ -82,6 +83,7 @@ func makePRPipelineConfig(name string) *config {
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": rayBazelBuildCache,
 			"BUILDKITE_CACHE_READONLY":  "true",
+			"RAYCI_STAGE":               "premerge",
 		},
 
 		BuildEnvKeys: []string{
