@@ -3,18 +3,23 @@ package wanda
 import (
 	"testing"
 
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-func TestParseSpecFile(t *testing.T) {
+func TestSpecMarshalLoopback(t *testing.T) {
 	spec := &Spec{
 		Name:       "hello",
 		Froms:      []string{"ubuntu:22.04"},
 		Dockerfile: "ci/docker/hello.Dockerfile",
 		Tags:       []string{"cr.ray.io/rayproject/hello"},
 		BuildArgs:  []string{"RAYCI_BUILDID"},
+
+		BuildHintArgs: []string{"REMOTE_CACHE_URL"},
 	}
 
 	bs, err := yaml.Marshal(spec)
@@ -80,12 +85,16 @@ func TestSpecExpand(t *testing.T) {
 			"RAYCI_BUILDID=$$RAYCI_BUILDID",
 			"UBUNTU_VERSION=$UBUNTU_VERSION",
 		},
+		BuildHintArgs: []string{
+			"REMOTE_CACHE_URL=$REMOTE_CACHE_URL",
+		},
 	}
 
 	envs := map[string]string{
-		"NAME":           "hello",
-		"UBUNTU_VERSION": "22.04",
-		"RAYCI_BUILDID":  "abc123",
+		"NAME":             "hello",
+		"UBUNTU_VERSION":   "22.04",
+		"RAYCI_BUILDID":    "abc123",
+		"REMOTE_CACHE_URL": "http://localhost:5000",
 	}
 
 	expanded := spec.expandVar(func(k string) (string, bool) {
@@ -102,9 +111,48 @@ func TestSpecExpand(t *testing.T) {
 			"RAYCI_BUILDID=$RAYCI_BUILDID",
 			"UBUNTU_VERSION=22.04",
 		},
+		BuildHintArgs: []string{
+			"REMOTE_CACHE_URL=http://localhost:5000",
+		},
 	}
 
 	if !reflect.DeepEqual(expanded, want) {
 		t.Errorf("got %+v, want %+v", expanded, want)
+	}
+}
+
+func TestParseSpecFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	specFile := filepath.Join(tmpDir, "spec.yaml")
+	spec := strings.Join([]string{
+		"name: hello",
+		"froms: [ubuntu:22.04]",
+		"dockerfile: ci/docker/hello.Dockerfile",
+		"tags: [cr.ray.io/rayproject/hello]",
+		`build_args: ["RAYCI_BUILDID", "UBUNTU_VERSION"]`,
+		`build_hint_args: ["REMOTE_CACHE_URL"]`,
+	}, "\n") + "\n"
+
+	if err := os.WriteFile(specFile, []byte(spec), 0644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	got, err := parseSpecFile(specFile)
+	if err != nil {
+		t.Fatalf("parse spec file: %v", err)
+	}
+
+	want := &Spec{
+		Name:          "hello",
+		Froms:         []string{"ubuntu:22.04"},
+		Dockerfile:    "ci/docker/hello.Dockerfile",
+		Tags:          []string{"cr.ray.io/rayproject/hello"},
+		BuildArgs:     []string{"RAYCI_BUILDID", "UBUNTU_VERSION"},
+		BuildHintArgs: []string{"REMOTE_CACHE_URL"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }

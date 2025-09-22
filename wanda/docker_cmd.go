@@ -126,7 +126,11 @@ func (c *dockerCmd) tag(src, asTag string) error {
 	return c.run("tag", src, asTag)
 }
 
-func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
+func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
+	if hints == nil {
+		hints = newBuildInputHints(nil)
+	}
+
 	// Pull down the required images, and tag them properly.
 	var froms []string
 	for from := range core.Froms {
@@ -160,13 +164,22 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore) error {
 		args = append(args, "-t", t)
 	}
 
+	buildArgs := make(map[string]string)
+	for k, v := range hints.BuildArgs {
+		buildArgs[k] = v
+	}
+	// non-hint args can overwrite hint args
+	for k, v := range core.BuildArgs {
+		buildArgs[k] = v
+	}
+
 	var buildArgKeys []string
-	for k := range core.BuildArgs {
+	for k := range buildArgs {
 		buildArgKeys = append(buildArgKeys, k)
 	}
 	sort.Strings(buildArgKeys)
 	for _, k := range buildArgKeys {
-		v := core.BuildArgs[k]
+		v := buildArgs[k]
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", k, v))
 	}
 
