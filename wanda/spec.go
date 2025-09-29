@@ -25,6 +25,9 @@ type Spec struct {
 	// in cache input compute. The value of these build args should not
 	// change the output of the build.
 	BuildHintArgs []string `yaml:"build_hint_args,omitempty"`
+
+	// DisableCaching disables use of caching.
+	DisableCaching bool `yaml:"disable_caching,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {

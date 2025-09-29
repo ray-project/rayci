@@ -254,6 +254,58 @@ func TestForge(t *testing.T) {
 		t.Errorf("world.txt in image, got %q, want %q", got, worldDotTxt)
 	}
 }
+
+func TestForge_noCache(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+
+	if err := Build("testdata/hello-nocache.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	const tag = "cr.ray.io/rayproject/hello"
+
+	ref, err := name.ParseReference(tag)
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+
+	if len(layers) != 1 {
+		t.Fatalf("got %d layers, want 1", len(layers))
+	}
+
+	config.BuildID = "abc123"
+	forge, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("make new forge: %v", err)
+	}
+
+	helloSpec, err := parseSpecFile("testdata/hello-nocache.wanda.yaml")
+	if err != nil {
+		t.Fatalf("parse hello spec: %v", err)
+	}
+
+	if err := forge.Build(helloSpec); err != nil {
+		t.Fatalf("rebuild hello: %v", err)
+	}
+
+	if hit := forge.cacheHit(); hit != 0 {
+		t.Errorf("got %d cache hits, want 0", hit)
+	}
+}
+
 func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("skipping test on non-linux")

@@ -170,6 +170,8 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 	inputCore.Epoch = f.config.Epoch
 
+	caching := !spec.DisableCaching
+
 	inputDigest, err := inputCore.digest()
 	if err != nil {
 		return fmt.Errorf("compute build input digest: %w", err)
@@ -199,7 +201,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
-	if !f.config.Rebuild {
+	if caching && !f.config.Rebuild {
 		if f.isRemote() {
 			ct, err := cranename.NewTag(cacheTag)
 			if err != nil {
@@ -264,7 +266,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 
 		// Save cache result too.
-		if !f.config.ReadOnlyCache {
+		if caching && !f.config.ReadOnlyCache {
 			if err := d.run("push", cacheTag); err != nil {
 				return fmt.Errorf("push cache: %w", err)
 			}
