@@ -24,7 +24,8 @@ type wandaStep struct {
 
 	launcherBranch string
 
-	matrix any
+	matrix   any
+	priority *int
 }
 
 func wandaCommands(br string) []string {
@@ -78,7 +79,10 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 		bkStep["agents"] = newBkAgents(agentQueue)
 	}
 
-	if p := s.ciConfig.BuilderPriority; p != 0 {
+	// Use step-level priority if set, otherwise fall back to config-level priority
+	if s.priority != nil {
+		bkStep["priority"] = *s.priority
+	} else if p := s.ciConfig.BuilderPriority; p != 0 {
 		bkStep["priority"] = p
 	}
 	if s.matrix != nil {
@@ -155,6 +159,15 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 	label, _ := stringInMap(step, "label")
 	instanceType, _ := stringInMap(step, "instance_type")
 
+	var priority *int
+	if p, ok := step["priority"]; ok {
+		pInt, ok := p.(int)
+		if !ok {
+			return nil, fmt.Errorf("priority must be an integer, got %T", p)
+		}
+		priority = &pInt
+	}
+
 	var matrix any
 	if m, ok := step["matrix"]; ok {
 		matrix = m
@@ -183,6 +196,7 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 		envs:           envs,
 		ciConfig:       c.config,
 		matrix:         matrix,
+		priority:       priority,
 		instanceType:   instanceType,
 		launcherBranch: c.info.launcherBranch,
 	}
