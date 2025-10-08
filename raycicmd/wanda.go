@@ -3,8 +3,11 @@ package raycicmd
 import (
 	"fmt"
 	"log"
+	"os"
 	"path"
 	"sort"
+
+	"github.com/ray-project/rayci/wanda"
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
@@ -24,7 +27,10 @@ type wandaStep struct {
 
 	launcherBranch string
 
-	matrix any
+	matrix   any
+	priority *int
+
+	cacheHit bool
 }
 
 func wandaCommands(br string) []string {
@@ -56,6 +62,9 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	if label == "" {
 		label = "wanda: " + s.name
 	}
+	if s.cacheHit {
+		label = label + " [cache hit]"
+	}
 
 	bkStep := map[string]any{
 		"label":    label,
@@ -78,7 +87,10 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 		bkStep["agents"] = newBkAgents(agentQueue)
 	}
 
-	if p := s.ciConfig.BuilderPriority; p != 0 {
+	// Use step-level priority if set, otherwise fall back to config-level priority
+	if s.priority != nil {
+		bkStep["priority"] = *s.priority
+	} else if p := s.ciConfig.BuilderPriority; p != 0 {
 		bkStep["priority"] = p
 	}
 	if s.matrix != nil {
@@ -106,6 +118,45 @@ func newWandaConverter(
 func (c *wandaConverter) match(step map[string]any) bool {
 	_, ok := step["wanda"]
 	return ok
+}
+
+func (c *wandaConverter) predictCacheHit(file string, envs map[string]string) bool {
+	// Only predict cache hits if we have the necessary config
+	if c.config.CIWorkRepo == "" {
+		return false
+	}
+
+	// Set environment variables for the prediction
+	// This allows the wanda package to expand variables in the spec file
+	for k, v := range envs {
+		_ = setEnvIfNotSet(k, v)
+	}
+
+	forgeConfig := &wanda.ForgeConfig{
+		WorkDir:    ".",
+		WorkRepo:   c.config.CIWorkRepo,
+		NamePrefix: c.config.ForgePrefix,
+		BuildID:    c.info.buildID,
+		Epoch:      wanda.DefaultCacheEpoch(),
+		RayCI:      true,
+		Rebuild:    false,
+	}
+
+	cacheHit, err := wanda.PredictCacheHit(file, forgeConfig)
+	if err != nil {
+		// If prediction fails, log the error but don't fail the build
+		log.Printf("failed to predict cache hit for %s: %v", file, err)
+		return false
+	}
+
+	return cacheHit
+}
+
+func setEnvIfNotSet(key, value string) error {
+	if os.Getenv(key) == "" {
+		return os.Setenv(key, value)
+	}
+	return nil
 }
 
 type envEntry struct {
@@ -155,6 +206,15 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 	label, _ := stringInMap(step, "label")
 	instanceType, _ := stringInMap(step, "instance_type")
 
+	var priority *int
+	if p, ok := step["priority"]; ok {
+		pInt, ok := p.(int)
+		if !ok {
+			return nil, fmt.Errorf("priority must be an integer, got %T", p)
+		}
+		priority = &pInt
+	}
+
 	var matrix any
 	if m, ok := step["matrix"]; ok {
 		matrix = m
@@ -183,12 +243,16 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 		envs:           envs,
 		ciConfig:       c.config,
 		matrix:         matrix,
+		priority:       priority,
 		instanceType:   instanceType,
 		launcherBranch: c.info.launcherBranch,
 	}
 	if dependsOn, ok := step["depends_on"]; ok {
 		s.dependsOn = dependsOn
 	}
+
+	// Predict cache hit if possible
+	s.cacheHit = c.predictCacheHit(file, envs)
 
 	return s.buildkiteStep(), nil
 }

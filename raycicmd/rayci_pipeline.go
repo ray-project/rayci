@@ -69,6 +69,6 @@ var (
 
 	wandaStepAllowedKeys = []string{
 		"name", "label", "wanda", "depends_on",
-		"matrix", "env", "tags", "instance_type",
+		"matrix", "env", "tags", "instance_type", "priority",
 	}
 )
