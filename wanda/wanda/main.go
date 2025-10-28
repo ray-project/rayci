@@ -8,6 +8,8 @@ import (
 	"github.com/ray-project/rayci/wanda"
 )
 
+const version = "0.21.0"
+
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
@@ -24,8 +26,14 @@ func main() {
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	epoch := flag.String("epoch", "", "epoch for the image tag")
 	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
+	version := flag.Bool("version", false, "print version and exit")
 
 	flag.Parse()
+
+	if *version {
+		fmt.Println(wanda.Version)
+		os.Exit(0)
+	}
 
 	if *rayCI {
 		*workRepo = os.Getenv("RAYCI_WORK_REPO")
