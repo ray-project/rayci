@@ -39,16 +39,16 @@ func makeBuildID(envs Envs, debug bool) (string, error) {
 }
 
 func gitCommit(envs Envs, debug bool) string {
+	if debug {
+		// In debug mode, use a dummy commit and return
+		log.Printf("Using dummy commit hash in debug mode)")
+		return "0000000000000000000000000000000000000000"
+	}
 	commit := getEnv(envs, "BUILDKITE_COMMIT")
-	if commit == "" || commit == "HEAD" {
+	if commit == "HEAD" {
 		cmd := exec.Command("git", "rev-parse", "HEAD")
 		bs, err := cmd.Output()
 		if err != nil {
-			if debug {
-				// In debug mode, use a dummy commit hash if git fails
-				log.Printf("Using dummy commit hash in debug mode (git command failed: %v)", err)
-				return "0000000000000000000000000000000000000000"
-			}
 			log.Printf("Fail to resolve HEAD commit: %v", err)
 			commit = ""
 		} else {
