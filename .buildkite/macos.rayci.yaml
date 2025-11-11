@@ -11,14 +11,3 @@ steps:
     depends_on: "macos-apple-silicon-block"
     commands: 
       - echo "Hello, MacOS arm64!"
-
-  - block: "Run Intel MacOS Tests"
-    key: "macos-intel-block"
-    depends_on: ~
-
-  - name: ":macos: intel silicon macos example"
-    job_env: MACOS
-    instance_type: macos
-    depends_on: "macos-intel-block"
-    commands: 
-      - echo "Hello, MacOS!"
