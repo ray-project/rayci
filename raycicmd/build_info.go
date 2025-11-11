@@ -17,7 +17,7 @@ type buildInfo struct {
 	selects          []string
 }
 
-func makeBuildID(envs Envs) (string, error) {
+func makeBuildID(envs Envs, debug bool) (string, error) {
 	buildID := getEnv(envs, "RAYCI_BUILD_ID")
 	if buildID != "" {
 		return buildID, nil
@@ -30,15 +30,25 @@ func makeBuildID(envs Envs) (string, error) {
 		return prefix, nil
 	}
 
+	// In debug mode, generate a dummy build ID
+	if debug {
+		return "debug000", nil
+	}
+
 	return "", fmt.Errorf("no build id found")
 }
 
-func gitCommit(envs Envs) string {
+func gitCommit(envs Envs, debug bool) string {
 	commit := getEnv(envs, "BUILDKITE_COMMIT")
-	if commit == "HEAD" {
+	if commit == "" || commit == "HEAD" {
 		cmd := exec.Command("git", "rev-parse", "HEAD")
 		bs, err := cmd.Output()
 		if err != nil {
+			if debug {
+				// In debug mode, use a dummy commit hash if git fails
+				log.Printf("Using dummy commit hash in debug mode (git command failed: %v)", err)
+				return "0000000000000000000000000000000000000000"
+			}
 			log.Printf("Fail to resolve HEAD commit: %v", err)
 			commit = ""
 		} else {

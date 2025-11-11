@@ -26,6 +26,7 @@ type Flags struct {
 	UploadPipeline bool   // flag -upload
 	BuildkiteAgent string // flag -bkagent
 	Select         string // flag -select
+	Debug          bool   // flag -debug
 }
 
 func parseFlags(args []string) (*Flags, []string) {
@@ -59,6 +60,10 @@ func parseFlags(args []string) (*Flags, []string) {
 		&flags.BuildkiteDir, "buildkite-dir", "",
 		"Path to the buildkite pipeline files; "+
 			"if empty, will use the directory from the config file.",
+	)
+	set.BoolVar(
+		&flags.Debug, "debug", false,
+		"Debug mode: generates the pipeline without requiring buildkite environment variables.",
 	)
 
 	if len(args) == 0 {
@@ -104,7 +109,7 @@ func stepSelects(s string, envs Envs) []string {
 }
 
 func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
-	buildID, err := makeBuildID(envs)
+	buildID, err := makeBuildID(envs, flags.Debug)
 	if err != nil {
 		return nil, fmt.Errorf("make build id: %w", err)
 	}
@@ -115,7 +120,7 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	// buildkite webhook event; for most parts, it is the same as the
 	// github author email.
 	buildAuthorEmail, _ := envs.Lookup("BUILDKITE_BUILD_CREATOR_EMAIL")
-	commit := gitCommit(envs)
+	commit := gitCommit(envs, flags.Debug)
 	selects := stepSelects(flags.Select, envs)
 
 	return &buildInfo{
@@ -178,7 +183,8 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("marshal pipeline: %w", err)
 	}
 
-	if !flags.UploadPipeline {
+	// In debug mode, always output to stdout or file, never upload
+	if flags.Debug || !flags.UploadPipeline {
 		if flags.OutputFile == "-" {
 			if _, err := os.Stdout.Write(bs); err != nil {
 				return fmt.Errorf("print pipeline: %w", err)
