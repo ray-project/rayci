@@ -33,9 +33,10 @@ func newConverter(config *config, info *buildInfo) *converter {
 
 	if c.config.ArtifactsBucket != "" && info.gitCommit != "" {
 		dest := fmt.Sprintf(
-			"s3://%s/%s",
+			"s3://%s/%s/%s",
 			c.config.ArtifactsBucket,
 			info.gitCommit,
+			info.buildID,
 		)
 		envMap["BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"] = dest
 	}

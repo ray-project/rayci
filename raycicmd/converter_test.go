@@ -148,7 +148,7 @@ func TestConvertPipelineStep(t *testing.T) {
 		MaxParallelism: 5,
 	}, info)
 
-	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890"
+	const artifactDest = "s3://artifacts_bucket/abcdefg1234567890/abc123"
 
 	for _, test := range []struct {
 		in  map[string]any
@@ -452,7 +452,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"timeout_in_minutes": defaultTimeoutInMinutes,
 			"retry":              defaultRayRetry,
 			"env": map[string]string{
-				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://artifacts_bucket/abcdefg1234567890",
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_BRANCH":              "beta",
@@ -498,7 +498,7 @@ func TestConvertPipelineStep(t *testing.T) {
 			"artifact_paths":     defaultArtifactPaths,
 			"retry":              defaultRayRetry,
 			"env": map[string]string{
-				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": "s3://artifacts_bucket/abcdefg1234567890",
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
 				"BUILDKITE_BAZEL_CACHE_URL":             "https://bazel-build-cache",
 				"RAYCI_BRANCH":                          "beta",
 				"RAYCI_BUILD_ID":                        "abc123",
