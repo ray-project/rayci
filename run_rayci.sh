@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source utils.sh
+source "$(dirname "$0")/utils.sh"
 
 TMP_DIR="$(mktemp -d)"
 
