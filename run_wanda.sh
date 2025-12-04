@@ -2,13 +2,11 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
-
 TMP_DIR="$(mktemp -d)"
 
 if [[ -f .rayciversion ]]; then
   RAYCI_VERSION="$(cat .rayciversion)"
-  log_header "Install wanda binary ${RAYCI_VERSION}"
+  echo "--- Install wanda binary ${RAYCI_VERSION}"
 
   WANDA_URL_PREFIX="https://github.com/ray-project/rayci/releases/download/"
   if [[ "$OSTYPE" =~ ^linux ]]; then
@@ -26,8 +24,7 @@ if [[ -f .rayciversion ]]; then
 
   curl -sfL "${WANDA_URL}" -o "$TMP_DIR/wanda"
   chmod +x "$TMP_DIR/wanda"
-  
-  log_header "Run wanda ${RAYCI_VERSION} ${@}"
+  echo "--- Run wanda ${RAYCI_VERSION} ${@}"
   exec "$TMP_DIR/wanda" "$@"
 
   exit 1  # Unreachable; just for safe-guarding.
@@ -37,7 +34,7 @@ fi
 
 RAYCI_BRANCH="${RAYCI_BRANCH:-stable}"
 
-log_header "Install wanda ($HOSTTYPE)"
+echo "--- Install wanda ($HOSTTYPE)"
 
 readonly GO_VERSION=1.24.5
 
@@ -59,6 +56,6 @@ export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
 "$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci/wanda/wanda@'"${RAYCI_BRANCH}"
 
-log_header "Run wanda ${RAYCI_VERSION} ${@}"
+echo "--- Run wanda ${@}"
 
 exec "$GOPATH/bin/wanda" "$@"
