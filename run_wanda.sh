@@ -24,6 +24,7 @@ if [[ -f .rayciversion ]]; then
 
   curl -sfL "${WANDA_URL}" -o "$TMP_DIR/wanda"
   chmod +x "$TMP_DIR/wanda"
+  echo "--- Run wanda ${RAYCI_VERSION}"
   exec "$TMP_DIR/wanda" "$@"
 
   exit 1  # Unreachable; just for safe-guarding.
