@@ -59,11 +59,11 @@ const worldDotTxt = "This is my world!"
 func TestForgeLocal_noNamePrefix(t *testing.T) {
 	config := &ForgeConfig{WorkDir: "testdata"}
 
-	if err := Build("testdata/localbase.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/localbase.wanda.yaml", config); err != nil {
 		t.Fatalf("build base: %v", err)
 	}
 
-	if err := Build("testdata/local.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/local.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -103,7 +103,7 @@ func TestForge_globFiles(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/glob.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/glob.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -150,7 +150,7 @@ func TestForge_withHints(t *testing.T) {
 		Rebuild:    true,
 	}
 
-	if err := Build("testdata/hello-hint.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/hello-hint.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -196,7 +196,7 @@ func TestForge(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -221,7 +221,7 @@ func TestForge(t *testing.T) {
 		t.Fatalf("got %d layers, want 1", len(layers))
 	}
 
-	if err := Build("testdata/world.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/world.wanda.yaml", config); err != nil {
 		t.Fatalf("build world: %v", err)
 	}
 
@@ -261,7 +261,7 @@ func TestForge_noCache(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/hello-nocache.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/hello-nocache.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
@@ -344,11 +344,11 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		Epoch:      "1",
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("build hello: %v", err)
 	}
 
-	if err := Build("testdata/world.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/world.wanda.yaml", config); err != nil {
 		t.Fatalf("build world: %v", err)
 	}
 
@@ -457,11 +457,11 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		Epoch:      randomEpoch(),
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("build hello: %v", err)
 	}
 
-	if err := Build("testdata/world.wanda.yaml", config); err != nil {
+	if err := BuildAndMaybePushRemote("testdata/world.wanda.yaml", config); err != nil {
 		t.Fatalf("build world: %v", err)
 	}
 

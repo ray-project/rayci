@@ -64,7 +64,7 @@ func main() {
 		ReadOnlyCache: *readOnly,
 	}
 
-	if err := wanda.Build(input, config); err != nil {
+	if err := wanda.BuildAndMaybePushRemote(input, config); err != nil {
 		log.Fatal(err)
 	}
 }
