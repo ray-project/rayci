@@ -24,7 +24,7 @@ if [[ -f .rayciversion ]]; then
 
   curl -sfL "${WANDA_URL}" -o "$TMP_DIR/wanda"
   chmod +x "$TMP_DIR/wanda"
-  echo "--- Run wanda ${RAYCI_VERSION} ${@}"
+  echo "--- Run wanda ${RAYCI_VERSION}"
   exec "$TMP_DIR/wanda" "$@"
 
   exit 1  # Unreachable; just for safe-guarding.
@@ -56,6 +56,6 @@ export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
 "$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci/wanda/wanda@'"${RAYCI_BRANCH}"
 
-echo "--- Run wanda ${@}"
+echo "--- Run wanda"
 
 exec "$GOPATH/bin/wanda" "$@"
