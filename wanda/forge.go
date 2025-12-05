@@ -14,8 +14,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Build builds a container image from the given specification file.
-func Build(specFile string, config *ForgeConfig) error {
+// BuildAndMaybePushRemote builds a container image from the given specification file.
+// If the image is built for remote, it will also push the image to the remote repository.
+func BuildAndMaybePushRemote(specFile string, config *ForgeConfig) error {
 	if config == nil {
 		config = &ForgeConfig{}
 	}
@@ -32,7 +33,7 @@ func Build(specFile string, config *ForgeConfig) error {
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)
 	}
-	return forge.Build(spec)
+	return forge.BuildAndMaybePushRemote(spec)
 }
 
 // Forge is a forge to build container images.
@@ -143,8 +144,9 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	return m, nil
 }
 
-// Build builds a container image from the given specification.
-func (f *Forge) Build(spec *Spec) error {
+// BuildAndMaybePushRemote builds a container image from the given specification.
+// If the image is built for remote, it will also push the image to the remote repository.
+func (f *Forge) BuildAndMaybePushRemote(spec *Spec) error {
 	// Prepare the tar stream.
 	ts := newTarStream()
 

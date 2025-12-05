@@ -297,7 +297,7 @@ func TestForge_noCache(t *testing.T) {
 		t.Fatalf("parse hello spec: %v", err)
 	}
 
-	if err := forge.Build(helloSpec); err != nil {
+	if err := forge.BuildAndMaybePushRemote(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
 	}
 
@@ -394,7 +394,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	// Apply a hint, and it should still be cache hit.
 	helloSpec.BuildHintArgs = []string{"REMOTE_CACHE_URL=http://localhost:5000"}
 
-	if err := forge.Build(helloSpec); err != nil {
+	if err := forge.BuildAndMaybePushRemote(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
 	}
 
@@ -428,7 +428,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		t.Fatalf("make forge for new epoch: %v", err)
 	}
 
-	if err := forge2.Build(helloSpec); err != nil {
+	if err := forge2.BuildAndMaybePushRemote(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
 	}
 
@@ -505,7 +505,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		t.Fatalf("parse hello spec: %v", err)
 	}
 
-	if err := forge.Build(helloSpec); err != nil {
+	if err := forge.BuildAndMaybePushRemote(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
 	}
 
@@ -539,7 +539,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		t.Fatalf("make forge for new epoch: %v", err)
 	}
 
-	if err := forge2.Build(helloSpec); err != nil {
+	if err := forge2.BuildAndMaybePushRemote(helloSpec); err != nil {
 		t.Fatalf("rebuild hello: %v", err)
 	}
 
