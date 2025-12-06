@@ -9,6 +9,15 @@ import (
 	"github.com/ray-project/rayci/wanda"
 )
 
+const usage = `--------------------------------
+wanda - container image builder for RayCI using a container registry as a content-addressed build cache.
+--------------------------------
+Runs in either remote mode or local mode.
+* Remote mode: Enabled by setting -rayci flag. Takes RAYCI_ env vars for input and runs in remote mode. Builds and uploads image to the cache repository.
+* Local mode: Takes exactly one argument for the spec file and builds the image for local use only.
+--------------------------------
+`
+
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
@@ -27,14 +36,7 @@ func main() {
 	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, `--------------------------------
-wanda - container image builder for RayCI using a container registry as a content-addressed build cache.
---------------------------------
-Runs in either remote mode or local mode.
-* Remote mode: Enabled by setting -rayci flag. Takes RAYCI_ env vars for input and runs in remote mode. Builds and uploads image to the cache repository.
-* Local mode: Takes exactly one argument for the spec file and builds the image for local use only.
---------------------------------
-`)
+		fmt.Fprint(os.Stderr, usage)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
