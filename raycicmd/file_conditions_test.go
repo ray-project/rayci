@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -30,15 +31,6 @@ func TestGlobToRegex(t *testing.T) {
 	}, {
 		pattern: "python/?.py",
 		want:    "^python/.\\.py$",
-	}, {
-		pattern: "python/*.py",
-		want:    "^python/.*\\.py$",
-	}, {
-		pattern: "python/*.py",
-		want:    "^python/.*\\.py$",
-	}, {
-		pattern: "python/*.py",
-		want:    "^python/.*\\.py$",
 	}} {
 		got := globToRegex(test.pattern)
 		if got != test.want {
@@ -53,7 +45,7 @@ func TestTagRuleMatch(t *testing.T) {
 		Lineno:   1,
 		Dirs:     []string{"fancy"},
 		Files:    []string{"file.txt"},
-		Patterns: []string{"python/*.py"},
+		Patterns: []*regexp.Regexp{regexp.MustCompile(globToRegex("python/*.py"))},
 	}
 
 	for _, test := range []struct {
@@ -115,7 +107,7 @@ func TestTagRuleMatchTags(t *testing.T) {
 		Lineno:   1,
 		Dirs:     []string{"fancy"},
 		Files:    []string{"file.txt"},
-		Patterns: []string{"python/*.py"},
+		Patterns: []*regexp.Regexp{regexp.MustCompile(globToRegex("python/*.py"))},
 	}
 
 	for _, test := range []struct {
@@ -183,9 +175,9 @@ func TestParseRulesText(t *testing.T) {
 		ruleContent: canonicalTestRules(),
 		wantTagDefs: []string{"paladin", "priest", "druid", "hunter", "rogue", "tank", "healer", "dps"},
 		wantRules: []*TagRule{
-			{Tags: []string{"paladin", "priest", "healer"}, Lineno: 16, Dirs: []string{"python"}, Files: []string{}, Patterns: []string{}},
-			{Tags: []string{"paladin"}, Lineno: 20, Dirs: []string{}, Files: []string{".buildkite/data.rayci.yml"}, Patterns: []string{}},
-			{Tags: []string{"druid"}, Lineno: 24, Dirs: []string{}, Files: []string{}, Patterns: []string{"doc/*.py"}},
+			{Tags: []string{"paladin", "priest", "healer"}, Lineno: 16, Dirs: []string{"python"}, Files: []string{}, Patterns: []*regexp.Regexp{}},
+			{Tags: []string{"paladin"}, Lineno: 20, Dirs: []string{}, Files: []string{".buildkite/data.rayci.yml"}, Patterns: []*regexp.Regexp{}},
+			{Tags: []string{"druid"}, Lineno: 24, Dirs: []string{}, Files: []string{}, Patterns: []*regexp.Regexp{regexp.MustCompile(globToRegex("doc/*.py"))}},
 		},
 	}} {
 		gotTagDefs, gotRules, err := parseRulesText(test.ruleContent)
@@ -248,7 +240,7 @@ func TestFallbackTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("NewTagRuleSet(): %v", err)
 	}
-	if _, err := ruleSet.ValidateRules(); err != nil {
+	if err := ruleSet.ValidateRules(); err != nil {
 		t.Errorf("ValidateRules(): %v", err)
 	}
 	tags := tagsForChangedFiles(ruleSet, []string{"lol_i_dont_match_any_rule.py"})
@@ -266,7 +258,7 @@ func TestNewTagRuleSet(t *testing.T) {
 	if err != nil {
 		t.Errorf("NewTagRuleSet(): %v", err)
 	}
-	if _, err := set.ValidateRules(); err != nil {
+	if err := set.ValidateRules(); err != nil {
 		t.Errorf("CheckRules(): %v", err)
 	}
 }
@@ -282,7 +274,7 @@ func TestTagRuleSetValidateRulesErrorUndeclaredTag(t *testing.T) {
 	if err != nil {
 		t.Errorf("NewTagRuleSet(): %v", err)
 	}
-	if _, err := set.ValidateRules(); err == nil {
+	if err := set.ValidateRules(); err == nil {
 		t.Errorf("ValidateRules(): got nil, want error")
 	}
 }
@@ -292,7 +284,7 @@ func TestTagRuleSetMatchTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("NewTagRuleSet(): %v", err)
 	}
-	if _, err := set.ValidateRules(); err != nil {
+	if err := set.ValidateRules(); err != nil {
 		t.Errorf("ValidateRules(): %v", err)
 	}
 	got, gotBool := set.MatchTags("python/ray/air/")

@@ -15,7 +15,7 @@ type TagRule struct {
 	Lineno   int
 	Dirs     []string
 	Files    []string
-	Patterns []string
+	Patterns []*regexp.Regexp
 }
 
 // globToRegex converts a glob pattern to a regex pattern.
@@ -55,9 +55,8 @@ func (r *TagRule) Match(changedFilePath string) bool {
 
 	// Py version depends on fnmatch.fnmatch, which is not available in std Go.
 	// Instead, we treat the pattern as a regex.
-	if slices.ContainsFunc(r.Patterns, func(pattern string) bool {
-		re, err := regexp.Compile(globToRegex(pattern))
-		return err == nil && re.MatchString(changedFilePath)
+	if slices.ContainsFunc(r.Patterns, func(re *regexp.Regexp) bool {
+		return re.MatchString(changedFilePath)
 	}) {
 		return true
 	}
@@ -104,7 +103,7 @@ func parseRulesText(ruleContent string) ([]string, []*TagRule, error) {
 	tags := []string{}
 	dirs := []string{}
 	files := []string{}
-	patterns := []string{}
+	patterns := []*regexp.Regexp{}
 
 	trackedLineno := 0
 	for lineno, line := range strings.Split(ruleContent, "\n") {
@@ -132,7 +131,7 @@ func parseRulesText(ruleContent string) ([]string, []*TagRule, error) {
 
 		if strings.HasPrefix(line, ";") {
 			if line != ";" {
-				panic(fmt.Sprintf("Unexpected tokens after semicolon on line %d: %s", trackedLineno, line))
+				return nil, nil, fmt.Errorf("unexpected tokens after semicolon on line %d: %s", trackedLineno, line)
 			}
 
 			// Dump current rule, and reset the state.
@@ -140,13 +139,17 @@ func parseRulesText(ruleContent string) ([]string, []*TagRule, error) {
 			tags = []string{}
 			dirs = []string{}
 			files = []string{}
-			patterns = []string{}
+			patterns = []*regexp.Regexp{}
 
 			continue
 		}
 
-		if strings.Contains(line, "*") {
-			patterns = append(patterns, line)
+		if strings.Contains(line, "*") || strings.Contains(line, "?") {
+			re, err := regexp.Compile(globToRegex(line))
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid pattern on line %d: %q: %w", trackedLineno, line, err)
+			}
+			patterns = append(patterns, re)
 			continue
 		}
 
@@ -197,18 +200,18 @@ func (s *TagRuleSet) AddRules(ruleContent string) error {
 	return nil
 }
 
-func (s *TagRuleSet) ValidateRules() ([]string, error) {
+func (s *TagRuleSet) ValidateRules() error {
 	for _, rule := range s.rules {
 		if len(rule.Tags) == 0 {
 			continue
 		}
 		for _, tag := range rule.Tags {
 			if _, ok := s.tagDefs[tag]; !ok {
-				return []string{}, fmt.Errorf("tag %s not declared, used in rule at line %d", tag, rule.Lineno)
+				return fmt.Errorf("tag %s not declared, used in rule at line %d", tag, rule.Lineno)
 			}
 		}
 	}
-	return []string{}, nil
+	return nil
 }
 
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
@@ -231,19 +234,12 @@ func isPullRequest(env Envs) bool {
 	return getEnv(env, "BUILDKITE_PULL_REQUEST") != "false"
 }
 
-// sortAndDeduplicateTags sorts tags and removes duplicates.
 func sortAndDeduplicateTags(tags []string) []string {
-	if len(tags) == 0 {
+	if len(tags) < 2 {
 		return tags
 	}
 	sort.Strings(tags)
-	result := tags[:1]
-	for _, tag := range tags[1:] {
-		if tag != result[len(result)-1] {
-			result = append(result, tag)
-		}
-	}
-	return result
+	return slices.Compact(tags)
 }
 
 func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
@@ -262,7 +258,7 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 		}
 	}
 
-	if _, err := ruleSet.ValidateRules(); err != nil {
+	if err := ruleSet.ValidateRules(); err != nil {
 		return nil, fmt.Errorf("validate rules: %w", err)
 	}
 	return ruleSet, nil

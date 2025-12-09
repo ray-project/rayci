@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -111,20 +113,9 @@ func TestListChangedFiles_Integration(t *testing.T) {
 	}
 
 	// Verify we got the expected files
-	if len(files) != len(changedFiles) {
-		t.Errorf("got %d files, want %d: %v", len(files), len(changedFiles), files)
-	}
-
-	for _, want := range changedFiles {
-		found := false
-		for _, got := range files {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("missing file %s in result %v", want, files)
-		}
+	sort.Strings(files)
+	sort.Strings(changedFiles)
+	if !reflect.DeepEqual(files, changedFiles) {
+		t.Errorf("ListChangedFiles() got %v, want %v", files, changedFiles)
 	}
 }
