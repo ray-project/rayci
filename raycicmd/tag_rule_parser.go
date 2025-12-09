@@ -86,7 +86,11 @@ func (p *TagRuleParser) Parse(ruleContent string) error {
 
 func (p *TagRuleParser) handleTagDef(line string) error {
 	if p.tagDefsEnded {
-		return fmt.Errorf("tag must be declared at file start. Line %d: %s", p.lineno, line)
+		return fmt.Errorf(
+			"tag must be declared at file start. Line %d: %s",
+			p.lineno,
+			line,
+		)
 	}
 	fields := strings.Fields(strings.TrimPrefix(line, "!"))
 	if len(fields) > 0 {
@@ -104,7 +108,11 @@ func (p *TagRuleParser) handleTags(line string) {
 
 func (p *TagRuleParser) flushRule(line string) error {
 	if line != ";" {
-		return fmt.Errorf("unexpected tokens after semicolon on line %d: %s", p.lineno, line)
+		return fmt.Errorf(
+			"unexpected tokens after semicolon on line %d: %s",
+			p.lineno,
+			line,
+		)
 	}
 
 	// Always append a rule here, even if it's effectively empty,
@@ -130,7 +138,12 @@ func (p *TagRuleParser) handlePathOrPattern(line string) error {
 	if strings.Contains(line, "*") || strings.Contains(line, "?") {
 		re, err := globToRegexp(line)
 		if err != nil {
-			return fmt.Errorf("invalid pattern on line %d: %q: %w", p.lineno, line, err)
+			return fmt.Errorf(
+				"invalid pattern on line %d: %q: %w",
+				p.lineno,
+				line,
+				err,
+			)
 		}
 		p.patterns = append(p.patterns, re)
 		return nil
@@ -147,7 +160,8 @@ func (p *TagRuleParser) handlePathOrPattern(line string) error {
 }
 
 func (p *TagRuleParser) flushFinalRule() {
-	if len(p.tags) == 0 && len(p.dirs) == 0 && len(p.files) == 0 && len(p.patterns) == 0 {
+	if len(p.tags) == 0 && len(p.dirs) == 0 && len(p.files) == 0 &&
+		len(p.patterns) == 0 {
 		return
 	}
 

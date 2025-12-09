@@ -64,7 +64,12 @@ func TestSanitizeLine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := sanitizeLine(tt.input)
 			if got != tt.want {
-				t.Errorf("sanitizeLine(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf(
+					"sanitizeLine(%q) = %q, want %q",
+					tt.input,
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -130,7 +135,11 @@ func TestTagRuleParserParse_TagDefinitions(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(p.tagDefs, tt.wantTagDefs) {
-				t.Errorf("Parse() tagDefs = %v, want %v", p.tagDefs, tt.wantTagDefs)
+				t.Errorf(
+					"Parse() tagDefs = %v, want %v",
+					p.tagDefs,
+					tt.wantTagDefs,
+				)
 			}
 		})
 	}
@@ -151,10 +160,16 @@ python/
 ;`,
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
-				if want := []string{"python"}; !reflect.DeepEqual(rules[0].Dirs, want) {
+				if want := []string{"python"}; !reflect.DeepEqual(
+					rules[0].Dirs,
+					want,
+				) {
 					t.Errorf("expected Dirs=%v, got %v", want, rules[0].Dirs)
 				}
-				if want := []string{"mytag"}; !reflect.DeepEqual(rules[0].Tags, want) {
+				if want := []string{"mytag"}; !reflect.DeepEqual(
+					rules[0].Tags,
+					want,
+				) {
 					t.Errorf("expected Tags=%v, got %v", want, rules[0].Tags)
 				}
 			},
@@ -167,8 +182,12 @@ README.md
 ;`,
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
-				if len(rules[0].Files) != 1 || rules[0].Files[0] != "README.md" {
-					t.Errorf("expected Files=[README.md], got %v", rules[0].Files)
+				if len(rules[0].Files) != 1 ||
+					rules[0].Files[0] != "README.md" {
+					t.Errorf(
+						"expected Files=[README.md], got %v",
+						rules[0].Files,
+					)
 				}
 			},
 		},
@@ -181,7 +200,10 @@ python/*.py
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Patterns) != 1 {
-					t.Errorf("expected 1 pattern, got %d", len(rules[0].Patterns))
+					t.Errorf(
+						"expected 1 pattern, got %d",
+						len(rules[0].Patterns),
+					)
 				}
 				// Verify the pattern matches expected files
 				if !rules[0].Patterns[0].MatchString("python/test.py") {
@@ -201,10 +223,16 @@ golang/
 			wantRules: 2,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if rules[0].Dirs[0] != "python" {
-					t.Errorf("first rule Dirs = %v, want [python]", rules[0].Dirs)
+					t.Errorf(
+						"first rule Dirs = %v, want [python]",
+						rules[0].Dirs,
+					)
 				}
 				if rules[1].Dirs[0] != "golang" {
-					t.Errorf("second rule Dirs = %v, want [golang]", rules[1].Dirs)
+					t.Errorf(
+						"second rule Dirs = %v, want [golang]",
+						rules[1].Dirs,
+					)
 				}
 			},
 		},
@@ -227,7 +255,10 @@ python/
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Tags) != 0 {
-					t.Errorf("expected empty Tags for skip rule, got %v", rules[0].Tags)
+					t.Errorf(
+						"expected empty Tags for skip rule, got %v",
+						rules[0].Tags,
+					)
 				}
 				if rules[0].Dirs[0] != ".git" {
 					t.Errorf("expected Dirs=[.git], got %v", rules[0].Dirs)
@@ -247,7 +278,11 @@ python/
 			}
 
 			if len(p.rules) != tt.wantRules {
-				t.Errorf("Parse() rules count = %d, want %d", len(p.rules), tt.wantRules)
+				t.Errorf(
+					"Parse() rules count = %d, want %d",
+					len(p.rules),
+					tt.wantRules,
+				)
 				return
 			}
 
@@ -336,7 +371,11 @@ python/ # Directory to match
 	}
 
 	if len(p.tagDefs) != 2 {
-		t.Errorf("expected 2 tag definitions, got %d: %v", len(p.tagDefs), p.tagDefs)
+		t.Errorf(
+			"expected 2 tag definitions, got %d: %v",
+			len(p.tagDefs),
+			p.tagDefs,
+		)
 	}
 
 	if len(p.rules) != 1 {
@@ -394,12 +433,19 @@ func TestTagRuleParserParse_Errors(t *testing.T) {
 			err := p.Parse(tt.input)
 
 			if err == nil {
-				t.Errorf("Parse() expected error containing %q, got nil", tt.wantError)
+				t.Errorf(
+					"Parse() expected error containing %q, got nil",
+					tt.wantError,
+				)
 				return
 			}
 
 			if !strings.Contains(err.Error(), tt.wantError) {
-				t.Errorf("Parse() error = %q, want error containing %q", err.Error(), tt.wantError)
+				t.Errorf(
+					"Parse() error = %q, want error containing %q",
+					err.Error(),
+					tt.wantError,
+				)
 			}
 		})
 	}
@@ -460,11 +506,13 @@ func TestTagRuleParserParse_PatternTypes(t *testing.T) {
 
 			rule := p.rules[0]
 
-			if tt.wantDirs != nil && !reflect.DeepEqual(rule.Dirs, tt.wantDirs) {
+			if tt.wantDirs != nil &&
+				!reflect.DeepEqual(rule.Dirs, tt.wantDirs) {
 				t.Errorf("Dirs = %v, want %v", rule.Dirs, tt.wantDirs)
 			}
 
-			if tt.wantFiles != nil && !reflect.DeepEqual(rule.Files, tt.wantFiles) {
+			if tt.wantFiles != nil &&
+				!reflect.DeepEqual(rule.Files, tt.wantFiles) {
 				t.Errorf("Files = %v, want %v", rule.Files, tt.wantFiles)
 			}
 
@@ -542,7 +590,14 @@ python/ray/data/
 	}
 
 	// Should have tag definitions
-	expectedTagDefs := []string{"python", "ml", "data", "serve", "train", "tune"}
+	expectedTagDefs := []string{
+		"python",
+		"ml",
+		"data",
+		"serve",
+		"train",
+		"tune",
+	}
 	sort.Strings(p.tagDefs)
 	sort.Strings(expectedTagDefs)
 	if !reflect.DeepEqual(p.tagDefs, expectedTagDefs) {
@@ -556,7 +611,10 @@ python/ray/data/
 
 	// First rule should be a skip rule (no tags)
 	if len(p.rules[0].Tags) != 0 {
-		t.Errorf("first rule should have no tags (skip rule), got %v", p.rules[0].Tags)
+		t.Errorf(
+			"first rule should have no tags (skip rule), got %v",
+			p.rules[0].Tags,
+		)
 	}
 
 	// Second rule should have python tag
@@ -610,7 +668,11 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 			}
 
 			if len(p.rules) != tt.wantRules {
-				t.Errorf("rules count = %d, want %d", len(p.rules), tt.wantRules)
+				t.Errorf(
+					"rules count = %d, want %d",
+					len(p.rules),
+					tt.wantRules,
+				)
 			}
 		})
 	}
