@@ -24,7 +24,9 @@ func TestListChangedFiles_InvalidCommitRange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := client.ListChangedFiles("main", tt.commitRange)
 			if err == nil {
-				t.Error("ListChangedFiles() expected error for invalid commit range")
+				t.Error(
+					"ListChangedFiles() expected error for invalid commit range",
+				)
 			}
 		})
 	}
@@ -99,7 +101,12 @@ func TestListChangedFiles_Integration(t *testing.T) {
 
 	// Verify we got the expected files
 	if len(files) != len(changedFiles) {
-		t.Errorf("got %d files, want %d: %v", len(files), len(changedFiles), files)
+		t.Errorf(
+			"got %d files, want %d: %v",
+			len(files),
+			len(changedFiles),
+			files,
+		)
 	}
 
 	for _, want := range changedFiles {

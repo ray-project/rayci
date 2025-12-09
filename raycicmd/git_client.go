@@ -19,7 +19,9 @@ type RealGitClient struct {
 	WorkDir string
 }
 
-func (g *RealGitClient) ListChangedFiles(baseBranch, commitRange string) ([]string, error) {
+func (g *RealGitClient) ListChangedFiles(
+	baseBranch, commitRange string,
+) ([]string, error) {
 	parts := strings.Split(commitRange, "...")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid commit range: %s", commitRange)
