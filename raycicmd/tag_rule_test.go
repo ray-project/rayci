@@ -17,7 +17,10 @@ func TestGlobToRegexp(t *testing.T) {
 		pattern: "python/?.py",
 		want:    "^python/.\\.py$",
 	}} {
-		got := globToRegexp(test.pattern)
+		got, err := globToRegexp(test.pattern)
+		if err != nil {
+			t.Errorf("globToRegexp(%v): %v", test.pattern, err)
+		}
 		if got.String() != test.want {
 			t.Errorf("globToRegexp(%v): got %v, want %v", test.pattern, got.String(), test.want)
 		}
@@ -25,12 +28,16 @@ func TestGlobToRegexp(t *testing.T) {
 }
 
 func TestTagRuleMatch(t *testing.T) {
+	re, err := globToRegexp("python/*.py")
+	if err != nil {
+		t.Errorf("globToRegexp(%v): %v", "python/*.py", err)
+	}
 	rule := &TagRule{
 		Tags:     []string{"hit"},
 		Lineno:   1,
 		Dirs:     []string{"fancy"},
 		Files:    []string{"file.txt"},
-		Patterns: []*regexp.Regexp{globToRegexp("python/*.py")},
+		Patterns: []*regexp.Regexp{re},
 	}
 
 	for _, test := range []struct {
@@ -87,12 +94,16 @@ func TestTagRuleMatch(t *testing.T) {
 }
 
 func TestTagRuleMatchTags(t *testing.T) {
+	re, err := globToRegexp("python/*.py")
+	if err != nil {
+		t.Errorf("globToRegexp(%v): %v", "python/*.py", err)
+	}
 	rule := &TagRule{
 		Tags:     []string{"hit"},
 		Lineno:   1,
 		Dirs:     []string{"fancy"},
 		Files:    []string{"file.txt"},
-		Patterns: []*regexp.Regexp{globToRegexp("python/*.py")},
+		Patterns: []*regexp.Regexp{re},
 	}
 
 	for _, test := range []struct {

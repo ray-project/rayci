@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -19,7 +20,7 @@ type TagRule struct {
 // * matches any characters (including /)
 // ? matches any single character
 // Other special regex chars are escaped.
-func globToRegexp(pattern string) *regexp.Regexp {
+func globToRegexp(pattern string) (*regexp.Regexp, error) {
 	var result strings.Builder
 	result.WriteString("^")
 	for _, ch := range pattern {
@@ -36,7 +37,11 @@ func globToRegexp(pattern string) *regexp.Regexp {
 		}
 	}
 	result.WriteString("$")
-	return regexp.MustCompile(result.String())
+	re, err := regexp.Compile(result.String())
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern %q: %w", pattern, err)
+	}
+	return re, nil
 }
 
 func (r *TagRule) Match(changedFilePath string) bool {
