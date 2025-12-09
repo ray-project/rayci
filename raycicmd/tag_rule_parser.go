@@ -50,7 +50,7 @@ func (p *TagRuleParser) Parse(ruleContent string) error {
 		p.lineno = i + 1
 
 		// Keep the same sanitization behavior as before.
-		line := sanitizeLine(strings.TrimSpace(rawLine))
+		line := sanitizeLine(rawLine)
 		if line == "" {
 			continue
 		}

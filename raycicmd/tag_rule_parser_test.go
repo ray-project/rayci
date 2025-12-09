@@ -151,11 +151,11 @@ python/
 ;`,
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
-				if len(rules[0].Dirs) != 1 || rules[0].Dirs[0] != "python" {
-					t.Errorf("expected Dirs=[python], got %v", rules[0].Dirs)
+				if want := []string{"python"}; !reflect.DeepEqual(rules[0].Dirs, want) {
+					t.Errorf("expected Dirs=%v, got %v", want, rules[0].Dirs)
 				}
-				if len(rules[0].Tags) != 1 || rules[0].Tags[0] != "mytag" {
-					t.Errorf("expected Tags=[mytag], got %v", rules[0].Tags)
+				if want := []string{"mytag"}; !reflect.DeepEqual(rules[0].Tags, want) {
+					t.Errorf("expected Tags=%v, got %v", want, rules[0].Tags)
 				}
 			},
 		},
@@ -280,8 +280,6 @@ src/main.go
 	rule := p.rules[0]
 
 	expectedDirs := []string{"python", "golang"}
-	sort.Strings(rule.Dirs)
-	sort.Strings(expectedDirs)
 	if !reflect.DeepEqual(rule.Dirs, expectedDirs) {
 		t.Errorf("Dirs = %v, want %v", rule.Dirs, expectedDirs)
 	}
