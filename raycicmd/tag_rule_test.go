@@ -22,7 +22,12 @@ func TestGlobToRegexp(t *testing.T) {
 			t.Errorf("globToRegexp(%v): %v", test.pattern, err)
 		}
 		if got.String() != test.want {
-			t.Errorf("globToRegexp(%v): got %v, want %v", test.pattern, got.String(), test.want)
+			t.Errorf(
+				"globToRegexp(%v): got %v, want %v",
+				test.pattern,
+				got.String(),
+				test.want,
+			)
 		}
 	}
 }
@@ -67,7 +72,13 @@ func TestTagRuleMatch(t *testing.T) {
 	}} {
 		got := rule.Match(test.changedFilePath)
 		if got != test.want {
-			t.Errorf("match(%v, %v): got %v, want %v", rule, test.changedFilePath, got, test.want)
+			t.Errorf(
+				"match(%v, %v): got %v, want %v",
+				rule,
+				test.changedFilePath,
+				got,
+				test.want,
+			)
 		}
 	}
 
@@ -88,7 +99,13 @@ func TestTagRuleMatch(t *testing.T) {
 	}} {
 		got := skipRule.Match(test.changedFilePath)
 		if got != test.want {
-			t.Errorf("match(%v, %v): got %v, want %v", skipRule, test.changedFilePath, got, test.want)
+			t.Errorf(
+				"match(%v, %v): got %v, want %v",
+				skipRule,
+				test.changedFilePath,
+				got,
+				test.want,
+			)
 		}
 	}
 }
@@ -121,10 +138,22 @@ func TestTagRuleMatchTags(t *testing.T) {
 	}} {
 		got, gotBool := rule.MatchTags(test.changedFilePath)
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("matchTags(%v, %v): got %v, want %v", rule, test.changedFilePath, got, test.want)
+			t.Errorf(
+				"matchTags(%v, %v): got %v, want %v",
+				rule,
+				test.changedFilePath,
+				got,
+				test.want,
+			)
 		}
 		if gotBool != test.wantBool {
-			t.Errorf("matchTags(%v, %v): gotBool %v, wantBool %v", rule, test.changedFilePath, gotBool, test.wantBool)
+			t.Errorf(
+				"matchTags(%v, %v): gotBool %v, wantBool %v",
+				rule,
+				test.changedFilePath,
+				gotBool,
+				test.wantBool,
+			)
 		}
 	}
 
@@ -148,10 +177,22 @@ func TestTagRuleMatchTags(t *testing.T) {
 	}} {
 		got, gotBool := skipRule.MatchTags(test.changedFilePath)
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("matchTags(%v, %v): got %v, want %v", skipRule, test.changedFilePath, got, test.want)
+			t.Errorf(
+				"matchTags(%v, %v): got %v, want %v",
+				skipRule,
+				test.changedFilePath,
+				got,
+				test.want,
+			)
 		}
 		if gotBool != test.wantBool {
-			t.Errorf("matchTags(%v, %v): gotBool %v, wantBool %v", skipRule, test.changedFilePath, gotBool, test.wantBool)
+			t.Errorf(
+				"matchTags(%v, %v): gotBool %v, wantBool %v",
+				skipRule,
+				test.changedFilePath,
+				gotBool,
+				test.wantBool,
+			)
 		}
 	}
 }
@@ -186,7 +227,13 @@ func TestTagRuleSetValidateRules(t *testing.T) {
 func TestTagRuleSetMatchTags(t *testing.T) {
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{"tag-hit": {}},
-		rules:   []*TagRule{{Tags: []string{"tag-hit"}, Lineno: 1, Files: []string{"fancy.txt"}}},
+		rules: []*TagRule{
+			{
+				Tags:   []string{"tag-hit"},
+				Lineno: 1,
+				Files:  []string{"fancy.txt"},
+			},
+		},
 	}
 	for _, test := range []struct {
 		changedFilePath string
@@ -203,10 +250,22 @@ func TestTagRuleSetMatchTags(t *testing.T) {
 	}} {
 		got, gotBool := set.MatchTags(test.changedFilePath)
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("matchTags(%v, %v): got %v, want %v", set, test.changedFilePath, got, test.want)
+			t.Errorf(
+				"matchTags(%v, %v): got %v, want %v",
+				set,
+				test.changedFilePath,
+				got,
+				test.want,
+			)
 		}
 		if gotBool != test.wantBool {
-			t.Errorf("matchTags(%v, %v): gotBool %v, wantBool %v", set, test.changedFilePath, gotBool, test.wantBool)
+			t.Errorf(
+				"matchTags(%v, %v): gotBool %v, wantBool %v",
+				set,
+				test.changedFilePath,
+				gotBool,
+				test.wantBool,
+			)
 		}
 	}
 }

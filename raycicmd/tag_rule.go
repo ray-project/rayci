@@ -55,7 +55,8 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 // directories, files, or glob patterns.
 func (r *TagRule) Match(changedFilePath string) bool {
 	if slices.ContainsFunc(r.Dirs, func(dir string) bool {
-		return changedFilePath == dir || strings.HasPrefix(changedFilePath, dir+"/")
+		return changedFilePath == dir ||
+			strings.HasPrefix(changedFilePath, dir+"/")
 	}) {
 		return true
 	}
@@ -96,7 +97,11 @@ func (s *TagRuleSet) ValidateRules() error {
 		}
 		for _, tag := range rule.Tags {
 			if _, ok := s.tagDefs[tag]; !ok {
-				return fmt.Errorf("tag %s not declared, used in rule at line %d", tag, rule.Lineno)
+				return fmt.Errorf(
+					"tag %s not declared, used in rule at line %d",
+					tag,
+					rule.Lineno,
+				)
 			}
 		}
 	}
