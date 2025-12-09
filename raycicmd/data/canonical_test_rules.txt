@@ -1,0 +1,25 @@
+# This is an example
+# of what we could see
+#
+#
+# in a real file!
+#   ! tag1 tag2 tag3  # Declares a tag. A tag must be declared first to be used.
+#   # Tags must be declared at the beginning.
+#
+
+! paladin priest
+! druid hunter rogue
+! tank healer dps
+
+python/ # Directory to match
+@ paladin priest healer # Tags to emit for a rule. A rule without tags is a skipping rule.
+;
+
+.buildkite/data.rayci.yml
+@ paladin
+;
+
+doc/*.py
+@ druid
+;
+
