@@ -83,3 +83,31 @@ func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 	}
 	return []string{}, false
 }
+
+type TagRuleSet struct {
+	tagDefs map[string]struct{}
+	rules   []*TagRule
+}
+
+func (s *TagRuleSet) ValidateRules() error {
+	for _, rule := range s.rules {
+		if len(rule.Tags) == 0 {
+			continue
+		}
+		for _, tag := range rule.Tags {
+			if _, ok := s.tagDefs[tag]; !ok {
+				return fmt.Errorf("tag %s not declared, used in rule at line %d", tag, rule.Lineno)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
+	for _, rule := range s.rules {
+		if rule.Match(changedFilePath) {
+			return rule.Tags, true
+		}
+	}
+	return []string{}, false
+}
