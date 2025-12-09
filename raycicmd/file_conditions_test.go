@@ -307,6 +307,105 @@ func TestTagRuleSetMatchTags(t *testing.T) {
 	}
 }
 
+func TestNeedRunAllTags(t *testing.T) {
+	tests := []struct {
+		name       string
+		env        map[string]string
+		wantResult bool
+		wantReason string
+	}{
+		{
+			name: "RAYCI_RUN_ALL_TESTS set to 1",
+			env: map[string]string{
+				"RAYCI_RUN_ALL_TESTS":    "1",
+				"BUILDKITE_PULL_REQUEST": "123",
+				"BUILDKITE_BRANCH":       "feature-branch",
+			},
+			wantResult: true,
+			wantReason: "RAYCI_RUN_ALL_TESTS is set, running all tags",
+		},
+		{
+			name: "BUILDKITE_BRANCH is master",
+			env: map[string]string{
+				"BUILDKITE_PULL_REQUEST": "123",
+				"BUILDKITE_BRANCH":       "master",
+			},
+			wantResult: true,
+			wantReason: "BUILDKITE_BRANCH is master, running all tags",
+		},
+		{
+			name: "BUILDKITE_BRANCH starts with releases/",
+			env: map[string]string{
+				"BUILDKITE_PULL_REQUEST": "123",
+				"BUILDKITE_BRANCH":       "releases/2.0.0",
+			},
+			wantResult: true,
+			wantReason: "BUILDKITE_BRANCH starts with releases/, running all tags",
+		},
+		{
+			name: "not a pull request (BUILDKITE_PULL_REQUEST is false)",
+			env: map[string]string{
+				"BUILDKITE_PULL_REQUEST": "false",
+				"BUILDKITE_BRANCH":       "feature-branch",
+			},
+			wantResult: true,
+			wantReason: "Not a PR build... skipping config parsing and running all tags",
+		},
+		{
+			name: "pull request on feature branch - no special conditions",
+			env: map[string]string{
+				"BUILDKITE_PULL_REQUEST": "456",
+				"BUILDKITE_BRANCH":       "feature-branch",
+			},
+			wantResult: false,
+			wantReason: "No special conditions met, running tags based on config files",
+		},
+		{
+			name: "pull request on branch starting with release (not releases/)",
+			env: map[string]string{
+				"BUILDKITE_PULL_REQUEST": "789",
+				"BUILDKITE_BRANCH":       "release-candidate",
+			},
+			wantResult: false,
+			wantReason: "No special conditions met, running tags based on config files",
+		},
+		{
+			name: "RAYCI_RUN_ALL_TESTS set to 0 (not 1)",
+			env: map[string]string{
+				"RAYCI_RUN_ALL_TESTS":    "0",
+				"BUILDKITE_PULL_REQUEST": "123",
+				"BUILDKITE_BRANCH":       "feature-branch",
+			},
+			wantResult: false,
+			wantReason: "No special conditions met, running tags based on config files",
+		},
+		{
+			name: "RAYCI_RUN_ALL_TESTS empty string",
+			env: map[string]string{
+				"RAYCI_RUN_ALL_TESTS":    "",
+				"BUILDKITE_PULL_REQUEST": "123",
+				"BUILDKITE_BRANCH":       "feature-branch",
+			},
+			wantResult: false,
+			wantReason: "No special conditions met, running tags based on config files",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newEnvsMap(tt.env)
+			gotResult, gotReason := needRunAllTags(env)
+
+			if gotResult != tt.wantResult {
+				t.Errorf("needRunAllTags() result = %v, want %v", gotResult, tt.wantResult)
+			}
+			if gotReason != tt.wantReason {
+				t.Errorf("needRunAllTags() reason = %q, want %q", gotReason, tt.wantReason)
+			}
+		})
+	}
+}
+
 func TestRunTagAnalysis(t *testing.T) {
 	// Main adds "always" and "lint" tags by default. We want to test that these tags are added.
 	testRules := "! always lint\n" + canonicalTestRules()

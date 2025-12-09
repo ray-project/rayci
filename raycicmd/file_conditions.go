@@ -292,6 +292,26 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	return sortAndDeduplicateTags(tags)
 }
 
+func needRunAllTags(env Envs) (bool, string) {
+	if getEnv(env, "RAYCI_RUN_ALL_TESTS") == "1" {
+		return true, "RAYCI_RUN_ALL_TESTS is set, running all tags"
+	}
+
+	if getEnv(env, "BUILDKITE_BRANCH") == "master" {
+		return true, "BUILDKITE_BRANCH is master, running all tags"
+	}
+
+	if strings.HasPrefix(getEnv(env, "BUILDKITE_BRANCH"), "releases/") {
+		return true, "BUILDKITE_BRANCH starts with releases/, running all tags"
+	}
+
+	if !isPullRequest(env) {
+		return true, "Not a PR build... skipping config parsing and running all tags"
+	}
+
+	return false, "No special conditions met, running tags based on config files"
+}
+
 func RunTagAnalysis(cfg *RunMainConfig) ([]string, error) {
 	env := cfg.Env
 
@@ -299,8 +319,9 @@ func RunTagAnalysis(cfg *RunMainConfig) ([]string, error) {
 		return nil, fmt.Errorf("BUILDKITE environment variable is not set")
 	}
 
-	if !isPullRequest(env) {
-		log.Printf("Not a PR build... skipping config targs and running all tags\n")
+	needRunAllTags, reason := needRunAllTags(env)
+	if needRunAllTags {
+		log.Printf("Running all tags: %s\n", reason)
 		return []string{"*"}, nil
 	}
 
