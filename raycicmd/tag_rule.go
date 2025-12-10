@@ -23,7 +23,6 @@ type TagRule struct {
 	Patterns []*regexp.Regexp
 }
 
-// **AI-generated code.
 // globToRegexp converts a glob pattern to an equivalent regex pattern.
 // * matches any characters (including /)
 // ? matches any single character
