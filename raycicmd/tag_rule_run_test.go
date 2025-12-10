@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -253,9 +254,11 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 			t.Fatalf("RunTagAnalysis: %v", err)
 		}
 
-		want := append(tc.Tags, "always")
-
+		want := append([]string{}, tc.Tags...)
+		want = append(want, defaultTags...)
 		sort.Strings(want)
+		want = slices.Compact(want)
+
 		if !reflect.DeepEqual(tags, want) {
 			t.Errorf("RunTagAnalysis(): got %v, want %v", tags, want)
 		}
