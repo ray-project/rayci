@@ -103,6 +103,16 @@ func RunTagAnalysis(
 		return []string{"*"}, nil
 	}
 
+	// If the config file does not exist, run all tags. This is the equivalent
+	// of the default behavior in the original Python code in cases that the
+	// binary ci/pipeline/test_conditional_testing.py does not exist.
+	for _, configPath := range configPaths {
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			log.Printf("config file %s does not exist, running all tags: %s", configPath, err)
+			return []string{"*"}, nil
+		}
+	}
+
 	baseBranch := getEnv(env, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
 	commit := getEnv(env, "BUILDKITE_COMMIT")
 	if baseBranch == "" || commit == "" {

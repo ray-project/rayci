@@ -13,6 +13,27 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+func TestRunTagAnalysis_ConfigFileNotExist(t *testing.T) {
+	envs := newEnvsMap(map[string]string{
+		"BUILDKITE":              "true",
+		"BUILDKITE_PULL_REQUEST": "123",
+	})
+
+	tags, err := RunTagAnalysis(
+		[]string{"/nonexistent/path/to/config.txt"},
+		envs,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("RunTagAnalysis() unexpected error: %v", err)
+	}
+
+	want := []string{"*"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Errorf("RunTagAnalysis() = %v, want %v", tags, want)
+	}
+}
+
 const testsYAML = `
 ci/pipeline/test_conditional_testing.py: lint tools
 python/ray/data/__init__.py: lint data ml train
