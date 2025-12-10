@@ -108,11 +108,8 @@ func TestTagRuleParserParse_TagDefinitions(t *testing.T) {
 			wantTagDefs: nil,
 		},
 		{
-			name: "tag definition after rule should error",
-			input: `python/
-@ sometag
-;
-! late_tag`,
+			name:    "tag definition after rule should error",
+			input:   strings.Join([]string{"python/", "@ sometag", ";", "! late_tag"}, "\n"),
 			wantErr: true,
 		},
 	}
@@ -152,55 +149,46 @@ func TestTagRuleParserParse_SimpleRules(t *testing.T) {
 		checkRule func(t *testing.T, rules []*TagRule)
 	}{
 		{
-			name: "single rule with directory",
-			input: `! mytag
-python/
-@ mytag
-;`,
+			name:      "single rule with directory",
+			input:     strings.Join([]string{"! mytag", "python/", "@ mytag", ";"}, "\n"),
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if want := []string{"python"}; !reflect.DeepEqual(
 					rules[0].Dirs,
 					want,
 				) {
-					t.Errorf("expected Dirs=%v, got %v", want, rules[0].Dirs)
+					t.Errorf("got Dirs=%v, want %v", rules[0].Dirs, want)
 				}
 				if want := []string{"mytag"}; !reflect.DeepEqual(
 					rules[0].Tags,
 					want,
 				) {
-					t.Errorf("expected Tags=%v, got %v", want, rules[0].Tags)
+					t.Errorf("got Tags=%v, want %v", rules[0].Tags, want)
 				}
 			},
 		},
 		{
-			name: "single rule with file",
-			input: `! mytag
-README.md
-@ mytag
-;`,
+			name:      "single rule with file",
+			input:     strings.Join([]string{"! mytag", "README.md", "@ mytag", ";"}, "\n"),
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Files) != 1 ||
 					rules[0].Files[0] != "README.md" {
 					t.Errorf(
-						"expected Files=[README.md], got %v",
+						"got Files=%v, want [README.md]",
 						rules[0].Files,
 					)
 				}
 			},
 		},
 		{
-			name: "single rule with pattern",
-			input: `! mytag
-python/*.py
-@ mytag
-;`,
+			name:      "single rule with pattern",
+			input:     strings.Join([]string{"! mytag", "python/*.py", "@ mytag", ";"}, "\n"),
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Patterns) != 1 {
 					t.Errorf(
-						"expected 1 pattern, got %d",
+						"got %d patterns, want 1",
 						len(rules[0].Patterns),
 					)
 				}
@@ -211,14 +199,8 @@ python/*.py
 			},
 		},
 		{
-			name: "multiple rules",
-			input: `! tag1 tag2
-python/
-@ tag1
-;
-golang/
-@ tag2
-;`,
+			name:      "multiple rules",
+			input:     strings.Join([]string{"! tag1 tag2", "python/", "@ tag1", ";", "golang/", "@ tag2", ";"}, "\n"),
 			wantRules: 2,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if rules[0].Dirs[0] != "python" {
@@ -236,31 +218,28 @@ golang/
 			},
 		},
 		{
-			name: "rule without semicolon at end",
-			input: `! mytag
-python/
-@ mytag`,
+			name:      "rule without semicolon at end",
+			input:     strings.Join([]string{"! mytag", "python/", "@ mytag"}, "\n"),
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Dirs) != 1 || rules[0].Dirs[0] != "python" {
-					t.Errorf("expected Dirs=[python], got %v", rules[0].Dirs)
+					t.Errorf("got Dirs=%v, want [python]", rules[0].Dirs)
 				}
 			},
 		},
 		{
-			name: "skip rule (no tags)",
-			input: `.git/
-;`,
+			name:      "skip rule (no tags)",
+			input:     strings.Join([]string{".git/", ";"}, "\n"),
 			wantRules: 1,
 			checkRule: func(t *testing.T, rules []*TagRule) {
 				if len(rules[0].Tags) != 0 {
 					t.Errorf(
-						"expected empty Tags for skip rule, got %v",
+						"got Tags=%v, want empty for skip rule",
 						rules[0].Tags,
 					)
 				}
 				if rules[0].Dirs[0] != ".git" {
-					t.Errorf("expected Dirs=[.git], got %v", rules[0].Dirs)
+					t.Errorf("got Dirs=%v, want [.git]", rules[0].Dirs)
 				}
 			},
 		},
@@ -292,13 +271,15 @@ python/
 }
 
 func TestTagRuleParserParse_MultiplePaths(t *testing.T) {
-	input := `! mytag
-python/
-golang/
-src/main.go
-*.md
-@ mytag
-;`
+	input := strings.Join([]string{
+		"! mytag",
+		"python/",
+		"golang/",
+		"src/main.go",
+		"*.md",
+		"@ mytag",
+		";",
+	}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -306,32 +287,28 @@ src/main.go
 	}
 
 	if len(cfg.Rules) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
+		t.Fatalf("got %d rules, want 1", len(cfg.Rules))
 	}
 
 	rule := cfg.Rules[0]
 
-	expectedDirs := []string{"python", "golang"}
-	if !reflect.DeepEqual(rule.Dirs, expectedDirs) {
-		t.Errorf("Dirs = %v, want %v", rule.Dirs, expectedDirs)
+	wantDirs := []string{"python", "golang"}
+	if !reflect.DeepEqual(rule.Dirs, wantDirs) {
+		t.Errorf("got Dirs=%v, want %v", rule.Dirs, wantDirs)
 	}
 
-	expectedFiles := []string{"src/main.go"}
-	if !reflect.DeepEqual(rule.Files, expectedFiles) {
-		t.Errorf("Files = %v, want %v", rule.Files, expectedFiles)
+	wantFiles := []string{"src/main.go"}
+	if !reflect.DeepEqual(rule.Files, wantFiles) {
+		t.Errorf("got Files=%v, want %v", rule.Files, wantFiles)
 	}
 
 	if len(rule.Patterns) != 1 {
-		t.Errorf("expected 1 pattern, got %d", len(rule.Patterns))
+		t.Errorf("got %d patterns, want 1", len(rule.Patterns))
 	}
 }
 
 func TestTagRuleParserParse_MultipleTags(t *testing.T) {
-	input := `! tag1 tag2 tag3
-python/
-@ tag1 tag2
-@ tag3
-;`
+	input := strings.Join([]string{"! tag1 tag2 tag3", "python/", "@ tag1 tag2", "@ tag3", ";"}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -339,26 +316,27 @@ python/
 	}
 
 	if len(cfg.Rules) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
+		t.Fatalf("got %d rules, want 1", len(cfg.Rules))
 	}
 
-	expectedTags := []string{"tag1", "tag2", "tag3"}
+	wantTags := []string{"tag1", "tag2", "tag3"}
 	sort.Strings(cfg.Rules[0].Tags)
-	sort.Strings(expectedTags)
-	if !reflect.DeepEqual(cfg.Rules[0].Tags, expectedTags) {
-		t.Errorf("Tags = %v, want %v", cfg.Rules[0].Tags, expectedTags)
+	sort.Strings(wantTags)
+	if !reflect.DeepEqual(cfg.Rules[0].Tags, wantTags) {
+		t.Errorf("got Tags=%v, want %v", cfg.Rules[0].Tags, wantTags)
 	}
 }
 
 func TestTagRuleParserParse_Comments(t *testing.T) {
-	input := `# This is a comment at the start
-! tag1 tag2 # tag definitions
-
-# Another comment
-python/ # Directory to match
-@ tag1 # Tag assignment
-; # Rule separator
-`
+	input := strings.Join([]string{
+		"# This is a comment at the start",
+		"! tag1 tag2 # tag definitions",
+		"",
+		"# Another comment",
+		"python/ # Directory to match",
+		"@ tag1 # Tag assignment",
+		"; # Rule separator",
+	}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -367,25 +345,19 @@ python/ # Directory to match
 
 	if len(cfg.TagDefs) != 2 {
 		t.Errorf(
-			"expected 2 tag definitions, got %d: %v",
+			"got %d tag definitions %v, want 2",
 			len(cfg.TagDefs),
 			cfg.TagDefs,
 		)
 	}
 
 	if len(cfg.Rules) != 1 {
-		t.Errorf("expected 1 rule, got %d", len(cfg.Rules))
+		t.Errorf("got %d rules, want 1", len(cfg.Rules))
 	}
 }
 
 func TestTagRuleParserParse_EmptyLines(t *testing.T) {
-	input := `! tag1
-
-python/
-
-@ tag1
-
-;`
+	input := strings.Join([]string{"! tag1", "", "python/", "", "@ tag1", "", ";"}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -393,11 +365,11 @@ python/
 	}
 
 	if len(cfg.Rules) != 1 {
-		t.Errorf("expected 1 rule, got %d", len(cfg.Rules))
+		t.Errorf("got %d rules, want 1", len(cfg.Rules))
 	}
 
 	if len(cfg.Rules[0].Dirs) != 1 || cfg.Rules[0].Dirs[0] != "python" {
-		t.Errorf("expected Dirs=[python], got %v", cfg.Rules[0].Dirs)
+		t.Errorf("got Dirs=%v, want [python]", cfg.Rules[0].Dirs)
 	}
 }
 
@@ -408,15 +380,13 @@ func TestTagRuleParserParse_Errors(t *testing.T) {
 		wantError string
 	}{
 		{
-			name: "tag definition after rule starts",
-			input: `python/
-! tag1`,
+			name:      "tag definition after rule starts",
+			input:     strings.Join([]string{"python/", "! tag1"}, "\n"),
 			wantError: "tag must be declared at file start",
 		},
 		{
-			name: "tokens after semicolon",
-			input: `python/
-; extra_stuff`,
+			name:      "tokens after semicolon",
+			input:     strings.Join([]string{"python/", "; extra_stuff"}, "\n"),
 			wantError: "unexpected tokens after semicolon",
 		},
 	}
@@ -427,7 +397,7 @@ func TestTagRuleParserParse_Errors(t *testing.T) {
 
 			if err == nil {
 				t.Errorf(
-					"Parse() expected error containing %q, got nil",
+					"got no error, want error containing %q",
 					tt.wantError,
 				)
 				return
@@ -493,7 +463,7 @@ func TestTagRuleParserParse_PatternTypes(t *testing.T) {
 
 			// Should have one rule from flushFinalRule
 			if len(cfg.Rules) != 1 {
-				t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
+				t.Fatalf("got %d rules, want 1", len(cfg.Rules))
 			}
 
 			rule := cfg.Rules[0]
@@ -509,24 +479,18 @@ func TestTagRuleParserParse_PatternTypes(t *testing.T) {
 			}
 
 			if tt.wantPattern && len(rule.Patterns) == 0 {
-				t.Errorf("expected pattern to be parsed, got none")
+				t.Errorf("got no patterns, want 1")
 			}
 
 			if !tt.wantPattern && len(rule.Patterns) > 0 {
-				t.Errorf("expected no patterns, got %d", len(rule.Patterns))
+				t.Errorf("got %d patterns, want 0", len(rule.Patterns))
 			}
 		})
 	}
 }
 
 func TestTagRuleParserParse_LineNumbers(t *testing.T) {
-	input := `! tag1
-python/
-@ tag1
-;
-golang/
-@ tag1
-;`
+	input := strings.Join([]string{"! tag1", "python/", "@ tag1", ";", "golang/", "@ tag1", ";"}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -534,7 +498,7 @@ golang/
 	}
 
 	if len(cfg.Rules) != 2 {
-		t.Fatalf("expected 2 rules, got %d", len(cfg.Rules))
+		t.Fatalf("got %d rules, want 2", len(cfg.Rules))
 	}
 
 	// First rule ends at line 4 (the ;)
@@ -549,30 +513,31 @@ golang/
 }
 
 func TestTagRuleParserParse_RealWorldExample(t *testing.T) {
-	input := `# Conditional testing rules
-! python ml data serve train tune
-
-# Skip hidden files
-.git/
-.github/
-;
-
-# Python core
-python/ray/
-@ python
-;
-
-# ML libraries
-python/ray/train/
-python/ray/tune/
-@ ml train tune
-;
-
-# Data processing
-python/ray/data/
-@ data
-;
-`
+	input := strings.Join([]string{
+		"# Conditional testing rules",
+		"! python ml data serve train tune",
+		"",
+		"# Skip hidden files",
+		".git/",
+		".github/",
+		";",
+		"",
+		"# Python core",
+		"python/ray/",
+		"@ python",
+		";",
+		"",
+		"# ML libraries",
+		"python/ray/train/",
+		"python/ray/tune/",
+		"@ ml train tune",
+		";",
+		"",
+		"# Data processing",
+		"python/ray/data/",
+		"@ data",
+		";",
+	}, "\n")
 
 	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
@@ -580,7 +545,7 @@ python/ray/data/
 	}
 
 	// Should have tag definitions
-	expectedTagDefs := []string{
+	wantTagDefs := []string{
 		"python",
 		"ml",
 		"data",
@@ -589,14 +554,14 @@ python/ray/data/
 		"tune",
 	}
 	sort.Strings(cfg.TagDefs)
-	sort.Strings(expectedTagDefs)
-	if !reflect.DeepEqual(cfg.TagDefs, expectedTagDefs) {
-		t.Errorf("tagDefs = %v, want %v", cfg.TagDefs, expectedTagDefs)
+	sort.Strings(wantTagDefs)
+	if !reflect.DeepEqual(cfg.TagDefs, wantTagDefs) {
+		t.Errorf("got tagDefs=%v, want %v", cfg.TagDefs, wantTagDefs)
 	}
 
 	// Should have 4 rules
 	if len(cfg.Rules) != 4 {
-		t.Errorf("expected 4 rules, got %d", len(cfg.Rules))
+		t.Errorf("got %d rules, want 4", len(cfg.Rules))
 	}
 
 	// First rule should be a skip rule (no tags)
@@ -620,16 +585,13 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 		wantRules int
 	}{
 		{
-			name: "rule with semicolon - no extra rule",
-			input: `python/
-@ tag1
-;`,
+			name:      "rule with semicolon - no extra rule",
+			input:     strings.Join([]string{"python/", "@ tag1", ";"}, "\n"),
 			wantRules: 1,
 		},
 		{
-			name: "rule without semicolon - flush creates rule",
-			input: `python/
-@ tag1`,
+			name:      "rule without semicolon - flush creates rule",
+			input:     strings.Join([]string{"python/", "@ tag1"}, "\n"),
 			wantRules: 1,
 		},
 		{
