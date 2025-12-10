@@ -55,7 +55,8 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 // directories, files, or glob patterns.
 func (r *TagRule) Match(changedFilePath string) bool {
 	if slices.ContainsFunc(r.Dirs, func(dir string) bool {
-		return changedFilePath == dir || strings.HasPrefix(changedFilePath, dir+"/")
+		return changedFilePath == dir ||
+			strings.HasPrefix(changedFilePath, dir+"/")
 	}) {
 		return true
 	}
@@ -80,6 +81,44 @@ func (r *TagRule) Match(changedFilePath string) bool {
 func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 	if r.Match(changedFilePath) {
 		return r.Tags, true
+	}
+	return []string{}, false
+}
+
+// TagRuleSet is a set of TagRules, used to match tags for changed files.
+type TagRuleSet struct {
+	// tagDefs is the set of all defined tags.
+	tagDefs map[string]struct{}
+	// rules is a list of TagRule instances seen in the order they were parsed.
+	rules []*TagRule
+}
+
+// ValidateRules validates that all tags used in the rules are defined.
+func (s *TagRuleSet) ValidateRules() error {
+	for _, rule := range s.rules {
+		if len(rule.Tags) == 0 {
+			continue
+		}
+		for _, tag := range rule.Tags {
+			if _, ok := s.tagDefs[tag]; !ok {
+				return fmt.Errorf(
+					"tag %s not declared, used in rule at line %d",
+					tag,
+					rule.Lineno,
+				)
+			}
+		}
+	}
+	return nil
+}
+
+// MatchTags returns the first matching rule's tags if the given file
+// path matches any of the rules in the set.
+func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
+	for _, rule := range s.rules {
+		if rule.Match(changedFilePath) {
+			return rule.Tags, true
+		}
 	}
 	return []string{}, false
 }
