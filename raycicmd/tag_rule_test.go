@@ -30,7 +30,7 @@ func TestGlobToRegexp(t *testing.T) {
 func TestTagRuleMatch(t *testing.T) {
 	re, err := globToRegexp("python/*.py")
 	if err != nil {
-		t.Errorf("globToRegexp(%v): %v", "python/*.py", err)
+		t.Fatalf("globToRegexp(%v): %v", "python/*.py", err)
 	}
 	rule := &TagRule{
 		Tags:     []string{"hit"},
@@ -96,7 +96,7 @@ func TestTagRuleMatch(t *testing.T) {
 func TestTagRuleMatchTags(t *testing.T) {
 	re, err := globToRegexp("python/*.py")
 	if err != nil {
-		t.Errorf("globToRegexp(%v): %v", "python/*.py", err)
+		t.Fatalf("globToRegexp(%v): %v", "python/*.py", err)
 	}
 	rule := &TagRule{
 		Tags:     []string{"hit"},

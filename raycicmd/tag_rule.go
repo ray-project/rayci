@@ -7,11 +7,19 @@ import (
 	"strings"
 )
 
+// TagRule defines a rule that maps changed file paths to tags for Buildkite
+// pipeline steps. When a file path matches any of the specified directories,
+// files, OR glob patterns, the associated tags are applied.
 type TagRule struct {
-	Tags     []string
-	Lineno   int
-	Dirs     []string
-	Files    []string
+	// Tags is a list of tags to apply when the rule matches.
+	Tags []string
+	// Lineno is the line number of the rule in the config file.
+	Lineno int
+	// Dirs is a list of directories to match.
+	Dirs []string
+	// Files is a list of files to match.
+	Files []string
+	// Patterns is a list of glob patterns (converted to regex patterns) to match.
 	Patterns []*regexp.Regexp
 }
 
@@ -44,6 +52,8 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 	return re, nil
 }
 
+// Match returns true if the given file path matches any of the rule's
+// directories, files, or glob patterns.
 func (r *TagRule) Match(changedFilePath string) bool {
 	if slices.ContainsFunc(r.Dirs, func(dir string) bool {
 		return changedFilePath == dir || strings.HasPrefix(changedFilePath, dir+"/")
@@ -66,6 +76,8 @@ func (r *TagRule) Match(changedFilePath string) bool {
 	return false
 }
 
+// MatchTags returns the tags for the rule if the given file path matches any
+// of the rule's directories, files, or glob patterns.
 func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 	if r.Match(changedFilePath) {
 		return r.Tags, true
