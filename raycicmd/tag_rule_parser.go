@@ -6,8 +6,18 @@ import (
 	"strings"
 )
 
-// ParseTagRuleConfig parses rule config content into a list of TagRules and
-// tag definitions.
+// TagRuleConfig holds the parsed result of a tag rule configuration file.
+type TagRuleConfig struct {
+	// Rules is the list of tag rules in the order they were defined.
+	// Rules are evaluated in order, and the first matched rule will be used.
+	Rules []*TagRule
+
+	// TagDefs is the list of declared tag names in the order they were defined.
+	// These are the tags declared with "!" at the start of the file.
+	TagDefs []string
+}
+
+// ParseTagRuleConfig parses rule config content into a TagRuleConfig.
 //
 // ruleContent is a string with the following format:
 //
@@ -22,12 +32,15 @@ import (
 //	;                   # Semicolon to separate rules
 //
 // Rules are evaluated in order, and the first matched rule will be used.
-func ParseTagRuleConfig(ruleContent string) ([]*TagRule, []string, error) {
+func ParseTagRuleConfig(ruleContent string) (*TagRuleConfig, error) {
 	p := &tagRuleParser{}
 	if err := p.parse(ruleContent); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return p.rules, p.tagDefs, nil
+	return &TagRuleConfig{
+		Rules:   p.rules,
+		TagDefs: p.tagDefs,
+	}, nil
 }
 
 // pendingRule holds the accumulated state for a rule being parsed.

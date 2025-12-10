@@ -119,7 +119,7 @@ func TestTagRuleParserParse_TagDefinitions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tagDefs, err := ParseTagRuleConfig(tt.input)
+			cfg, err := ParseTagRuleConfig(tt.input)
 
 			if tt.wantErr {
 				if err == nil {
@@ -133,10 +133,10 @@ func TestTagRuleParserParse_TagDefinitions(t *testing.T) {
 				return
 			}
 
-			if !reflect.DeepEqual(tagDefs, tt.wantTagDefs) {
+			if !reflect.DeepEqual(cfg.TagDefs, tt.wantTagDefs) {
 				t.Errorf(
 					"Parse() tagDefs = %v, want %v",
-					tagDefs,
+					cfg.TagDefs,
 					tt.wantTagDefs,
 				)
 			}
@@ -268,24 +268,24 @@ python/
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rules, _, err := ParseTagRuleConfig(tt.input)
+			cfg, err := ParseTagRuleConfig(tt.input)
 
 			if err != nil {
 				t.Errorf("Parse() unexpected error: %v", err)
 				return
 			}
 
-			if len(rules) != tt.wantRules {
+			if len(cfg.Rules) != tt.wantRules {
 				t.Errorf(
 					"Parse() rules count = %d, want %d",
-					len(rules),
+					len(cfg.Rules),
 					tt.wantRules,
 				)
 				return
 			}
 
 			if tt.checkRule != nil {
-				tt.checkRule(t, rules)
+				tt.checkRule(t, cfg.Rules)
 			}
 		})
 	}
@@ -300,16 +300,16 @@ src/main.go
 @ mytag
 ;`
 
-	rules, _, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() unexpected error: %v", err)
 	}
 
-	if len(rules) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(rules))
+	if len(cfg.Rules) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
 	}
 
-	rule := rules[0]
+	rule := cfg.Rules[0]
 
 	expectedDirs := []string{"python", "golang"}
 	if !reflect.DeepEqual(rule.Dirs, expectedDirs) {
@@ -333,20 +333,20 @@ python/
 @ tag3
 ;`
 
-	rules, _, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() unexpected error: %v", err)
 	}
 
-	if len(rules) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(rules))
+	if len(cfg.Rules) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
 	}
 
 	expectedTags := []string{"tag1", "tag2", "tag3"}
-	sort.Strings(rules[0].Tags)
+	sort.Strings(cfg.Rules[0].Tags)
 	sort.Strings(expectedTags)
-	if !reflect.DeepEqual(rules[0].Tags, expectedTags) {
-		t.Errorf("Tags = %v, want %v", rules[0].Tags, expectedTags)
+	if !reflect.DeepEqual(cfg.Rules[0].Tags, expectedTags) {
+		t.Errorf("Tags = %v, want %v", cfg.Rules[0].Tags, expectedTags)
 	}
 }
 
@@ -360,21 +360,21 @@ python/ # Directory to match
 ; # Rule separator
 `
 
-	rules, tagDefs, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() unexpected error: %v", err)
 	}
 
-	if len(tagDefs) != 2 {
+	if len(cfg.TagDefs) != 2 {
 		t.Errorf(
 			"expected 2 tag definitions, got %d: %v",
-			len(tagDefs),
-			tagDefs,
+			len(cfg.TagDefs),
+			cfg.TagDefs,
 		)
 	}
 
-	if len(rules) != 1 {
-		t.Errorf("expected 1 rule, got %d", len(rules))
+	if len(cfg.Rules) != 1 {
+		t.Errorf("expected 1 rule, got %d", len(cfg.Rules))
 	}
 }
 
@@ -387,17 +387,17 @@ python/
 
 ;`
 
-	rules, _, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() unexpected error: %v", err)
 	}
 
-	if len(rules) != 1 {
-		t.Errorf("expected 1 rule, got %d", len(rules))
+	if len(cfg.Rules) != 1 {
+		t.Errorf("expected 1 rule, got %d", len(cfg.Rules))
 	}
 
-	if len(rules[0].Dirs) != 1 || rules[0].Dirs[0] != "python" {
-		t.Errorf("expected Dirs=[python], got %v", rules[0].Dirs)
+	if len(cfg.Rules[0].Dirs) != 1 || cfg.Rules[0].Dirs[0] != "python" {
+		t.Errorf("expected Dirs=[python], got %v", cfg.Rules[0].Dirs)
 	}
 }
 
@@ -423,7 +423,7 @@ func TestTagRuleParserParse_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := ParseTagRuleConfig(tt.input)
+			_, err := ParseTagRuleConfig(tt.input)
 
 			if err == nil {
 				t.Errorf(
@@ -486,17 +486,17 @@ func TestTagRuleParserParse_PatternTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rules, _, err := ParseTagRuleConfig(tt.input)
+			cfg, err := ParseTagRuleConfig(tt.input)
 			if err != nil {
 				t.Fatalf("Parse() error: %v", err)
 			}
 
 			// Should have one rule from flushFinalRule
-			if len(rules) != 1 {
-				t.Fatalf("expected 1 rule, got %d", len(rules))
+			if len(cfg.Rules) != 1 {
+				t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
 			}
 
-			rule := rules[0]
+			rule := cfg.Rules[0]
 
 			if tt.wantDirs != nil &&
 				!reflect.DeepEqual(rule.Dirs, tt.wantDirs) {
@@ -528,23 +528,23 @@ golang/
 @ tag1
 ;`
 
-	rules, _, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}
 
-	if len(rules) != 2 {
-		t.Fatalf("expected 2 rules, got %d", len(rules))
+	if len(cfg.Rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(cfg.Rules))
 	}
 
 	// First rule ends at line 4 (the ;)
-	if rules[0].Lineno != 4 {
-		t.Errorf("first rule Lineno = %d, want 4", rules[0].Lineno)
+	if cfg.Rules[0].Lineno != 4 {
+		t.Errorf("first rule Lineno = %d, want 4", cfg.Rules[0].Lineno)
 	}
 
 	// Second rule ends at line 7 (the ;)
-	if rules[1].Lineno != 7 {
-		t.Errorf("second rule Lineno = %d, want 7", rules[1].Lineno)
+	if cfg.Rules[1].Lineno != 7 {
+		t.Errorf("second rule Lineno = %d, want 7", cfg.Rules[1].Lineno)
 	}
 }
 
@@ -574,7 +574,7 @@ python/ray/data/
 ;
 `
 
-	rules, tagDefs, err := ParseTagRuleConfig(input)
+	cfg, err := ParseTagRuleConfig(input)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}
@@ -588,28 +588,28 @@ python/ray/data/
 		"train",
 		"tune",
 	}
-	sort.Strings(tagDefs)
+	sort.Strings(cfg.TagDefs)
 	sort.Strings(expectedTagDefs)
-	if !reflect.DeepEqual(tagDefs, expectedTagDefs) {
-		t.Errorf("tagDefs = %v, want %v", tagDefs, expectedTagDefs)
+	if !reflect.DeepEqual(cfg.TagDefs, expectedTagDefs) {
+		t.Errorf("tagDefs = %v, want %v", cfg.TagDefs, expectedTagDefs)
 	}
 
 	// Should have 4 rules
-	if len(rules) != 4 {
-		t.Errorf("expected 4 rules, got %d", len(rules))
+	if len(cfg.Rules) != 4 {
+		t.Errorf("expected 4 rules, got %d", len(cfg.Rules))
 	}
 
 	// First rule should be a skip rule (no tags)
-	if len(rules[0].Tags) != 0 {
+	if len(cfg.Rules[0].Tags) != 0 {
 		t.Errorf(
 			"first rule should have no tags (skip rule), got %v",
-			rules[0].Tags,
+			cfg.Rules[0].Tags,
 		)
 	}
 
 	// Second rule should have python tag
-	if len(rules[1].Tags) != 1 || rules[1].Tags[0] != "python" {
-		t.Errorf("second rule Tags = %v, want [python]", rules[1].Tags)
+	if len(cfg.Rules[1].Tags) != 1 || cfg.Rules[1].Tags[0] != "python" {
+		t.Errorf("second rule Tags = %v, want [python]", cfg.Rules[1].Tags)
 	}
 }
 
@@ -651,15 +651,15 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rules, _, err := ParseTagRuleConfig(tt.input)
+			cfg, err := ParseTagRuleConfig(tt.input)
 			if err != nil {
 				t.Fatalf("Parse() error: %v", err)
 			}
 
-			if len(rules) != tt.wantRules {
+			if len(cfg.Rules) != tt.wantRules {
 				t.Errorf(
 					"rules count = %d, want %d",
-					len(rules),
+					len(cfg.Rules),
 					tt.wantRules,
 				)
 			}
