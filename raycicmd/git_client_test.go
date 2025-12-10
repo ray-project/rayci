@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,7 @@ func TestListChangedFiles_InvalidCommitRange(t *testing.T) {
 	}
 }
 
+// runGitCommand runs a git command in the specified directory.
 func runGitCommand(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -41,146 +43,122 @@ func runGitCommand(t *testing.T, dir string, args ...string) {
 	}
 }
 
-func TestListChangedFiles_Integration(t *testing.T) {
-	// Set up bare origin and working directory
+// gitTestHelper provides a test git repository with origin and working directory.
+type gitTestHelper struct {
+	t       *testing.T
+	Origin  string
+	WorkDir string
+}
+
+func newGitTestHelper(t *testing.T) *gitTestHelper {
+	t.Helper()
 	origin := t.TempDir()
 	workDir := t.TempDir()
 
-	// Initialize bare repo
-	runGitCommand(t, origin, "init", "--bare")
+	h := &gitTestHelper{t: t, Origin: origin, WorkDir: workDir}
+
+	// Initialize bare origin repo
+	h.gitIn(origin, "init", "--bare")
 
 	// Initialize working repo
-	runGitCommand(t, workDir, "init")
-	runGitCommand(t, workDir, "config", "user.email", "test@test.com")
-	runGitCommand(t, workDir, "config", "user.name", "Test")
-	runGitCommand(t, workDir, "remote", "add", "origin", origin)
+	h.gitIn(workDir, "init")
+	h.gitIn(workDir, "config", "user.email", "test@test.com")
+	h.gitIn(workDir, "config", "user.name", "Test")
+	h.gitIn(workDir, "remote", "add", "origin", origin)
 
-	// Create initial commit on master
-	readmePath := filepath.Join(workDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# README\n"), 0644); err != nil {
-		t.Fatalf("write README: %v", err)
+	return h
+}
+
+func (h *gitTestHelper) gitIn(dir string, args ...string) {
+	h.t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		h.t.Fatalf("git %v failed: %v\n%s", args, err, out)
 	}
-	runGitCommand(t, workDir, "add", "README.md")
-	runGitCommand(t, workDir, "commit", "-m", "initial commit")
-	runGitCommand(t, workDir, "push", "origin", "master")
+}
 
-	// Create a PR branch with changes
-	runGitCommand(t, workDir, "checkout", "-b", "feature-branch")
+func (h *gitTestHelper) git(args ...string) {
+	h.gitIn(h.WorkDir, args...)
+}
 
-	// Add some files
-	changedFiles := []string{"src/main.go", "src/util.go", "docs/readme.txt"}
-	for _, f := range changedFiles {
-		fullPath := filepath.Join(workDir, f)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(fullPath, []byte("content\n"), 0644); err != nil {
-			t.Fatalf("write file: %v", err)
-		}
-	}
-	runGitCommand(t, workDir, "add", ".")
-	runGitCommand(t, workDir, "commit", "-m", "add files")
-
-	// Get the commit hash
+func (h *gitTestHelper) head() string {
+	h.t.Helper()
 	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = workDir
-	commitBytes, err := cmd.Output()
+	cmd.Dir = h.WorkDir
+	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("get commit: %v", err)
+		h.t.Fatalf("git rev-parse HEAD: %v", err)
 	}
-	commit := strings.TrimSpace(string(commitBytes))
+	return strings.TrimSpace(string(out))
+}
 
-	// Test ListChangedFiles
-	client := &RealGitClient{WorkDir: workDir}
-	commitRange := "origin/master..." + commit
+func (h *gitTestHelper) writeFile(path, content string) {
+	h.t.Helper()
+	fullPath := filepath.Join(h.WorkDir, path)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		h.t.Fatalf("mkdir %s: %v", filepath.Dir(fullPath), err)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		h.t.Fatalf("write %s: %v", path, err)
+	}
+}
 
-	files, err := client.ListChangedFiles("master", commitRange)
+func (h *gitTestHelper) commitFiles(msg string, files ...string) string {
+	h.t.Helper()
+	for _, f := range files {
+		h.writeFile(f, "content\n")
+	}
+	h.git("add", ".")
+	h.git("commit", "-m", msg)
+	return h.head()
+}
+
+func (h *gitTestHelper) initialCommit() {
+	h.t.Helper()
+	h.writeFile("README.md", "# README\n")
+	h.git("add", "README.md")
+	h.git("commit", "-m", "initial commit")
+}
+
+func TestListChangedFiles_Integration(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	wantFiles := []string{"src/main.go", "src/util.go", "docs/readme.txt"}
+	commit := h.commitFiles("add files", wantFiles...)
+
+	client := &RealGitClient{WorkDir: h.WorkDir}
+	files, err := client.ListChangedFiles("master", "origin/master..."+commit)
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
 
-	// Verify we got the expected files
-	if len(files) != len(changedFiles) {
-		t.Errorf(
-			"got %d files, want %d: %v",
-			len(files),
-			len(changedFiles),
-			files,
-		)
+	if len(files) != len(wantFiles) {
+		t.Fatalf("got %d files, want %d: %v", len(files), len(wantFiles), files)
 	}
-
-	for _, want := range changedFiles {
-		found := false
-		for _, got := range files {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
+	for _, want := range wantFiles {
+		if !slices.Contains(files, want) {
 			t.Errorf("missing file %s in result %v", want, files)
 		}
 	}
 }
 
 func TestListChangedFiles_EmptyBaseBranch(t *testing.T) {
-	// Set up bare origin and working directory
-	origin := t.TempDir()
-	workDir := t.TempDir()
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	baseCommit := h.head()
 
-	// Initialize bare repo
-	runGitCommand(t, origin, "init", "--bare")
+	newCommit := h.commitFiles("add new file", "new_file.txt")
 
-	// Initialize working repo
-	runGitCommand(t, workDir, "init")
-	runGitCommand(t, workDir, "config", "user.email", "test@test.com")
-	runGitCommand(t, workDir, "config", "user.name", "Test")
-	runGitCommand(t, workDir, "remote", "add", "origin", origin)
-
-	// Create initial commit
-	readmePath := filepath.Join(workDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# README\n"), 0644); err != nil {
-		t.Fatalf("write README: %v", err)
-	}
-	runGitCommand(t, workDir, "add", "README.md")
-	runGitCommand(t, workDir, "commit", "-m", "initial commit")
-
-	// Get the base commit
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = workDir
-	baseCommitBytes, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("get base commit: %v", err)
-	}
-	baseCommit := strings.TrimSpace(string(baseCommitBytes))
-
-	// Add another file
-	newFilePath := filepath.Join(workDir, "new_file.txt")
-	if err := os.WriteFile(newFilePath, []byte("new content\n"), 0644); err != nil {
-		t.Fatalf("write new file: %v", err)
-	}
-	runGitCommand(t, workDir, "add", "new_file.txt")
-	runGitCommand(t, workDir, "commit", "-m", "add new file")
-
-	// Get the new commit hash
-	cmd = exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = workDir
-	newCommitBytes, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("get new commit: %v", err)
-	}
-	newCommit := strings.TrimSpace(string(newCommitBytes))
-
-	// Test ListChangedFiles with empty baseBranch (skips fetch)
-	client := &RealGitClient{WorkDir: workDir}
-	commitRange := baseCommit + "..." + newCommit
-
-	files, err := client.ListChangedFiles("", commitRange)
+	client := &RealGitClient{WorkDir: h.WorkDir}
+	files, err := client.ListChangedFiles("", baseCommit+"..."+newCommit)
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
 
-	// Should have exactly one file
 	if len(files) != 1 || files[0] != "new_file.txt" {
 		t.Errorf("got files %v, want [new_file.txt]", files)
 	}
