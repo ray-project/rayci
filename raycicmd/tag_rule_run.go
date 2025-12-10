@@ -33,7 +33,7 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 }
 
 func isPullRequest(env Envs) bool {
-	return getEnv(env, "BUILDKITE_PULL_REQUEST") != "false"
+	return getEnv(env, "BUILDKITE_PULL_REQUEST") != "false" && getEnv(env, "BUILDKITE_PULL_REQUEST") != ""
 }
 
 func needRunAllTags(env Envs) (bool, string) {
@@ -74,18 +74,35 @@ var fallbackTags = strings.Fields(
 )
 
 func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
-	tags := append([]string{}, defaultTags...)
+	tagSet := make(map[string]struct{})
+	for _, tag := range defaultTags {
+		tagSet[tag] = struct{}{}
+	}
 
+	hasUnhandledFiles := false
 	for _, file := range files {
 		if matchTags, matched := ruleSet.MatchTags(file); matched {
-			tags = append(tags, matchTags...)
+			for _, tag := range matchTags {
+				tagSet[tag] = struct{}{}
+			}
 		} else {
 			log.Printf("Unhandled source code change: %s\n", file)
-			tags = append(tags, fallbackTags...)
+			hasUnhandledFiles = true
 		}
 	}
 
-	return sortAndDeduplicateTags(tags)
+	if hasUnhandledFiles {
+		for _, tag := range fallbackTags {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	return tags
 }
 
 func RunTagAnalysis(
