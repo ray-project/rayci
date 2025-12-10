@@ -14,27 +14,6 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-func TestRunTagAnalysis_ConfigFileNotExist(t *testing.T) {
-	envs := newEnvsMap(map[string]string{
-		"BUILDKITE":              "true",
-		"BUILDKITE_PULL_REQUEST": "123",
-	})
-
-	tags, err := RunTagAnalysis(
-		[]string{"/nonexistent/path/to/config.txt"},
-		envs,
-		nil,
-	)
-	if err != nil {
-		t.Fatalf("RunTagAnalysis() unexpected error: %v", err)
-	}
-
-	want := []string{"*"}
-	if !reflect.DeepEqual(tags, want) {
-		t.Errorf("RunTagAnalysis() = %v, want %v", tags, want)
-	}
-}
-
 const testsYAML = `
 ci/pipeline/test_conditional_testing.py: lint tools
 python/ray/data/__init__.py: lint data ml train
@@ -104,6 +83,27 @@ BUILD.bazel:
     - release_tests
 `
 
+func TestRunTagAnalysis_ConfigFileNotExist(t *testing.T) {
+	envs := newEnvsMap(map[string]string{
+		"BUILDKITE":              "true",
+		"BUILDKITE_PULL_REQUEST": "123",
+	})
+
+	tags, err := RunTagAnalysis(
+		[]string{"/nonexistent/path/to/config.txt"},
+		envs,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("RunTagAnalysis() unexpected error: %v", err)
+	}
+
+	want := []string{"*"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Errorf("RunTagAnalysis() = %v, want %v", tags, want)
+	}
+}
+
 var testRulesSnapshot = filepath.Join(
 	"data",
 	"62231dd4ba8e784da8800b248ad7616b8db92de7.txt",
@@ -152,7 +152,7 @@ func (s *TestTagSet) UnmarshalYAML(value *yaml.Node) error {
 		for _, item := range value.Content {
 			if item.Kind != yaml.ScalarNode {
 				return fmt.Errorf(
-					"expected scalar in sequence, got kind %d",
+					"got kind %d, want scalar in sequence",
 					item.Kind,
 				)
 			}
