@@ -19,15 +19,15 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 			return nil, err
 		}
 
-		parser := &TagRuleParser{}
-		if err := parser.Parse(string(ruleContent)); err != nil {
+		rules, tagDefs, err := ParseTagRuleConfig(string(ruleContent))
+		if err != nil {
 			return nil, err
 		}
 
-		for _, tagDef := range parser.tagDefs {
+		for _, tagDef := range tagDefs {
 			combinedSet.tagDefs[tagDef] = struct{}{}
 		}
-		combinedSet.rules = append(combinedSet.rules, parser.rules...)
+		combinedSet.rules = append(combinedSet.rules, rules...)
 	}
 	return combinedSet, nil
 }
