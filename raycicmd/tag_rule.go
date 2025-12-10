@@ -85,11 +85,15 @@ func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 	return []string{}, false
 }
 
+// TagRuleSet is a set of TagRules, used to match tags for changed files.
 type TagRuleSet struct {
+	// tagDefs is the set of all defined tags.
 	tagDefs map[string]struct{}
-	rules   []*TagRule
+	// rules is a list of TagRule instances seen in the order they were parsed.
+	rules []*TagRule
 }
 
+// ValidateRules validates that all tags used in the rules are defined.
 func (s *TagRuleSet) ValidateRules() error {
 	for _, rule := range s.rules {
 		if len(rule.Tags) == 0 {
@@ -108,6 +112,8 @@ func (s *TagRuleSet) ValidateRules() error {
 	return nil
 }
 
+// MatchTags returns the first matching rule's tags if the given file
+// path matches any of the rules in the set.
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
 	for _, rule := range s.rules {
 		if rule.Match(changedFilePath) {
