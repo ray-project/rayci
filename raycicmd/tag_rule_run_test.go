@@ -248,7 +248,7 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		tags, err := RunTagAnalysis(
 			[]string{testRulesSnapshot},
 			envs,
-			&RealGitClient{WorkDir: workDir},
+			&ChangeLister{WorkDir: workDir},
 		)
 		if err != nil {
 			t.Fatalf("RunTagAnalysis: %v", err)

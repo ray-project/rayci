@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 )
@@ -56,14 +55,6 @@ func needRunAllTags(env Envs) (bool, string) {
 	return false, "No special conditions met, running tags based on config files"
 }
 
-func sortAndDeduplicateTags(tags []string) []string {
-	if len(tags) < 2 {
-		return tags
-	}
-	sort.Strings(tags)
-	return slices.Compact(tags)
-}
-
 // defaultTags are always included in all PR builds.
 var defaultTags = []string{"always", "lint"}
 
@@ -108,7 +99,7 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 func RunTagAnalysis(
 	configPaths []string,
 	env Envs,
-	git GitClient,
+	lister *ChangeLister,
 ) ([]string, error) {
 	if getEnv(env, "BUILDKITE") != "true" {
 		return nil, fmt.Errorf("BUILDKITE environment variable is not set")
@@ -143,13 +134,12 @@ func RunTagAnalysis(
 		return nil, err
 	}
 
-	commitRange := fmt.Sprintf("origin/%s...%s", baseBranch, commit)
-	changedFiles, err := git.ListChangedFiles(baseBranch, commitRange)
+	changedFiles, err := lister.ListChangedFiles(baseBranch, commit)
 	if err != nil {
 		return nil, fmt.Errorf("list changed files: %w", err)
 	}
 
-	log.Printf("commit range: %s\n", commitRange)
+	log.Printf("baseBranch: %s, commit: %s\n", baseBranch, commit)
 	log.Printf("changedFiles: %v\n", changedFiles)
 
 	tags := tagsForChangedFiles(ruleSet, changedFiles)
