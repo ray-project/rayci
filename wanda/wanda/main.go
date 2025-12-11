@@ -52,6 +52,7 @@ func main() {
 		*readOnly = os.Getenv("BUILDKITE_CACHE_READONLY") == "true"
 		*buildID = os.Getenv("RAYCI_BUILD_ID")
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
+		*rebuild = os.Getenv("RAYCI_WANDA_ALWAYS_REBUILD") == "true"
 
 		if *epoch == "" {
 			*epoch = wanda.DefaultCacheEpoch()
