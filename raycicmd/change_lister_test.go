@@ -121,8 +121,8 @@ func TestListChangedFiles(t *testing.T) {
 	wantFiles := []string{"src/main.go", "src/util.go", "docs/readme.txt"}
 	commit := h.commitFiles("add files", wantFiles...)
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -175,8 +175,8 @@ func TestListChangedFiles_MergeBase(t *testing.T) {
 
 	// The diff should only show feature.go, not other.go,
 	// because we diff against the merge-base (common ancestor).
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", featureCommit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: featureCommit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -203,8 +203,8 @@ func TestListChangedFiles_CustomRemote(t *testing.T) {
 	commit := h.commitFiles("add feature", "feature.go")
 
 	// Use a lister with custom remote.
-	lister := &ChangeLister{WorkDir: h.WorkDir, Remote: "upstream"}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, Remote: "upstream", BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -234,8 +234,8 @@ func TestListChangedFiles_MultipleCommits(t *testing.T) {
 	h.commitFiles("first commit", "first.go")
 	commit := h.commitFiles("second commit", "second.go")
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -275,8 +275,8 @@ func TestListChangedFiles_ModifyExistingFile(t *testing.T) {
 	h.git("commit", "-m", "modify readme")
 	commit := h.head()
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -312,8 +312,8 @@ func TestListChangedFiles_DeleteFile(t *testing.T) {
 	h.git("commit", "-m", "delete file")
 	commit := h.head()
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -347,8 +347,8 @@ func TestListChangedFiles_RenameFile(t *testing.T) {
 	h.git("commit", "-m", "rename file")
 	commit := h.head()
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -382,8 +382,8 @@ func TestListChangedFiles_NoChanges(t *testing.T) {
 	// No changes, just branch off
 	commit := h.head()
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -425,8 +425,8 @@ func TestListChangedFiles_SameFileModifiedOnBothBranches(t *testing.T) {
 	h.git("commit", "-m", "modify shared.go on master")
 	h.git("push", "origin", "master")
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", featureCommit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: featureCommit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -456,8 +456,8 @@ func TestListChangedFiles_DeepDirectoryStructure(t *testing.T) {
 	wantFiles := []string{"a/b/c/deep.go", "x/y/z/another.go"}
 	commit := h.commitFiles("add nested files", wantFiles...)
 
-	lister := &ChangeLister{WorkDir: h.WorkDir}
-	files, err := lister.ListChangedFiles("master", commit)
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
