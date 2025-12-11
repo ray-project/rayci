@@ -10,7 +10,7 @@ import (
 )
 
 func TestListChangedFiles_InvalidCommitRange(t *testing.T) {
-	client := &RealGitClient{}
+	lister := &ChangeLister{}
 
 	tests := []struct {
 		name        string
@@ -23,7 +23,7 @@ func TestListChangedFiles_InvalidCommitRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := client.ListChangedFiles("main", tt.commitRange)
+			_, err := lister.ListChangedFiles("main", tt.commitRange)
 			if err == nil {
 				t.Error(
 					"ListChangedFiles() expected error for invalid commit range",
@@ -130,8 +130,8 @@ func TestListChangedFiles_Integration(t *testing.T) {
 	wantFiles := []string{"src/main.go", "src/util.go", "docs/readme.txt"}
 	commit := h.commitFiles("add files", wantFiles...)
 
-	client := &RealGitClient{WorkDir: h.WorkDir}
-	files, err := client.ListChangedFiles("master", "origin/master..."+commit)
+	lister := &ChangeLister{WorkDir: h.WorkDir}
+	files, err := lister.ListChangedFiles("master", "origin/master..."+commit)
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}
@@ -153,8 +153,8 @@ func TestListChangedFiles_EmptyBaseBranch(t *testing.T) {
 
 	newCommit := h.commitFiles("add new file", "new_file.txt")
 
-	client := &RealGitClient{WorkDir: h.WorkDir}
-	files, err := client.ListChangedFiles("", baseCommit+"..."+newCommit)
+	lister := &ChangeLister{WorkDir: h.WorkDir}
+	files, err := lister.ListChangedFiles("", baseCommit+"..."+newCommit)
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
 	}

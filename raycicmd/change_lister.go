@@ -6,20 +6,15 @@ import (
 	"strings"
 )
 
-// GitClient abstracts git operations for testability.
-type GitClient interface {
-	// ListChangedFiles returns files changed between baseBranch and the commit in commitRange.
-	// commitRange should be in the format "origin/branch...commit".
-	ListChangedFiles(baseBranch, commitRange string) ([]string, error)
-}
-
-// RealGitClient implements GitClient using actual git commands.
-type RealGitClient struct {
+// ChangeLister lists files changed between git commits.
+type ChangeLister struct {
 	// WorkDir is the directory to run git commands in. If empty, uses current directory.
 	WorkDir string
 }
 
-func (g *RealGitClient) ListChangedFiles(
+// ListChangedFiles returns files changed between baseBranch and the commit in commitRange.
+// commitRange should be in the format "origin/branch...commit".
+func (g *ChangeLister) ListChangedFiles(
 	baseBranch, commitRange string,
 ) ([]string, error) {
 	parts := strings.Split(commitRange, "...")
