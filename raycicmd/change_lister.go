@@ -6,7 +6,11 @@ import (
 	"strings"
 )
 
-// ChangeLister lists files changed between git commits.
+// ChangeLister lists files change by finding the merge-base (common
+// ancestor) between the base branch and the commit, then diffing against that.
+// This correctly shows only changes in a style similar to GitHub PR diffs,
+// excluding changes that happened on the base branch after the PR branch was
+// created.
 type ChangeLister struct {
 	// WorkDir is the directory to run git commands in. If empty, uses current directory.
 	WorkDir string
