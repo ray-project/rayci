@@ -99,7 +99,7 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 func RunTagAnalysis(
 	configPaths []string,
 	env Envs,
-	lister *ChangeLister,
+	lister ChangeLister,
 ) ([]string, error) {
 	if getEnv(env, "BUILDKITE") != "true" {
 		return nil, fmt.Errorf("BUILDKITE environment variable is not set")
@@ -134,7 +134,7 @@ func RunTagAnalysis(
 		return nil, err
 	}
 
-	changedFiles, err := lister.ListChangedFiles(baseBranch, commit)
+	changedFiles, err := lister.ListChangedFiles()
 	if err != nil {
 		return nil, fmt.Errorf("list changed files: %w", err)
 	}
