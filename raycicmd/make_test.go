@@ -11,6 +11,15 @@ import (
 	"reflect"
 )
 
+// mockFileLister is a FileLister that returns a fixed list of changed files.
+type mockFileLister struct {
+	changedFiles []string
+}
+
+func (m *mockFileLister) ListChangedFiles(baseBranch, commitRange string) ([]string, error) {
+	return m.changedFiles, nil
+}
+
 func TestIsRayCIYaml(t *testing.T) {
 	for _, f := range []string{
 		"foo.rayci.yaml",
@@ -236,16 +245,43 @@ func TestMakePipeline(t *testing.T) {
 		SkipTags:      []string{"disabled"},
 		BuildkiteDirs: []string{".buildkite", "private/buildkite"},
 	}
+
+	// Create a test rules file that maps "src/enabled/" to the "enabled" tag.
+	rulesContent := strings.Join([]string{
+		"! enabled",
+		"src/enabled/",
+		"@ enabled",
+		";",
+	}, "\n")
+	rulesPath := filepath.Join(tmp, "test_rules.txt")
+	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0o600); err != nil {
+		t.Fatalf("write test rules: %v", err)
+	}
+
+	// Common test envs for Buildkite PR build context.
+	testEnvs := newEnvsMap(map[string]string{
+		"BUILDKITE":                          "true",
+		"BUILDKITE_PULL_REQUEST":             "123",
+		"BUILDKITE_PULL_REQUEST_BASE_BRANCH": "main",
+		"BUILDKITE_COMMIT":                   "abc123",
+		"BUILDKITE_BRANCH":                   "feature-branch",
+	})
+
+	// Mock FileLister returns a file that matches the "enabled" rule.
+	mockLister := &mockFileLister{
+		changedFiles: []string{"src/enabled/test.py"},
+	}
+
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
-		config.TagFilterCommand = []string{"echo", "enabled"}
+		config.TagFilterConfig = []string{rulesPath}
 
 		buildID := "fakebuild"
 		info := &buildInfo{
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(tmp, &config, info, testEnvs, mockLister)
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -272,7 +308,7 @@ func TestMakePipeline(t *testing.T) {
 
 	t.Run("filter_noTagMeansAlways", func(t *testing.T) {
 		config := *commonConfig
-		config.TagFilterCommand = []string{"echo", "enabled"}
+		config.TagFilterConfig = []string{rulesPath}
 		config.NoTagMeansAlways = true
 
 		buildID := "fakebuild"
@@ -280,7 +316,7 @@ func TestMakePipeline(t *testing.T) {
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(tmp, &config, info, testEnvs, mockLister)
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -312,7 +348,7 @@ func TestMakePipeline(t *testing.T) {
 			selects: []string{"test2"},
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(tmp, &config, info, nil, nil)
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -348,7 +384,7 @@ func TestMakePipeline(t *testing.T) {
 		config := *commonConfig
 		config.NotifyOwnerOnFailure = false
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(tmp, &config, info, nil, nil)
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -362,7 +398,7 @@ func TestMakePipeline(t *testing.T) {
 			buildAuthorEmail: email,
 		}
 		config.NotifyOwnerOnFailure = true
-		got, err = makePipeline(tmp, &config, infoWithEmail)
+		got, err = makePipeline(tmp, &config, infoWithEmail, nil, nil)
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}

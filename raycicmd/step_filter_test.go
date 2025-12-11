@@ -1,62 +1,142 @@
 package raycicmd
 
 import (
-	"testing"
-
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
+	"strings"
+	"testing"
 )
+
+// testGitRepo holds the result of setting up a test git repository.
+type testGitRepo struct {
+	lister  *ChangeLister
+	envs    *envsMap
+	workDir string
+}
+
+// setupTestGitRepo creates a git repo with the specified changed files and returns
+// a ChangeLister and environment variables configured for testing.
+func setupTestGitRepo(t *testing.T, changedFiles []string) *testGitRepo {
+	t.Helper()
+
+	origin := t.TempDir()
+	workDir := t.TempDir()
+
+	// Initialize bare origin repo
+	runGit(t, origin, "init", "--bare")
+
+	// Initialize working repo
+	runGit(t, workDir, "init")
+	runGit(t, workDir, "config", "user.email", "test@test.com")
+	runGit(t, workDir, "config", "user.name", "Test")
+	runGit(t, workDir, "remote", "add", "origin", origin)
+
+	// Create initial commit on main branch
+	readmePath := filepath.Join(workDir, "README.md")
+	if err := os.WriteFile(readmePath, []byte("# Test Repo\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+	runGit(t, workDir, "add", "README.md")
+	runGit(t, workDir, "commit", "-m", "initial commit")
+	runGit(t, workDir, "branch", "-M", "main")
+	runGit(t, workDir, "push", "-u", "origin", "main")
+
+	// Create feature branch with changed files
+	runGit(t, workDir, "checkout", "-b", "feature-branch")
+	for _, f := range changedFiles {
+		fullPath := filepath.Join(workDir, f)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+			t.Fatalf("mkdir for %s: %v", f, err)
+		}
+		if err := os.WriteFile(fullPath, []byte("content\n"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", f, err)
+		}
+	}
+	runGit(t, workDir, "add", ".")
+	runGit(t, workDir, "commit", "-m", "add changed files")
+
+	// Get the commit hash
+	commit := getGitOutput(t, workDir, "rev-parse", "HEAD")
+
+	envs := newEnvsMap(map[string]string{
+		"BUILDKITE":                          "true",
+		"BUILDKITE_PULL_REQUEST":             "123",
+		"BUILDKITE_PULL_REQUEST_BASE_BRANCH": "main",
+		"BUILDKITE_COMMIT":                   commit,
+		"BUILDKITE_BRANCH":                   "feature-branch",
+	})
+
+	return &testGitRepo{
+		lister:  &ChangeLister{WorkDir: workDir},
+		envs:    envs,
+		workDir: workDir,
+	}
+}
+
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+}
+
+func getGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v failed: %v", args, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// writeTestRules creates a temp rules file and returns its path.
+func writeTestRules(t *testing.T, rulesContent string) string {
+	t.Helper()
+	rulesPath := filepath.Join(t.TempDir(), "test_rules.txt")
+	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0o600); err != nil {
+		t.Fatalf("write rules: %v", err)
+	}
+	return rulesPath
+}
 
 func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
-		cmd      []string
-		skipTags []string
-		want     *stepFilter
-		wantErr  bool
+		name         string
+		filterConfig []string
+		skipTags     []string
+		want         *stepFilter
 	}{{
-		cmd:  []string{"echo", "RAYCI_COVERAGE"},
-		want: &stepFilter{tags: stringSet("RAYCI_COVERAGE")},
-	}, {
-		cmd:  []string{"echo", "RAYCI_COVERAGE\n"},
-		want: &stepFilter{tags: stringSet("RAYCI_COVERAGE")},
-	}, {
-		cmd:  []string{"echo", "\t  \n  \t"},
-		want: &stepFilter{},
-	}, {
-		cmd:  []string{},
+		name: "empty filterConfig",
 		want: &stepFilter{runAll: true},
 	}, {
-		cmd:  nil,
-		want: &stepFilter{runAll: true},
+		name:         "nil filterConfig",
+		filterConfig: nil,
+		want:         &stepFilter{runAll: true},
 	}, {
-		cmd:  []string{"echo", "*"},
-		want: &stepFilter{runAll: true},
-	}, {
+		name:     "skipTags only",
 		skipTags: []string{"disabled"},
 		want:     &stepFilter{skipTags: stringSet("disabled"), runAll: true},
 	}, {
-		cmd:     []string{"exit", "1"},
-		wantErr: true,
-	}, {
-		cmd:  []string{"./local-not-exist.sh"},
-		want: &stepFilter{runAll: true},
+		name:     "multiple skipTags",
+		skipTags: []string{"disabled", "skip"},
+		want:     &stepFilter{skipTags: stringSet("disabled", "skip"), runAll: true},
 	}} {
-		got, err := newStepFilter(test.skipTags, nil, test.cmd)
-		if test.wantErr {
-			if err == nil {
-				t.Errorf("run %q: want error, got nil", test.cmd)
+		t.Run(test.name, func(t *testing.T) {
+			got, err := newStepFilter(test.skipTags, nil, test.filterConfig, nil, nil)
+			if err != nil {
+				t.Fatalf("newStepFilter: %s", err)
 			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("run %q: %s", test.cmd, err)
-		}
 
-		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf(
-				"run %q: got %+v, want %+v",
-				test.cmd, got, test.want,
-			)
-		}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("got %+v, want %+v", got, test.want)
+			}
+		})
 	}
 }
 
@@ -175,7 +255,11 @@ func TestStepFilter_runAll(t *testing.T) {
 }
 
 func TestStepFilter_selects(t *testing.T) {
-	filter, _ := newStepFilter([]string{"disabled"}, []string{"foo", "bar"}, nil)
+	filter, _ := newStepFilter(
+		[]string{"disabled"},
+		[]string{"foo", "bar"},
+		nil, nil, nil,
+	)
 	for _, node := range []*stepNode{
 		{key: "foo"},
 		{id: "foo"},
@@ -194,7 +278,7 @@ func TestStepFilter_selects(t *testing.T) {
 		}
 	}
 
-	filter, _ = newStepFilter([]string{"disabled"}, []string{"foo", "bar"}, nil)
+	filter, _ = newStepFilter([]string{"disabled"}, []string{"foo", "bar"}, nil, nil, nil)
 	for _, node := range []*stepNode{
 		{key: "f"},
 		{id: "f"},
@@ -208,7 +292,7 @@ func TestStepFilter_selects(t *testing.T) {
 }
 
 func TestStepFilter_tagSelects(t *testing.T) {
-	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil)
+	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil, nil, nil)
 	for _, node := range []*stepNode{
 		{key: "bar"},
 		{id: "id", tags: []string{"foo"}},
@@ -220,11 +304,19 @@ func TestStepFilter_tagSelects(t *testing.T) {
 }
 
 func TestStepFilter_selectsAndTags_noTagMeansAlways(t *testing.T) {
-	filter, _ := newStepFilter(
+	rulesPath := writeTestRules(t, "! tune\nsrc/tune/\n@ tune\n;\n")
+	repo := setupTestGitRepo(t, []string{"src/tune/file.py"})
+
+	filter, err := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar", "tag:pick"},
-		[]string{"echo", "tune"},
+		[]string{rulesPath},
+		repo.envs,
+		repo.lister,
 	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
 	filter.noTagMeansAlways = true
 
 	for _, node := range []*stepNode{
@@ -250,11 +342,19 @@ func TestStepFilter_selectsAndTags_noTagMeansAlways(t *testing.T) {
 }
 
 func TestStepFilter_selectsAndTags(t *testing.T) {
-	filter, _ := newStepFilter(
+	rulesPath := writeTestRules(t, "! tune\nsrc/tune/\n@ tune\n;\n")
+	repo := setupTestGitRepo(t, []string{"src/tune/file.py"})
+
+	filter, err := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar", "tag:pick"},
-		[]string{"echo", "tune"},
+		[]string{rulesPath},
+		repo.envs,
+		repo.lister,
 	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
 
 	for _, node := range []*stepNode{
 		{id: "foo", tags: []string{"tune"}},
@@ -266,8 +366,8 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 	}
 
 	for _, node := range []*stepNode{
-		{key: "foo"}, // need to have tags
-		{id: "bar"},  // need to have tags
+		{key: "foo"},
+		{id: "bar"},
 		{id: "foo", tags: []string{"not_tune"}},
 		{id: "bar", tags: []string{"tune_not"}},
 		{key: "w00t"},
@@ -278,42 +378,45 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 	}
 }
 
-func TestRunFilterCmd(t *testing.T) {
-	for _, test := range []struct {
-		cmd []string
-		res *filterCmdResult
-	}{{
-		cmd: []string{"echo", "RAYCI_COVERAGE"},
-		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
-	}, {
-		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
-		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
-	}, {
-		cmd: []string{"echo", "\t  \n  \t"},
-		res: &filterCmdResult{cmdExists: true},
-	}, {
-		cmd: []string{},
-		res: &filterCmdResult{},
-	}, {
-		cmd: nil,
-		res: &filterCmdResult{},
-	}, {
-		cmd: []string{"echo", "*"},
-		res: &filterCmdResult{cmdExists: true, runAll: true},
-	}, {
-		cmd: []string{"./not-exist"},
-		res: &filterCmdResult{},
-	}} {
-		got, err := runFilterCmd(test.cmd)
+func TestRunFilterConfig(t *testing.T) {
+	t.Run("empty filterConfig", func(t *testing.T) {
+		got, err := runFilterConfig(nil, nil, nil)
 		if err != nil {
-			t.Fatalf("run %q: %s", test.cmd, err)
+			t.Fatalf("runFilterConfig: %s", err)
+		}
+		if !got.runAll {
+			t.Errorf("runAll: got %v, want true", got.runAll)
+		}
+	})
+
+	t.Run("nil filterConfig", func(t *testing.T) {
+		got, err := runFilterConfig([]string{}, nil, nil)
+		if err != nil {
+			t.Fatalf("runFilterConfig: %s", err)
+		}
+		if !got.runAll {
+			t.Errorf("runAll: got %v, want true", got.runAll)
+		}
+	})
+
+	t.Run("with filterConfig", func(t *testing.T) {
+		rulesPath := writeTestRules(t, "! mytag\nsrc/mydir/\n@ mytag\n;\n")
+		repo := setupTestGitRepo(t, []string{"src/mydir/file.py"})
+
+		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.lister)
+		if err != nil {
+			t.Fatalf("runFilterConfig: %s", err)
 		}
 
-		if !reflect.DeepEqual(got, test.res) {
-			t.Errorf(
-				"run %q: got %+v, want %+v",
-				test.cmd, got, test.res,
-			)
+		if got.runAll {
+			t.Errorf("runAll: got true, want false")
 		}
-	}
+
+		// Should have "mytag" plus default tags "always" and "lint".
+		for _, tag := range []string{"mytag", "always", "lint"} {
+			if !got.tags[tag] {
+				t.Errorf("missing tag %q in %v", tag, got.tags)
+			}
+		}
+	})
 }

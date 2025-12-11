@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+// FileLister lists changed files between two git refs.
+// Interface defined at point of use for testability.
+type FileLister interface {
+	ListChangedFiles(baseBranch, commit string) ([]string, error)
+}
+
 func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 	combinedSet := &TagRuleSet{
 		tagDefs: make(map[string]struct{}),
@@ -99,7 +105,7 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 func RunTagAnalysis(
 	configPaths []string,
 	env Envs,
-	lister *ChangeLister,
+	lister FileLister,
 ) ([]string, error) {
 	if getEnv(env, "BUILDKITE") != "true" {
 		return nil, fmt.Errorf("BUILDKITE environment variable is not set")

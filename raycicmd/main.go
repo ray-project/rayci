@@ -167,7 +167,7 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("make build info: %w", err)
 	}
 
-	pipeline, err := makePipeline(flags.RepoDir, config, info)
+	pipeline, err := makePipeline(flags.RepoDir, config, info, envs, &ChangeLister{})
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)
 	}

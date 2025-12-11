@@ -2,8 +2,6 @@ package raycicmd
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -58,20 +56,20 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags, selects []string, filterCmd []string,
+	skipTags, selects []string, filterConfig []string, envs Envs, lister FileLister,
 ) (*stepFilter, error) {
-	filterCmdRes, err := runFilterCmd(filterCmd)
+	filterConfigRes, err := runFilterConfig(filterConfig, envs, lister)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("run filter config: %w", err)
 	}
 
 	filter := &stepFilter{
 		skipTags: stringSet(skipTags...),
 	}
-	if !filterCmdRes.cmdExists || filterCmdRes.runAll {
+	if len(filterConfig) == 0 || filterConfigRes.runAll {
 		filter.runAll = true
 	} else {
-		filter.tags = filterCmdRes.tags
+		filter.tags = filterConfigRes.tags
 	}
 
 	if selects != nil {
@@ -91,44 +89,36 @@ func newStepFilter(
 	return filter, err
 }
 
-type filterCmdResult struct {
-	cmdExists bool
-	runAll    bool
-	tags      map[string]bool
-}
+func runFilterConfig(filterConfig []string, envs Envs, lister FileLister) (*filterConfigResult, error) {
+	res := &filterConfigResult{}
 
-func runFilterCmd(cmd []string) (*filterCmdResult, error) {
-	res := &filterCmdResult{}
-	if len(cmd) == 0 {
-		return res, nil
-	}
-
-	bin := cmd[0]
-	if strings.HasPrefix(bin, "./") {
-		// A local in repo launcher, and the file does not exist yet.
-		// Run all tags in this case.
-		if _, err := os.Lstat(bin); os.IsNotExist(err) {
-			return res, nil
-		}
-	}
-
-	c := exec.Command(cmd[0], cmd[1:]...)
-	c.Stderr = os.Stderr
-	output, err := c.Output()
-	if err != nil {
-		return nil, fmt.Errorf("tag filter script: %w", err)
-	}
-
-	res.cmdExists = true
-
-	tags := strings.Fields(string(output))
-	if len(tags) == 1 && tags[0] == "*" {
-		// '*" means run everything (except the skips).
-		// It is often equivalent to having no tag filters configured.
+	fmt.Println("filterConfig", filterConfig)
+	if len(filterConfig) == 0 {
 		res.runAll = true
 		return res, nil
 	}
 
-	res.tags = stringSet(tags...)
+	tags, err := RunTagAnalysis(
+		filterConfig,
+		envs,
+		lister,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tags) == 1 && tags[0] == "*" {
+		// '*" means run everything (except the skips).
+		// It is often equivalent to having no tag filters configured.
+		res.runAll = true
+	} else {
+		res.tags = stringSet(tags...)
+	}
+
 	return res, nil
+}
+
+type filterConfigResult struct {
+	runAll bool
+	tags   map[string]bool
 }
