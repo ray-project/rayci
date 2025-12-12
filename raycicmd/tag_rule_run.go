@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// loadTagRuleSet loads and merges tag rule configurations from multiple files.
+// Tag definitions and rules from all files are combined into a single TagRuleSet.
 func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 	combinedSet := &TagRuleSet{
 		tagDefs: make(map[string]struct{}),
@@ -31,58 +33,75 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 	return combinedSet, nil
 }
 
+// isPullRequest returns true if the current build is for a pull request.
+// Buildkite sets BUILDKITE_PULL_REQUEST to "false" for non-PR builds,
+// or to the PR number for PR builds.
 func isPullRequest(env Envs) bool {
-	return getEnv(env, "BUILDKITE_PULL_REQUEST") != "false" && getEnv(env, "BUILDKITE_PULL_REQUEST") != ""
+	pr := getEnv(env, "BUILDKITE_PULL_REQUEST")
+	return pr != "false" && pr != ""
 }
 
+// needRunAllTags checks if all tags should be run regardless of changed files.
+// Returns true with a reason string if any of these conditions are met:
+//   - RAYCI_RUN_ALL_TESTS=1 is set
+//   - Building on the master branch
+//   - Building on a release branch (releases/*)
+//   - Not a pull request build
 func needRunAllTags(env Envs) (bool, string) {
 	if getEnv(env, "RAYCI_RUN_ALL_TESTS") == "1" {
-		return true, "RAYCI_RUN_ALL_TESTS is set, running all tags"
+		return true, "RAYCI_RUN_ALL_TESTS is set"
 	}
 
-	if getEnv(env, "BUILDKITE_BRANCH") == "master" {
-		return true, "BUILDKITE_BRANCH is master, running all tags"
+	branch := getEnv(env, "BUILDKITE_BRANCH")
+	if branch == "master" {
+		return true, "building on master branch"
 	}
 
-	if strings.HasPrefix(getEnv(env, "BUILDKITE_BRANCH"), "releases/") {
-		return true, "BUILDKITE_BRANCH starts with releases/, running all tags"
+	if strings.HasPrefix(branch, "releases/") {
+		return true, "building on release branch"
 	}
 
 	if !isPullRequest(env) {
-		return true, "Not a PR build... skipping config parsing and running all tags"
+		return true, "not a PR build"
 	}
 
-	return false, "No special conditions met, running tags based on config files"
+	return false, ""
 }
 
-// defaultTags are always included in all PR builds.
+// defaultTags are always included in PR builds, regardless of which files changed.
 var defaultTags = []string{"always", "lint"}
 
-// fallbackTags are used when a changed file doesn't match any known rule.
-var fallbackTags = strings.Fields(
-	"ml tune train data serve core_cpp cpp java python doc " +
-		"linux_wheels macos_wheels dashboard tools release_tests",
-)
+// fallbackTags are added when any changed file doesn't match a known rule.
+// This ensures broad test coverage when the tag rule configuration is incomplete.
+var fallbackTags = []string{
+	"ml", "tune", "train", "data", "serve",
+	"core_cpp", "cpp", "java", "python", "doc",
+	"linux_wheels", "macos_wheels", "dashboard", "tools", "release_tests",
+}
 
+// tagsForChangedFiles determines which tags to run based on changed files.
+// It always includes defaultTags, then adds tags matched by each file.
+// If any file doesn't match a rule, fallbackTags are added to ensure coverage.
 func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	tagSet := make(map[string]struct{})
 	for _, tag := range defaultTags {
 		tagSet[tag] = struct{}{}
 	}
 
-	hasUnhandledFiles := false
+	hasUnmatchedFiles := false
 	for _, file := range files {
-		if matchTags, matched := ruleSet.MatchTags(file); matched {
-			for _, tag := range matchTags {
+		matchedTags, matched := ruleSet.MatchTags(file)
+		if matched {
+			for _, tag := range matchedTags {
 				tagSet[tag] = struct{}{}
 			}
 		} else {
-			log.Printf("Unhandled source code change: %s\n", file)
-			hasUnhandledFiles = true
+			log.Printf("unhandled file (no matching rule): %s", file)
+			hasUnmatchedFiles = true
 		}
 	}
 
-	if hasUnhandledFiles {
+	if hasUnmatchedFiles {
 		for _, tag := range fallbackTags {
 			tagSet[tag] = struct{}{}
 		}
@@ -96,6 +115,14 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	return tags
 }
 
+// RunTagAnalysis determines which test tags to run based on changed files.
+//
+// For PR builds, it analyzes changed files against tag rules and returns
+// only the relevant tags. For non-PR builds (master, release branches, etc.),
+// it returns ["*"] to run all tags.
+//
+// The function requires BUILDKITE=true and, for PR builds, also requires
+// BUILDKITE_PULL_REQUEST_BASE_BRANCH and BUILDKITE_COMMIT to be set.
 func RunTagAnalysis(
 	configPaths []string,
 	env Envs,
@@ -105,20 +132,26 @@ func RunTagAnalysis(
 		return nil, fmt.Errorf("BUILDKITE environment variable is not set")
 	}
 
-	needRunAllTags, reason := needRunAllTags(env)
-	if needRunAllTags {
-		log.Printf("Running all tags: %s\n", reason)
+	runAll, reason := needRunAllTags(env)
+	if runAll {
+		log.Printf("running all tags: %s", reason)
 		return []string{"*"}, nil
 	}
 
-	// If the config file does not exist, run all tags. This is the equivalent
-	// of the default behavior in the original Python code in cases that the
-	// binary ci/pipeline/test_conditional_testing.py does not exist.
+	// If no config files exist, run all tags. This matches the original
+	// Python behavior when ci/pipeline/test_conditional_testing.py was absent.
+	// See: https://github.com/ray-project/rayci/blob/23e47c9b5502a3646f506cf5362c6d3507952bce/raycicmd/step_filter.go#L108-L109
+	hasConfigFile := false
 	for _, configPath := range configPaths {
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			log.Printf("config file %s does not exist, running all tags: %s", configPath, err)
-			return []string{"*"}, nil
+		if _, err := os.Stat(configPath); err == nil {
+			hasConfigFile = true
+			break
 		}
+		log.Printf("config file not found: %s", configPath)
+	}
+	if !hasConfigFile {
+		log.Printf("no config files found, running all tags")
+		return []string{"*"}, nil
 	}
 
 	baseBranch := getEnv(env, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
@@ -131,7 +164,7 @@ func RunTagAnalysis(
 
 	ruleSet, err := loadTagRuleSet(configPaths)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load tag rules: %w", err)
 	}
 
 	changedFiles, err := lister.ListChangedFiles()
@@ -139,11 +172,11 @@ func RunTagAnalysis(
 		return nil, fmt.Errorf("list changed files: %w", err)
 	}
 
-	log.Printf("baseBranch: %s, commit: %s\n", baseBranch, commit)
-	log.Printf("changedFiles: %v\n", changedFiles)
+	log.Printf("base branch: %s, commit: %s", baseBranch, commit)
+	log.Printf("changed files: %v", changedFiles)
 
 	tags := tagsForChangedFiles(ruleSet, changedFiles)
-	log.Printf("tags: %s\n", strings.Join(tags, " "))
+	log.Printf("selected tags: %s", strings.Join(tags, " "))
 
 	return tags, nil
 }

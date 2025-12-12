@@ -104,6 +104,30 @@ func TestRunTagAnalysis_ConfigFileNotExist(t *testing.T) {
 	}
 }
 
+func TestRunTagAnalysis_MultipleConfigFilesNoneExist(t *testing.T) {
+	envs := newEnvsMap(map[string]string{
+		"BUILDKITE":              "true",
+		"BUILDKITE_PULL_REQUEST": "123",
+	})
+
+	tags, err := RunTagAnalysis(
+		[]string{
+			"/nonexistent/path/to/config1.txt",
+			"/nonexistent/path/to/config2.txt",
+		},
+		envs,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("RunTagAnalysis() unexpected error: %v", err)
+	}
+
+	want := []string{"*"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Errorf("RunTagAnalysis() = %v, want %v", tags, want)
+	}
+}
+
 var testRulesSnapshot = filepath.Join(
 	"data",
 	"62231dd4ba8e784da8800b248ad7616b8db92de7.txt",
