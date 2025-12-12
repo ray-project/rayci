@@ -52,15 +52,6 @@ func needRunAllTags(env Envs) (bool, string) {
 		return true, "RAYCI_RUN_ALL_TESTS is set"
 	}
 
-	branch := getEnv(env, "BUILDKITE_BRANCH")
-	if branch == "master" {
-		return true, "building on master branch"
-	}
-
-	if strings.HasPrefix(branch, "releases/") {
-		return true, "building on release branch"
-	}
-
 	if !isPullRequest(env) {
 		return true, "not a PR build"
 	}
