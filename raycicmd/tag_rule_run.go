@@ -9,11 +9,15 @@ import (
 )
 
 // loadTagRuleSet loads and merges tag rule configurations from multiple files.
-// Tag definitions and rules from all files are combined into a single TagRuleSet.
+// Tag definitions, rules, default tags, and fallback tags from all files are
+// combined into a single TagRuleSet.
 func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 	combinedSet := &TagRuleSet{
 		tagDefs: make(map[string]struct{}),
 	}
+	defaultTagSet := make(map[string]struct{})
+	fallbackTagSet := make(map[string]struct{})
+
 	for _, configPath := range configPaths {
 		ruleContent, err := os.ReadFile(configPath)
 		if err != nil {
@@ -28,8 +32,27 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 		for _, tagDef := range cfg.TagDefs {
 			combinedSet.tagDefs[tagDef] = struct{}{}
 		}
+		for _, tag := range cfg.DefaultTags {
+			defaultTagSet[tag] = struct{}{}
+		}
+		for _, tag := range cfg.FallbackTags {
+			fallbackTagSet[tag] = struct{}{}
+		}
 		combinedSet.rules = append(combinedSet.rules, cfg.Rules...)
 	}
+
+	// Sort the default and fallback tags for deterministic output.
+	// Rules are not sorted, as they must be evaluated in order of definition.
+	for tag := range defaultTagSet {
+		combinedSet.defaultTags = append(combinedSet.defaultTags, tag)
+	}
+	sort.Strings(combinedSet.defaultTags)
+
+	for tag := range fallbackTagSet {
+		combinedSet.fallbackTags = append(combinedSet.fallbackTags, tag)
+	}
+	sort.Strings(combinedSet.fallbackTags)
+
 	return combinedSet, nil
 }
 
@@ -59,23 +82,12 @@ func needRunAllTags(env Envs) (bool, string) {
 	return false, ""
 }
 
-// defaultTags are always included in PR builds, regardless of which files changed.
-var defaultTags = []string{"always", "lint"}
-
-// fallbackTags are added when any changed file doesn't match a known rule.
-// This ensures broad test coverage when the tag rule configuration is incomplete.
-var fallbackTags = []string{
-	"ml", "tune", "train", "data", "serve",
-	"core_cpp", "cpp", "java", "python", "doc",
-	"linux_wheels", "macos_wheels", "dashboard", "tools", "release_tests",
-}
-
 // tagsForChangedFiles determines which tags to run based on changed files.
-// It always includes defaultTags, then adds tags matched by each file.
-// If any file doesn't match a rule, fallbackTags are added to ensure coverage.
+// It always includes the rule set's default tags, then adds tags matched by each file.
+// If any file doesn't match a rule, fallback tags are added to ensure coverage.
 func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	tagSet := make(map[string]struct{})
-	for _, tag := range defaultTags {
+	for _, tag := range ruleSet.DefaultTags() {
 		tagSet[tag] = struct{}{}
 	}
 
@@ -93,7 +105,7 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	}
 
 	if hasUnmatchedFiles {
-		for _, tag := range fallbackTags {
+		for _, tag := range ruleSet.FallbackTags() {
 			tagSet[tag] = struct{}{}
 		}
 	}

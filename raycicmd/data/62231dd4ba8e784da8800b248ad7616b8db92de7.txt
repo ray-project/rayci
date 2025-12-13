@@ -5,6 +5,8 @@
 # Empty lines will be ignored too.
 #
 #   ! tag1 tag2 tag3  # Declares a tag. A tag must be declared first to be used.
+#   !default tag1 tag2  # Tags always included regardless of content
+#   !fallback tag1 tag2 # Tags added when files don't match any rule
 #   # Tags must be declared at the beginning.
 #
 #   dir/  # Directory to match
@@ -13,6 +15,14 @@
 #   @ tag1 tag2 tag3  # Tags to emit for a rule. A rule without tags is a skipping rule.
 #
 #   ;  # Semicolon to separate rules
+
+# Default tags are always included
+!default always lint
+
+# Fallback tags are added when any changed file doesn't match a known rule
+!fallback ml tune train data serve
+!fallback core_cpp cpp java python doc
+!fallback linux_wheels macos_wheels dashboard tools release_tests
 
 ! always lint
 ! python cpp core_cpp java workflow cgraphs_direct_transport dashboard

@@ -195,6 +195,13 @@ type TestTagMap map[string]TestTagSet
 // Mimicking test_conditional_testing_pull_request from
 // https://github.com/ray-project/ray/blob/c963d646f0197947429b374cb06f831b47aab5dd/ci/pipeline/test_conditional_testing.py#L87
 func TestWithTestRulesSnapshot(t *testing.T) {
+	// Load default tags from the config file
+	ruleSet, err := loadTagRuleSet([]string{testRulesSnapshot})
+	if err != nil {
+		t.Fatalf("loadTagRuleSet: %v", err)
+	}
+	configDefaultTags := ruleSet.DefaultTags()
+
 	raw := TestTagMap{}
 
 	if err := yaml.Unmarshal([]byte(testsYAML), &raw); err != nil {
@@ -279,7 +286,7 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		}
 
 		want := append([]string{}, tc.Tags...)
-		want = append(want, defaultTags...)
+		want = append(want, configDefaultTags...)
 		sort.Strings(want)
 		want = slices.Compact(want)
 
