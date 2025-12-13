@@ -145,10 +145,13 @@ func (p *tagRuleParser) parseLine(rawLine string) error {
 // Any tag definitions after a rule will cause an error, as no tag definitions
 // are allowed after defining a rule.
 //
-// Special prefixes are supported:
+// Special commands (no space after !) are supported:
 //   - "!default tag1 tag2" adds to defaultTags (always included in PR builds)
 //   - "!fallback tag1 tag2" adds to fallbackTags (added when files don't match)
-//   - "! tag1 tag2" adds to tagDefs (standard tag declarations)
+//
+// Standard tag declarations (space after !) add to tagDefs:
+//   - "! tag1 tag2" adds to tagDefs
+//   - "! default" defines a tag named "default" (not a command)
 func (p *tagRuleParser) handleTagDef(line string) error {
 	if p.tagDefsEnded {
 		return fmt.Errorf(
@@ -163,16 +166,25 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 		return nil
 	}
 
-	switch fields[0] {
-	case "default":
-		p.defaultTags = append(p.defaultTags, fields[1:]...)
-		p.tagDefs = append(p.tagDefs, fields[1:]...)
-	case "fallback":
-		p.fallbackTags = append(p.fallbackTags, fields[1:]...)
-		p.tagDefs = append(p.tagDefs, fields[1:]...)
-	default:
-		p.tagDefs = append(p.tagDefs, fields...)
+	// Commands like !default and !fallback have no space after !.
+	// Standard tag definitions like "! tag1 tag2" have a space after !.
+	isCommand := !strings.HasPrefix(content, " ")
+
+	if isCommand {
+		switch fields[0] {
+		case "default":
+			p.defaultTags = append(p.defaultTags, fields[1:]...)
+			p.tagDefs = append(p.tagDefs, fields[1:]...)
+			return nil
+		case "fallback":
+			p.fallbackTags = append(p.fallbackTags, fields[1:]...)
+			p.tagDefs = append(p.tagDefs, fields[1:]...)
+			return nil
+		}
 	}
+
+	// Standard tag definition (or unrecognized command treated as tags)
+	p.tagDefs = append(p.tagDefs, fields...)
 	return nil
 }
 

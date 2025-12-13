@@ -685,6 +685,19 @@ func TestTagRuleParserParse_DefaultAndFallbackTags(t *testing.T) {
 			name:  "empty fallback",
 			input: "!fallback",
 		},
+		{
+			// "! default" (with space) defines a tag named "default", not a command
+			name:        "tag named default with space",
+			input:       "! default fallback",
+			wantTagDefs: []string{"default", "fallback"},
+		},
+		{
+			// "!default" (no space) is a command
+			name:            "default command vs tag",
+			input:           "!default always\n! default other",
+			wantDefaultTags: []string{"always"},
+			wantTagDefs:     []string{"always", "default", "other"},
+		},
 	}
 
 	for _, tt := range tests {
