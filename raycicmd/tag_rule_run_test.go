@@ -128,6 +128,74 @@ func TestRunTagAnalysis_MultipleConfigFilesNoneExist(t *testing.T) {
 	}
 }
 
+func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
+	// Create two temporary config files
+	dir := t.TempDir()
+
+	config1 := filepath.Join(dir, "config1.txt")
+	config1Content := strings.Join([]string{
+		"!default always",
+		"!fallback ml tune",
+		"! tag1 tag2",
+		"",
+		"python/",
+		"@ tag1",
+		";",
+	}, "\n")
+	if err := os.WriteFile(config1, []byte(config1Content), 0644); err != nil {
+		t.Fatalf("write config1: %v", err)
+	}
+
+	config2 := filepath.Join(dir, "config2.txt")
+	config2Content := strings.Join([]string{
+		"!default lint",
+		"!fallback train data",
+		"! tag3 tag4",
+		"",
+		"java/",
+		"@ tag3",
+		";",
+		"",
+		"cpp/",
+		"@ tag4",
+		";",
+	}, "\n")
+	if err := os.WriteFile(config2, []byte(config2Content), 0644); err != nil {
+		t.Fatalf("write config2: %v", err)
+	}
+
+	merged, err := loadAndMergeTagRuleConfigs([]string{config1, config2})
+	if err != nil {
+		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
+	}
+
+	wantDefaultTags := map[string]struct{}{"always": {}, "lint": {}}
+	if !reflect.DeepEqual(merged.DefaultTags, wantDefaultTags) {
+		t.Errorf("DefaultTags = %v, want %v", merged.DefaultTags, wantDefaultTags)
+	}
+
+	wantFallbackTags := map[string]struct{}{"data": {}, "ml": {}, "train": {}, "tune": {}}
+	if !reflect.DeepEqual(merged.FallbackTags, wantFallbackTags) {
+		t.Errorf("FallbackTags = %v, want %v", merged.FallbackTags, wantFallbackTags)
+	}
+
+	// Rules should be combined (3 total: python/, java/, cpp/)
+	if len(merged.RuleSet.rules) != 3 {
+		t.Errorf("len(rules) = %d, want 3", len(merged.RuleSet.rules))
+	}
+
+	// Test that rules from both files work
+	if tags, matched := merged.RuleSet.MatchTags("python/foo.py"); !matched || !reflect.DeepEqual(tags, []string{"tag1"}) {
+		t.Errorf("MatchTags(python/foo.py) = %v, %v; want [tag1], true", tags, matched)
+	}
+	if tags, matched := merged.RuleSet.MatchTags("java/Main.java"); !matched || !reflect.DeepEqual(tags, []string{"tag3"}) {
+		t.Errorf("MatchTags(java/Main.java) = %v, %v; want [tag3], true", tags, matched)
+	}
+	if tags, matched := merged.RuleSet.MatchTags("cpp/main.cc"); !matched || !reflect.DeepEqual(tags, []string{"tag4"}) {
+		t.Errorf("MatchTags(cpp/main.cc) = %v, %v; want [tag4], true", tags, matched)
+	}
+}
+
 var testRulesSnapshot = filepath.Join(
 	"data",
 	"62231dd4ba8e784da8800b248ad7616b8db92de7.txt",
@@ -196,11 +264,11 @@ type TestTagMap map[string]TestTagSet
 // https://github.com/ray-project/ray/blob/c963d646f0197947429b374cb06f831b47aab5dd/ci/pipeline/test_conditional_testing.py#L87
 func TestWithTestRulesSnapshot(t *testing.T) {
 	// Load default tags from the config file
-	ruleSet, err := loadTagRuleSet([]string{testRulesSnapshot})
+	merged, err := loadAndMergeTagRuleConfigs([]string{testRulesSnapshot})
 	if err != nil {
-		t.Fatalf("loadTagRuleSet: %v", err)
+		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
 	}
-	configDefaultTags := ruleSet.DefaultTags()
+	configDefaultTags := merged.DefaultTags
 
 	raw := TestTagMap{}
 
@@ -286,7 +354,9 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		}
 
 		want := append([]string{}, tc.Tags...)
-		want = append(want, configDefaultTags...)
+		for tag := range configDefaultTags {
+			want = append(want, tag)
+		}
 		sort.Strings(want)
 		want = slices.Compact(want)
 

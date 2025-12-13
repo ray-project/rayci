@@ -8,15 +8,27 @@ import (
 	"strings"
 )
 
-// loadTagRuleSet loads and merges tag rule configurations from multiple files.
-// Tag definitions, rules, default tags, and fallback tags from all files are
-// combined into a single TagRuleSet.
-func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
-	combinedSet := &TagRuleSet{
-		tagDefs: make(map[string]struct{}),
+// mergedTagRuleConfig holds the result of merging multiple tag rule config files.
+type mergedTagRuleConfig struct {
+	// RuleSet contains the merged rules for matching files to tags.
+	RuleSet *TagRuleSet
+	// DefaultTags are always included, regardless of which files changed.
+	DefaultTags map[string]struct{}
+	// FallbackTags are added when any changed file doesn't match a known rule.
+	FallbackTags map[string]struct{}
+}
+
+// loadAndMergeTagRuleConfigs loads and merges tag rule configurations from multiple files.
+// Tag definitions and rules from all files are combined into a single TagRuleSet.
+// Default and fallback tags are also merged.
+func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, error) {
+	merged := &mergedTagRuleConfig{
+		RuleSet: &TagRuleSet{
+			tagDefs: make(map[string]struct{}),
+		},
+		DefaultTags:  make(map[string]struct{}),
+		FallbackTags: make(map[string]struct{}),
 	}
-	defaultTagSet := make(map[string]struct{})
-	fallbackTagSet := make(map[string]struct{})
 
 	for _, configPath := range configPaths {
 		ruleContent, err := os.ReadFile(configPath)
@@ -30,30 +42,18 @@ func loadTagRuleSet(configPaths []string) (*TagRuleSet, error) {
 		}
 
 		for _, tagDef := range cfg.TagDefs {
-			combinedSet.tagDefs[tagDef] = struct{}{}
+			merged.RuleSet.tagDefs[tagDef] = struct{}{}
 		}
 		for _, tag := range cfg.DefaultTags {
-			defaultTagSet[tag] = struct{}{}
+			merged.DefaultTags[tag] = struct{}{}
 		}
 		for _, tag := range cfg.FallbackTags {
-			fallbackTagSet[tag] = struct{}{}
+			merged.FallbackTags[tag] = struct{}{}
 		}
-		combinedSet.rules = append(combinedSet.rules, cfg.Rules...)
+		merged.RuleSet.rules = append(merged.RuleSet.rules, cfg.Rules...)
 	}
 
-	// Sort the default and fallback tags for deterministic output.
-	// Rules are not sorted, as they must be evaluated in order of definition.
-	for tag := range defaultTagSet {
-		combinedSet.defaultTags = append(combinedSet.defaultTags, tag)
-	}
-	sort.Strings(combinedSet.defaultTags)
-
-	for tag := range fallbackTagSet {
-		combinedSet.fallbackTags = append(combinedSet.fallbackTags, tag)
-	}
-	sort.Strings(combinedSet.fallbackTags)
-
-	return combinedSet, nil
+	return merged, nil
 }
 
 // isPullRequest returns true if the current build is for a pull request.
@@ -83,11 +83,16 @@ func needRunAllTags(env Envs) (bool, string) {
 }
 
 // tagsForChangedFiles determines which tags to run based on changed files.
-// It always includes the rule set's default tags, then adds tags matched by each file.
+// It always includes the default tags, then adds tags matched by each file.
 // If any file doesn't match a rule, fallback tags are added to ensure coverage.
-func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
+func tagsForChangedFiles(
+	ruleSet *TagRuleSet,
+	defaultTags map[string]struct{},
+	fallbackTags map[string]struct{},
+	files []string,
+) []string {
 	tagSet := make(map[string]struct{})
-	for _, tag := range ruleSet.DefaultTags() {
+	for tag := range defaultTags {
 		tagSet[tag] = struct{}{}
 	}
 
@@ -105,7 +110,7 @@ func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	}
 
 	if hasUnmatchedFiles {
-		for _, tag := range ruleSet.FallbackTags() {
+		for tag := range fallbackTags {
 			tagSet[tag] = struct{}{}
 		}
 	}
@@ -165,7 +170,7 @@ func RunTagAnalysis(
 		)
 	}
 
-	ruleSet, err := loadTagRuleSet(configPaths)
+	merged, err := loadAndMergeTagRuleConfigs(configPaths)
 	if err != nil {
 		return nil, fmt.Errorf("load tag rules: %w", err)
 	}
@@ -178,7 +183,7 @@ func RunTagAnalysis(
 	log.Printf("base branch: %s, commit: %s", baseBranch, commit)
 	log.Printf("changed files: %v", changedFiles)
 
-	tags := tagsForChangedFiles(ruleSet, changedFiles)
+	tags := tagsForChangedFiles(merged.RuleSet, merged.DefaultTags, merged.FallbackTags, changedFiles)
 	log.Printf("selected tags: %s", strings.Join(tags, " "))
 
 	return tags, nil

@@ -91,10 +91,6 @@ type TagRuleSet struct {
 	tagDefs map[string]struct{}
 	// rules is a list of TagRule instances seen in the order they were parsed.
 	rules []*TagRule
-	// defaultTags are always included in PR builds, regardless of which files changed.
-	defaultTags []string
-	// fallbackTags are added when any changed file doesn't match a known rule.
-	fallbackTags []string
 }
 
 // ValidateRules validates that all tags used in the rules are defined.
@@ -125,14 +121,4 @@ func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
 		}
 	}
 	return []string{}, false
-}
-
-// DefaultTags returns the tags that are always included in PR builds.
-func (s *TagRuleSet) DefaultTags() []string {
-	return s.defaultTags
-}
-
-// FallbackTags returns the tags added when files don't match any rule.
-func (s *TagRuleSet) FallbackTags() []string {
-	return s.fallbackTags
 }
