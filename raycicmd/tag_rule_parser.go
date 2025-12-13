@@ -13,8 +13,18 @@ type TagRuleConfig struct {
 	Rules []*TagRule
 
 	// TagDefs is the list of declared tag names in the order they were defined.
-	// These are the tags declared with "!" at the start of the file.
+	// These tags are declared with "!" at the start of the file, including both
+	// default and fallback tags.
 	TagDefs []string
+
+	// DefaultTags are always included, regardless of which files changed.
+	// These are declared with "!default tag1 tag2" at the start of the file.
+	DefaultTags []string
+
+	// FallbackTags are added when any changed file doesn't match a known rule.
+	// This ensures broad test coverage when the tag rule configuration is incomplete.
+	// These are declared with "!fallback tag1 tag2" at the start of the file.
+	FallbackTags []string
 }
 
 // ParseTagRuleConfig parses rule config content into a TagRuleConfig.
@@ -25,6 +35,8 @@ type TagRuleConfig struct {
 //	# Empty lines will be ignored too.
 //
 //	! tag1 tag2 tag3    # Tag declarations, only allowed at file start
+//	!default tag1 tag2  # Tags always included in PR builds
+//	!fallback tag1 tag2 # Tags added when files don't match any rule
 //	dir/                # Directory to match
 //	file                # File to match
 //	dir/*.py            # Pattern to match, using glob pattern
@@ -38,8 +50,10 @@ func ParseTagRuleConfig(ruleContent string) (*TagRuleConfig, error) {
 		return nil, err
 	}
 	return &TagRuleConfig{
-		Rules:   p.rules,
-		TagDefs: p.tagDefs,
+		Rules:        p.rules,
+		TagDefs:      p.tagDefs,
+		DefaultTags:  p.defaultTags,
+		FallbackTags: p.fallbackTags,
 	}, nil
 }
 
@@ -78,6 +92,10 @@ func (pr *pendingRule) isEmpty() bool {
 type tagRuleParser struct {
 	// tagDefs is the list of tag definitions seen in the order they were parsed.
 	tagDefs []string
+	// defaultTags is the list of default tags (always included regardless of content).
+	defaultTags []string
+	// fallbackTags is the list of fallback tags (added when files don't match any rule).
+	fallbackTags []string
 	// rules is the list of TagRules seen in the order they were parsed.
 	rules []*TagRule
 	// pending is the current rule being accumulated.
@@ -126,6 +144,11 @@ func (p *tagRuleParser) parseLine(rawLine string) error {
 // handleTagDef takes all tags separated by whitespace and adds them to the tagDefs list.
 // Any tag definitions after a rule will cause an error, as no tag definitions
 // are allowed after defining a rule.
+//
+// Special prefixes are supported:
+//   - "!default tag1 tag2" adds to defaultTags (always included in PR builds)
+//   - "!fallback tag1 tag2" adds to fallbackTags (added when files don't match)
+//   - "! tag1 tag2" adds to tagDefs (standard tag declarations)
 func (p *tagRuleParser) handleTagDef(line string) error {
 	if p.tagDefsEnded {
 		return fmt.Errorf(
@@ -133,7 +156,21 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 			p.lineno, line,
 		)
 	}
-	if fields := strings.Fields(strings.TrimPrefix(line, "!")); len(fields) > 0 {
+
+	content := strings.TrimPrefix(line, "!")
+	fields := strings.Fields(content)
+	if len(fields) == 0 {
+		return nil
+	}
+
+	switch fields[0] {
+	case "default":
+		p.defaultTags = append(p.defaultTags, fields[1:]...)
+		p.tagDefs = append(p.tagDefs, fields[1:]...)
+	case "fallback":
+		p.fallbackTags = append(p.fallbackTags, fields[1:]...)
+		p.tagDefs = append(p.tagDefs, fields[1:]...)
+	default:
 		p.tagDefs = append(p.tagDefs, fields...)
 	}
 	return nil

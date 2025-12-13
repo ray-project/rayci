@@ -628,3 +628,96 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 		})
 	}
 }
+
+func TestTagRuleParserParse_DefaultAndFallbackTags(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		wantDefaultTags  []string
+		wantFallbackTags []string
+		wantTagDefs      []string
+	}{
+		{
+			name:            "default tags only",
+			input:           "!default always lint",
+			wantDefaultTags: []string{"always", "lint"},
+			wantTagDefs:     []string{"always", "lint"},
+		},
+		{
+			name:             "fallback tags only",
+			input:            "!fallback ml tune train",
+			wantFallbackTags: []string{"ml", "tune", "train"},
+			wantTagDefs:      []string{"ml", "tune", "train"},
+		},
+		{
+			name:             "both default and fallback tags",
+			input:            "!default always lint\n!fallback ml tune",
+			wantDefaultTags:  []string{"always", "lint"},
+			wantFallbackTags: []string{"ml", "tune"},
+			wantTagDefs:      []string{"always", "lint", "ml", "tune"},
+		},
+		{
+			name:             "multiple default and fallback lines",
+			input:            "!default always\n!default lint\n!fallback ml\n!fallback tune train",
+			wantDefaultTags:  []string{"always", "lint"},
+			wantFallbackTags: []string{"ml", "tune", "train"},
+			wantTagDefs:      []string{"always", "lint", "ml", "tune", "train"},
+		},
+		{
+			name:             "mixed with regular tag definitions",
+			input:            "!default always lint\n! python ml data\n!fallback core_cpp cpp",
+			wantDefaultTags:  []string{"always", "lint"},
+			wantFallbackTags: []string{"core_cpp", "cpp"},
+			wantTagDefs:      []string{"always", "lint", "python", "ml", "data", "core_cpp", "cpp"},
+		},
+		{
+			name:             "with comments",
+			input:            "!default always lint # Default tags\n!fallback ml # Fallback",
+			wantDefaultTags:  []string{"always", "lint"},
+			wantFallbackTags: []string{"ml"},
+			wantTagDefs:      []string{"always", "lint", "ml"},
+		},
+		{
+			name:  "empty default",
+			input: "!default",
+		},
+		{
+			name:  "empty fallback",
+			input: "!fallback",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := ParseTagRuleConfig(tt.input)
+			if err != nil {
+				t.Fatalf("Parse() error: %v", err)
+			}
+
+			if !reflect.DeepEqual(cfg.DefaultTags, tt.wantDefaultTags) {
+				t.Errorf(
+					"DefaultTags = %v, want %v",
+					cfg.DefaultTags,
+					tt.wantDefaultTags,
+				)
+			}
+
+			if !reflect.DeepEqual(cfg.FallbackTags, tt.wantFallbackTags) {
+				t.Errorf(
+					"FallbackTags = %v, want %v",
+					cfg.FallbackTags,
+					tt.wantFallbackTags,
+				)
+			}
+
+			if tt.wantTagDefs != nil &&
+				!reflect.DeepEqual(cfg.TagDefs, tt.wantTagDefs) {
+				t.Errorf(
+					"TagDefs = %v, want %v",
+					cfg.TagDefs,
+					tt.wantTagDefs,
+				)
+			}
+		})
+	}
+}
