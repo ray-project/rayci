@@ -10,7 +10,12 @@ import (
 type TagRuleConfig struct {
 	// Rules is the list of tag rules in the order they were defined.
 	// Rules are evaluated in order, and the first matched rule will be used.
+	// This excludes default rules (rules with Default=true).
 	Rules []*TagRule
+
+	// DefaultRules contains rules with Default=true.
+	// These rules match any file and are typically used as catch-all rules.
+	DefaultRules []*TagRule
 
 	// TagDefs is the list of declared tag names in the order they were defined.
 	// These tags are declared with "!" at the start of the file.
@@ -42,9 +47,21 @@ func ParseTagRuleConfig(ruleContent string) (*TagRuleConfig, error) {
 	if err := p.parse(ruleContent); err != nil {
 		return nil, err
 	}
+
+	// Separate default rules (Default=true) from regular rules
+	var rules, defaultRules []*TagRule
+	for _, rule := range p.rules {
+		if rule.Default {
+			defaultRules = append(defaultRules, rule)
+		} else {
+			rules = append(rules, rule)
+		}
+	}
+
 	return &TagRuleConfig{
-		Rules:   p.rules,
-		TagDefs: p.tagDefs,
+		Rules:        rules,
+		DefaultRules: defaultRules,
+		TagDefs:      p.tagDefs,
 	}, nil
 }
 
@@ -98,6 +115,9 @@ type tagRuleParser struct {
 	lineno int
 	// tagDefsEnded is true if the tag definitions have ended.
 	tagDefsEnded bool
+	// seenDefaultRule is true if we've seen a \default rule.
+	// Non-default rules cannot appear after default rules.
+	seenDefaultRule bool
 }
 
 func (p *tagRuleParser) parse(ruleContent string) error {
@@ -107,8 +127,7 @@ func (p *tagRuleParser) parse(ruleContent string) error {
 			return err
 		}
 	}
-	p.flushFinalRule()
-	return nil
+	return p.flushFinalRule()
 }
 
 // parseLine parses a single line by dispatching to the appropriate handler
@@ -194,6 +213,24 @@ func (p *tagRuleParser) handleRuleEnd(line string) error {
 			p.lineno, line,
 		)
 	}
+	// Validate that a rule cannot be both default and fallthrough
+	if p.pending.default_ && p.pending.fallthrough_ {
+		return fmt.Errorf(
+			"rule on line %d cannot have both \\default and \\fallthrough",
+			p.lineno,
+		)
+	}
+	// Validate that non-default rules cannot appear after default rules
+	if p.seenDefaultRule && !p.pending.default_ {
+		return fmt.Errorf(
+			"non-default rule on line %d cannot appear after \\default rules",
+			p.lineno,
+		)
+	}
+	// Track that we've seen a default rule
+	if p.pending.default_ {
+		p.seenDefaultRule = true
+	}
 	// Always append a rule here, even if it's effectively empty,
 	// to preserve the original behavior.
 	p.rules = append(p.rules, p.pending.flush(p.lineno))
@@ -224,10 +261,25 @@ func (p *tagRuleParser) handlePathOrPattern(line string) error {
 }
 
 // flushFinalRule flushes any remaining pending rules and adds it to the rules list.
-func (p *tagRuleParser) flushFinalRule() {
+func (p *tagRuleParser) flushFinalRule() error {
 	if !p.pending.isEmpty() {
+		// Validate that a rule cannot be both default and fallthrough
+		if p.pending.default_ && p.pending.fallthrough_ {
+			return fmt.Errorf(
+				"rule on line %d cannot have both \\default and \\fallthrough",
+				p.lineno,
+			)
+		}
+		// Validate that non-default rules cannot appear after default rules
+		if p.seenDefaultRule && !p.pending.default_ {
+			return fmt.Errorf(
+				"non-default rule on line %d cannot appear after \\default rules",
+				p.lineno,
+			)
+		}
 		p.rules = append(p.rules, p.pending.flush(p.lineno))
 	}
+	return nil
 }
 
 // sanitizeLine removes comments (everything after #) and trims whitespace.
