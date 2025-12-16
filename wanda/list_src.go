@@ -13,6 +13,7 @@ import (
 // walkFilesInDir recursively walks the files in the given directory.
 // It returns a list of files in the directory.
 // It does not follow symlinks, and it does not return directories.
+// Symlinks to directories are skipped.
 func walkFilesInDir(dir string) ([]string, error) {
 	var files []string
 	dirfs := os.DirFS(dir)
@@ -21,9 +22,27 @@ func walkFilesInDir(dir string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() {
-			files = append(files, filepath.Join(dir, p))
+		if d.IsDir() {
+			return nil
 		}
+
+		isSymlink := d.Type()&os.ModeSymlink != 0
+		// Check if it's a symlink pointing to a directory
+		if isSymlink {
+			fullPath := filepath.Join(dir, p)
+			target, err := filepath.EvalSymlinks(fullPath)
+			if err != nil {
+				return nil // Skip broken symlinks
+			}
+			info, err := os.Stat(target)
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() {
+				return nil // Skip symlinks to directories
+			}
+		}
+		files = append(files, filepath.Join(dir, p))
 		return nil
 	})
 	if err != nil {

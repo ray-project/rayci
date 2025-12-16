@@ -186,6 +186,65 @@ func TestListSrcFilesSingle_file(t *testing.T) {
 	}
 }
 
+// TestWalkFilesInDir_symlinkToDir tests that symlinks pointing to directories
+// are skipped. This is a regression test for the issue where walking python/
+// would include python/ray/rllib (a symlink to a directory), which would then
+// fail when trying to read it as a file for digest computation.
+func TestWalkFilesInDir_symlinkToDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a subdirectory structure: parent/child/file.txt
+	parent := filepath.Join(tmpDir, "parent")
+	child := filepath.Join(parent, "child")
+	if err := os.MkdirAll(child, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Create a regular file
+	file := filepath.Join(child, "file.txt")
+	if err := os.WriteFile(file, []byte("content"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	// Create another directory outside parent
+	otherDir := filepath.Join(tmpDir, "other")
+	if err := os.MkdirAll(otherDir, 0755); err != nil {
+		t.Fatalf("mkdir other: %v", err)
+	}
+	otherFile := filepath.Join(otherDir, "other.txt")
+	if err := os.WriteFile(otherFile, []byte("other"), 0644); err != nil {
+		t.Fatalf("write other file: %v", err)
+	}
+
+	// Create a symlink inside parent that points to otherDir (a directory)
+	// This simulates python/ray/rllib -> ../../rllib
+	symlinkToDir := filepath.Join(parent, "link_to_dir")
+	if err := os.Symlink(otherDir, symlinkToDir); err != nil {
+		t.Fatalf("symlink to dir: %v", err)
+	}
+
+	// Create a symlink to a regular file (should be included)
+	symlinkToFile := filepath.Join(parent, "link_to_file")
+	if err := os.Symlink(otherFile, symlinkToFile); err != nil {
+		t.Fatalf("symlink to file: %v", err)
+	}
+
+	got, err := walkFilesInDir(parent)
+	if err != nil {
+		t.Fatalf("walkFilesInDir failed: %v", err)
+	}
+
+	// Should include: child/file.txt and link_to_file
+	// Should NOT include: link_to_dir (symlink to directory)
+	want := []string{
+		filepath.Join(parent, "child", "file.txt"),
+		filepath.Join(parent, "link_to_file"),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("walkFilesInDir with symlink to dir:\ngot  %v\nwant %v", got, want)
+	}
+}
+
 func TestListSrcFilesSingle_dir(t *testing.T) {
 	tmpDir := t.TempDir()
 
