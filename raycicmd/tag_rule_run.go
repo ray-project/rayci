@@ -13,13 +13,13 @@ type mergedTagRuleConfig struct {
 	// RuleSet contains the merged rules for matching files to tags.
 	RuleSet *TagRuleSet
 	// DefaultTags contains the union of all default tags across all configs.
-	// These are tags from rules with both Fallthrough=true and Default=true.
+	// These are tags from default rules (\default).
 	DefaultTags []string
 }
 
 // loadAndMergeTagRuleConfigs loads and merges tag rule configurations from multiple files.
 // Tag definitions and rules from all files are combined into a single TagRuleSet.
-// Default tags (from rules with Fallthrough=true and Default=true) are unioned across all configs.
+// Default tags (from \default rules) are unioned across all configs.
 func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, error) {
 	merged := &mergedTagRuleConfig{
 		RuleSet: &TagRuleSet{
@@ -44,13 +44,12 @@ func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, err
 			merged.RuleSet.tagDefs[tagDef] = struct{}{}
 		}
 		merged.RuleSet.rules = append(merged.RuleSet.rules, cfg.Rules...)
+		merged.RuleSet.defaultRules = append(merged.RuleSet.defaultRules, cfg.DefaultRules...)
 
-		// Collect default tags from rules with Fallthrough=true and Default=true
-		for _, rule := range cfg.Rules {
-			if rule.Fallthrough && rule.Default {
-				for _, tag := range rule.Tags {
-					defaultTagSet[tag] = struct{}{}
-				}
+		// Collect default tags from default rules
+		for _, rule := range cfg.DefaultRules {
+			for _, tag := range rule.Tags {
+				defaultTagSet[tag] = struct{}{}
 			}
 		}
 	}
@@ -97,26 +96,35 @@ func needRunAllTags(env Envs) (bool, string) {
 //   - If the rule has Fallthrough=true, continue to the next rule
 //   - Otherwise, stop processing rules for this file
 //
-// Rules with Default=true match any file (catch-all).
-// Rules with Fallthrough=true always continue matching after adding tags.
+// If no non-fallthrough rule matches a file, default rules are applied.
+// Fallthrough rules add tags but don't prevent default rule fallback.
 func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
 	tagSet := make(map[string]struct{})
 
 	for _, file := range files {
-		matched := false
+		terminatingRuleMatched := false
 		for _, rule := range ruleSet.rules {
 			if rule.Match(file) {
 				for _, tag := range rule.Tags {
 					tagSet[tag] = struct{}{}
 				}
-				matched = true
 				if !rule.Fallthrough {
+					terminatingRuleMatched = true
 					break // stop processing rules for this file
 				}
 			}
 		}
-		if !matched {
-			log.Printf("unhandled file (no matching rule): %s", file)
+		// If no terminating rule matched, apply default rules from all configs
+		if !terminatingRuleMatched {
+			if len(ruleSet.defaultRules) > 0 {
+				for _, rule := range ruleSet.defaultRules {
+					for _, tag := range rule.Tags {
+						tagSet[tag] = struct{}{}
+					}
+				}
+			} else {
+				log.Printf("unhandled file (no matching rule): %s", file)
+			}
 		}
 	}
 

@@ -138,9 +138,8 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 	config1Content := strings.Join([]string{
 		"! always lint tag1 tag2",
 		"",
-		"# Fallthrough rule: always includes these tags",
+		"# Fallthrough rule: always includes these tags (matches everything)",
 		"\\fallthrough",
-		"\\default",
 		"@ always lint",
 		";",
 		"",
@@ -202,10 +201,10 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 		t.Errorf("tagsForChangedFiles(cpp/main.cc) = %v, want %v", cppTags, wantCppTags)
 	}
 
-	// Test DefaultTags from config1's fallthrough+default rule
-	wantDefaultTags := []string{"always", "lint"}
-	if !reflect.DeepEqual(merged.DefaultTags, wantDefaultTags) {
-		t.Errorf("DefaultTags = %v, want %v", merged.DefaultTags, wantDefaultTags)
+	// No \default rules in these configs, so DefaultTags should be empty
+	// (fallthrough rules don't contribute to DefaultTags)
+	if len(merged.DefaultTags) != 0 {
+		t.Errorf("DefaultTags = %v, want empty", merged.DefaultTags)
 	}
 }
 
@@ -217,7 +216,7 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 	config1Content := strings.Join([]string{
 		"! always lint debug",
 		"",
-		"\\fallthrough",
+		"# Default catch-all rule",
 		"\\default",
 		"@ always lint",
 		";",
@@ -230,7 +229,7 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 	config2Content := strings.Join([]string{
 		"! debug trace",
 		"",
-		"\\fallthrough",
+		"# Default catch-all rule",
 		"\\default",
 		"@ debug trace",
 		";",
@@ -244,7 +243,7 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
 	}
 
-	// DefaultTags should be the union of all fallthrough+default rule tags
+	// DefaultTags should be the union of all \default rule tags
 	wantDefaultTags := []string{"always", "debug", "lint", "trace"}
 	if !reflect.DeepEqual(merged.DefaultTags, wantDefaultTags) {
 		t.Errorf("DefaultTags = %v, want %v", merged.DefaultTags, wantDefaultTags)
