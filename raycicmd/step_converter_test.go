@@ -157,24 +157,46 @@ func TestJobEnvImage(t *testing.T) {
 	info := &buildInfo{buildID: "build123"}
 	conv := newCommandConverter(config, info, nil)
 
-	for _, test := range []struct {
-		name string
-		want string
-	}{
-		// Wanda image names (no "/") should be prefixed
-		{"forge", "ecr.io/rayproject/ci:build123-forge"},
-		{"my-image", "ecr.io/rayproject/ci:build123-my-image"},
-		{"", "ecr.io/rayproject/ci:build123-forge"}, // default
+	testCases := []struct {
+		name  string
+		input string
+		want  string
+	}{{
+		name:  "Wanda image name",
+		input: "forge",
+		want:  "ecr.io/rayproject/ci:build123-forge",
+	}, {
+		name:  "Wanda image name with hyphen",
+		input: "my-image",
+		want:  "ecr.io/rayproject/ci:build123-my-image",
+	}, {
+		name:  "Empty name uses default",
+		input: "",
+		want:  "ecr.io/rayproject/ci:build123-forge",
+	}, {
+		name:  "Full image reference",
+		input: "rayproject/manylinux2014:1.0.0-jdk-x86_64",
+		want:  "rayproject/manylinux2014:1.0.0-jdk-x86_64",
+	}, {
+		name:  "Full image reference with docker.io",
+		input: "docker.io/library/ubuntu:22.04",
+		want:  "docker.io/library/ubuntu:22.04",
+	}, {
+		name:  "Full image reference with gcr.io",
+		input: "gcr.io/my-project/my-image:latest",
+		want:  "gcr.io/my-project/my-image:latest",
+	}}
 
-		// Full image references (with "/") should be used as-is
-		{"rayproject/manylinux2014:1.0.0-jdk-x86_64", "rayproject/manylinux2014:1.0.0-jdk-x86_64"},
-		{"docker.io/library/ubuntu:22.04", "docker.io/library/ubuntu:22.04"},
-		{"gcr.io/my-project/my-image:latest", "gcr.io/my-project/my-image:latest"},
-	} {
-		got := conv.jobEnvImage(test.name)
-		if got != test.want {
-			t.Errorf("jobEnvImage(%q) = %q, want %q", test.name, got, test.want)
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := conv.jobEnvImage(tc.input)
+			if got != tc.want {
+				t.Errorf(
+					"jobEnvImage(%q) = %q, want %q",
+					tc.input, got, tc.want,
+				)
+			}
+		})
 	}
 }
 
