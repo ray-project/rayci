@@ -50,6 +50,12 @@ func (c *commandConverter) jobEnvImage(name string) string {
 		name = c.defaultJobEnv
 	}
 
+	// If the name contains a "/", treat it as a full image reference
+	// (e.g., "rayproject/manylinux2014:1.0.0-jdk-x86_64").
+	// Otherwise, treat it as a wanda image name and construct the full path.
+	if strings.Contains(name, "/") {
+		return name
+	}
 	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)
 }
 

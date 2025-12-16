@@ -152,6 +152,54 @@ func TestTriggerConverter(t *testing.T) {
 	}
 }
 
+func TestJobEnvImage(t *testing.T) {
+	config := &config{CIWorkRepo: "ecr.io/rayproject/ci"}
+	info := &buildInfo{buildID: "build123"}
+	conv := newCommandConverter(config, info, nil)
+
+	testCases := []struct {
+		name  string
+		input string
+		want  string
+	}{{
+		name:  "Wanda image name",
+		input: "forge",
+		want:  "ecr.io/rayproject/ci:build123-forge",
+	}, {
+		name:  "Wanda image name with hyphen",
+		input: "my-image",
+		want:  "ecr.io/rayproject/ci:build123-my-image",
+	}, {
+		name:  "Empty name uses default",
+		input: "",
+		want:  "ecr.io/rayproject/ci:build123-forge",
+	}, {
+		name:  "Full image reference",
+		input: "rayproject/manylinux2014:1.0.0-jdk-x86_64",
+		want:  "rayproject/manylinux2014:1.0.0-jdk-x86_64",
+	}, {
+		name:  "Full image reference with docker.io",
+		input: "docker.io/library/ubuntu:22.04",
+		want:  "docker.io/library/ubuntu:22.04",
+	}, {
+		name:  "Full image reference with gcr.io",
+		input: "gcr.io/my-project/my-image:latest",
+		want:  "gcr.io/my-project/my-image:latest",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := conv.jobEnvImage(tc.input)
+			if got != tc.want {
+				t.Errorf(
+					"jobEnvImage(%q) = %q, want %q",
+					tc.input, got, tc.want,
+				)
+			}
+		})
+	}
+}
+
 func TestIsBlockOrWait(t *testing.T) {
 	for _, test := range []map[string]any{
 		{"wait": "true"},
