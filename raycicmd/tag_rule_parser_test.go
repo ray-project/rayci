@@ -772,3 +772,36 @@ func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
 		t.Error("expected error for unknown directive, got nil")
 	}
 }
+
+func TestTagRuleParserParse_DirectiveMustComeBeforeTags(t *testing.T) {
+	// Directives must come before @ tags
+	errorInputs := []string{
+		// directive after tags
+		"! tag1\n@ tag1\n\\fallthrough\n;",
+		"! tag1\n@ tag1\n\\default\n;",
+		// directive after tags (without semicolon)
+		"! tag1\n@ tag1\n\\fallthrough",
+	}
+
+	for _, input := range errorInputs {
+		_, err := ParseTagRuleConfig(input)
+		if err == nil {
+			t.Errorf("expected error for input %q, got nil", input)
+		}
+	}
+
+	// Valid: directive before tags
+	validInputs := []string{
+		"! tag1\n\\fallthrough\n@ tag1\n;",
+		"! tag1\n\\default\n@ tag1\n;",
+		// Multiple @ lines after directive
+		"! tag1 tag2\n\\default\n@ tag1\n@ tag2\n;",
+	}
+
+	for _, input := range validInputs {
+		_, err := ParseTagRuleConfig(input)
+		if err != nil {
+			t.Errorf("unexpected error for input %q: %v", input, err)
+		}
+	}
+}

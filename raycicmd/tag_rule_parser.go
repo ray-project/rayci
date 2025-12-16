@@ -35,9 +35,9 @@ type TagRuleConfig struct {
 //	dir/                # Directory to match
 //	file                # File to match
 //	dir/*.py            # Pattern to match, using glob pattern
-//	@ tag1 tag2         # Tags to emit for a rule. A rule without tags is a skipping rule.
 //	\fallthrough        # Tags are always included, matching continues
 //	\default            # Rule matches any file (catch-all)
+//	@ tag1 tag2         # Tags to emit for a rule. A rule without tags is a skipping rule.
 //	;                   # Semicolon to separate rules
 //
 // Rules are evaluated in order, and the first matched rule will be used
@@ -81,6 +81,9 @@ type pendingRule struct {
 	fallthrough_ bool
 	// default_ means this rule matches any file.
 	default_ bool
+	// seenTags is true if we've seen @ tags in this rule.
+	// Directives must come before tags.
+	seenTags bool
 }
 
 func (pr *pendingRule) flush(lineno int) *TagRule {
@@ -100,7 +103,7 @@ func (pr *pendingRule) flush(lineno int) *TagRule {
 func (pr *pendingRule) isEmpty() bool {
 	return len(pr.tags) == 0 && len(pr.dirs) == 0 &&
 		len(pr.files) == 0 && len(pr.patterns) == 0 &&
-		!pr.fallthrough_ && !pr.default_
+		!pr.fallthrough_ && !pr.default_ && !pr.seenTags
 }
 
 // tagRuleParser holds the intermediate state while parsing rule config content.
@@ -185,7 +188,16 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 // Supported directives:
 //   - \fallthrough: Tags are always included, matching continues to next rule
 //   - \default: Rule matches any file (catch-all)
+//
+// Directives must appear before @ tags within a rule.
 func (p *tagRuleParser) handleDirective(line string) error {
+	// Directives must come before tags
+	if p.pending.seenTags {
+		return fmt.Errorf(
+			"directive on line %d must appear before @ tags",
+			p.lineno,
+		)
+	}
 	directive := strings.TrimPrefix(line, "\\")
 	switch directive {
 	case "fallthrough":
@@ -202,6 +214,7 @@ func (p *tagRuleParser) handleDirective(line string) error {
 func (p *tagRuleParser) handleTags(line string) {
 	if fields := strings.Fields(strings.TrimPrefix(line, "@")); len(fields) > 0 {
 		p.pending.tags = append(p.pending.tags, fields...)
+		p.pending.seenTags = true
 	}
 }
 
