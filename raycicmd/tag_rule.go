@@ -58,9 +58,17 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 }
 
 // Match returns true if the given file path matches any of the rule's
-// directories, files, or glob patterns. A rule with Default=true matches any file.
+// directories, files, or glob patterns.
+// A rule with Default=true matches any file.
+// A rule with Fallthrough=true and no paths also matches any file.
 func (r *TagRule) Match(changedFilePath string) bool {
 	if r.Default {
+		return true
+	}
+
+	// Fallthrough rules without paths match everything
+	hasNoPaths := len(r.Dirs) == 0 && len(r.Files) == 0 && len(r.Patterns) == 0
+	if r.Fallthrough && hasNoPaths {
 		return true
 	}
 
@@ -129,27 +137,30 @@ func (s *TagRuleSet) ValidateRules() error {
 // MatchTags returns the accumulated tags for rules matching the given file path.
 // For fallthrough rules, tags are accumulated and matching continues.
 // For non-fallthrough rules, tags are added and matching stops.
-// If no rule matches, tags from all default rules are returned.
+// If no non-fallthrough rule matches, tags from all default rules are also returned.
+// The returned bool indicates whether a non-fallthrough rule matched (true) or
+// if default rules had to be used (false).
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
 	tags := []string{}
-	matched := false
+	terminatingRuleMatched := false
 
 	for _, rule := range s.rules {
 		if rule.Match(changedFilePath) {
 			tags = append(tags, rule.Tags...)
-			matched = true
 			if !rule.Fallthrough {
+				terminatingRuleMatched = true
 				break // Stop on first non-fallthrough match
 			}
 		}
 	}
 
-	// If no rule matched, use default rules (but still return matched=false)
-	if !matched && len(s.defaultRules) > 0 {
+	// If no terminating (non-fallthrough) rule matched, use default rules
+	// Fallthrough rules add tags but don't prevent default rule fallback
+	if !terminatingRuleMatched && len(s.defaultRules) > 0 {
 		for _, rule := range s.defaultRules {
 			tags = append(tags, rule.Tags...)
 		}
 	}
 
-	return tags, matched
+	return tags, terminatingRuleMatched
 }
