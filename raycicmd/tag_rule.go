@@ -21,6 +21,12 @@ type TagRule struct {
 	Files []string
 	// Patterns is a list of glob patterns (converted to regex patterns) to match.
 	Patterns []*regexp.Regexp
+	// Fallthrough means this rule's tags are always included, and matching
+	// continues to find more specific rules. Used with \fallthrough directive.
+	Fallthrough bool
+	// Default means this rule matches any file. Used as a catch-all with \default
+	// directive.
+	Default bool
 }
 
 // globToRegexp converts a glob pattern to an equivalent regex pattern.
@@ -52,8 +58,12 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 }
 
 // Match returns true if the given file path matches any of the rule's
-// directories, files, or glob patterns.
+// directories, files, or glob patterns. A rule with Default=true matches any file.
 func (r *TagRule) Match(changedFilePath string) bool {
+	if r.Default {
+		return true
+	}
+
 	if slices.ContainsFunc(r.Dirs, func(dir string) bool {
 		return changedFilePath == dir ||
 			strings.HasPrefix(changedFilePath, dir+"/")

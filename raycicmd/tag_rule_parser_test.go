@@ -629,74 +629,60 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_DefaultAndFallbackTags(t *testing.T) {
+func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            string
-		wantDefaultTags  []string
-		wantFallbackTags []string
-		wantTagDefs      []string
+		name            string
+		input           string
+		wantRules       int
+		wantFallthrough []bool
+		wantDefault     []bool
+		wantTags        [][]string
+		wantTagDefs     []string
 	}{
 		{
-			name:            "default tags only",
-			input:           "!default always lint",
-			wantDefaultTags: []string{"always", "lint"},
+			name:            "fallthrough directive only",
+			input:           "! tag1\n\\fallthrough\n@ tag1\n;",
+			wantRules:       1,
+			wantFallthrough: []bool{true},
+			wantDefault:     []bool{false},
+			wantTags:        [][]string{{"tag1"}},
+			wantTagDefs:     []string{"tag1"},
+		},
+		{
+			name:            "default directive only",
+			input:           "! tag1\n\\default\n@ tag1\n;",
+			wantRules:       1,
+			wantFallthrough: []bool{false},
+			wantDefault:     []bool{true},
+			wantTags:        [][]string{{"tag1"}},
+			wantTagDefs:     []string{"tag1"},
+		},
+		{
+			name:            "both fallthrough and default",
+			input:           "! always lint\n\\fallthrough\n\\default\n@ always lint\n;",
+			wantRules:       1,
+			wantFallthrough: []bool{true},
+			wantDefault:     []bool{true},
+			wantTags:        [][]string{{"always", "lint"}},
 			wantTagDefs:     []string{"always", "lint"},
 		},
 		{
-			name:             "fallback tags only",
-			input:            "!fallback ml tune train",
-			wantFallbackTags: []string{"ml", "tune", "train"},
-			wantTagDefs:      []string{"ml", "tune", "train"},
+			name:            "multiple rules with different directives",
+			input:           "! tag1 tag2\n\\fallthrough\n\\default\n@ tag1\n;\npython/\n@ tag2\n;",
+			wantRules:       2,
+			wantFallthrough: []bool{true, false},
+			wantDefault:     []bool{true, false},
+			wantTags:        [][]string{{"tag1"}, {"tag2"}},
+			wantTagDefs:     []string{"tag1", "tag2"},
 		},
 		{
-			name:             "both default and fallback tags",
-			input:            "!default always lint\n!fallback ml tune",
-			wantDefaultTags:  []string{"always", "lint"},
-			wantFallbackTags: []string{"ml", "tune"},
-			wantTagDefs:      []string{"always", "lint", "ml", "tune"},
-		},
-		{
-			name:             "multiple default and fallback lines",
-			input:            "!default always\n!default lint\n!fallback ml\n!fallback tune train",
-			wantDefaultTags:  []string{"always", "lint"},
-			wantFallbackTags: []string{"ml", "tune", "train"},
-			wantTagDefs:      []string{"always", "lint", "ml", "tune", "train"},
-		},
-		{
-			name:             "mixed with regular tag definitions",
-			input:            "!default always lint\n! python ml data\n!fallback core_cpp cpp",
-			wantDefaultTags:  []string{"always", "lint"},
-			wantFallbackTags: []string{"core_cpp", "cpp"},
-			wantTagDefs:      []string{"always", "lint", "python", "ml", "data", "core_cpp", "cpp"},
-		},
-		{
-			name:             "with comments",
-			input:            "!default always lint # Default tags\n!fallback ml # Fallback",
-			wantDefaultTags:  []string{"always", "lint"},
-			wantFallbackTags: []string{"ml"},
-			wantTagDefs:      []string{"always", "lint", "ml"},
-		},
-		{
-			name:  "empty default",
-			input: "!default",
-		},
-		{
-			name:  "empty fallback",
-			input: "!fallback",
-		},
-		{
-			// "! default" (with space) defines a tag named "default", not a command
-			name:        "tag named default with space",
-			input:       "! default fallback",
-			wantTagDefs: []string{"default", "fallback"},
-		},
-		{
-			// "!default" (no space) is a command
-			name:            "default command vs tag",
-			input:           "!default always\n! default other",
-			wantDefaultTags: []string{"always"},
-			wantTagDefs:     []string{"always", "default", "other"},
+			name:            "default rule at end for catch-all",
+			input:           "! tag1 fallback\npython/\n@ tag1\n;\n\\default\n@ fallback\n;",
+			wantRules:       2,
+			wantFallthrough: []bool{false, false},
+			wantDefault:     []bool{false, true},
+			wantTags:        [][]string{{"tag1"}, {"fallback"}},
+			wantTagDefs:     []string{"tag1", "fallback"},
 		},
 	}
 
@@ -707,30 +693,32 @@ func TestTagRuleParserParse_DefaultAndFallbackTags(t *testing.T) {
 				t.Fatalf("Parse() error: %v", err)
 			}
 
-			if !reflect.DeepEqual(cfg.DefaultTags, tt.wantDefaultTags) {
-				t.Errorf(
-					"DefaultTags = %v, want %v",
-					cfg.DefaultTags,
-					tt.wantDefaultTags,
-				)
+			if len(cfg.Rules) != tt.wantRules {
+				t.Fatalf("got %d rules, want %d", len(cfg.Rules), tt.wantRules)
 			}
 
-			if !reflect.DeepEqual(cfg.FallbackTags, tt.wantFallbackTags) {
-				t.Errorf(
-					"FallbackTags = %v, want %v",
-					cfg.FallbackTags,
-					tt.wantFallbackTags,
-				)
+			for i, rule := range cfg.Rules {
+				if rule.Fallthrough != tt.wantFallthrough[i] {
+					t.Errorf("rule %d: Fallthrough = %v, want %v", i, rule.Fallthrough, tt.wantFallthrough[i])
+				}
+				if rule.Default != tt.wantDefault[i] {
+					t.Errorf("rule %d: Default = %v, want %v", i, rule.Default, tt.wantDefault[i])
+				}
+				if !reflect.DeepEqual(rule.Tags, tt.wantTags[i]) {
+					t.Errorf("rule %d: Tags = %v, want %v", i, rule.Tags, tt.wantTags[i])
+				}
 			}
 
-			if tt.wantTagDefs != nil &&
-				!reflect.DeepEqual(cfg.TagDefs, tt.wantTagDefs) {
-				t.Errorf(
-					"TagDefs = %v, want %v",
-					cfg.TagDefs,
-					tt.wantTagDefs,
-				)
+			if tt.wantTagDefs != nil && !reflect.DeepEqual(cfg.TagDefs, tt.wantTagDefs) {
+				t.Errorf("TagDefs = %v, want %v", cfg.TagDefs, tt.wantTagDefs)
 			}
 		})
+	}
+}
+
+func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
+	_, err := ParseTagRuleConfig("! tag1\n\\unknown\n@ tag1\n;")
+	if err == nil {
+		t.Error("expected error for unknown directive, got nil")
 	}
 }
