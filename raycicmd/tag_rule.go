@@ -99,13 +99,17 @@ func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 type TagRuleSet struct {
 	// tagDefs is the set of all defined tags.
 	tagDefs map[string]struct{}
-	// rules is a list of TagRule instances seen in the order they were parsed.
+	// rules is a list of non-default TagRule instances in the order they were parsed.
 	rules []*TagRule
+	// defaultRules is a list of default (catch-all) TagRule instances.
+	// These are used when no other rule matches.
+	defaultRules []*TagRule
 }
 
 // ValidateRules validates that all tags used in the rules are defined.
 func (s *TagRuleSet) ValidateRules() error {
-	for _, rule := range s.rules {
+	allRules := append(s.rules, s.defaultRules...)
+	for _, rule := range allRules {
 		if len(rule.Tags) == 0 {
 			continue
 		}
@@ -122,13 +126,30 @@ func (s *TagRuleSet) ValidateRules() error {
 	return nil
 }
 
-// MatchTags returns the first matching rule's tags if the given file
-// path matches any of the rules in the set.
+// MatchTags returns the accumulated tags for rules matching the given file path.
+// For fallthrough rules, tags are accumulated and matching continues.
+// For non-fallthrough rules, tags are added and matching stops.
+// If no rule matches, tags from all default rules are returned.
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
+	tags := []string{}
+	matched := false
+
 	for _, rule := range s.rules {
 		if rule.Match(changedFilePath) {
-			return rule.Tags, true
+			tags = append(tags, rule.Tags...)
+			matched = true
+			if !rule.Fallthrough {
+				break // Stop on first non-fallthrough match
+			}
 		}
 	}
-	return []string{}, false
+
+	// If no rule matched, use default rules (but still return matched=false)
+	if !matched && len(s.defaultRules) > 0 {
+		for _, rule := range s.defaultRules {
+			tags = append(tags, rule.Tags...)
+		}
+	}
+
+	return tags, matched
 }

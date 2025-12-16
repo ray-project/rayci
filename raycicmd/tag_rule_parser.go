@@ -218,14 +218,8 @@ func (p *tagRuleParser) handleTags(line string) {
 	}
 }
 
-// handleRuleEnd flushes the pending rule and adds it to the rules list.
-func (p *tagRuleParser) handleRuleEnd(line string) error {
-	if line != ";" {
-		return fmt.Errorf(
-			"unexpected tokens after semicolon on line %d: %s",
-			p.lineno, line,
-		)
-	}
+// validateAndAppendRule validates the pending rule and appends it to the rules list.
+func (p *tagRuleParser) validateAndAppendRule() error {
 	// Validate that a rule cannot be both default and fallthrough
 	if p.pending.default_ && p.pending.fallthrough_ {
 		return fmt.Errorf(
@@ -244,10 +238,19 @@ func (p *tagRuleParser) handleRuleEnd(line string) error {
 	if p.pending.default_ {
 		p.seenDefaultRule = true
 	}
-	// Always append a rule here, even if it's effectively empty,
-	// to preserve the original behavior.
 	p.rules = append(p.rules, p.pending.flush(p.lineno))
 	return nil
+}
+
+// handleRuleEnd flushes the pending rule and adds it to the rules list.
+func (p *tagRuleParser) handleRuleEnd(line string) error {
+	if line != ";" {
+		return fmt.Errorf(
+			"unexpected tokens after semicolon on line %d: %s",
+			p.lineno, line,
+		)
+	}
+	return p.validateAndAppendRule()
 }
 
 // handlePathOrPattern handles paths and patterns by dispatching to the
@@ -276,21 +279,7 @@ func (p *tagRuleParser) handlePathOrPattern(line string) error {
 // flushFinalRule flushes any remaining pending rules and adds it to the rules list.
 func (p *tagRuleParser) flushFinalRule() error {
 	if !p.pending.isEmpty() {
-		// Validate that a rule cannot be both default and fallthrough
-		if p.pending.default_ && p.pending.fallthrough_ {
-			return fmt.Errorf(
-				"rule on line %d cannot have both \\default and \\fallthrough",
-				p.lineno,
-			)
-		}
-		// Validate that non-default rules cannot appear after default rules
-		if p.seenDefaultRule && !p.pending.default_ {
-			return fmt.Errorf(
-				"non-default rule on line %d cannot appear after \\default rules",
-				p.lineno,
-			)
-		}
-		p.rules = append(p.rules, p.pending.flush(p.lineno))
+		return p.validateAndAppendRule()
 	}
 	return nil
 }
