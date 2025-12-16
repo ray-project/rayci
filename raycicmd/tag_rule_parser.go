@@ -36,7 +36,7 @@ type TagRuleConfig struct {
 //	file                # File to match
 //	dir/*.py            # Pattern to match, using glob pattern
 //	\fallthrough        # Tags are always included, matching continues
-//	\default            # Rule matches any file (catch-all)
+//	\default            # Rule matches any file. Used as a final catch-all fallback rule.
 //	@ tag1 tag2         # Tags to emit for a rule. A rule without tags is a skipping rule.
 //	;                   # Semicolon to separate rules
 //
@@ -187,7 +187,7 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 // handleDirective handles rule directives that modify rule behavior.
 // Supported directives:
 //   - \fallthrough: Tags are always included, matching continues to next rule
-//   - \default: Rule matches any file (catch-all)
+//   - \default: Rule matches any file. Used as a final catch-all fallback rule.
 //
 // Directives must appear before @ tags within a rule.
 func (p *tagRuleParser) handleDirective(line string) error {
