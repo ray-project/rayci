@@ -251,8 +251,8 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 }
 
 var testRulesSnapshot = filepath.Join(
-	"data",
-	"62231dd4ba8e784da8800b248ad7616b8db92de7.txt",
+	"testdata",
+	"test_rules.txt",
 )
 
 func runCommandFromDirectory(cmd *exec.Cmd, dir string) ([]byte, error) {
