@@ -1,6 +1,7 @@
 package wanda
 
 import (
+	"sort"
 	"testing"
 
 	"os"
@@ -279,6 +280,8 @@ func TestWalkFilesInDir_symlinkToDir(t *testing.T) {
 		filepath.Join(srcDir, "linked"),      // The symlink (not followed)
 		filepath.Join(srcDir, "regular.txt"), // The regular file
 	}
+	sort.Strings(got)
+	sort.Strings(want)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
