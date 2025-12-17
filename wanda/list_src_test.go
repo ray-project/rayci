@@ -240,3 +240,86 @@ func TestListSrcFilesSingle_dir(t *testing.T) {
 		t.Errorf("got %v, want %v", gotGlob, want)
 	}
 }
+
+func TestWalkFilesInDir_symlinkToDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a target directory with files.
+	targetDir := filepath.Join(tmpDir, "target")
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		t.Fatalf("mkdir target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "target_file.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("write target file: %v", err)
+	}
+
+	// Create a source directory with a regular file and a symlink to the target directory.
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("mkdir src: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "regular.txt"), []byte("regular"), 0644); err != nil {
+		t.Fatalf("write regular file: %v", err)
+	}
+
+	// Create symlink to directory (using relative path).
+	symlinkPath := filepath.Join(srcDir, "linked")
+	if err := os.Symlink("../target", symlinkPath); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	// Walk the source directory.
+	got, err := walkFilesInDir(srcDir)
+	if err != nil {
+		t.Fatalf("walkFilesInDir failed: %v", err)
+	}
+
+	// Should contain the symlink itself, but NOT the contents of the target directory.
+	want := []string{
+		filepath.Join(srcDir, "linked"),      // The symlink (not followed)
+		filepath.Join(srcDir, "regular.txt"), // The regular file
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Verify that target_file.txt is NOT in the result.
+	for _, f := range got {
+		if filepath.Base(f) == "target_file.txt" {
+			t.Errorf("symlink contents should not be included, but found %q", f)
+		}
+	}
+}
+
+func TestWalkFilesInDir_symlinkToFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a target file.
+	targetFile := filepath.Join(tmpDir, "target.txt")
+	if err := os.WriteFile(targetFile, []byte("target content"), 0644); err != nil {
+		t.Fatalf("write target file: %v", err)
+	}
+
+	// Create a source directory with a symlink to the target file.
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("mkdir src: %v", err)
+	}
+
+	symlinkPath := filepath.Join(srcDir, "link.txt")
+	if err := os.Symlink("../target.txt", symlinkPath); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	got, err := walkFilesInDir(srcDir)
+	if err != nil {
+		t.Fatalf("walkFilesInDir failed: %v", err)
+	}
+
+	want := []string{
+		filepath.Join(srcDir, "link.txt"),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

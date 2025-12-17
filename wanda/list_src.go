@@ -3,6 +3,7 @@ package wanda
 import (
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 // walkFilesInDir recursively walks the files in the given directory.
 // It returns a list of files in the directory.
 // It does not follow symlinks, and it does not return directories.
+// If a symlink points to a directory, a warning is logged to acknowledge
+// that the symlink's contents will not be included in the build context.
 func walkFilesInDir(dir string) ([]string, error) {
 	var files []string
 	dirfs := os.DirFS(dir)
@@ -22,7 +25,21 @@ func walkFilesInDir(dir string) ([]string, error) {
 			return err
 		}
 		if !d.IsDir() {
-			files = append(files, filepath.Join(dir, p))
+			fullPath := filepath.Join(dir, p)
+			files = append(files, fullPath)
+
+			// Warn if this is a symlink pointing to a directory.
+			// The symlink itself will be included, but its contents won't.
+			if d.Type()&os.ModeSymlink != 0 {
+				if targetInfo, err := os.Stat(fullPath); err == nil && targetInfo.IsDir() {
+					targetPath, _ := os.Readlink(fullPath)
+					log.Printf(
+						"WARNING: %q is a symlink to directory %q; "+
+							"only the symlink will be included, not its contents",
+						fullPath, targetPath,
+					)
+				}
+			}
 		}
 		return nil
 	})
