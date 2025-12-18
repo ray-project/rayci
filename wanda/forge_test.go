@@ -43,6 +43,11 @@ func filesInLayer(layer cranev1.Layer) (map[string]string, error) {
 			continue
 		}
 
+		if hdr.Typeflag == tar.TypeSymlink {
+			files[hdr.Name] = hdr.Linkname
+			continue
+		}
+
 		content, err := io.ReadAll(tr)
 		if err != nil {
 			return nil, fmt.Errorf("read tar content: %w", err)
@@ -98,6 +103,13 @@ func TestForgeLocal_noNamePrefix(t *testing.T) {
 }
 
 func TestForge_globFiles(t *testing.T) {
+	symlinkPath := "testdata/src/link-to-foo.h"
+	symlinkTarget := "foo.h"
+	if err := os.Symlink(symlinkTarget, symlinkPath); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+	defer os.Remove(symlinkPath)
+
 	config := &ForgeConfig{
 		WorkDir:    "testdata",
 		NamePrefix: "cr.ray.io/rayproject/",
@@ -124,7 +136,7 @@ func TestForge_globFiles(t *testing.T) {
 	}
 
 	if len(layers) != 1 {
-		t.Fatalf("got %d layers, want 2", len(layers))
+		t.Fatalf("got %d layers, want 1", len(layers))
 	}
 
 	files, err := filesInLayer(layers[0])
@@ -140,6 +152,12 @@ func TestForge_globFiles(t *testing.T) {
 		if _, ok := files[file]; !ok {
 			t.Errorf("%q not in image", file)
 		}
+	}
+
+	if got, ok := files["src/link-to-foo.h"]; !ok {
+		t.Error("symlink src/link-to-foo.h not found in image")
+	} else if got != symlinkTarget {
+		t.Errorf("symlink target: got %q, want %q", got, symlinkTarget)
 	}
 }
 

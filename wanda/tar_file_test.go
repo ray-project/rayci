@@ -154,3 +154,134 @@ func TestTarFileRecord(t *testing.T) {
 	}
 
 }
+
+func TestTarFileSymlink(t *testing.T) {
+	tmp := t.TempDir()
+
+	target := filepath.Join(tmp, "target")
+	targetData := []byte("target content")
+	if err := os.WriteFile(target, targetData, 0644); err != nil {
+		t.Fatalf("write target file: %v", err)
+	}
+
+	// Symlink to target
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink("target", link); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	tf := &tarFile{
+		name:    "mylink",
+		srcFile: link,
+		meta: &tarMeta{
+			Mode:    0777,
+			UserID:  1000,
+			GroupID: 1000,
+		},
+	}
+
+	// Test writeTo for symlink.
+	tarBuf := new(bytes.Buffer)
+	tw := tar.NewWriter(tarBuf)
+	modTime := time.Now().Truncate(time.Second)
+
+	if err := tf.writeTo(tw, modTime); err != nil {
+		t.Fatalf("write symlink to tar stream: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar stream: %v", err)
+	}
+
+	// Read back the tar and verify symlink.
+	tr := tar.NewReader(tarBuf)
+	header, err := tr.Next()
+	if err != nil {
+		t.Fatalf("read tar header: %v", err)
+	}
+	if header.Name != "mylink" {
+		t.Errorf("got name %q, want %q", header.Name, "mylink")
+	}
+	if header.Typeflag != tar.TypeSymlink {
+		t.Errorf("got typeflag %d, want %d (TypeSymlink)", header.Typeflag, tar.TypeSymlink)
+	}
+	if header.Linkname != "target" {
+		t.Errorf("got linkname %q, want %q", header.Linkname, "target")
+	}
+	if header.Uid != 1000 {
+		t.Errorf("got uid %d, want %d", header.Uid, 1000)
+	}
+	if header.Gid != 1000 {
+		t.Errorf("got gid %d, want %d", header.Gid, 1000)
+	}
+}
+
+func TestTarFileSymlinkRecord(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Create a symlink.
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink("some/target/path", link); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	tf := &tarFile{
+		name:    "mylink",
+		srcFile: link,
+		meta: &tarMeta{
+			Mode:    0777,
+			UserID:  1000,
+			GroupID: 1000,
+		},
+	}
+
+	r, err := tf.record()
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+
+	if r.Name != "mylink" {
+		t.Errorf("got name %q, want %q", r.Name, "mylink")
+	}
+	if r.Symlink != "some/target/path" {
+		t.Errorf("got symlink %q, want %q", r.Symlink, "some/target/path")
+	}
+	if r.Size != 0 {
+		t.Errorf("got size %d, want %d", r.Size, 0)
+	}
+	if r.ContentDigest == "" {
+		t.Error("got empty content digest for symlink")
+	}
+
+	// Test JSON roundtrip.
+	bs, err := json.Marshal(r)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	loopback := new(tarFileRecord)
+	if err := json.Unmarshal(bs, loopback); err != nil {
+		t.Fatalf("unmarshal record: %v", err)
+	}
+	if !reflect.DeepEqual(r, loopback) {
+		t.Errorf("got loopback record %+v, want %+v", loopback, r)
+	}
+
+	// Verify that different symlink targets produce different digests.
+	link2 := filepath.Join(tmp, "link2")
+	if err := os.Symlink("different/target", link2); err != nil {
+		t.Fatalf("create symlink2: %v", err)
+	}
+
+	tf2 := &tarFile{
+		name:    "mylink",
+		srcFile: link2,
+		meta:    tf.meta,
+	}
+
+	r2, err := tf2.record()
+	if err != nil {
+		t.Fatalf("record for link2: %v", err)
+	}
+	if r2.ContentDigest == r.ContentDigest {
+		t.Error("different symlink targets should produce different digests")
+	}
+}
