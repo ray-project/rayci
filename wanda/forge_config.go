@@ -40,6 +40,11 @@ type ForgeConfig struct {
 
 // newContainerCmd creates a ContainerCmd based on the config settings.
 func (c *ForgeConfig) newContainerCmd() ContainerCmd {
+	if c.ContainerRuntime == RuntimePodman {
+		return NewPodmanCmd(&PodmanCmdConfig{
+			Bin: c.ContainerBin,
+		})
+	}
 	return NewDockerCmd(&DockerCmdConfig{
 		Bin:             c.ContainerBin,
 		UseLegacyEngine: runtime.GOOS == "windows",

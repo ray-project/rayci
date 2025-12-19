@@ -82,9 +82,9 @@ func (c *baseContainerCmd) inspectImage(tag string) (*imageInfo, error) {
 	cmd.Stdout = buf
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Docker returns 1
+			// Docker returns 1, podman returns 125 for "image not found".
 			code := exitErr.ExitCode()
-			if code == 1 {
+			if code == 1 || code == 125 {
 				return nil, nil
 			}
 		}

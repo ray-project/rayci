@@ -33,7 +33,8 @@ func dockerAvailable() bool {
 }
 
 func podmanAvailable() bool {
-	return false
+	_, err := exec.LookPath("podman")
+	return err == nil
 }
 
 var containerRuntimes = []containerRuntimeTest{

@@ -27,6 +27,7 @@ Flags:
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	dockerBin := flag.String("docker", "", "path to the docker/podman binary")
+	podman := flag.Bool("podman", false, "use podman instead of docker")
 	rayCI := flag.Bool(
 		"rayci", false,
 		"takes RAYCI_ env vars for input and run in remote mode",
@@ -73,6 +74,9 @@ func main() {
 
 	// Determine the container runtime.
 	runtime := wanda.RuntimeDocker
+	if *podman {
+		runtime = wanda.RuntimePodman
+	}
 
 	config := &wanda.ForgeConfig{
 		WorkDir:    *workDir,
