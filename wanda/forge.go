@@ -45,7 +45,7 @@ type Forge struct {
 
 	cacheHitCount int
 
-	docker *dockerCmd
+	containerCmd ContainerCmd
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -56,8 +56,9 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 	}
 
 	f := &Forge{
-		config:  config,
-		workDir: absWorkDir,
+		config:       config,
+		workDir:      absWorkDir,
+		containerCmd: config.newContainerCmd(),
 		remoteOpts: []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
 			remote.WithPlatform(crane.Platform{
@@ -66,7 +67,6 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 			}),
 		},
 	}
-	f.docker = f.newDockerCmd()
 
 	return f, nil
 }
@@ -83,13 +83,6 @@ func (f *Forge) cacheTag(digest string) string {
 	return f.config.cacheTag(digest)
 }
 
-func (f *Forge) newDockerCmd() *dockerCmd {
-	return newDockerCmd(&dockerCmdConfig{
-		bin:             f.config.DockerBin,
-		useLegacyEngine: runtime.GOOS == "windows",
-	})
-}
-
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	m := make(map[string]*imageSource)
 	namePrefix := f.config.NamePrefix
@@ -97,7 +90,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	for _, from := range froms {
 		if strings.HasPrefix(from, "@") { // A local image.
 			name := strings.TrimPrefix(from, "@")
-			src, err := resolveDockerImage(f.docker, from, name)
+			src, err := resolveDockerImage(f.containerCmd, from, name)
 			if err != nil {
 				return nil, fmt.Errorf("resolve local image %s: %w", from, err)
 			}
@@ -108,7 +101,7 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		if namePrefix != "" && strings.HasPrefix(from, namePrefix) {
 			if !f.isRemote() {
 				// Treat it as a local image.
-				src, err := resolveDockerImage(f.docker, from, from)
+				src, err := resolveDockerImage(f.containerCmd, from, from)
 				if err != nil {
 					return nil, fmt.Errorf(
 						"resolve prefixed local image %s: %w", from, err,
@@ -227,7 +220,7 @@ func (f *Forge) Build(spec *Spec) error {
 				return nil // and we are done.
 			}
 		} else {
-			info, err := f.docker.inspectImage(cacheTag)
+			info, err := f.containerCmd.inspectImage(cacheTag)
 			if err != nil {
 				return fmt.Errorf("check cache image: %w", err)
 			}
@@ -238,7 +231,7 @@ func (f *Forge) Build(spec *Spec) error {
 				for _, tag := range in.tagList() {
 					log.Printf("tag output as %s", tag)
 					if tag != cacheTag {
-						if err := f.docker.tag(cacheTag, tag); err != nil {
+						if err := f.containerCmd.tag(cacheTag, tag); err != nil {
 							return fmt.Errorf("tag cache image: %w", err)
 						}
 					}
@@ -251,23 +244,28 @@ func (f *Forge) Build(spec *Spec) error {
 	inputHints := newBuildInputHints(spec.BuildHintArgs)
 
 	// Now we can build the image.
-	// Always use a new dockerCmd so that it can run in its own environment.
-	d := f.newDockerCmd()
-	d.setWorkDir(f.workDir)
+	var newCmd ContainerCmd
+	if f.config.ContainerRuntime == RuntimeDocker {
+		// Always use a new dockerCmd so that it can run in its own environment.
+		newCmd = f.config.newContainerCmd()
+	} else {
+		newCmd = f.containerCmd
+	}
+	newCmd.setWorkDir(f.workDir)
 
-	if err := d.build(in, inputCore, inputHints); err != nil {
-		return fmt.Errorf("build docker: %w", err)
+	if err := newCmd.build(in, inputCore, inputHints); err != nil {
+		return fmt.Errorf("build: %w", err)
 	}
 
 	// Push the image to the work repo with workTag and cacheTag if needed.
 	if f.isRemote() {
-		if err := d.run("push", workTag); err != nil {
-			return fmt.Errorf("push docker: %w", err)
+		if err := newCmd.run("push", workTag); err != nil {
+			return fmt.Errorf("push: %w", err)
 		}
 
 		// Save cache result too.
 		if caching && !f.config.ReadOnlyCache {
-			if err := d.run("push", cacheTag); err != nil {
+			if err := newCmd.run("push", cacheTag); err != nil {
 				return fmt.Errorf("push cache: %w", err)
 			}
 		}

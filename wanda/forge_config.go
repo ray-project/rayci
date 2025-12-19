@@ -2,13 +2,23 @@ package wanda
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
+)
+
+// ContainerRuntime specifies which container runtime to use.
+type ContainerRuntime int
+
+const (
+	// RuntimeDocker uses Docker as the container runtime.
+	RuntimeDocker ContainerRuntime = iota
+	// RuntimePodman uses Podman as the container runtime.
+	RuntimePodman
 )
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
 	WorkDir    string
-	DockerBin  string
 	WorkRepo   string
 	NamePrefix string
 	BuildID    string
@@ -18,6 +28,22 @@ type ForgeConfig struct {
 	Rebuild bool
 
 	ReadOnlyCache bool
+
+	// ContainerRuntime specifies which container runtime to use.
+	// Defaults to RuntimeDocker.
+	ContainerRuntime ContainerRuntime
+
+	// ContainerBin is the path to the container runtime binary.
+	// If empty, uses the default binary name ("docker" or "podman").
+	ContainerBin string
+}
+
+// newContainerCmd creates a ContainerCmd based on the config settings.
+func (c *ForgeConfig) newContainerCmd() ContainerCmd {
+	return NewDockerCmd(&DockerCmdConfig{
+		Bin:             c.ContainerBin,
+		UseLegacyEngine: runtime.GOOS == "windows",
+	})
 }
 
 func (c *ForgeConfig) isRemote() bool { return c.WorkRepo != "" }

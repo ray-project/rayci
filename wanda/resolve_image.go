@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-func resolveDockerImage(d *dockerCmd, name, ref string) (*imageSource, error) {
+func resolveDockerImage(d ContainerCmd, name, ref string) (*imageSource, error) {
 	info, err := d.inspectImage(ref)
 	if err != nil {
 		return nil, fmt.Errorf("inspect image %s: %w", ref, err)
