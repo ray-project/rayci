@@ -26,7 +26,7 @@ Flags:
 
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
-	docker := flag.String("docker", "", "path to the docker client binary")
+	dockerBin := flag.String("docker", "", "path to the docker/podman binary")
 	rayCI := flag.Bool(
 		"rayci", false,
 		"takes RAYCI_ env vars for input and run in remote mode",
@@ -71,9 +71,11 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
+	// Determine the container runtime.
+	runtime := wanda.RuntimeDocker
+
 	config := &wanda.ForgeConfig{
 		WorkDir:    *workDir,
-		DockerBin:  *docker,
 		WorkRepo:   *workRepo,
 		NamePrefix: *namePrefix,
 		BuildID:    *buildID,
@@ -83,6 +85,9 @@ func main() {
 		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,
+
+		ContainerRuntime: runtime,
+		ContainerBin:     *dockerBin,
 	}
 
 	if err := wanda.Build(input, config); err != nil {
