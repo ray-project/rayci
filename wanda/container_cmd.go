@@ -105,6 +105,11 @@ func (c *baseContainerCmd) tag(src, asTag string) error {
 }
 
 func (c *baseContainerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
+	return c.doBuild(in, core, hints, nil)
+}
+
+// doBuild is the common build implementation that accepts extra flags.
+func (c *baseContainerCmd) doBuild(in *buildInput, core *buildInputCore, hints *buildInputHints, extraFlags []string) error {
 	if hints == nil {
 		hints = newBuildInputHints(nil)
 	}
@@ -132,6 +137,7 @@ func (c *baseContainerCmd) build(in *buildInput, core *buildInputCore, hints *bu
 	// Build the image.
 	var args []string
 	args = append(args, "build")
+	args = append(args, extraFlags...)
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {
