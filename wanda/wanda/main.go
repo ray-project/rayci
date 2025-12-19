@@ -26,7 +26,8 @@ Flags:
 
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
-	dockerBin := flag.String("docker", "", "path to the docker/podman binary")
+	// Flag kept as docker for backward compatibility.
+	containerBin := flag.String("docker", "", "path to the docker/podman binary")
 	podman := flag.Bool("podman", false, "use podman instead of docker")
 	rayCI := flag.Bool(
 		"rayci", false,
@@ -91,7 +92,7 @@ func main() {
 		ReadOnlyCache: *readOnly,
 
 		ContainerRuntime: runtime,
-		ContainerBin:     *dockerBin,
+		ContainerBin:     *containerBin,
 	}
 
 	if err := wanda.Build(input, config); err != nil {

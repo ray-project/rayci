@@ -6,15 +6,16 @@ import (
 )
 
 func podmanCmdEnvs() []string {
-	var envs []string
-	for _, k := range []string{
+	keys := []string{
 		"HOME",
 		"USER",
 		"PATH",
 		"XDG_RUNTIME_DIR",
 		"CONTAINERS_CONF",
 		"REGISTRY_AUTH_FILE",
-	} {
+	}
+	var envs []string
+	for _, k := range keys {
 		if v, ok := os.LookupEnv(k); ok {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
