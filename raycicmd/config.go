@@ -102,17 +102,12 @@ type config struct {
 	// Optional.
 	HookEnvKeys []string `yaml:"hook_env_keys"`
 
-	// TagFilterCommand is a command invocation that populates the buildkite
-	// step tags. When this command is specified, a buildkite step is skipped
-	// if it is tagged by something that is not returned by this command.
-	//
-	// If the first arg (the binary) starts with "./", then it is treated as
-	// a file path relative the repsitory root, and it will be checked if the
-	// file exists. If the file does not exist, then the command is ignored
-	// and all steps will be executed.
+	// TagFilterConfig is a list of config files that contain tag rules.
+	// When any configs are specified, a buildkite step is skipped if it is
+	// tagged by something that is not returned by this command.
 	//
 	// Optional.
-	TagFilterCommand []string `yaml:"tag_filter_command"`
+	TagFilterConfig []string `yaml:"tag_filter_config"`
 
 	// SkipTags is the list of tags that will always be skipped.
 	//

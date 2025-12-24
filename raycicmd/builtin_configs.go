@@ -92,7 +92,7 @@ func makePRPipelineConfig(name string) *config {
 		},
 		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
-		TagFilterCommand: []string{"./ci/ci_tags_from_change.sh"},
+		TagFilterConfig: []string{"ci/pipeline/test_rules.txt"},
 
 		SkipTags: []string{"disabled", "skip-on-premerge"},
 
