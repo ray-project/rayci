@@ -86,7 +86,7 @@ func sortPipelineGroups(gs []*pipelineGroup) {
 	sort.Slice(gs, func(i, j int) bool { return gs[i].lessThan(gs[j]) })
 }
 
-func makePipeline(repoDir string, config *config, info *buildInfo) (
+func makePipeline(repoDir string, config *config, info *buildInfo, envs Envs, lister ChangeLister) (
 	*bkPipeline, error,
 ) {
 	pl := new(bkPipeline)
@@ -96,7 +96,9 @@ func makePipeline(repoDir string, config *config, info *buildInfo) (
 	filter, err := newStepFilter(
 		config.SkipTags,
 		info.selects,
-		config.TagFilterCommand,
+		config.TagFilterConfig,
+		envs,
+		lister,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)

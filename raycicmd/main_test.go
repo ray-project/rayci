@@ -84,6 +84,53 @@ func TestLoadConfig_customBuildkiteDirs(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_tagFilterConfigEnvVar(t *testing.T) {
+	envs := newEnvsMap(map[string]string{
+		"RAYCI_TAG_FILTER_CONFIG": "rules1.txt,rules2.txt",
+	})
+	c, err := loadConfig("", "", envs)
+	if err != nil {
+		t.Fatal("load config: ", err)
+	}
+
+	want := []string{"rules1.txt", "rules2.txt"}
+	if !reflect.DeepEqual(c.TagFilterConfig, want) {
+		t.Errorf("got %v, want %v", c.TagFilterConfig, want)
+	}
+}
+
+func TestTagFilterConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want []string
+	}{
+		{"not set", "", nil},
+		{"empty", "", nil},
+		{"single", "rules.txt", []string{"rules.txt"}},
+		{"multiple", "rules1.txt,rules2.txt", []string{"rules1.txt", "rules2.txt"}},
+		{"with spaces", "  rules.txt  ", []string{"rules.txt"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var envs *envsMap
+			if tt.name == "not set" {
+				envs = newEnvsMap(map[string]string{})
+			} else {
+				envs = newEnvsMap(map[string]string{
+					"RAYCI_TAG_FILTER_CONFIG": tt.env,
+				})
+			}
+
+			got := tagFilterConfig(envs)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("tagFilterConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExecWithInput(t *testing.T) {
 	out := new(bytes.Buffer)
 	if err := execWithInput(
