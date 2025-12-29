@@ -97,7 +97,6 @@ type filterConfigResult struct {
 func runFilterConfig(filterConfig []string, envs Envs, lister ChangeLister) (*filterConfigResult, error) {
 	res := &filterConfigResult{}
 
-	fmt.Println("filterConfig", filterConfig)
 	if len(filterConfig) == 0 {
 		res.runAll = true
 		return res, nil

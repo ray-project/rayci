@@ -132,11 +132,19 @@ func tagFilterConfig(envs Envs) []string {
 	if !ok {
 		return nil
 	}
-	v = strings.TrimSpace(v)
-	if v == "" {
+
+	var result []string
+	for _, p := range strings.Split(v, ",") {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	if len(result) == 0 {
 		return nil
 	}
-	return strings.Split(v, ",")
+	return result
 }
 
 func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
