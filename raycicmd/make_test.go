@@ -317,9 +317,9 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
-			envs:   testEnvs,
+			config:  &config,
+			info:    info,
+			envs:    testEnvs,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -357,9 +357,9 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
-			envs:   newEnvsMap(nil),
+			config:  &config,
+			info:    info,
+			envs:    newEnvsMap(nil),
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -396,9 +396,9 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
-			envs:   testEnvs,
+			config:  &config,
+			info:    info,
+			envs:    testEnvs,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -435,9 +435,9 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
-			envs:   newEnvsMap(nil),
+			config:  &config,
+			info:    info,
+			envs:    newEnvsMap(nil),
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -473,8 +473,8 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
+			config:  &config,
+			info:    info,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -514,8 +514,8 @@ func TestMakePipeline(t *testing.T) {
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   info,
+			config:  &config,
+			info:    info,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -533,8 +533,8 @@ func TestMakePipeline(t *testing.T) {
 		got, err = makePipeline(&pipelineContext{
 			repoDir: tmp,
 			lister:  lister,
-			config: &config,
-			info:   infoWithEmail,
+			config:  &config,
+			info:    infoWithEmail,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
