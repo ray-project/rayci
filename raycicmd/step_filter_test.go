@@ -388,6 +388,9 @@ func TestFilterFromCmd(t *testing.T) {
 		cmd: []string{"echo", "*"},
 		res: &filterSetup{runAll: true},
 	}, {
+		cmd: []string{"echo", "tag1 tag2 *"},
+		res: &filterSetup{runAll: true},
+	}, {
 		cmd: []string{"./not-exist"},
 		res: &filterSetup{runAll: true},
 	}} {

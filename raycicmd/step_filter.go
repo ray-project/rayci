@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -115,11 +116,14 @@ func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) 
 		return nil, err
 	}
 
-	if len(tags) == 1 && tags[0] == "*" {
-		// '*" means run everything (except the skips).
-		// It is often equivalent to having no tag filters configured.
+	// Check if tags contains a "*" tag.
+	if slices.Contains(tags, "*") {
+		// '*' means run all tags (except the skips).
+		// It is often equivalent to having no tag filters configured, or
+		// a repo transitioning to using tag rules.
 		return &filterSetup{runAll: true}, nil
 	}
+
 	return &filterSetup{tags: stringSet(tags...)}, nil
 }
 
@@ -144,9 +148,10 @@ func filterFromCmd(cmd []string) (*filterSetup, error) {
 	}
 
 	tags := strings.Fields(string(output))
-	if len(tags) == 1 && tags[0] == "*" {
-		// '*" means run everything (except the skips).
-		// It is often equivalent to having no tag filters configured.
+	if slices.Contains(tags, "*") {
+		// '*' means run all tags (except the skips).
+		// It is often equivalent to having no tag filters configured, or
+		// a repo transitioning to using tag rules.
 		return &filterSetup{runAll: true}, nil
 	}
 	return &filterSetup{tags: stringSet(tags...)}, nil
