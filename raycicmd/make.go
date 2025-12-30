@@ -87,10 +87,10 @@ func sortPipelineGroups(gs []*pipelineGroup) {
 }
 
 type pipelineContext struct {
-	repoDir string
-	config  *config
-	info    *buildInfo
-	envs    Envs
+	repoDir      string
+	config       *config
+	info         *buildInfo
+	envs         Envs
 	changeLister ChangeLister
 }
 

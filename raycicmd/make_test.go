@@ -315,11 +315,11 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
-			envs:    testEnvs,
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         testEnvs,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -355,11 +355,11 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
-			envs:    newEnvsMap(nil),
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         newEnvsMap(nil),
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -394,11 +394,11 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
-			envs:    testEnvs,
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         testEnvs,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -433,11 +433,11 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
-			envs:    newEnvsMap(nil),
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         newEnvsMap(nil),
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -471,10 +471,10 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -512,10 +512,10 @@ func TestMakePipeline(t *testing.T) {
 		config.NotifyOwnerOnFailure = false
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    info,
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
@@ -531,10 +531,10 @@ func TestMakePipeline(t *testing.T) {
 		}
 		config.NotifyOwnerOnFailure = true
 		got, err = makePipeline(&pipelineContext{
-			repoDir: tmp,
-			changeLister:  lister,
-			config:  &config,
-			info:    infoWithEmail,
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         infoWithEmail,
 		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
