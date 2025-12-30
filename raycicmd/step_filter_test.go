@@ -63,16 +63,13 @@ func writeTestRules(t *testing.T, rulesContent string) string {
 func TestNewTagsStepFilter(t *testing.T) {
 	for _, test := range []struct {
 		name         string
+		filterCmd    []string
 		filterConfig []string
 		skipTags     []string
 		want         *stepFilter
 	}{{
-		name: "empty filterConfig",
+		name: "neither filterCmd nor tagRuleFiles set",
 		want: &stepFilter{runAll: true},
-	}, {
-		name:         "nil filterConfig",
-		filterConfig: nil,
-		want:         &stepFilter{runAll: true},
 	}, {
 		name:     "skipTags only",
 		skipTags: []string{"disabled"},
@@ -83,7 +80,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 		want:     &stepFilter{skipTags: stringSet("disabled", "skip"), runAll: true},
 	}} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := newStepFilter(test.skipTags, nil, nil, test.filterConfig, nil, nil)
+			got, err := newStepFilter(test.skipTags, nil, test.filterCmd, test.filterConfig, nil, nil)
 			if err != nil {
 				t.Fatalf("newStepFilter: %s", err)
 			}
@@ -335,27 +332,7 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 	}
 }
 
-func TestRunFilterConfig(t *testing.T) {
-	t.Run("empty filterConfig", func(t *testing.T) {
-		got, err := runFilterConfig(nil, nil, nil)
-		if err != nil {
-			t.Fatalf("runFilterConfig: %s", err)
-		}
-		if !got.runAll {
-			t.Errorf("runAll: got %v, want true", got.runAll)
-		}
-	})
-
-	t.Run("nil filterConfig", func(t *testing.T) {
-		got, err := runFilterConfig([]string{}, nil, nil)
-		if err != nil {
-			t.Fatalf("runFilterConfig: %s", err)
-		}
-		if !got.runAll {
-			t.Errorf("runAll: got %v, want true", got.runAll)
-		}
-	})
-
+func TestFilterFromRuleFiles(t *testing.T) {
 	t.Run("with filterConfig", func(t *testing.T) {
 		// Rules with a fallthrough rule for src/mydir/ and default rules for always/lint.
 		// The fallthrough directive means matching continues, so default rules also apply.
@@ -370,9 +347,9 @@ func TestRunFilterConfig(t *testing.T) {
 		rulesPath := writeTestRules(t, rules)
 		repo := setupTestGitRepo(t, []string{"src/mydir/file.py"})
 
-		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.lister)
+		got, err := filterFromRuleFiles([]string{rulesPath}, repo.envs, repo.lister)
 		if err != nil {
-			t.Fatalf("runFilterConfig: %s", err)
+			t.Fatalf("filterFromRuleFiles: %s", err)
 		}
 
 		if got.runAll {
@@ -388,33 +365,27 @@ func TestRunFilterConfig(t *testing.T) {
 	})
 }
 
-func TestRunFilterCmd(t *testing.T) {
+func TestFilterFromCmd(t *testing.T) {
 	for _, test := range []struct {
 		cmd []string
 		res *filterResult
 	}{{
 		cmd: []string{"echo", "RAYCI_COVERAGE"},
-		res: &filterResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterResult{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
-		res: &filterResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterResult{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "\t  \n  \t"},
-		res: &filterResult{cmdExists: true},
-	}, {
-		cmd: []string{},
-		res: &filterResult{},
-	}, {
-		cmd: nil,
-		res: &filterResult{},
+		res: &filterResult{tags: stringSet()},
 	}, {
 		cmd: []string{"echo", "*"},
-		res: &filterResult{cmdExists: true, runAll: true},
+		res: &filterResult{runAll: true},
 	}, {
 		cmd: []string{"./not-exist"},
-		res: &filterResult{},
+		res: &filterResult{runAll: true},
 	}} {
-		got, err := runFilterCmd(test.cmd)
+		got, err := filterFromCmd(test.cmd)
 		if err != nil {
 			t.Fatalf("run %q: %s", test.cmd, err)
 		}
