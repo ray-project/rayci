@@ -9,7 +9,7 @@ import (
 
 // testGitRepo holds the result of setting up a test git repository.
 type testGitRepo struct {
-	repoDir *RepoDir
+	lister  ChangeLister
 	envs    *envsMap
 	workDir string
 }
@@ -44,10 +44,7 @@ func setupTestGitRepo(t *testing.T, changedFiles []string) *testGitRepo {
 	})
 
 	return &testGitRepo{
-		repoDir: &RepoDir{
-			WorkDir: h.WorkDir,
-			lister:  &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "main", Commit: commit},
-		},
+		lister:  &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "main", Commit: commit},
 		envs:    envs,
 		workDir: h.WorkDir,
 	}
@@ -271,7 +268,7 @@ func TestStepFilter_selectsAndTags_noTagMeansAlways(t *testing.T) {
 		nil, // filterCmd (deprecated fallback)
 		[]string{rulesPath},
 		repo.envs,
-		repo.repoDir.lister,
+		repo.lister,
 	)
 	if err != nil {
 		t.Fatalf("newStepFilter: %v", err)
@@ -310,7 +307,7 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 		nil, // filterCmd (deprecated fallback)
 		[]string{rulesPath},
 		repo.envs,
-		repo.repoDir.lister,
+		repo.lister,
 	)
 	if err != nil {
 		t.Fatalf("newStepFilter: %v", err)
@@ -373,7 +370,7 @@ func TestRunFilterConfig(t *testing.T) {
 		rulesPath := writeTestRules(t, rules)
 		repo := setupTestGitRepo(t, []string{"src/mydir/file.py"})
 
-		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.repoDir.lister)
+		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.lister)
 		if err != nil {
 			t.Fatalf("runFilterConfig: %s", err)
 		}

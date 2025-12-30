@@ -86,17 +86,12 @@ func sortPipelineGroups(gs []*pipelineGroup) {
 	sort.Slice(gs, func(i, j int) bool { return gs[i].lessThan(gs[j]) })
 }
 
-// RepoDir represents a repository directory to calculate diffs against.
-type RepoDir struct {
-	WorkDir string
-	lister  ChangeLister
-}
-
 type pipelineContext struct {
-	repoDir *RepoDir
+	repoDir string
 	config  *config
 	info    *buildInfo
 	envs    Envs
+	lister  ChangeLister
 }
 
 func makePipeline(ctx *pipelineContext) (
@@ -112,7 +107,7 @@ func makePipeline(ctx *pipelineContext) (
 		ctx.config.TagFilterCommand,
 		ctx.config.TagFilterConfig,
 		ctx.envs,
-		ctx.repoDir.lister,
+		ctx.lister,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)
@@ -128,7 +123,7 @@ func makePipeline(ctx *pipelineContext) (
 
 	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {
-		bkDir = filepath.Join(ctx.repoDir.WorkDir, bkDir) // extend to full path
+		bkDir = filepath.Join(ctx.repoDir, bkDir) // extend to full path
 
 		names, err := listCIYamlFiles(bkDir)
 		if err != nil {

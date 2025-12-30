@@ -20,7 +20,7 @@ import (
 //  3. Return a repo and envs configured for the feature branch
 //
 // This uses gitTestHelper from change_lister_test.go.
-func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*RepoDir, *envsMap) {
+func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*GitChangeLister, *envsMap) {
 	t.Helper()
 
 	h := newGitTestHelper(t)
@@ -55,16 +55,13 @@ func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*Re
 		"BUILDKITE_BRANCH":                   "feature-branch",
 	})
 
-	repoDir := &RepoDir{
-		WorkDir: workDir,
-		lister: &GitChangeLister{
-			WorkDir:    workDir,
-			BaseBranch: "main",
-			Commit:     commit,
-		},
+	lister := &GitChangeLister{
+		WorkDir:    workDir,
+		BaseBranch: "main",
+		Commit:     commit,
 	}
 
-	return repoDir, envs
+	return lister, envs
 }
 
 func TestIsRayCIYaml(t *testing.T) {
@@ -306,7 +303,7 @@ func TestMakePipeline(t *testing.T) {
 	}
 
 	// Set up a real git repo with a changed file that matches the "enabled" rule.
-	repoDir, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/enabled/test.py"})
+	lister, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/enabled/test.py"})
 
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
@@ -318,7 +315,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 			envs:   testEnvs,
@@ -357,7 +355,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 			envs:   newEnvsMap(nil),
@@ -395,7 +394,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 			envs:   testEnvs,
@@ -433,7 +433,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 			envs:   newEnvsMap(nil),
@@ -470,7 +471,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 		})
@@ -510,7 +512,8 @@ func TestMakePipeline(t *testing.T) {
 		config.NotifyOwnerOnFailure = false
 
 		got, err := makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   info,
 		})
@@ -528,7 +531,8 @@ func TestMakePipeline(t *testing.T) {
 		}
 		config.NotifyOwnerOnFailure = true
 		got, err = makePipeline(&pipelineContext{
-			repoDir: repoDir,
+			repoDir: tmp,
+			lister:  lister,
 			config: &config,
 			info:   infoWithEmail,
 		})
