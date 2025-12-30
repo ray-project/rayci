@@ -191,12 +191,20 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("make build info: %w", err)
 	}
 
-	lister := &GitChangeLister{
-		WorkDir:    flags.RepoDir,
-		BaseBranch: getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH"),
-		Commit:     getEnv(envs, "BUILDKITE_COMMIT"),
+	repoDir := &RepoDir{
+		WorkDir: flags.RepoDir,
+		lister: &GitChangeLister{
+			WorkDir:    flags.RepoDir,
+			BaseBranch: getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH"),
+			Commit:     getEnv(envs, "BUILDKITE_COMMIT"),
+		},
 	}
-	pipeline, err := makePipeline(flags.RepoDir, config, info, envs, lister)
+	pipeline, err := makePipeline(&pipelineContext{
+		repoDir: repoDir,
+		config:  config,
+		info:    info,
+		envs:    envs,
+	})
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)
 	}

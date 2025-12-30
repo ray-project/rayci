@@ -9,7 +9,7 @@ import (
 
 // testGitRepo holds the result of setting up a test git repository.
 type testGitRepo struct {
-	lister  *GitChangeLister
+	repoDir *RepoDir
 	envs    *envsMap
 	workDir string
 }
@@ -44,7 +44,10 @@ func setupTestGitRepo(t *testing.T, changedFiles []string) *testGitRepo {
 	})
 
 	return &testGitRepo{
-		lister:  &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "main", Commit: commit},
+		repoDir: &RepoDir{
+			WorkDir: h.WorkDir,
+			lister:  &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "main", Commit: commit},
+		},
 		envs:    envs,
 		workDir: h.WorkDir,
 	}
@@ -83,7 +86,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 		want:     &stepFilter{skipTags: stringSet("disabled", "skip"), runAll: true},
 	}} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := newStepFilter(test.skipTags, nil, test.filterConfig, nil, nil)
+			got, err := newStepFilter(test.skipTags, nil, nil, test.filterConfig, nil, nil)
 			if err != nil {
 				t.Fatalf("newStepFilter: %s", err)
 			}
@@ -213,7 +216,7 @@ func TestStepFilter_selects(t *testing.T) {
 	filter, _ := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar"},
-		nil, nil, nil,
+		nil, nil, nil, nil,
 	)
 	for _, node := range []*stepNode{
 		{key: "foo"},
@@ -233,7 +236,7 @@ func TestStepFilter_selects(t *testing.T) {
 		}
 	}
 
-	filter, _ = newStepFilter([]string{"disabled"}, []string{"foo", "bar"}, nil, nil, nil)
+	filter, _ = newStepFilter([]string{"disabled"}, []string{"foo", "bar"}, nil, nil, nil, nil)
 	for _, node := range []*stepNode{
 		{key: "f"},
 		{id: "f"},
@@ -247,7 +250,7 @@ func TestStepFilter_selects(t *testing.T) {
 }
 
 func TestStepFilter_tagSelects(t *testing.T) {
-	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil, nil, nil)
+	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil, nil, nil, nil)
 	for _, node := range []*stepNode{
 		{key: "bar"},
 		{id: "id", tags: []string{"foo"}},
@@ -265,9 +268,10 @@ func TestStepFilter_selectsAndTags_noTagMeansAlways(t *testing.T) {
 	filter, err := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar", "tag:pick"},
+		nil, // filterCmd (deprecated fallback)
 		[]string{rulesPath},
 		repo.envs,
-		repo.lister,
+		repo.repoDir.lister,
 	)
 	if err != nil {
 		t.Fatalf("newStepFilter: %v", err)
@@ -303,9 +307,10 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 	filter, err := newStepFilter(
 		[]string{"disabled"},
 		[]string{"foo", "bar", "tag:pick"},
+		nil, // filterCmd (deprecated fallback)
 		[]string{rulesPath},
 		repo.envs,
-		repo.lister,
+		repo.repoDir.lister,
 	)
 	if err != nil {
 		t.Fatalf("newStepFilter: %v", err)
@@ -368,7 +373,7 @@ func TestRunFilterConfig(t *testing.T) {
 		rulesPath := writeTestRules(t, rules)
 		repo := setupTestGitRepo(t, []string{"src/mydir/file.py"})
 
-		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.lister)
+		got, err := runFilterConfig([]string{rulesPath}, repo.envs, repo.repoDir.lister)
 		if err != nil {
 			t.Fatalf("runFilterConfig: %s", err)
 		}
@@ -384,4 +389,44 @@ func TestRunFilterConfig(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRunFilterCmd(t *testing.T) {
+	for _, test := range []struct {
+		cmd []string
+		res *filterCmdResult
+	}{{
+		cmd: []string{"echo", "RAYCI_COVERAGE"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
+		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+	}, {
+		cmd: []string{"echo", "\t  \n  \t"},
+		res: &filterCmdResult{cmdExists: true},
+	}, {
+		cmd: []string{},
+		res: &filterCmdResult{},
+	}, {
+		cmd: nil,
+		res: &filterCmdResult{},
+	}, {
+		cmd: []string{"echo", "*"},
+		res: &filterCmdResult{cmdExists: true, runAll: true},
+	}, {
+		cmd: []string{"./not-exist"},
+		res: &filterCmdResult{},
+	}} {
+		got, err := runFilterCmd(test.cmd)
+		if err != nil {
+			t.Fatalf("run %q: %s", test.cmd, err)
+		}
+
+		if !reflect.DeepEqual(got, test.res) {
+			t.Errorf(
+				"run %q: got %+v, want %+v",
+				test.cmd, got, test.res,
+			)
+		}
+	}
 }

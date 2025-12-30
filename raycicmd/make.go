@@ -86,35 +86,48 @@ func sortPipelineGroups(gs []*pipelineGroup) {
 	sort.Slice(gs, func(i, j int) bool { return gs[i].lessThan(gs[j]) })
 }
 
-func makePipeline(repoDir string, config *config, info *buildInfo, envs Envs, lister ChangeLister) (
+type RepoDir struct {
+	WorkDir string
+	lister  ChangeLister
+}
+
+type pipelineContext struct {
+	repoDir *RepoDir
+	config  *config
+	info    *buildInfo
+	envs    Envs
+}
+
+func makePipeline(ctx *pipelineContext) (
 	*bkPipeline, error,
 ) {
 	pl := new(bkPipeline)
 
-	c := newConverter(config, info)
+	c := newConverter(ctx.config, ctx.info)
 
 	filter, err := newStepFilter(
-		config.SkipTags,
-		info.selects,
-		config.TagFilterConfig,
-		envs,
-		lister,
+		ctx.config.SkipTags,
+		ctx.info.selects,
+		ctx.config.TagFilterCommand,
+		ctx.config.TagFilterConfig,
+		ctx.envs,
+		ctx.repoDir.lister,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)
 	}
 
-	filter.noTagMeansAlways = config.NoTagMeansAlways
+	filter.noTagMeansAlways = ctx.config.NoTagMeansAlways
 
 	// Build steps for CI.
-	bkDirs := config.BuildkiteDirs
+	bkDirs := ctx.config.BuildkiteDirs
 	if len(bkDirs) == 0 {
 		bkDirs = []string{".buildkite"}
 	}
 
 	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {
-		bkDir = filepath.Join(repoDir, bkDir) // extend to full path
+		bkDir = filepath.Join(ctx.repoDir.WorkDir, bkDir) // extend to full path
 
 		names, err := listCIYamlFiles(bkDir)
 		if err != nil {
@@ -141,15 +154,15 @@ func makePipeline(repoDir string, config *config, info *buildInfo, envs Envs, li
 	pl.Steps = steps
 
 	if pl.totalSteps() == 0 {
-		q, ok := config.RunnerQueues["default"]
+		q, ok := ctx.config.RunnerQueues["default"]
 		if !ok {
 			q = ""
 		}
 		return makeNoopBkPipeline(q), nil
 	}
 
-	if config.NotifyOwnerOnFailure {
-		if email := info.buildAuthorEmail; email != "" {
+	if ctx.config.NotifyOwnerOnFailure {
+		if email := ctx.info.buildAuthorEmail; email != "" {
 			pl.Notify = append(pl.Notify, makeBuildFailureBkNotify(email))
 		}
 	}

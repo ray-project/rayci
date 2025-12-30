@@ -2,6 +2,8 @@ package raycicmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -55,9 +57,49 @@ func (f *stepFilter) hit(step *stepNode) bool {
 	return !f.reject(step) && f.accept(step)
 }
 
+// newStepFilterFromCmd creates a step filter from a command that populates the buildkite step tags.
+// This is a fallback for the old tag filter command.
+func newStepFilterFromCmd(filterCmd []string, skipTags, selects []string) (*stepFilter, error) {
+	filterCmdRes, err := runFilterCmd(filterCmd)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := &stepFilter{
+		skipTags: stringSet(skipTags...),
+	}
+	if !filterCmdRes.cmdExists || filterCmdRes.runAll {
+		filter.runAll = true
+	} else {
+		filter.tags = filterCmdRes.tags
+	}
+
+	if selects != nil {
+		filter.selects = make(map[string]bool)
+		filter.tagSelects = make(map[string]bool)
+
+		for _, k := range selects {
+			if strings.HasPrefix(k, "tag:") {
+				name := strings.TrimPrefix(k, "tag:")
+				filter.tagSelects[name] = true
+			} else {
+				filter.selects[k] = true
+			}
+		}
+	}
+
+	return filter, err
+}
+
 func newStepFilter(
-	skipTags, selects []string, filterConfig []string, envs Envs, lister ChangeLister,
+	skipTags, selects []string, filterCmd []string, filterConfig []string, envs Envs, lister ChangeLister,
 ) (*stepFilter, error) {
+	// TagFilterConfig has higher priority than TagFilterCommand.
+	// If TagFilterConfig is set, use it; otherwise fall back to TagFilterCommand.
+	if len(filterConfig) == 0 {
+		return newStepFilterFromCmd(filterCmd, skipTags, selects)
+	}
+
 	filterConfigRes, err := runFilterConfig(filterConfig, envs, lister)
 	if err != nil {
 		return nil, fmt.Errorf("run filter config: %w", err)
@@ -66,7 +108,7 @@ func newStepFilter(
 	filter := &stepFilter{
 		skipTags: stringSet(skipTags...),
 	}
-	if len(filterConfig) == 0 || filterConfigRes.runAll {
+	if filterConfigRes.runAll {
 		filter.runAll = true
 	} else {
 		filter.tags = filterConfigRes.tags
@@ -119,5 +161,47 @@ func runFilterConfig(filterConfig []string, envs Envs, lister ChangeLister) (*fi
 		res.tags = stringSet(tags...)
 	}
 
+	return res, nil
+}
+
+type filterCmdResult struct {
+	cmdExists bool
+	runAll    bool
+	tags      map[string]bool
+}
+
+func runFilterCmd(cmd []string) (*filterCmdResult, error) {
+	res := &filterCmdResult{}
+	if len(cmd) == 0 {
+		return res, nil
+	}
+
+	bin := cmd[0]
+	if strings.HasPrefix(bin, "./") {
+		// A local in repo launcher, and the file does not exist yet.
+		// Run all tags in this case.
+		if _, err := os.Lstat(bin); os.IsNotExist(err) {
+			return res, nil
+		}
+	}
+
+	c := exec.Command(cmd[0], cmd[1:]...)
+	c.Stderr = os.Stderr
+	output, err := c.Output()
+	if err != nil {
+		return nil, fmt.Errorf("tag filter script: %w", err)
+	}
+
+	res.cmdExists = true
+
+	tags := strings.Fields(string(output))
+	if len(tags) == 1 && tags[0] == "*" {
+		// '*" means run everything (except the skips).
+		// It is often equivalent to having no tag filters configured.
+		res.runAll = true
+		return res, nil
+	}
+
+	res.tags = stringSet(tags...)
 	return res, nil
 }

@@ -17,10 +17,10 @@ import (
 // (the "base" state). This function will:
 //  1. Initialize a git repo in workDir and commit all existing files to main
 //  2. Create a feature branch and add the specified changedFiles
-//  3. Return a lister and envs configured for the feature branch
+//  3. Return a repo and envs configured for the feature branch
 //
 // This uses gitTestHelper from change_lister_test.go.
-func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*GitChangeLister, *envsMap) {
+func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*RepoDir, *envsMap) {
 	t.Helper()
 
 	h := newGitTestHelper(t)
@@ -55,13 +55,16 @@ func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*Gi
 		"BUILDKITE_BRANCH":                   "feature-branch",
 	})
 
-	lister := &GitChangeLister{
-		WorkDir:    workDir,
-		BaseBranch: "main",
-		Commit:     commit,
+	repoDir := &RepoDir{
+		WorkDir: workDir,
+		lister: &GitChangeLister{
+			WorkDir:    workDir,
+			BaseBranch: "main",
+			Commit:     commit,
+		},
 	}
 
-	return lister, envs
+	return repoDir, envs
 }
 
 func TestIsRayCIYaml(t *testing.T) {
@@ -303,7 +306,7 @@ func TestMakePipeline(t *testing.T) {
 	}
 
 	// Set up a real git repo with a changed file that matches the "enabled" rule.
-	gitLister, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/enabled/test.py"})
+	repoDir, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/enabled/test.py"})
 
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
@@ -314,7 +317,12 @@ func TestMakePipeline(t *testing.T) {
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info, testEnvs, gitLister)
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+			envs:   testEnvs,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -339,6 +347,43 @@ func TestMakePipeline(t *testing.T) {
 		}
 	})
 
+	t.Run("filter_cmd", func(t *testing.T) {
+		config := *commonConfig
+		config.TagFilterCommand = []string{"echo", "enabled"}
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+			envs:   newEnvsMap(nil),
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+		// Should only select the enabled steps and its dependencies.
+		// which are 2 steps in 2 different groups.
+		if want := 2; len(got.Steps) != want {
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		// sub functions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
+
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+		if want := 2; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
 	t.Run("filter_noTagMeansAlways", func(t *testing.T) {
 		config := *commonConfig
 		config.TagFilterConfig = []string{rulesPath}
@@ -349,7 +394,50 @@ func TestMakePipeline(t *testing.T) {
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info, testEnvs, gitLister)
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+			envs:   testEnvs,
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+
+		if want := 3; len(got.Steps) != want { // all steps are groups.
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		// sub functions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
+
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+
+		if want := 4; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
+	t.Run("filter_noTagMeansAlways_cmd", func(t *testing.T) {
+		config := *commonConfig
+		config.TagFilterCommand = []string{"echo", "enabled"}
+		config.NoTagMeansAlways = true
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+			envs:   newEnvsMap(nil),
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -381,7 +469,11 @@ func TestMakePipeline(t *testing.T) {
 			selects: []string{"test2"},
 		}
 
-		got, err := makePipeline(tmp, &config, info, nil, nil)
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -417,7 +509,11 @@ func TestMakePipeline(t *testing.T) {
 		config := *commonConfig
 		config.NotifyOwnerOnFailure = false
 
-		got, err := makePipeline(tmp, &config, info, nil, nil)
+		got, err := makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   info,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -431,7 +527,11 @@ func TestMakePipeline(t *testing.T) {
 			buildAuthorEmail: email,
 		}
 		config.NotifyOwnerOnFailure = true
-		got, err = makePipeline(tmp, &config, infoWithEmail, nil, nil)
+		got, err = makePipeline(&pipelineContext{
+			repoDir: repoDir,
+			config: &config,
+			info:   infoWithEmail,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
