@@ -124,6 +124,9 @@ func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) 
 }
 
 func filterFromCmd(cmd []string) (*filterResult, error) {
+	if len(cmd) == 0 {
+		return &filterResult{runAll: true}, nil
+	}
 	bin := cmd[0]
 	if strings.HasPrefix(bin, "./") {
 		// A local in repo launcher, and the file does not exist yet.

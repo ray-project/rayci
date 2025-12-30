@@ -163,7 +163,9 @@ func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
 		config.BuildkiteDirs = strings.Split(buildkiteDir, ":")
 	}
 
-	config.TagRuleFiles = tagRuleFiles(envs)
+	if envFiles := tagRuleFiles(envs); envFiles != nil {
+		config.TagRuleFiles = envFiles
+	}
 
 	return config, nil
 }
