@@ -86,6 +86,7 @@ func sortPipelineGroups(gs []*pipelineGroup) {
 	sort.Slice(gs, func(i, j int) bool { return gs[i].lessThan(gs[j]) })
 }
 
+// RepoDir represents a repository directory to calculate diffs against.
 type RepoDir struct {
 	WorkDir string
 	lister  ChangeLister
