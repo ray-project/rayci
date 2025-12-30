@@ -60,7 +60,7 @@ func (f *stepFilter) hit(step *stepNode) bool {
 func newStepFilter(
 	skipTags, selects []string, filterCmd []string, tagRuleFiles []string, envs Envs, lister ChangeLister,
 ) (*stepFilter, error) {
-	var setup *filterResult
+	var setup *filterSetup
 
 	if len(filterCmd) > 0 {
 		res, err := filterFromCmd(filterCmd)
@@ -75,7 +75,7 @@ func newStepFilter(
 		}
 		setup = res
 	} else {
-		setup = &filterResult{runAll: true}
+		setup = &filterSetup{runAll: true}
 	}
 
 	filter := &stepFilter{
@@ -104,12 +104,12 @@ func newStepFilter(
 	return filter, nil
 }
 
-type filterResult struct {
+type filterSetup struct {
 	runAll bool
 	tags   map[string]bool
 }
 
-func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) (*filterResult, error) {
+func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
 	tags, err := RunTagAnalysis(tagRuleFiles, envs, lister)
 	if err != nil {
 		return nil, err
@@ -118,21 +118,21 @@ func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) 
 	if len(tags) == 1 && tags[0] == "*" {
 		// '*" means run everything (except the skips).
 		// It is often equivalent to having no tag filters configured.
-		return &filterResult{runAll: true}, nil
+		return &filterSetup{runAll: true}, nil
 	}
-	return &filterResult{tags: stringSet(tags...)}, nil
+	return &filterSetup{tags: stringSet(tags...)}, nil
 }
 
-func filterFromCmd(cmd []string) (*filterResult, error) {
+func filterFromCmd(cmd []string) (*filterSetup, error) {
 	if len(cmd) == 0 {
-		return &filterResult{runAll: true}, nil
+		return &filterSetup{runAll: true}, nil
 	}
 	bin := cmd[0]
 	if strings.HasPrefix(bin, "./") {
 		// A local in repo launcher, and the file does not exist yet.
 		// Run all tags in this case.
 		if _, err := os.Lstat(bin); os.IsNotExist(err) {
-			return &filterResult{runAll: true}, nil
+			return &filterSetup{runAll: true}, nil
 		}
 	}
 
@@ -147,7 +147,7 @@ func filterFromCmd(cmd []string) (*filterResult, error) {
 	if len(tags) == 1 && tags[0] == "*" {
 		// '*" means run everything (except the skips).
 		// It is often equivalent to having no tag filters configured.
-		return &filterResult{runAll: true}, nil
+		return &filterSetup{runAll: true}, nil
 	}
-	return &filterResult{tags: stringSet(tags...)}, nil
+	return &filterSetup{tags: stringSet(tags...)}, nil
 }

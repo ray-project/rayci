@@ -94,12 +94,12 @@ func TestLoadConfig_tagFilterConfigEnvVar(t *testing.T) {
 	}
 
 	want := []string{"rules1.txt", "rules2.txt"}
-	if !reflect.DeepEqual(c.TagRuleFiles, want) {
-		t.Errorf("got %v, want %v", c.TagRuleFiles, want)
+	if !reflect.DeepEqual(c.TestRulesFiles, want) {
+		t.Errorf("got %v, want %v", c.TestRulesFiles, want)
 	}
 }
 
-func TestTagRuleFiles(t *testing.T) {
+func TestTestRulesFiles(t *testing.T) {
 	tests := []struct {
 		name string
 		env  string

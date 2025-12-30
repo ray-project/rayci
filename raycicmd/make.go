@@ -105,7 +105,7 @@ func makePipeline(ctx *pipelineContext) (
 		ctx.config.SkipTags,
 		ctx.info.selects,
 		ctx.config.TagFilterCommand,
-		ctx.config.TagRuleFiles,
+		ctx.config.TestRulesFiles,
 		ctx.envs,
 		ctx.changeLister,
 	)

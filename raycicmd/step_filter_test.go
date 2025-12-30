@@ -368,22 +368,22 @@ func TestFilterFromRuleFiles(t *testing.T) {
 func TestFilterFromCmd(t *testing.T) {
 	for _, test := range []struct {
 		cmd []string
-		res *filterResult
+		res *filterSetup
 	}{{
 		cmd: []string{"echo", "RAYCI_COVERAGE"},
-		res: &filterResult{tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterSetup{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
-		res: &filterResult{tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterSetup{tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "\t  \n  \t"},
-		res: &filterResult{tags: stringSet()},
+		res: &filterSetup{tags: stringSet()},
 	}, {
 		cmd: []string{"echo", "*"},
-		res: &filterResult{runAll: true},
+		res: &filterSetup{runAll: true},
 	}, {
 		cmd: []string{"./not-exist"},
-		res: &filterResult{runAll: true},
+		res: &filterSetup{runAll: true},
 	}} {
 		got, err := filterFromCmd(test.cmd)
 		if err != nil {
