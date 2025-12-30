@@ -334,6 +334,21 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 }
 
 func TestFilterFromRuleFiles(t *testing.T) {
+	t.Run("default star triggers runAll", func(t *testing.T) {
+		rules := "! *\n\\default\n@ *\n;\n"
+		rulesPath := writeTestRules(t, rules)
+		repo := setupTestGitRepo(t, []string{"src/any/file.py"})
+
+		got, err := filterFromRuleFiles([]string{rulesPath}, repo.envs, repo.lister)
+		if err != nil {
+			t.Fatalf("filterFromRuleFiles: %s", err)
+		}
+
+		if !got.runAll {
+			t.Errorf("runAll: got false, want true")
+		}
+	})
+
 	t.Run("with filterConfig", func(t *testing.T) {
 		// Rules with a fallthrough rule for src/mydir/ and default rules for always/lint.
 		// The fallthrough directive means matching continues, so default rules also apply.
