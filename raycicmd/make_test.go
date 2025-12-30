@@ -307,7 +307,7 @@ func TestMakePipeline(t *testing.T) {
 
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
-		config.TagFilterConfig = []string{rulesPath}
+		config.TagRuleFiles = []string{rulesPath}
 
 		buildID := "fakebuild"
 		info := &buildInfo{
@@ -385,7 +385,7 @@ func TestMakePipeline(t *testing.T) {
 
 	t.Run("filter_noTagMeansAlways", func(t *testing.T) {
 		config := *commonConfig
-		config.TagFilterConfig = []string{rulesPath}
+		config.TagRuleFiles = []string{rulesPath}
 		config.NoTagMeansAlways = true
 
 		buildID := "fakebuild"

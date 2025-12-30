@@ -111,15 +111,15 @@ type config struct {
 	// file exists. If the file does not exist, then the command is ignored
 	// and all steps will be executed.
 	//
-	// Optional. Soon to be deprecated in favor of TagFilterConfig.
+	// Optional. Soon to be deprecated in favor of TagRuleFiles.
 	TagFilterCommand []string `yaml:"tag_filter_command"`
 
-	// TagFilterConfig is a list of config files that contain tag rules.
-	// When any configs are specified, a buildkite step is skipped if it is
+	// TagRuleFiles is a list of files that contain tag rules.
+	// When any rule files are specified, a buildkite step is skipped if it is
 	// tagged by something that is not returned by this command.
 	//
 	// Optional.
-	TagFilterConfig []string `yaml:"tag_filter_config"`
+	TagRuleFiles []string `yaml:"tag_rule_files"`
 
 	// SkipTags is the list of tags that will always be skipped.
 	//

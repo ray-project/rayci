@@ -127,8 +127,8 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	}, nil
 }
 
-func tagFilterConfig(envs Envs) []string {
-	v, ok := envs.Lookup("RAYCI_TAG_FILTER_CONFIG")
+func tagRuleFiles(envs Envs) []string {
+	v, ok := envs.Lookup("RAYCI_TAG_RULE_FILES")
 	if !ok {
 		return nil
 	}
@@ -163,9 +163,7 @@ func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
 		config.BuildkiteDirs = strings.Split(buildkiteDir, ":")
 	}
 
-	if tfc := tagFilterConfig(envs); tfc != nil {
-		config.TagFilterConfig = tfc
-	}
+	config.TagRuleFiles = tagRuleFiles(envs)
 
 	return config, nil
 }
@@ -197,10 +195,10 @@ func Main(args []string, envs Envs) error {
 		Commit:     getEnv(envs, "BUILDKITE_COMMIT"),
 	}
 	pipeline, err := makePipeline(&pipelineContext{
-		repoDir: flags.RepoDir,
-		config:  config,
-		info:    info,
-		envs:    envs,
+		repoDir:      flags.RepoDir,
+		config:       config,
+		info:         info,
+		envs:         envs,
 		changeLister: lister,
 	})
 	if err != nil {

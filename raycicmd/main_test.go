@@ -86,7 +86,7 @@ func TestLoadConfig_customBuildkiteDirs(t *testing.T) {
 
 func TestLoadConfig_tagFilterConfigEnvVar(t *testing.T) {
 	envs := newEnvsMap(map[string]string{
-		"RAYCI_TAG_FILTER_CONFIG": "rules1.txt,rules2.txt",
+		"RAYCI_TAG_RULE_FILES": "rules1.txt,rules2.txt",
 	})
 	c, err := loadConfig("", "", envs)
 	if err != nil {
@@ -94,12 +94,12 @@ func TestLoadConfig_tagFilterConfigEnvVar(t *testing.T) {
 	}
 
 	want := []string{"rules1.txt", "rules2.txt"}
-	if !reflect.DeepEqual(c.TagFilterConfig, want) {
-		t.Errorf("got %v, want %v", c.TagFilterConfig, want)
+	if !reflect.DeepEqual(c.TagRuleFiles, want) {
+		t.Errorf("got %v, want %v", c.TagRuleFiles, want)
 	}
 }
 
-func TestTagFilterConfig(t *testing.T) {
+func TestTagRuleFiles(t *testing.T) {
 	tests := []struct {
 		name string
 		env  string
@@ -119,13 +119,13 @@ func TestTagFilterConfig(t *testing.T) {
 				envs = newEnvsMap(map[string]string{})
 			} else {
 				envs = newEnvsMap(map[string]string{
-					"RAYCI_TAG_FILTER_CONFIG": tt.env,
+					"RAYCI_TAG_RULE_FILES": tt.env,
 				})
 			}
 
-			got := tagFilterConfig(envs)
+			got := tagRuleFiles(envs)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("tagFilterConfig() = %v, want %v", got, tt.want)
+				t.Errorf("tagRuleFiles() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -94,8 +94,8 @@ func newStepFilterFromCmd(filterCmd []string, skipTags, selects []string) (*step
 func newStepFilter(
 	skipTags, selects []string, filterCmd []string, filterConfig []string, envs Envs, lister ChangeLister,
 ) (*stepFilter, error) {
-	// TagFilterConfig has higher priority than TagFilterCommand.
-	// If TagFilterConfig is set, use it; otherwise fall back to TagFilterCommand.
+	// TagRuleFiles has higher priority than TagFilterCommand.
+	// If TagRuleFiles is set, use it; otherwise fall back to TagFilterCommand.
 	if len(filterConfig) == 0 {
 		return newStepFilterFromCmd(filterCmd, skipTags, selects)
 	}
