@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -336,14 +337,19 @@ func TestFilterFromRuleFiles(t *testing.T) {
 	t.Run("with filterConfig", func(t *testing.T) {
 		// Rules with a fallthrough rule for src/mydir/ and default rules for always/lint.
 		// The fallthrough directive means matching continues, so default rules also apply.
-		rules := "! mytag always lint\n" +
-			"src/mydir/\n" +
-			"\\fallthrough\n" +
-			"@ mytag\n" +
-			";\n" +
-			"\\default\n" +
-			"@ always lint\n" +
-			";\n"
+		joinLines := func(lines ...string) string {
+			return strings.Join(lines, "\n")
+		}
+
+		rules := joinLines("! mytag always lint",
+			"src/mydir/",
+			"\\fallthrough",
+			"@ mytag",
+			";",
+			"\\default",
+			"@ always lint",
+			";",
+		)
 		rulesPath := writeTestRules(t, rules)
 		repo := setupTestGitRepo(t, []string{"src/mydir/file.py"})
 
