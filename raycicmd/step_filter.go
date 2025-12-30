@@ -131,13 +131,14 @@ func newStepFilter(
 	return filter, err
 }
 
-type filterConfigResult struct {
-	runAll bool
-	tags   map[string]bool
+type filterResult struct {
+	cmdExists bool
+	runAll    bool
+	tags      map[string]bool
 }
 
-func runFilterConfig(filterConfig []string, envs Envs, lister ChangeLister) (*filterConfigResult, error) {
-	res := &filterConfigResult{}
+func runFilterConfig(filterConfig []string, envs Envs, lister ChangeLister) (*filterResult, error) {
+	res := &filterResult{}
 
 	if len(filterConfig) == 0 {
 		res.runAll = true
@@ -164,14 +165,8 @@ func runFilterConfig(filterConfig []string, envs Envs, lister ChangeLister) (*fi
 	return res, nil
 }
 
-type filterCmdResult struct {
-	cmdExists bool
-	runAll    bool
-	tags      map[string]bool
-}
-
-func runFilterCmd(cmd []string) (*filterCmdResult, error) {
-	res := &filterCmdResult{}
+func runFilterCmd(cmd []string) (*filterResult, error) {
+	res := &filterResult{}
 	if len(cmd) == 0 {
 		return res, nil
 	}

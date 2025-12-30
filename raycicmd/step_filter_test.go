@@ -391,28 +391,28 @@ func TestRunFilterConfig(t *testing.T) {
 func TestRunFilterCmd(t *testing.T) {
 	for _, test := range []struct {
 		cmd []string
-		res *filterCmdResult
+		res *filterResult
 	}{{
 		cmd: []string{"echo", "RAYCI_COVERAGE"},
-		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "RAYCI_COVERAGE\n"},
-		res: &filterCmdResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
+		res: &filterResult{cmdExists: true, tags: stringSet("RAYCI_COVERAGE")},
 	}, {
 		cmd: []string{"echo", "\t  \n  \t"},
-		res: &filterCmdResult{cmdExists: true},
+		res: &filterResult{cmdExists: true},
 	}, {
 		cmd: []string{},
-		res: &filterCmdResult{},
+		res: &filterResult{},
 	}, {
 		cmd: nil,
-		res: &filterCmdResult{},
+		res: &filterResult{},
 	}, {
 		cmd: []string{"echo", "*"},
-		res: &filterCmdResult{cmdExists: true, runAll: true},
+		res: &filterResult{cmdExists: true, runAll: true},
 	}, {
 		cmd: []string{"./not-exist"},
-		res: &filterCmdResult{},
+		res: &filterResult{},
 	}} {
 		got, err := runFilterCmd(test.cmd)
 		if err != nil {
