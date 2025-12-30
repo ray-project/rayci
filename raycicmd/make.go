@@ -91,7 +91,7 @@ type pipelineContext struct {
 	config  *config
 	info    *buildInfo
 	envs    Envs
-	lister  ChangeLister
+	changeLister ChangeLister
 }
 
 func makePipeline(ctx *pipelineContext) (
@@ -107,7 +107,7 @@ func makePipeline(ctx *pipelineContext) (
 		ctx.config.TagFilterCommand,
 		ctx.config.TagFilterConfig,
 		ctx.envs,
-		ctx.lister,
+		ctx.changeLister,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("run tag filter command: %w", err)

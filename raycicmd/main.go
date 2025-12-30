@@ -201,7 +201,7 @@ func Main(args []string, envs Envs) error {
 		config:  config,
 		info:    info,
 		envs:    envs,
-		lister:  lister,
+		changeLister: lister,
 	})
 	if err != nil {
 		return fmt.Errorf("make pipeline: %w", err)

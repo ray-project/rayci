@@ -316,7 +316,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 			envs:    testEnvs,
@@ -356,7 +356,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 			envs:    newEnvsMap(nil),
@@ -395,7 +395,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 			envs:    testEnvs,
@@ -434,7 +434,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 			envs:    newEnvsMap(nil),
@@ -472,7 +472,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 		})
@@ -513,7 +513,7 @@ func TestMakePipeline(t *testing.T) {
 
 		got, err := makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    info,
 		})
@@ -532,7 +532,7 @@ func TestMakePipeline(t *testing.T) {
 		config.NotifyOwnerOnFailure = true
 		got, err = makePipeline(&pipelineContext{
 			repoDir: tmp,
-			lister:  lister,
+			changeLister:  lister,
 			config:  &config,
 			info:    infoWithEmail,
 		})
