@@ -12,6 +12,7 @@ import (
 )
 
 func TestJSONAPI(t *testing.T) {
+	// Topic: con-testing
 	type request struct {
 		Message string `json:"message"`
 	}
