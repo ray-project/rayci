@@ -16,14 +16,10 @@
 #   ;  # Semicolon to separate rules
 
 ! always lint
-! wanda raycicmd raycirun reefd ecosystem_ci
+! raycirun reefd ecosystem_ci
 
 \fallthrough
-@ always
-;
-
-\fallthrough
-@ lint
+@ always lint
 ;
 
 raycirun/
@@ -39,5 +35,5 @@ ecosystem_ci/
 ;
 
 \default
-@ wanda raycicmd raycirun reefd ecosystem_ci
+@ raycirun reefd ecosystem_ci
 ;
