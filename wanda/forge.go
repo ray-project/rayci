@@ -55,17 +55,15 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
 
-	// Determine target platform for image resolution.
-	// If Platform is specified in config, parse it (e.g., "linux/arm64").
-	// Otherwise, default to the host OS/arch.
 	targetOS := runtime.GOOS
 	targetArch := runtime.GOARCH
 	if config.Platform != "" {
 		parts := strings.SplitN(config.Platform, "/", 2)
-		if len(parts) == 2 {
-			targetOS = parts[0]
-			targetArch = parts[1]
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("invalid platform format: %q, expected \"os/arch\"", config.Platform)
 		}
+		targetOS = parts[0]
+		targetArch = parts[1]
 	}
 
 	f := &Forge{

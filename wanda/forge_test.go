@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -60,6 +61,84 @@ func filesInLayer(layer cranev1.Layer) (map[string]string, error) {
 }
 
 const worldDotTxt = "This is my world!"
+
+func TestNewForge_Platform(t *testing.T) {
+	tests := []struct {
+		name        string
+		platform    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "empty platform uses defaults",
+			platform: "",
+			wantErr:  false,
+		},
+		{
+			name:     "valid linux/amd64",
+			platform: "linux/amd64",
+			wantErr:  false,
+		},
+		{
+			name:     "valid linux/arm64",
+			platform: "linux/arm64",
+			wantErr:  false,
+		},
+		{
+			name:        "invalid format - no slash",
+			platform:    "linuxamd64",
+			wantErr:     true,
+			errContains: "invalid platform format",
+		},
+		{
+			name:        "invalid format - empty os",
+			platform:    "/amd64",
+			wantErr:     true,
+			errContains: "invalid platform format",
+		},
+		{
+			name:        "invalid format - empty arch",
+			platform:    "linux/",
+			wantErr:     true,
+			errContains: "invalid platform format",
+		},
+		{
+			name:        "invalid format - only slash",
+			platform:    "/",
+			wantErr:     true,
+			errContains: "invalid platform format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &ForgeConfig{
+				WorkDir:  "testdata",
+				Platform: tt.platform,
+			}
+
+			forge, err := NewForge(config)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("got nil error, want error containing %q", tt.errContains)
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("got error %q, want error containing %q", err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("got error %v, want nil", err)
+			}
+
+			if forge == nil {
+				t.Error("got nil forge, want non-nil")
+			}
+		})
+	}
+}
 
 func TestForgeLocal_noNamePrefix(t *testing.T) {
 	config := &ForgeConfig{WorkDir: "testdata"}

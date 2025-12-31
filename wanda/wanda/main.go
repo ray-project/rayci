@@ -72,8 +72,6 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
-	// Platform can be set via flag or WANDA_PLATFORM env var.
-	// This is needed for cross-platform builds (e.g., building linux/arm64 on macOS).
 	targetPlatform := *platform
 	if targetPlatform == "" {
 		targetPlatform = os.Getenv("WANDA_PLATFORM")
