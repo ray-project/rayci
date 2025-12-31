@@ -22,6 +22,10 @@
 @ always lint
 ;
 
+README.md
+# skip
+;
+
 raycirun/
 @ raycirun
 ;
