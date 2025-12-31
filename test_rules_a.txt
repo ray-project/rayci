@@ -40,18 +40,6 @@ raycicmd/
 @ raycicmd
 ;
 
-raycirun/
-@ raycirun
-;
-
-reefd/
-@ reefd
-;
-
-ecosystem_ci/
-@ ecosystem_ci
-;
-
 \default
 @ wanda raycicmd raycirun reefd ecosystem_ci
 ;
