@@ -18,6 +18,12 @@
 ! always lint
 ! wanda raycicmd raycirun reefd ecosystem_ci
 
+README.md
+.gitignore
+.flake8
+# skip
+;
+
 \fallthrough
 @ always lint
 ;
@@ -40,13 +46,6 @@ reefd/
 
 ecosystem_ci/
 @ ecosystem_ci
-;
-
-LICENSE
-README.md
-.gitignore
-.flake8
-# skip
 ;
 
 \default
