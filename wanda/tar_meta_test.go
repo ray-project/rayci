@@ -11,6 +11,7 @@ import (
 func TestTarMetaFromFileInfo(t *testing.T) {
 	tmp := t.TempDir()
 
+	// Test to trigger only wanda changes.
 	for _, mod := range []int64{
 		0755, // bazel's sandbox umask does not support 777.
 		0644,
