@@ -15,11 +15,10 @@
 #
 #   ;  # Semicolon to separate rules
 
-! always lint
-! ecosystem_ci
+! always ecosystem_ci
 
 \fallthrough
-@ always lint
+@ always
 ;
 
 README.md
