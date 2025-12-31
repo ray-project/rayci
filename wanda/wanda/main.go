@@ -27,6 +27,7 @@ Flags:
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
+	platform := flag.String("platform", "", "target platform for image resolution (e.g., linux/arm64)")
 	rayCI := flag.Bool(
 		"rayci", false,
 		"takes RAYCI_ env vars for input and run in remote mode",
@@ -71,6 +72,13 @@ func main() {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
 
+	// Platform can be set via flag or WANDA_PLATFORM env var.
+	// This is needed for cross-platform builds (e.g., building linux/arm64 on macOS).
+	targetPlatform := *platform
+	if targetPlatform == "" {
+		targetPlatform = os.Getenv("WANDA_PLATFORM")
+	}
+
 	config := &wanda.ForgeConfig{
 		WorkDir:    *workDir,
 		DockerBin:  *docker,
@@ -78,6 +86,7 @@ func main() {
 		NamePrefix: *namePrefix,
 		BuildID:    *buildID,
 		Epoch:      *epoch,
+		Platform:   targetPlatform,
 
 		RayCI:   *rayCI,
 		Rebuild: *rebuild,
