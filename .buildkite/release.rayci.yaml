@@ -4,6 +4,9 @@ steps:
   # This makes sure that the release queue is working and also
   # builds the releases and save the binaries in build artifacts.
   - name: rayci and wanda binaries
+    tags:
+      - wanda
+      - raycicmd
     instance_type: release
     commands:
       - bash release.sh

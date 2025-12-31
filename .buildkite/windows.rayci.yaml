@@ -2,14 +2,16 @@ group: windows
 sort_key: "~windows"
 steps:
   - name: hello-windows
+    tags: wanda
     wanda: .buildkite/windows.wanda.yaml
     instance_type: builder-windows
 
   - name: ":windows: windows example"
+    tags: wanda
     job_env: WINDOWS
     instance_type: windows
     depends_on: hello-windows
-    commands: 
+    commands:
       - bash .buildkite/windows_docker.sh
       - docker run -i --rm $${RAYCI_WORK_REPO}:$${RAYCI_BUILD_ID}-hello-windows bash -c "echo 'Hello, Windows!'"
       - touch /c/artifact-mount/hello-windows.txt

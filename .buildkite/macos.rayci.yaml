@@ -3,11 +3,13 @@ sort_key: "~macos"
 steps:
   - block: "Run Apple Silicon MacOS Tests"
     key: "macos-apple-silicon-block"
+    tags: always
     depends_on: ~
 
   - name: ":macos: apple silicon macos example"
+    tags: always
     job_env: MACOS
     instance_type: macos-arm64
     depends_on: "macos-apple-silicon-block"
-    commands: 
+    commands:
       - echo "Hello, MacOS arm64!"
