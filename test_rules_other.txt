@@ -16,25 +16,22 @@
 #   ;  # Semicolon to separate rules
 
 ! always lint
-! wanda raycicmd
+! ecosystem_ci
 
 \fallthrough
 @ always lint
 ;
 
+README.md
 .gitignore
 .flake8
 # skip
 ;
 
-wanda/
-@ wanda
-;
-
-raycicmd/
-@ raycicmd
+ecosystem_ci/
+@ ecosystem_ci
 ;
 
 \default
-@ wanda raycicmd
+@ ecosystem_ci
 ;

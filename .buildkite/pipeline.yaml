@@ -1,6 +1,6 @@
 steps:
   - label: "test rayci with rayci"
     commands:
-      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" RAYCI_TAG_RULE_FILES="test_rules_a.txt,test_rules_b.txt" /bin/bash run_rayci.sh -upload
+      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" RAYCI_TAG_RULE_FILES="test_rules_go.txt,test_rules_other.txt" /bin/bash run_rayci.sh -upload
     agents:
       queue: "runner_queue_small_pr"

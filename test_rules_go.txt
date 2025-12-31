@@ -16,14 +16,18 @@
 #   ;  # Semicolon to separate rules
 
 ! always lint
-! raycirun reefd ecosystem_ci
+! wanda raycicmd raycirun reefd
 
 \fallthrough
 @ always lint
 ;
 
-README.md
-# skip
+wanda/
+@ wanda
+;
+
+raycicmd/
+@ raycicmd
 ;
 
 raycirun/
@@ -34,10 +38,6 @@ reefd/
 @ reefd
 ;
 
-ecosystem_ci/
-@ ecosystem_ci
-;
-
 \default
-@ raycirun reefd ecosystem_ci
+@ wanda raycicmd raycirun reefd
 ;
