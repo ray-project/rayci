@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/anyscale/templates/ci/maketmpl"
+	"github.com/ray-project/rayci/maketmpl"
 )
 
 func main() {
