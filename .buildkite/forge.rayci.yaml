@@ -4,20 +4,24 @@ steps:
     wanda: .buildkite/forge.wanda.yaml
 
   - name: hello
+    tags: wanda
     wanda: .buildkite/hello.wanda.yaml
     depends_on: forge
-  
+
   - name: hello test
+    tags: wanda
     depends_on: hello
     job_env: hello
     command: cat /opt/app/hello.txt
 
   - name: retry test
+    tags: wanda
     depends_on: hello
     job_env: hello
     command: if [[ "$${BUILDKITE_RETRY_COUNT-0}" == 0 ]]; then exit 1; fi
 
   - name: python-base
+    tags: wanda
     label: python {{matrix}}
     wanda: .buildkite/python.wanda.yaml
     matrix:

@@ -21,6 +21,7 @@ function build_wanda {
 
 build_rayci linux amd64
 
+build_wanda darwin arm64
 build_wanda linux amd64
 build_wanda linux arm64
 build_wanda windows amd64

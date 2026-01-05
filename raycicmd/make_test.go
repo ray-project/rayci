@@ -1,15 +1,68 @@
 package raycicmd
 
 import (
-	"strings"
-	"testing"
-
 	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+	"testing"
 )
+
+// setupGitRepoInDir initializes a git repository in workDir and returns a
+// GitChangeLister configured for testing.
+//
+// The workDir should already contain files that should exist on the main branch
+// (the "base" state). This function will:
+//  1. Initialize a git repo in workDir and commit all existing files to main
+//  2. Create a feature branch and add the specified changedFiles
+//  3. Return a repo and envs configured for the feature branch
+//
+// This uses gitTestHelper from change_lister_test.go.
+func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*GitChangeLister, *envsMap) {
+	t.Helper()
+
+	h := newGitTestHelper(t)
+	// Override WorkDir to use the provided directory, then initialize git there.
+	h.WorkDir = workDir
+	h.git("init")
+	h.git("config", "user.email", "test@test.com")
+	h.git("config", "user.name", "Test")
+	h.git("remote", "add", "origin", h.Origin)
+
+	// Commit all existing files in workDir to main branch (the "base" state).
+	h.git("add", ".")
+	h.git("commit", "-m", "initial commit with base files")
+	h.git("branch", "-M", "main")
+	h.git("push", "-u", "origin", "main")
+
+	// Create feature branch with changed files
+	h.git("checkout", "-b", "feature-branch")
+	for _, f := range changedFiles {
+		h.writeFile(f, "content\n")
+	}
+	h.git("add", ".")
+	h.git("commit", "-m", "add changed files")
+
+	commit := h.head()
+
+	envs := newEnvsMap(map[string]string{
+		"BUILDKITE":                          "true",
+		"BUILDKITE_PULL_REQUEST":             "123",
+		"BUILDKITE_PULL_REQUEST_BASE_BRANCH": "main",
+		"BUILDKITE_COMMIT":                   commit,
+		"BUILDKITE_BRANCH":                   "feature-branch",
+	})
+
+	lister := &GitChangeLister{
+		WorkDir:    workDir,
+		BaseBranch: "main",
+		Commit:     commit,
+	}
+
+	return lister, envs
+}
 
 func TestIsRayCIYaml(t *testing.T) {
 	for _, f := range []string{
@@ -236,16 +289,38 @@ func TestMakePipeline(t *testing.T) {
 		SkipTags:      []string{"disabled"},
 		BuildkiteDirs: []string{".buildkite", "private/buildkite"},
 	}
+
+	// Create a test rules file that maps "src/enabled/" to the "enabled" tag.
+	rulesContent := strings.Join([]string{
+		"! enabled",
+		"src/enabled/",
+		"@ enabled",
+		";",
+	}, "\n")
+	rulesPath := filepath.Join(tmp, "test_rules.txt")
+	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0o600); err != nil {
+		t.Fatalf("write test rules: %v", err)
+	}
+
+	// Set up a real git repo with a changed file that matches the "enabled" rule.
+	lister, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/enabled/test.py"})
+
 	t.Run("filter", func(t *testing.T) {
 		config := *commonConfig
-		config.TagFilterCommand = []string{"echo", "enabled"}
+		config.TestRulesFiles = []string{rulesPath}
 
 		buildID := "fakebuild"
 		info := &buildInfo{
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         testEnvs,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -256,7 +331,7 @@ func TestMakePipeline(t *testing.T) {
 			t.Errorf("got %d groups, want %d", len(got.Steps), want)
 		}
 
-		// sub funtions are already tested in their unit tests.
+		// sub functions are already tested in their unit tests.
 		// so we only check the total number of groups here.
 		// we also have an e2e test at the repo level.
 
@@ -270,7 +345,84 @@ func TestMakePipeline(t *testing.T) {
 		}
 	})
 
+	t.Run("filter_cmd", func(t *testing.T) {
+		config := *commonConfig
+		config.TagFilterCommand = []string{"echo", "enabled"}
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         newEnvsMap(nil),
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+		// Should only select the enabled steps and its dependencies.
+		// which are 2 steps in 2 different groups.
+		if want := 2; len(got.Steps) != want {
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		// sub functions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
+
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+		if want := 2; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
 	t.Run("filter_noTagMeansAlways", func(t *testing.T) {
+		config := *commonConfig
+		config.TestRulesFiles = []string{rulesPath}
+		config.NoTagMeansAlways = true
+
+		buildID := "fakebuild"
+		info := &buildInfo{
+			buildID: buildID,
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         testEnvs,
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+
+		if want := 3; len(got.Steps) != want { // all steps are groups.
+			t.Errorf("got %d groups, want %d", len(got.Steps), want)
+		}
+
+		// sub functions are already tested in their unit tests.
+		// so we only check the total number of groups here.
+		// we also have an e2e test at the repo level.
+
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+
+		if want := 4; totalSteps != want {
+			t.Fatalf("got %d steps, want %d", totalSteps, want)
+		}
+	})
+
+	t.Run("filter_noTagMeansAlways_cmd", func(t *testing.T) {
 		config := *commonConfig
 		config.TagFilterCommand = []string{"echo", "enabled"}
 		config.NoTagMeansAlways = true
@@ -280,7 +432,13 @@ func TestMakePipeline(t *testing.T) {
 			buildID: buildID,
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+			envs:         newEnvsMap(nil),
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -289,7 +447,7 @@ func TestMakePipeline(t *testing.T) {
 			t.Errorf("got %d groups, want %d", len(got.Steps), want)
 		}
 
-		// sub funtions are already tested in their unit tests.
+		// sub functions are already tested in their unit tests.
 		// so we only check the total number of groups here.
 		// we also have an e2e test at the repo level.
 
@@ -312,7 +470,12 @@ func TestMakePipeline(t *testing.T) {
 			selects: []string{"test2"},
 		}
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -348,7 +511,12 @@ func TestMakePipeline(t *testing.T) {
 		config := *commonConfig
 		config.NotifyOwnerOnFailure = false
 
-		got, err := makePipeline(tmp, &config, info)
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         info,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
@@ -362,7 +530,12 @@ func TestMakePipeline(t *testing.T) {
 			buildAuthorEmail: email,
 		}
 		config.NotifyOwnerOnFailure = true
-		got, err = makePipeline(tmp, &config, infoWithEmail)
+		got, err = makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       &config,
+			info:         infoWithEmail,
+		})
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}

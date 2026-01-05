@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -58,20 +59,33 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags, selects []string, filterCmd []string,
+	skipTags, selects []string, filterCmd []string, tagRuleFiles []string, envs Envs, lister ChangeLister,
 ) (*stepFilter, error) {
-	filterCmdRes, err := runFilterCmd(filterCmd)
-	if err != nil {
-		return nil, err
+	var setup *filterSetup
+
+	if len(filterCmd) > 0 {
+		res, err := filterFromCmd(filterCmd)
+		if err != nil {
+			return nil, fmt.Errorf("filter from cmd: %w", err)
+		}
+		setup = res
+	} else if len(tagRuleFiles) > 0 {
+		res, err := filterFromRuleFiles(tagRuleFiles, envs, lister)
+		if err != nil {
+			return nil, fmt.Errorf("filter from rule files: %w", err)
+		}
+		setup = res
+	} else {
+		setup = &filterSetup{runAll: true}
 	}
 
 	filter := &stepFilter{
 		skipTags: stringSet(skipTags...),
 	}
-	if !filterCmdRes.cmdExists || filterCmdRes.runAll {
+	if setup.runAll {
 		filter.runAll = true
 	} else {
-		filter.tags = filterCmdRes.tags
+		filter.tags = setup.tags
 	}
 
 	if selects != nil {
@@ -88,27 +102,41 @@ func newStepFilter(
 		}
 	}
 
-	return filter, err
+	return filter, nil
 }
 
-type filterCmdResult struct {
-	cmdExists bool
-	runAll    bool
-	tags      map[string]bool
+type filterSetup struct {
+	runAll bool
+	tags   map[string]bool
 }
 
-func runFilterCmd(cmd []string) (*filterCmdResult, error) {
-	res := &filterCmdResult{}
-	if len(cmd) == 0 {
-		return res, nil
+func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
+	tags, err := RunTagAnalysis(tagRuleFiles, envs, lister)
+	if err != nil {
+		return nil, err
 	}
 
+	// Check if tags contains a "*" tag.
+	if slices.Contains(tags, "*") {
+		// '*' means run all tags (except the skips).
+		// It is often equivalent to having no tag filters configured, or
+		// a repo transitioning to using tag rules.
+		return &filterSetup{runAll: true}, nil
+	}
+
+	return &filterSetup{tags: stringSet(tags...)}, nil
+}
+
+func filterFromCmd(cmd []string) (*filterSetup, error) {
+	if len(cmd) == 0 {
+		return &filterSetup{runAll: true}, nil
+	}
 	bin := cmd[0]
 	if strings.HasPrefix(bin, "./") {
 		// A local in repo launcher, and the file does not exist yet.
 		// Run all tags in this case.
 		if _, err := os.Lstat(bin); os.IsNotExist(err) {
-			return res, nil
+			return &filterSetup{runAll: true}, nil
 		}
 	}
 
@@ -119,16 +147,12 @@ func runFilterCmd(cmd []string) (*filterCmdResult, error) {
 		return nil, fmt.Errorf("tag filter script: %w", err)
 	}
 
-	res.cmdExists = true
-
 	tags := strings.Fields(string(output))
-	if len(tags) == 1 && tags[0] == "*" {
-		// '*" means run everything (except the skips).
-		// It is often equivalent to having no tag filters configured.
-		res.runAll = true
-		return res, nil
+	if slices.Contains(tags, "*") {
+		// '*' means run all tags (except the skips).
+		// It is often equivalent to having no tag filters configured, or
+		// a repo transitioning to using tag rules.
+		return &filterSetup{runAll: true}, nil
 	}
-
-	res.tags = stringSet(tags...)
-	return res, nil
+	return &filterSetup{tags: stringSet(tags...)}, nil
 }
