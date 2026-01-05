@@ -11,7 +11,7 @@ set -euo pipefail
 
 apt-get update
 apt-get upgrade -y
-apt-get install -y curl zip unzip awscli ca-certificates git gnupg
+apt-get install -y curl zip unzip awscli ca-certificates git gnupg python3-pip python-is-python3
 
 # Install docker client.
 install -m 0755 -d /etc/apt/keyrings
@@ -34,6 +34,7 @@ else
   curl -sSfL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
 fi
 
+python -m pip install pip==25.2
 pip install jupyterlab==4.5.0
 
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
