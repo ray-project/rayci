@@ -17,15 +17,15 @@ apt-get update
 apt-get upgrade -y
 apt-get install -y curl zip unzip ca-certificates git gnupg python3-pip python-is-python3
 
-# Install AWS CLI v2 (self-contained, won't conflict with pip packages)
-if [[ "$HOSTTYPE" == "aarch64" || "$HOSTTYPE" == "arm64" ]]; then
-  curl -sSfL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
-else
-  curl -sSfL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
-fi
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
-rm -rf /tmp/awscliv2.zip /tmp/aws
+# Install awscli v2
+AWSCLI_TMP="$(mktemp -d)"
+(
+	cd "${AWSCLI_TMP}"
+	curl -sfL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
+	unzip -q awscliv2.zip
+	./aws/install
+)
+rm -rf "${AWSCLI_TMP}"
 
 # Install docker client.
 install -m 0755 -d /etc/apt/keyrings
