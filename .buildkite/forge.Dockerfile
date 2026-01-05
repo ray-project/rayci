@@ -6,6 +6,8 @@ ENV DEBIAN_FRONTEND="noninteractive"
 
 ARG PYTHON_DEPSET
 
+COPY $PYTHON_DEPSET /home/python_depset.lock
+
 RUN <<EOF
 #!/bin/bash
 
@@ -36,8 +38,8 @@ else
   curl -sSfL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
 fi
 
-python -m pip install pip==25.2
-pip install -r $PYTHON_DEPSET
+python -m pip install --upgrade pip==25.2
+pip install -r /home/python_depset.lock
 
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
 rm "/tmp/golang.tar.gz"
