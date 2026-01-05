@@ -5,6 +5,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND="noninteractive"
 
 ARG PYTHON_DEPSET
+ARG ARCH
 
 COPY $PYTHON_DEPSET /home/python_depset.lock
 
