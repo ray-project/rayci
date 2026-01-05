@@ -51,6 +51,8 @@ chown -R app:root /workdir
 usermod -a -G docker app
 usermod -a -G docker0 app
 
+pip install jupyterlab==4.5.0
+
 EOF
 
 USER app
