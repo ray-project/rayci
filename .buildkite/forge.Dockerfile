@@ -34,6 +34,8 @@ else
   curl -sSfL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
 fi
 
+pip install jupyterlab==4.5.0
+
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
 rm "/tmp/golang.tar.gz"
 ln -s /usr/local/go/bin/go /usr/local/bin/go
@@ -50,8 +52,6 @@ chown -R app:root /opt/app
 chown -R app:root /workdir
 usermod -a -G docker app
 usermod -a -G docker0 app
-
-pip install jupyterlab==4.5.0
 
 EOF
 
