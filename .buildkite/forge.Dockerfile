@@ -4,6 +4,8 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND="noninteractive"
 
+ARG PYTHON_DEPSET
+
 RUN <<EOF
 #!/bin/bash
 
@@ -35,7 +37,7 @@ else
 fi
 
 python -m pip install pip==25.2
-pip install jupyterlab==4.5.0
+pip install -r $PYTHON_DEPSET
 
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
 rm "/tmp/golang.tar.gz"
