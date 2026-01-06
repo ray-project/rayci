@@ -2,3 +2,8 @@ name: forge-arm64
 froms:
   - ubuntu:22.04
 dockerfile: .buildkite/forge.Dockerfile
+srcs:
+  - .buildkite/dependencies/python_depset.lock
+build_args:
+  - PYTHON_DEPSET=.buildkite/dependencies/python_depset.lock
+  - ARCH=aarch64

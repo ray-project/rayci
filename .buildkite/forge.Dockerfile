@@ -4,6 +4,11 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND="noninteractive"
 
+ARG PYTHON_DEPSET
+ARG ARCH
+
+COPY $PYTHON_DEPSET /home/python_depset.lock
+
 RUN <<EOF
 #!/bin/bash
 
@@ -11,7 +16,17 @@ set -euo pipefail
 
 apt-get update
 apt-get upgrade -y
-apt-get install -y curl zip unzip awscli ca-certificates git gnupg
+apt-get install -y curl zip unzip ca-certificates git gnupg python3-pip python-is-python3
+
+# Install awscli v2
+AWSCLI_TMP="$(mktemp -d)"
+(
+	cd "${AWSCLI_TMP}"
+	curl -sfL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
+	unzip -q awscliv2.zip
+	./aws/install
+)
+rm -rf "${AWSCLI_TMP}"
 
 # Install docker client.
 install -m 0755 -d /etc/apt/keyrings
@@ -33,6 +48,9 @@ if [[ "$HOSTTYPE" == "aarch64" || "$HOSTTYPE" == "arm64" ]]; then
 else
   curl -sSfL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/golang.tar.gz"
 fi
+
+python -m pip install --upgrade pip==25.2
+pip install -r /home/python_depset.lock
 
 tar -C "/usr/local" -xzf "/tmp/golang.tar.gz"
 rm "/tmp/golang.tar.gz"

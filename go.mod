@@ -8,6 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.254.1
 	github.com/buildkite/go-buildkite/v4 v4.8.0
 	github.com/google/go-containerregistry v0.20.6
+	golang.org/x/net v0.46.0
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.0
 )
@@ -64,7 +66,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.4.0 // indirect
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b // indirect
-	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
