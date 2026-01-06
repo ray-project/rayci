@@ -5,7 +5,6 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND="noninteractive"
 
 ARG PYTHON_DEPSET
-ARG ARCH
 
 COPY $PYTHON_DEPSET /home/python_depset.lock
 
@@ -13,6 +12,15 @@ RUN <<EOF
 #!/bin/bash
 
 set -euo pipefail
+
+if [[ "$HOSTTYPE" =~ ^x86_64 ]]; then
+    ARCH="x86_64"
+elif [[ "$HOSTTYPE" =~ ^aarch64 ]]; then
+    ARCH="aarch64"
+else
+    echo "Unsupported architecture $MACHTYPE" >/dev/stderr
+    exit 1
+fi
 
 apt-get update
 apt-get upgrade -y
