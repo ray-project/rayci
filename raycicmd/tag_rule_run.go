@@ -61,6 +61,10 @@ func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, err
 	}
 	sort.Strings(merged.DefaultTags)
 
+	if err := merged.RuleSet.ValidateRules(); err != nil {
+		return nil, err
+	}
+
 	return merged, nil
 }
 

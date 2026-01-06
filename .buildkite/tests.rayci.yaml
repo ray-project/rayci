@@ -1,11 +1,21 @@
 group: go tests
 steps:
   - label: Go tests
+    tags:
+      - wanda
+      - raycicmd
+      - raycirun
+      - reefd
     command: WANDA_TEST_CR_PORT=5555 go test ./...
     queue: small
     docker_publish_tcp_ports: "5555"
     depends_on: forge
   - label: Go arm64 tests
+    tags:
+      - wanda
+      - raycicmd
+      - raycirun
+      - reefd
     command: WANDA_TEST_CR_PORT=5555 go test ./...
     job_env: forge-arm64
     queue: medium-arm64
@@ -13,13 +23,15 @@ steps:
     depends_on: forge-arm64
 
   - label: Go fmt
+    tags: lint
     command:
       - go fmt ./...
       - git diff --exit-code
     queue: small
-    depends_on: forge    
+    depends_on: forge
 
   - label: Python {{matrix}} tests
+    tags: wanda
     command:
       - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 029272617770.dkr.ecr.us-west-2.amazonaws.com
       - export IMAGE=$$RAYCI_WORK_REPO:$$RAYCI_BUILD_ID-wanda-py{{matrix}}
