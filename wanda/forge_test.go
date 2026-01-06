@@ -455,6 +455,54 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	}
 }
 
+func TestBuildWithDeps(t *testing.T) {
+	config := &ForgeConfig{WorkDir: "testdata"}
+
+	if err := BuildWithDeps("testdata/dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("BuildWithDeps: %v", err)
+	}
+
+	// Verify dep-top was built and contains content from all layers
+	ref, err := name.ParseReference("dep-top")
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+
+	// Should have 3 layers: dep-base, dep-middle, dep-top
+	if len(layers) != 3 {
+		t.Fatalf("got %d layers, want 3", len(layers))
+	}
+
+	// Check that dep-middle's world.txt is in the image
+	files, err := filesInLayer(layers[1])
+	if err != nil {
+		t.Fatalf("read layer: %v", err)
+	}
+
+	if got := files["opt/app/world.txt"]; got != worldDotTxt {
+		t.Errorf("world.txt in image, got %q, want %q", got, worldDotTxt)
+	}
+}
+
+func TestBuildWithDeps_NoDeps(t *testing.T) {
+	config := &ForgeConfig{WorkDir: "testdata"}
+
+	// BuildWithDeps should work for specs without deps (backward compat)
+	if err := BuildWithDeps("testdata/hello.wanda.yaml", config); err != nil {
+		t.Fatalf("BuildWithDeps: %v", err)
+	}
+}
+
 func TestForgeLocal_withNamePrefix(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("skipping test on non-linux")

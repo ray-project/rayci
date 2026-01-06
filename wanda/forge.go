@@ -35,6 +35,64 @@ func Build(specFile string, config *ForgeConfig) error {
 	return forge.Build(spec)
 }
 
+// BuildWithDeps builds a spec and all its dependencies in topological order.
+// In RayCI mode, deps are assumed built by prior pipeline steps; only the root is built.
+func BuildWithDeps(specFile string, config *ForgeConfig) error {
+	if config == nil {
+		config = &ForgeConfig{}
+	}
+
+	// In RayCI mode, only build the root spec (deps built by prior steps)
+	if config.RayCI {
+		return Build(specFile, config)
+	}
+
+	graph, err := BuildDepGraph(specFile, os.LookupEnv)
+	if err != nil {
+		return fmt.Errorf("build dep graph: %w", err)
+	}
+
+	if err := graph.ValidateDeps(); err != nil {
+		return fmt.Errorf("validate deps: %w", err)
+	}
+
+	forge, err := NewForge(config)
+	if err != nil {
+		return fmt.Errorf("make forge: %w", err)
+	}
+
+	for _, name := range graph.Order() {
+		rs := graph.Get(name)
+		spec := rs.Spec
+
+		log.Printf("building %s (from %s)", name, rs.Path)
+
+		if err := forge.buildWithLocalTag(spec); err != nil {
+			return fmt.Errorf("build %s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+// buildWithLocalTag builds a spec and ensures it's tagged with spec.Name
+// so that @name references can resolve it.
+func (f *Forge) buildWithLocalTag(spec *Spec) error {
+	if !hasTag(spec.Tags, spec.Name) {
+		spec.Tags = append(spec.Tags, spec.Name)
+	}
+	return f.Build(spec)
+}
+
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
 // Forge is a forge to build container images.
 type Forge struct {
 	config *ForgeConfig

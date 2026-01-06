@@ -1,0 +1,3 @@
+FROM dep-middle
+
+COPY Dockerfile.dep-top /opt/app/top.txt

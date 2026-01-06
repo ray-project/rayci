@@ -1,4 +1,4 @@
 name: dep-top
 deps: [dep-middle.wanda.yaml]
 froms: ["@dep-middle"]
-dockerfile: Dockerfile.local
+dockerfile: Dockerfile.dep-top
