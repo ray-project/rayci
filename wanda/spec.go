@@ -14,6 +14,10 @@ type Spec struct {
 
 	Tags []string `yaml:"tags"`
 
+	// Deps lists paths to dependency wanda files that must be built first.
+	// Paths are relative to the spec file's directory.
+	Deps []string `yaml:"deps,omitempty"`
+
 	// Inputs
 	Froms      []string `yaml:"froms"`
 	Srcs       []string `yaml:"srcs,omitempty"`
@@ -30,7 +34,8 @@ type Spec struct {
 	DisableCaching bool `yaml:"disable_caching,omitempty"`
 }
 
-func parseSpecFile(f string) (*Spec, error) {
+// ParseSpecFile parses a wanda spec file.
+func ParseSpecFile(f string) (*Spec, error) {
 	bs, err := os.ReadFile(f)
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
@@ -121,11 +126,13 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 
 	result.Name = expandVar(s.Name, lookup)
 	result.Tags = stringsExpanVar(s.Tags, lookup)
+	result.Deps = stringsExpanVar(s.Deps, lookup)
 	result.Froms = stringsExpanVar(s.Froms, lookup)
 	result.Srcs = stringsExpanVar(s.Srcs, lookup)
 	result.Dockerfile = expandVar(s.Dockerfile, lookup)
 	result.BuildArgs = stringsExpanVar(s.BuildArgs, lookup)
 	result.BuildHintArgs = stringsExpanVar(s.BuildHintArgs, lookup)
+	result.DisableCaching = s.DisableCaching
 
 	return result
 }

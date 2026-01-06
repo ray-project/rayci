@@ -20,7 +20,7 @@ func Build(specFile string, config *ForgeConfig) error {
 		config = &ForgeConfig{}
 	}
 
-	spec, err := parseSpecFile(specFile)
+	spec, err := ParseSpecFile(specFile)
 	if err != nil {
 		return fmt.Errorf("parse spec file: %w", err)
 	}
