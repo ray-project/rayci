@@ -59,7 +59,7 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags, selects []string, filterCmd []string, tagRuleFiles []string, envs Envs, lister ChangeLister,
+	skipTags, selects []string, filterCmd []string, testRulesFiles []string, envs Envs, lister ChangeLister,
 ) (*stepFilter, error) {
 	var setup *filterSetup
 
@@ -69,8 +69,8 @@ func newStepFilter(
 			return nil, fmt.Errorf("filter from cmd: %w", err)
 		}
 		setup = res
-	} else if len(tagRuleFiles) > 0 {
-		res, err := filterFromRuleFiles(tagRuleFiles, envs, lister)
+	} else if len(testRulesFiles) > 0 {
+		res, err := filterFromRuleFiles(testRulesFiles, envs, lister)
 		if err != nil {
 			return nil, fmt.Errorf("filter from rule files: %w", err)
 		}
@@ -110,8 +110,8 @@ type filterSetup struct {
 	tags   map[string]bool
 }
 
-func filterFromRuleFiles(tagRuleFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
-	tags, err := RunTagAnalysis(tagRuleFiles, envs, lister)
+func filterFromRuleFiles(testRulesFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
+	tags, err := RunTagAnalysis(testRulesFiles, envs, lister)
 	if err != nil {
 		return nil, err
 	}
