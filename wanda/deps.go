@@ -60,7 +60,10 @@ func BuildDepGraph(specPath string, lookup lookupFunc) (*DepGraph, error) {
 		return nil, fmt.Errorf("abs path for root: %w", err)
 	}
 	for name, rs := range g.specs {
-		rsAbs, _ := filepath.Abs(rs.Path)
+		rsAbs, err := filepath.Abs(rs.Path)
+		if err != nil {
+			return nil, fmt.Errorf("abs path for spec %q: %w", rs.Path, err)
+		}
 		if rsAbs == absPath {
 			g.root = name
 			break
@@ -145,9 +148,10 @@ func (g *DepGraph) topoSort() error {
 	}
 
 	var order []string
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
+	head := 0
+	for head < len(queue) {
+		current := queue[head]
+		head++
 		order = append(order, current)
 
 		for _, dependent := range dependents[current] {
