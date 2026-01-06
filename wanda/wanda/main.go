@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ray-project/rayci/wanda"
 )
@@ -13,7 +14,11 @@ const usage = `
 wanda - container image builder for RayCI using a container registry as a
 content-addressed build cache.
 
-Runs in either remote mode or local mode.
+Usage:
+  wanda [flags] <spec.wanda.yaml>      Build an image (with dependencies)
+  wanda deps <spec.wanda.yaml>         Show dependency build order
+
+Modes:
 - Remote:
    Enabled by setting -rayci flag. Takes RAYCI_ env vars for input and runs in
    remote mode. Builds and uploads image to the cache repository.
@@ -25,6 +30,15 @@ Flags:
 `
 
 func main() {
+	// Check for subcommand before flag parsing
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		switch os.Args[1] {
+		case "deps":
+			runDeps(os.Args[2:])
+			return
+		}
+	}
+
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
 	rayCI := flag.Bool(
@@ -87,5 +101,26 @@ func main() {
 
 	if err := wanda.BuildWithDeps(input, config); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func runDeps(args []string) {
+	if len(args) != 1 {
+		log.Fatal("usage: wanda deps <spec.wanda.yaml>")
+	}
+
+	graph, err := wanda.BuildDepGraph(args[0], os.LookupEnv)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := graph.ValidateDeps(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Build order:")
+	for i, name := range graph.Order() {
+		rs := graph.Get(name)
+		fmt.Printf("  %d. %s (%s)\n", i+1, name, rs.Path)
 	}
 }
