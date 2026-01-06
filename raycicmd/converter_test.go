@@ -1132,6 +1132,9 @@ func TestMergeStringSlices(t *testing.T) {
 		want []string
 	}{
 		{nil, nil, nil},
+		{[]string{}, nil, nil},
+		{nil, []string{}, nil},
+		{[]string{}, []string{}, nil},
 		{[]string{"a"}, nil, []string{"a"}},
 		{nil, []string{"b"}, []string{"b"}},
 		{[]string{"a"}, []string{"b"}, []string{"a", "b"}},

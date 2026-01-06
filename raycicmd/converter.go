@@ -116,11 +116,8 @@ func stepTags(step map[string]any) []string {
 }
 
 func mergeStringSlices(a, b []string) []string {
-	if len(a) == 0 {
-		return b
-	}
-	if len(b) == 0 {
-		return a
+	if len(a) == 0 && len(b) == 0 {
+		return nil
 	}
 	result := make([]string, 0, len(a)+len(b))
 	result = append(result, a...)
