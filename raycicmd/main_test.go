@@ -86,7 +86,7 @@ func TestLoadConfig_customBuildkiteDirs(t *testing.T) {
 
 func TestLoadConfig_tagFilterConfigEnvVar(t *testing.T) {
 	envs := newEnvsMap(map[string]string{
-		"RAYCI_TAG_RULE_FILES": "rules1.txt,rules2.txt",
+		"RAYCI_TEST_RULE_FILES": "rules1.txt,rules2.txt",
 	})
 	c, err := loadConfig("", "", envs)
 	if err != nil {
@@ -119,13 +119,13 @@ func TestTestRulesFiles(t *testing.T) {
 				envs = newEnvsMap(map[string]string{})
 			} else {
 				envs = newEnvsMap(map[string]string{
-					"RAYCI_TAG_RULE_FILES": tt.env,
+					"RAYCI_TEST_RULE_FILES": tt.env,
 				})
 			}
 
-			got := tagRuleFiles(envs)
+			got := testRuleFilesFromEnv(envs)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("tagRuleFiles() = %v, want %v", got, tt.want)
+				t.Errorf("testRuleFilesFromEnv() = %v, want %v", got, tt.want)
 			}
 		})
 	}

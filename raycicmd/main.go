@@ -127,8 +127,8 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 	}, nil
 }
 
-func tagRuleFiles(envs Envs) []string {
-	v, ok := envs.Lookup("RAYCI_TAG_RULE_FILES")
+func testRuleFilesFromEnv(envs Envs) []string {
+	v, ok := envs.Lookup("RAYCI_TEST_RULE_FILES")
 	if !ok {
 		return nil
 	}
@@ -163,7 +163,7 @@ func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
 		config.BuildkiteDirs = strings.Split(buildkiteDir, ":")
 	}
 
-	if envFiles := tagRuleFiles(envs); envFiles != nil {
+	if envFiles := testRuleFilesFromEnv(envs); envFiles != nil {
 		config.TestRulesFiles = envFiles
 	}
 

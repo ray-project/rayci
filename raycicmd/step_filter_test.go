@@ -69,7 +69,7 @@ func TestNewTagsStepFilter(t *testing.T) {
 		skipTags     []string
 		want         *stepFilter
 	}{{
-		name: "neither filterCmd nor tagRuleFiles set",
+		name: "neither filterCmd nor testRulesFiles set",
 		want: &stepFilter{runAll: true},
 	}, {
 		name:     "skipTags only",
