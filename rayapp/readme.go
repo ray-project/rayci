@@ -1,4 +1,4 @@
-package maketmpl
+package rayapp
 
 import (
 	"fmt"
@@ -121,7 +121,7 @@ func readmeFromNotebook(f string) (*readmeFile, error) {
 		return nil, fmt.Errorf("notebook is a directory")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "maketmpl_*")
+	tmpDir, err := os.MkdirTemp("", "rayapp_*")
 	if err != nil {
 		return nil, fmt.Errorf("create temp dir: %w", err)
 	}
