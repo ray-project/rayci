@@ -203,19 +203,25 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		// If a group is accept, then steps in this group is marked as included.
 		// and all this groups dependencies will be included. Individual steps
 		// in this group can still be rejected.
-		groupAccepted := filter.accept(g)
+		groupAllAccepted := filter.accept(g)
+
+		// This will be flipped if any step in the group is accepted.
+		// This will stay false if the group is empty or all steps are rejected.
+		groupAnyAccepted := false
 
 		for _, step := range g.subSteps {
 			if groupRejected || filter.reject(step) {
 				// when the group is rejected, all steps are rejected.
 				rejects[step.id] = struct{}{}
-			} else if filter.accept(step) {
+			} else if filter.accept(step) || groupAllAccepted {
 				hits[step.id] = struct{}{}
-				groupAccepted = true
+				groupAnyAccepted = true
 			}
 		}
 
-		if groupAccepted {
+		// If any step in the group is accepted, the group is accepted.
+		// and this will accept all dependencies of this group later on.
+		if groupAnyAccepted {
 			hits[g.id] = struct{}{}
 		}
 	}

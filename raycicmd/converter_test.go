@@ -887,8 +887,6 @@ func TestConvertPipelineGroup(t *testing.T) {
 	filter := &stepFilter{
 		skipTags: stringSet("disabled"),
 		tags:     stringSet("foo"),
-
-		noTagMeansAlways: true,
 	}
 	bk, err := convertSingleGroup(c, g, filter)
 	if err != nil {
@@ -904,8 +902,8 @@ func TestConvertPipelineGroup(t *testing.T) {
 			bk.DependsOn, want,
 		)
 	}
-	if len(bk.Steps) != 3 {
-		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk.Steps))
+	if len(bk.Steps) != 2 {
+		t.Errorf("convertPipelineGroup: got %d steps, want 2", len(bk.Steps))
 	}
 }
 
@@ -947,26 +945,32 @@ func TestConvertPipelineGroups(t *testing.T) {
 		},
 	}, {
 		Group: "deps",
-		Steps: []map[string]any{
-			{
-				"commands":   []string{"echo deps bad"},
-				"depends_on": []string{"bad"},
-				"tags":       []interface{}{"foo"},
-			},
-		},
+		Steps: []map[string]any{{
+			"commands":   []string{"echo deps bad"},
+			"depends_on": []string{"bad"},
+			"tags":       []interface{}{"foo"},
+		}},
+	}, {
+		Group: "selectall",
+		Tags:  []string{"always"},
+		Steps: []map[string]any{{
+			"commands": []string{"step 1"},
+		}, {
+			"commands": []string{"step 2"},
+		}},
 	}}
 
 	filter := &stepFilter{
 		skipTags: stringSet("disabled"),
-		tags:     stringSet("foo"),
+		tags:     stringSet("foo", "always"),
 	}
 	bk, err := c.convertGroups(groups, filter)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
 	}
 
-	if len(bk) != 1 {
-		t.Fatalf("convertPipelineGroups: got %d groups, want 1", len(bk))
+	if len(bk) != 2 {
+		t.Fatalf("convertPipelineGroups: got %d groups, want 2", len(bk))
 	}
 
 	bk0 := bk[0]
@@ -982,5 +986,13 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}
 	if len(bk0.Steps) != 3 {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk0.Steps))
+	}
+
+	bk1 := bk[1]
+	if bk1.Group != "selectall" {
+		t.Errorf("convertPipelineGroup: got group %s, want selectall", bk1.Group)
+	}
+	if len(bk1.Steps) != 2 {
+		t.Errorf("convertPipelineGroup: got %d steps, want 2", len(bk1.Steps))
 	}
 }
