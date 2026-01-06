@@ -78,10 +78,14 @@ func BuildWithDeps(specFile string, config *ForgeConfig) error {
 // buildWithLocalTag builds a spec and ensures it's tagged with spec.Name
 // so that @name references can resolve it.
 func (f *Forge) buildWithLocalTag(spec *Spec) error {
-	if !hasTag(spec.Tags, spec.Name) {
-		spec.Tags = append(spec.Tags, spec.Name)
+	if hasTag(spec.Tags, spec.Name) {
+		return f.Build(spec)
 	}
-	return f.Build(spec)
+
+	// Create a copy to avoid modifying the original from the dependency graph.
+	specCopy := *spec
+	specCopy.Tags = append(spec.Tags, spec.Name)
+	return f.Build(&specCopy)
 }
 
 func hasTag(tags []string, tag string) bool {

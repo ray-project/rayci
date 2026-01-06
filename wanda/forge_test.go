@@ -501,6 +501,15 @@ func TestBuildWithDeps_NoDeps(t *testing.T) {
 	if err := BuildWithDeps("testdata/hello.wanda.yaml", config); err != nil {
 		t.Fatalf("BuildWithDeps: %v", err)
 	}
+
+	// Verify that the image was built
+	ref, err := name.ParseReference("hello")
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+	if _, err := daemon.Image(ref); err != nil {
+		t.Fatalf("image 'hello' not found: %v", err)
+	}
 }
 
 func TestForgeLocal_withNamePrefix(t *testing.T) {
