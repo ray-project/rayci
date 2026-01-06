@@ -83,6 +83,16 @@ func TestBuildDepGraph_LinearChain(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// A -> B -> C (A depends on B, B depends on C)
+	//
+	//   a
+	//   |
+	//   v
+	//   b
+	//   |
+	//   v
+	//   c
+	//
+	// Build order: c, b, a
 	writeSpec(t, tmpDir, "c.wanda.yaml", strings.Join([]string{
 		"name: c",
 		"dockerfile: Dockerfile",
@@ -141,6 +151,16 @@ func TestBuildDepGraph_Diamond(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Diamond: A -> B, A -> C, B -> D, C -> D
+	//
+	//       a
+	//      / \
+	//     v   v
+	//     b   c
+	//      \ /
+	//       v
+	//       d
+	//
+	// Build order: d, then b and c (either order), then a
 	writeSpec(t, tmpDir, "d.wanda.yaml", strings.Join([]string{
 		"name: d",
 		"dockerfile: Dockerfile",
@@ -204,6 +224,11 @@ func TestBuildDepGraph_CycleDetection(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Cycle: A -> B -> A
+	//
+	//   a <--+
+	//   |    |
+	//   v    |
+	//   b ---+
 	writeSpec(t, tmpDir, "a.wanda.yaml", strings.Join([]string{
 		"name: a",
 		"deps: [b.wanda.yaml]",
@@ -309,6 +334,16 @@ func TestBuildDepGraph_TransitiveDeps(t *testing.T) {
 
 	// A -> B -> C, A only lists B in deps (not C)
 	// C should still be discovered transitively
+	//
+	//   a (deps: [b])
+	//   |
+	//   v
+	//   b (deps: [c])
+	//   |
+	//   v
+	//   c
+	//
+	// A doesn't directly list C, but C is discovered via B
 	writeSpec(t, tmpDir, "c.wanda.yaml", strings.Join([]string{
 		"name: c",
 		"dockerfile: Dockerfile",
