@@ -984,3 +984,162 @@ func TestConvertPipelineGroups(t *testing.T) {
 		t.Errorf("convertPipelineGroup: got %d steps, want 3", len(bk0.Steps))
 	}
 }
+
+func TestConvertPipelineGroups_groupTagPropagation(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	// Group with "e2e" tag - all steps should inherit this tag
+	groups := []*pipelineGroup{{
+		Group: "e2e tests",
+		Tags:  []string{"e2e"},
+		Steps: []map[string]any{
+			// Step without tags - should inherit "e2e" from group
+			{"commands": []string{"echo 1"}, "key": "step1"},
+			// Step with its own tag - should have both "e2e" and "slow"
+			{"commands": []string{"echo 2"}, "key": "step2", "tags": []interface{}{"slow"}},
+		},
+	}, {
+		// Group without tags - steps should not inherit any tags
+		Group: "other",
+		Steps: []map[string]any{
+			{"commands": []string{"echo 3"}, "key": "step3"},
+			{"commands": []string{"echo 4"}, "key": "step4", "tags": []interface{}{"fast"}},
+		},
+	}}
+
+	// Filter by "e2e" tag - should include steps from "e2e tests" group
+	filter := &stepFilter{
+		tags: stringSet("e2e"),
+	}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+
+	// Only the "e2e tests" group should be included since it has steps matching the "e2e" tag
+	if len(bk) != 1 {
+		t.Fatalf("convertPipelineGroups: got %d groups, want 1", len(bk))
+	}
+
+	if bk[0].Group != "e2e tests" {
+		t.Errorf("convertPipelineGroups: got group %s, want 'e2e tests'", bk[0].Group)
+	}
+
+	// Both steps in the "e2e tests" group should be included:
+	// - step1: inherits "e2e" from group
+	// - step2: has ["e2e", "slow"] (group tag + own tag)
+	if len(bk[0].Steps) != 2 {
+		t.Errorf("convertPipelineGroups: got %d steps, want 2", len(bk[0].Steps))
+	}
+}
+
+// TestConvertPipelineGroups_groupTagsDoNotOverwriteStepTags verifies that
+// group-level tags are merged with step-level tags, not replacing them.
+// A step with its own tags should have BOTH group tags AND its own tags.
+func TestConvertPipelineGroups_groupTagsDoNotOverwriteStepTags(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "mixed tags",
+		Tags:  []string{"group-tag"},
+		Steps: []map[string]any{
+			// Step with its own tag - should have ["group-tag", "step-tag"]
+			{"commands": []string{"echo 1"}, "key": "step1", "tags": []interface{}{"step-tag"}},
+			// Step without tags - should only have ["group-tag"]
+			{"commands": []string{"echo 2"}, "key": "step2"},
+		},
+	}}
+
+	// Test 1: Filter by step-specific tag "step-tag"
+	// This should include step1 (which has "step-tag") but NOT step2
+	// This proves step tags are preserved after merging with group tags
+	filterByStepTag := &stepFilter{
+		tags: stringSet("step-tag"),
+	}
+	bk, err := c.convertGroups(groups, filterByStepTag)
+	if err != nil {
+		t.Fatalf("convert with step-tag filter: %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("filter by step-tag: got %d groups, want 1", len(bk))
+	}
+	if len(bk[0].Steps) != 1 {
+		t.Fatalf("filter by step-tag: got %d steps, want 1 (only step1 should match)", len(bk[0].Steps))
+	}
+
+	// Test 2: Filter by group tag "group-tag"
+	// This should include BOTH steps since both inherit the group tag
+	filterByGroupTag := &stepFilter{
+		tags: stringSet("group-tag"),
+	}
+	bk, err = c.convertGroups(groups, filterByGroupTag)
+	if err != nil {
+		t.Fatalf("convert with group-tag filter: %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("filter by group-tag: got %d groups, want 1", len(bk))
+	}
+	if len(bk[0].Steps) != 2 {
+		t.Fatalf("filter by group-tag: got %d steps, want 2 (both steps should match)", len(bk[0].Steps))
+	}
+
+	// Test 3: Filter by both tags - step1 should match both, step2 only group-tag
+	// Using "step-tag" filter means only step1 matches
+	// This confirms step1 has BOTH tags (group-tag AND step-tag)
+	filterByBothTags := &stepFilter{
+		tags: stringSet("group-tag", "step-tag"),
+	}
+	bk, err = c.convertGroups(groups, filterByBothTags)
+	if err != nil {
+		t.Fatalf("convert with both tags filter: %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("filter by both tags: got %d groups, want 1", len(bk))
+	}
+	// Both steps should be included since the filter uses OR logic
+	// (a step matches if it has ANY of the filter tags)
+	if len(bk[0].Steps) != 2 {
+		t.Fatalf("filter by both tags: got %d steps, want 2", len(bk[0].Steps))
+	}
+}
+
+func TestMergeStringSlices(t *testing.T) {
+	for _, test := range []struct {
+		a, b []string
+		want []string
+	}{
+		{nil, nil, nil},
+		{[]string{"a"}, nil, []string{"a"}},
+		{nil, []string{"b"}, []string{"b"}},
+		{[]string{"a"}, []string{"b"}, []string{"a", "b"}},
+		{[]string{"a", "b"}, []string{"c"}, []string{"a", "b", "c"}},
+	} {
+		got := mergeStringSlices(test.a, test.b)
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("mergeStringSlices(%v, %v): got %v, want %v", test.a, test.b, got, test.want)
+		}
+	}
+}

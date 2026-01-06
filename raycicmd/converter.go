@@ -115,6 +115,19 @@ func stepTags(step map[string]any) []string {
 	return nil
 }
 
+func mergeStringSlices(a, b []string) []string {
+	if len(a) == 0 {
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
+	result := make([]string, 0, len(a)+len(b))
+	result = append(result, a...)
+	result = append(result, b...)
+	return result
+}
+
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
@@ -130,10 +143,14 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		}
 
 		for j, step := range g.Steps {
+			// Merge group tags with step-specific tags so that steps inherit
+			// group-level tags for conditional pipeline selection.
+			tags := mergeStringSlices(g.Tags, stepTags(step))
+
 			stepNode := &stepNode{
 				id:   fmt.Sprintf("g%d_s%d", i, j),
 				key:  stepKey(step),
-				tags: stepTags(step),
+				tags: tags,
 				src:  step,
 			}
 			set.add(stepNode)
