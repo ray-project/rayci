@@ -1,4 +1,4 @@
-package maketmpl
+package rayapp
 
 import (
 	"bytes"
