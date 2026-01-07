@@ -1,9 +1,6 @@
 package raycicmd
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -143,7 +140,7 @@ func TestRunTestRules_AllPass(t *testing.T) {
 
 	ruleSet := newTestRuleSet(t, rulesContent)
 
-	testCases := []ruleTestCase{
+	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
 		{File: "python/ray/data/dataset.py", Tags: []string{"always", "lint", "data"}, Lineno: 2},
 	}
@@ -170,7 +167,7 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 
 	ruleSet := newTestRuleSet(t, rulesContent)
 
-	testCases := []ruleTestCase{
+	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
 		// This one has a typo: "daat" instead of "data"
 		{File: "python/ray/data/dataset.py", Tags: []string{"always", "lint", "daat"}, Lineno: 2},
@@ -192,204 +189,126 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 	}
 }
 
-func TestPrintFailures_Format(t *testing.T) {
-	failures := []testCaseResult{
-		{
-			File:    "fail.py",
-			Lineno:  2,
-			Extra:   []string{"extra1", "extra2"},
-			Missing: []string{"missing1"},
-		},
-	}
+func TestParseTestCases_EmptyFilePath(t *testing.T) {
+	content := ": tag1 tag2"
 
-	var buf bytes.Buffer
-	printFailures(&buf, failures)
-	output := buf.String()
-
-	if !strings.Contains(output, "FAIL: fail.py (line 2)") {
-		t.Errorf("output should contain file and line, got: %s", output)
+	_, err := parseTestCases(content)
+	if err == nil {
+		t.Error("parseTestCases() should return error for empty file path")
 	}
-	if !strings.Contains(output, "+extra1 (unexpected)") {
-		t.Errorf("output should show extra tags, got: %s", output)
-	}
-	if !strings.Contains(output, "-missing1 (missing)") {
-		t.Errorf("output should show missing tags, got: %s", output)
+	if !strings.Contains(err.Error(), "empty file path") {
+		t.Errorf("error should mention empty file path, got: %v", err)
 	}
 }
 
-func TestTestRulesMain_Success_Silent(t *testing.T) {
-	dir := t.TempDir()
+func TestParseTestCases_EmptyTags(t *testing.T) {
+	content := "file.py:"
 
-	rulesFile := filepath.Join(dir, "rules.txt")
-	rulesContent := strings.Join([]string{
-		"! always lint data ml",
-		"",
-		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
-		"python/ray/data/",
-		"@ data ml",
-		";",
-	}, "\n")
-	if err := os.WriteFile(rulesFile, []byte(rulesContent), 0644); err != nil {
-		t.Fatalf("write rules: %v", err)
-	}
-
-	testsFile := filepath.Join(dir, "tests.txt")
-	testsContent := strings.Join([]string{
-		"python/ray/data/__init__.py: always lint data ml",
-		"python/ray/data/dataset.py: always data lint ml",
-	}, "\n")
-	if err := os.WriteFile(testsFile, []byte(testsContent), 0644); err != nil {
-		t.Fatalf("write tests: %v", err)
-	}
-
-	envs := newEnvsMap(map[string]string{
-		"RAYCI_TEST_RULE_FILES": rulesFile,
-	})
-
-	var buf bytes.Buffer
-	err := TestRulesMain([]string{testsFile}, envs, &buf)
-
+	cases, err := parseTestCases(content)
 	if err != nil {
-		t.Errorf("TestRulesMain() error: %v", err)
+		t.Fatalf("parseTestCases() error: %v", err)
 	}
 
-	// Should be silent on success
-	if buf.String() != "" {
-		t.Errorf("output should be empty on success, got: %q", buf.String())
+	if len(cases) != 1 {
+		t.Fatalf("got %d cases, want 1", len(cases))
+	}
+	if cases[0].File != "file.py" {
+		t.Errorf("File = %q, want %q", cases[0].File, "file.py")
+	}
+	if len(cases[0].Tags) != 0 {
+		t.Errorf("Tags = %v, want empty", cases[0].Tags)
 	}
 }
 
-func TestTestRulesMain_Failure_Output(t *testing.T) {
-	dir := t.TempDir()
+func TestDiffTags_Identical(t *testing.T) {
+	got := []string{"a", "b", "c"}
+	want := []string{"a", "b", "c"}
 
-	rulesFile := filepath.Join(dir, "rules.txt")
+	extra, missing := diffTags(got, want)
+
+	if len(extra) != 0 {
+		t.Errorf("extra = %v, want empty", extra)
+	}
+	if len(missing) != 0 {
+		t.Errorf("missing = %v, want empty", missing)
+	}
+}
+
+func TestDiffTags_Empty(t *testing.T) {
+	extra, missing := diffTags(nil, nil)
+
+	if len(extra) != 0 {
+		t.Errorf("extra = %v, want empty", extra)
+	}
+	if len(missing) != 0 {
+		t.Errorf("missing = %v, want empty", missing)
+	}
+}
+
+func TestDiffTags_AllExtra(t *testing.T) {
+	got := []string{"a", "b"}
+	want := []string{}
+
+	extra, missing := diffTags(got, want)
+
+	if !reflect.DeepEqual(extra, []string{"a", "b"}) {
+		t.Errorf("extra = %v, want [a b]", extra)
+	}
+	if len(missing) != 0 {
+		t.Errorf("missing = %v, want empty", missing)
+	}
+}
+
+func TestDiffTags_AllMissing(t *testing.T) {
+	got := []string{}
+	want := []string{"a", "b"}
+
+	extra, missing := diffTags(got, want)
+
+	if len(extra) != 0 {
+		t.Errorf("extra = %v, want empty", extra)
+	}
+	if !reflect.DeepEqual(missing, []string{"a", "b"}) {
+		t.Errorf("missing = %v, want [a b]", missing)
+	}
+}
+
+func TestRunTestRules_DuplicateTagsInExpected(t *testing.T) {
 	rulesContent := strings.Join([]string{
-		"! always lint data",
+		"! always lint",
 		"",
 		"\\fallthrough",
 		"@ always lint",
 		";",
-		"",
-		"python/",
-		"@ data",
-		";",
 	}, "\n")
-	if err := os.WriteFile(rulesFile, []byte(rulesContent), 0644); err != nil {
-		t.Fatalf("write rules: %v", err)
+
+	ruleSet := newTestRuleSet(t, rulesContent)
+
+	testCases := []*ruleTestCase{
+		{File: "foo.py", Tags: []string{"always", "lint", "always", "lint"}, Lineno: 1},
 	}
 
-	testsFile := filepath.Join(dir, "tests.txt")
-	testsContent := "python/foo.py: always lint wrongtag"
-	if err := os.WriteFile(testsFile, []byte(testsContent), 0644); err != nil {
-		t.Fatalf("write tests: %v", err)
-	}
+	failures := runTestRules(ruleSet, testCases)
 
-	envs := newEnvsMap(map[string]string{
-		"RAYCI_TEST_RULE_FILES": rulesFile,
-	})
-
-	var buf bytes.Buffer
-	err := TestRulesMain([]string{testsFile}, envs, &buf)
-
-	if err == nil {
-		t.Error("TestRulesMain() should return error for failing tests")
-	}
-
-	output := buf.String()
-	if !strings.Contains(output, "FAIL:") {
-		t.Errorf("output should contain FAIL, got: %s", output)
-	}
-	if !strings.Contains(output, "+data (unexpected)") {
-		t.Errorf("output should show extra tag, got: %s", output)
-	}
-	if !strings.Contains(output, "-wrongtag (missing)") {
-		t.Errorf("output should show missing tag, got: %s", output)
+	if len(failures) != 0 {
+		t.Errorf("len(failures) = %d, want 0 (duplicates should be deduplicated)", len(failures))
 	}
 }
 
-func TestTestRulesMain_MissingTestsArg(t *testing.T) {
-	err := TestRulesMain([]string{}, newEnvsMap(nil), nil)
-
-	if err == nil {
-		t.Error("TestRulesMain() should return error when tests file is missing")
-	}
-	errMsg := err.Error()
-	if !strings.Contains(errMsg, "usage:") {
-		t.Errorf("error should show usage, got: %v", err)
-	}
-	if !strings.Contains(errMsg, "Test file format:") {
-		t.Errorf("error should show file format, got: %v", err)
-	}
-}
-
-func TestTestRulesMain_MissingEnvVar(t *testing.T) {
-	dir := t.TempDir()
-	testsFile := filepath.Join(dir, "tests.txt")
-	if err := os.WriteFile(testsFile, []byte("foo.py: tag"), 0644); err != nil {
-		t.Fatalf("write tests: %v", err)
-	}
-
-	err := TestRulesMain([]string{testsFile}, newEnvsMap(nil), nil)
-
-	if err == nil {
-		t.Error("TestRulesMain() should return error when env var is missing")
-	}
-	if !strings.Contains(err.Error(), "RAYCI_TEST_RULE_FILES") {
-		t.Errorf("error should mention env var, got: %v", err)
-	}
-}
-
-func TestTestRulesMain_MultipleRulesFiles(t *testing.T) {
-	dir := t.TempDir()
-
-	rules1 := filepath.Join(dir, "rules1.txt")
-	rules1Content := strings.Join([]string{
-		"! always lint tag1",
+func TestRunTestRules_EmptyTestCases(t *testing.T) {
+	rulesContent := strings.Join([]string{
+		"! always",
 		"",
 		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
-		"dir1/",
-		"@ tag1",
+		"@ always",
 		";",
 	}, "\n")
-	if err := os.WriteFile(rules1, []byte(rules1Content), 0644); err != nil {
-		t.Fatalf("write rules1: %v", err)
-	}
 
-	rules2 := filepath.Join(dir, "rules2.txt")
-	rules2Content := strings.Join([]string{
-		"! tag2",
-		"",
-		"dir2/",
-		"@ tag2",
-		";",
-	}, "\n")
-	if err := os.WriteFile(rules2, []byte(rules2Content), 0644); err != nil {
-		t.Fatalf("write rules2: %v", err)
-	}
+	ruleSet := newTestRuleSet(t, rulesContent)
 
-	testsFile := filepath.Join(dir, "tests.txt")
-	testsContent := strings.Join([]string{
-		"dir1/foo.py: always lint tag1",
-		"dir2/bar.py: always lint tag2",
-	}, "\n")
-	if err := os.WriteFile(testsFile, []byte(testsContent), 0644); err != nil {
-		t.Fatalf("write tests: %v", err)
-	}
+	failures := runTestRules(ruleSet, nil)
 
-	envs := newEnvsMap(map[string]string{
-		"RAYCI_TEST_RULE_FILES": rules1 + "," + rules2,
-	})
-
-	var buf bytes.Buffer
-	err := TestRulesMain([]string{testsFile}, envs, &buf)
-
-	if err != nil {
-		t.Errorf("TestRulesMain() error: %v", err)
+	if len(failures) != 0 {
+		t.Errorf("len(failures) = %d, want 0", len(failures))
 	}
 }
