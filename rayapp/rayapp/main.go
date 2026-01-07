@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"log"
 	"fmt"
 	"github.com/ray-project/rayci/rayapp"
+	"log"
 )
 
 func main() {
