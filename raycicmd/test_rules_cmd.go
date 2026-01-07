@@ -3,7 +3,6 @@ package raycicmd
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"slices"
 	"sort"
@@ -16,7 +15,7 @@ type ruleTestCase struct {
 	Lineno int
 }
 
-func parseTestCasesFile(path string) ([]ruleTestCase, error) {
+func parseTestCasesFile(path string) ([]*ruleTestCase, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -24,8 +23,8 @@ func parseTestCasesFile(path string) ([]ruleTestCase, error) {
 	return parseTestCases(string(content))
 }
 
-func parseTestCases(content string) ([]ruleTestCase, error) {
-	var cases []ruleTestCase
+func parseTestCases(content string) ([]*ruleTestCase, error) {
+	var cases []*ruleTestCase
 
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	lineno := 0
@@ -51,14 +50,9 @@ func parseTestCases(content string) ([]ruleTestCase, error) {
 			return nil, fmt.Errorf("line %d: empty file path", lineno)
 		}
 
-		var tags []string
-		if tagsStr != "" {
-			tags = strings.Fields(tagsStr)
-		}
-
-		cases = append(cases, ruleTestCase{
+		cases = append(cases, &ruleTestCase{
 			File:   file,
-			Tags:   tags,
+			Tags:   strings.Fields(tagsStr),
 			Lineno: lineno,
 		})
 	}
@@ -101,12 +95,12 @@ func diffTags(got, want []string) (extra, missing []string) {
 	return extra, missing
 }
 
-func runTestRules(ruleSet *TagRuleSet, testCases []ruleTestCase) (failures []testCaseResult) {
+func runTestRules(ruleSet *TagRuleSet, testCases []*ruleTestCase) []*testCaseResult {
+	var failures []*testCaseResult
 	for _, tc := range testCases {
 		got := tagsForChangedFiles(ruleSet, []string{tc.File})
 
-		want := make([]string, len(tc.Tags))
-		copy(want, tc.Tags)
+		want := slices.Clone(tc.Tags)
 		sort.Strings(want)
 		want = slices.Compact(want)
 
@@ -115,7 +109,7 @@ func runTestRules(ruleSet *TagRuleSet, testCases []ruleTestCase) (failures []tes
 		}
 
 		extra, missing := diffTags(got, want)
-		failures = append(failures, testCaseResult{
+		failures = append(failures, &testCaseResult{
 			File:    tc.File,
 			Lineno:  tc.Lineno,
 			Extra:   extra,
@@ -126,14 +120,14 @@ func runTestRules(ruleSet *TagRuleSet, testCases []ruleTestCase) (failures []tes
 	return failures
 }
 
-func printFailures(w io.Writer, failures []testCaseResult) {
+func printFailures(failures []*testCaseResult) {
 	for _, f := range failures {
-		fmt.Fprintf(w, "FAIL: %s (line %d)\n", f.File, f.Lineno)
+		fmt.Printf("FAIL: %s (line %d)\n", f.File, f.Lineno)
 		for _, tag := range f.Extra {
-			fmt.Fprintf(w, "  +%s (unexpected)\n", tag)
+			fmt.Printf("  +%s (unexpected)\n", tag)
 		}
 		for _, tag := range f.Missing {
-			fmt.Fprintf(w, "  -%s (missing)\n", tag)
+			fmt.Printf("  -%s (missing)\n", tag)
 		}
 	}
 }
@@ -153,44 +147,34 @@ Example:
   README.md: always lint
 `
 
-// TestRulesMain runs the test-rules subcommand.
-func TestRulesMain(args []string, envs Envs, stdout io.Writer) error {
+func subcmdTestRules(args []string, envs Envs) error {
 	if len(args) != 1 {
 		return fmt.Errorf(testRulesUsage)
 	}
 	testsFile := args[0]
 
-	if stdout == nil {
-		stdout = os.Stdout
-	}
-
-	// Get rule files from env
 	rulePaths := testRuleFilesFromEnv(envs)
 	if len(rulePaths) == 0 {
 		return fmt.Errorf("RAYCI_TEST_RULE_FILES environment variable is required")
 	}
 
-	// Load and merge rules
 	merged, err := loadAndMergeTagRuleConfigs(rulePaths)
 	if err != nil {
 		return fmt.Errorf("load rules: %w", err)
 	}
 
-	// Load test cases
 	testCases, err := parseTestCasesFile(testsFile)
 	if err != nil {
 		return fmt.Errorf("load tests: %w", err)
 	}
-
 	if len(testCases) == 0 {
 		return fmt.Errorf("no test cases found in %s", testsFile)
 	}
 
-	// Run tests
 	failures := runTestRules(merged.RuleSet, testCases)
 
 	if len(failures) > 0 {
-		printFailures(stdout, failures)
+		printFailures(failures)
 		return fmt.Errorf("%d/%d test(s) failed", len(failures), len(testCases))
 	}
 

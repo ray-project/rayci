@@ -178,7 +178,7 @@ func Main(args []string, envs Envs) error {
 
 	// Check for subcommands first
 	if len(args) > 1 && args[1] == "test-rules" {
-		return TestRulesMain(args[2:], envs, nil)
+		return subcmdTestRules(args[2:], envs)
 	}
 
 	flags, args := parseFlags(args)
