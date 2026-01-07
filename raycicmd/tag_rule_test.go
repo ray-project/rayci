@@ -395,13 +395,14 @@ func TestTagRuleSetMatchTags_FallthroughDoesNotPreventDefault(t *testing.T) {
 	// This test verifies that fallthrough rules add their tags but do NOT
 	// prevent default rules from being applied. Only terminating (non-fallthrough)
 	// rules should prevent default rule fallback.
+	matchAllPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{
 			"always": {}, "lint": {}, "python": {}, "fallback": {},
 		},
 		rules: []*TagRule{
-			// Fallthrough rule that matches everything (no paths = match all)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
+			// Fallthrough rule that matches everything (using * pattern)
+			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true, Patterns: []*regexp.Regexp{matchAllPattern}},
 			// Python directory rule (terminating)
 			{Tags: []string{"python"}, Lineno: 2, Dirs: []string{"python"}},
 		},
@@ -452,17 +453,18 @@ func TestTagRuleSetMatchTags_FallthroughDoesNotPreventDefault(t *testing.T) {
 
 func TestTagRuleSetMatchTags_MultipleFallthroughWithDefault(t *testing.T) {
 	// Test multiple fallthrough rules combined with default rules
+	matchAllPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{
 			"always": {}, "lint": {}, "debug": {}, "trace": {}, "fallback": {},
 		},
 		rules: []*TagRule{
-			// First fallthrough rule (matches everything)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
+			// First fallthrough rule (matches everything using * pattern)
+			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true, Patterns: []*regexp.Regexp{matchAllPattern}},
 			// Second fallthrough rule with specific path
 			{Tags: []string{"debug"}, Lineno: 2, Fallthrough: true, Dirs: []string{"src"}},
-			// Third fallthrough rule (matches everything)
-			{Tags: []string{"trace"}, Lineno: 3, Fallthrough: true},
+			// Third fallthrough rule (matches everything using * pattern)
+			{Tags: []string{"trace"}, Lineno: 3, Fallthrough: true, Patterns: []*regexp.Regexp{matchAllPattern}},
 		},
 		defaultRules: []*TagRule{
 			{Tags: []string{"fallback"}, Lineno: 4, Default: true},
@@ -506,13 +508,14 @@ func TestTagRuleSetMatchTags_MultipleFallthroughWithDefault(t *testing.T) {
 
 func TestTagRuleSetMatchTags_TerminatingRulePreventsDefault(t *testing.T) {
 	// Verify that a terminating rule (non-fallthrough) prevents default rules
+	matchAllPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{
 			"always": {}, "lint": {}, "java": {}, "fallback": {},
 		},
 		rules: []*TagRule{
-			// Fallthrough rule (matches everything)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
+			// Fallthrough rule (matches everything using * pattern)
+			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true, Patterns: []*regexp.Regexp{matchAllPattern}},
 			// Terminating rule for java/
 			{Tags: []string{"java"}, Lineno: 2, Dirs: []string{"java"}},
 		},

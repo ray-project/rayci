@@ -642,8 +642,8 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 		wantDefaultTags [][]string
 	}{
 		{
-			name:             "fallthrough directive only",
-			input:            "! tag1\n\\fallthrough\n@ tag1\n;",
+			name:             "fallthrough directive with star pattern",
+			input:            strings.Join([]string{"! tag1", "*", "@ tag1", "\\fallthrough", ";"}, "\n"),
 			wantRules:        1, // fallthrough without default goes to regular rules
 			wantDefaultRules: 0,
 			wantRegularTags:  [][]string{{"tag1"}},
@@ -652,7 +652,7 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 		},
 		{
 			name:             "default directive only",
-			input:            "! tag1\n\\default\n@ tag1\n;",
+			input:            strings.Join([]string{"! tag1", "\\default", "@ tag1", ";"}, "\n"),
 			wantRules:        0,
 			wantDefaultRules: 1, // default goes to DefaultRules
 			wantRegularTags:  nil,
@@ -661,7 +661,7 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 		},
 		{
 			name:             "multiple rules with fallthrough then default",
-			input:            "! tag1 tag2\n\\fallthrough\n@ tag1\n;\n\\default\n@ tag2\n;",
+			input:            strings.Join([]string{"! tag1 tag2", "*", "@ tag1", "\\fallthrough", ";", "\\default", "@ tag2", ";"}, "\n"),
 			wantRules:        1, // fallthrough rule
 			wantDefaultRules: 1, // default rule
 			wantRegularTags:  [][]string{{"tag1"}},
@@ -670,7 +670,7 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 		},
 		{
 			name:             "default rule at end for catch-all",
-			input:            "! tag1 fallback\npython/\n@ tag1\n;\n\\default\n@ fallback\n;",
+			input:            strings.Join([]string{"! tag1 fallback", "python/", "@ tag1", ";", "\\default", "@ fallback", ";"}, "\n"),
 			wantRules:        1, // python/ rule
 			wantDefaultRules: 1, // default catch-all rule
 			wantRegularTags:  [][]string{{"tag1"}},
@@ -721,9 +721,8 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 func TestTagRuleParserParse_DefaultAndFallthroughError(t *testing.T) {
 	// A rule cannot have both \default and \fallthrough
 	inputs := []string{
-		"! tag1\n\\fallthrough\n\\default\n@ tag1\n;",
-		"! tag1\n\\default\n\\fallthrough\n@ tag1\n;",
-		"! tag1\n\\fallthrough\n\\default\n@ tag1", // without semicolon
+		strings.Join([]string{"! tag1", "\\default", "@ tag1", "\\fallthrough", ";"}, "\n"),
+		strings.Join([]string{"! tag1", "\\default", "@ tag1", "\\fallthrough"}, "\n"), // without semicolon
 	}
 
 	for _, input := range inputs {
@@ -773,35 +772,49 @@ func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_DirectiveMustComeBeforeTags(t *testing.T) {
-	// Directives must come before @ tags
-	errorInputs := []string{
-		// directive after tags
-		"! tag1\n@ tag1\n\\fallthrough\n;",
-		"! tag1\n@ tag1\n\\default\n;",
-		// directive after tags (without semicolon)
-		"! tag1\n@ tag1\n\\fallthrough",
+func TestTagRuleParserParse_FallthroughMustPrecedeSemicolon(t *testing.T) {
+	// \fallthrough must be immediately followed by ;
+	errorInputs := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "fallthrough followed by tags",
+			input: strings.Join([]string{"! tag1 tag2", "*", "\\fallthrough", "@ tag1", ";"}, "\n"),
+		},
+		{
+			name:  "fallthrough followed by path",
+			input: strings.Join([]string{"! tag1", "*", "@ tag1", "\\fallthrough", "python/", ";"}, "\n"),
+		},
+		{
+			name:  "fallthrough followed by pattern",
+			input: strings.Join([]string{"! tag1", "*", "@ tag1", "\\fallthrough", "*.py", ";"}, "\n"),
+		},
+		{
+			name:  "fallthrough followed by another directive",
+			input: strings.Join([]string{"! tag1", "*", "@ tag1", "\\fallthrough", "\\default", ";"}, "\n"),
+		},
+		{
+			name:  "fallthrough at end of file without semicolon",
+			input: strings.Join([]string{"! tag1", "*", "@ tag1", "\\fallthrough"}, "\n"),
+		},
 	}
 
-	for _, input := range errorInputs {
-		_, err := ParseTagRuleConfig(input)
-		if err == nil {
-			t.Errorf("expected error for input %q, got nil", input)
-		}
+	for _, tt := range errorInputs {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTagRuleConfig(tt.input)
+			if err == nil {
+				t.Errorf("expected error for input %q, got nil", tt.input)
+			}
+		})
 	}
+}
 
-	// Valid: directive before tags
-	validInputs := []string{
-		"! tag1\n\\fallthrough\n@ tag1\n;",
-		"! tag1\n\\default\n@ tag1\n;",
-		// Multiple @ lines after directive
-		"! tag1 tag2\n\\default\n@ tag1\n@ tag2\n;",
-	}
-
-	for _, input := range validInputs {
-		_, err := ParseTagRuleConfig(input)
-		if err != nil {
-			t.Errorf("unexpected error for input %q: %v", input, err)
-		}
+func TestTagRuleParserParse_DefaultMustComeBeforeTags(t *testing.T) {
+	// \default must come before @ tags
+	input := strings.Join([]string{"! tag1", "@ tag1", "\\default", ";"}, "\n")
+	_, err := ParseTagRuleConfig(input)
+	if err == nil {
+		t.Errorf("expected error for input %q, got nil", input)
 	}
 }

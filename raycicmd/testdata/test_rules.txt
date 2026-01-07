@@ -23,9 +23,10 @@
 ! linux_wheels macos_wheels docker doc python_dependencies tools
 ! release_tests spark_on_ray
 
-# Default tags are always included via this fallthrough rule
-\fallthrough
+# These tags are always included via this fallthrough rule
+*
 @ always lint
+\fallthrough
 ;
 
 python/ray/air/

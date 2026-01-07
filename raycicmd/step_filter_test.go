@@ -358,8 +358,8 @@ func TestFilterFromRuleFiles(t *testing.T) {
 
 		rules := joinLines("! mytag always lint",
 			"src/mydir/",
-			"\\fallthrough",
 			"@ mytag",
+			"\\fallthrough",
 			";",
 			"\\default",
 			"@ always lint",

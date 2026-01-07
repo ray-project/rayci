@@ -60,15 +60,9 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 // Match returns true if the given file path matches any of the rule's
 // directories, files, or glob patterns.
 // A rule with Default=true matches any file.
-// A rule with Fallthrough=true and no paths also matches any file.
+// Use * pattern to match any file in a fallthrough rule.
 func (r *TagRule) Match(changedFilePath string) bool {
 	if r.Default {
-		return true
-	}
-
-	// Fallthrough rules without paths match everything
-	hasNoPaths := len(r.Dirs) == 0 && len(r.Files) == 0 && len(r.Patterns) == 0
-	if r.Fallthrough && hasNoPaths {
 		return true
 	}
 
