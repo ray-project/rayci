@@ -1,7 +1,6 @@
 package raycicmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"slices"
@@ -26,34 +25,26 @@ func parseTestCasesFile(path string) ([]*ruleTestCase, error) {
 func parseTestCases(content string) ([]*ruleTestCase, error) {
 	var cases []*ruleTestCase
 
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	lineno := 0
-	for scanner.Scan() {
-		lineno++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip comments and empty lines
+	for lineno, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Parse "file: tag1 tag2 tag3"
 		idx := strings.Index(line, ":")
 		if idx == -1 {
-			return nil, fmt.Errorf("line %d: invalid format, expected 'file: tags'", lineno)
+			return nil, fmt.Errorf("line %d: invalid format, expected 'file: tags'", lineno+1)
 		}
 
 		file := strings.TrimSpace(line[:idx])
-		tagsStr := strings.TrimSpace(line[idx+1:])
-
 		if file == "" {
-			return nil, fmt.Errorf("line %d: empty file path", lineno)
+			return nil, fmt.Errorf("line %d: empty file path", lineno+1)
 		}
 
 		cases = append(cases, &ruleTestCase{
 			File:   file,
-			Tags:   strings.Fields(tagsStr),
-			Lineno: lineno,
+			Tags:   strings.Fields(line[idx+1:]),
+			Lineno: lineno + 1,
 		})
 	}
 
