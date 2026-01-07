@@ -1,4 +1,10 @@
 steps:
+  - label: ":test_tube: Validate test rules"
+    commands:
+      - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" RAYCI_TEST_RULE_FILES="test_rules_other.txt,test_rules_go.txt" /bin/bash run_rayci.sh test-rules test_rules_test.txt
+    agents:
+      queue: "runner_queue_small_pr"
+
   - label: "test rayci with rayci"
     commands:
       - RAYCI_BRANCH="$${BUILDKITE_COMMIT}" RAYCI_TEST_RULE_FILES="test_rules_other.txt,test_rules_go.txt" /bin/bash run_rayci.sh -upload

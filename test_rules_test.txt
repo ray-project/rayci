@@ -1,0 +1,35 @@
+# Unit tests for test_rules_go.txt and test_rules_other.txt
+#
+# Run with:
+#   RAYCI_TEST_RULE_FILES=test_rules_other.txt,test_rules_go.txt rayci test-rules test_rules_test.txt
+#
+# Format: file_path: tag1 tag2 tag3
+#
+# NOTE: Rules are processed in order. The first file's fallthrough adds "always",
+# then if a terminating rule matches (e.g., ecosystem_ci/), processing stops
+# before the second file's fallthrough can add "lint".
+
+# === Go module directories ===
+wanda/main.go: always lint wanda
+wanda/cmd/wanda/main.go: always lint wanda
+raycicmd/main.go: always lint raycicmd
+raycicmd/config.go: always lint raycicmd
+raycicmd/test_rules_cmd.go: always lint raycicmd
+raycirun/main.go: always lint raycirun
+raycirun/run.go: always lint raycirun
+reefd/main.go: always lint reefd
+reefd/server.go: always lint reefd
+
+# === Ecosystem CI ===
+ecosystem_ci/test.py: always ecosystem_ci
+ecosystem_ci/config.yaml: always ecosystem_ci
+
+# === Skip rules (only first fallthrough) ===
+README.md: always
+.gitignore: always
+.flake8: always
+
+# === Default fallback (unmatched files) ===
+some/random/file.txt: always lint ecosystem_ci wanda raycicmd raycirun reefd
+.buildkite/pipeline.yaml: always lint ecosystem_ci wanda raycicmd raycirun reefd
+go.mod: always lint ecosystem_ci wanda raycicmd raycirun reefd
