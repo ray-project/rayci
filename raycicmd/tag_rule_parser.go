@@ -123,8 +123,6 @@ func (p *tagRuleParser) parseLine(rawLine string) error {
 		p.handleTags(line)
 	case strings.HasPrefix(line, ";"):
 		return p.handleRuleEnd(line)
-	case strings.HasPrefix(line, "\\"):
-		return p.handleDirective(line)
 	default:
 		return p.handlePathOrPattern(line)
 	}
@@ -154,12 +152,6 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 
 	p.tagDefs = append(p.tagDefs, fields...)
 	return nil
-}
-
-// handleDirective handles rule directives.
-// No directives are currently supported.
-func (p *tagRuleParser) handleDirective(line string) error {
-	return fmt.Errorf("unknown directive on line %d: %s", p.lineno, line)
 }
 
 // handleTags takes all tags separated by whitespace and adds them to the pending rule's tags list.
