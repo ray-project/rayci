@@ -172,13 +172,18 @@ func loadConfig(configFile, buildkiteDir string, envs Envs) (*config, error) {
 
 // Main runs tha main function of rayci command.
 func Main(args []string, envs Envs) error {
+	if envs == nil {
+		envs = &osEnvs{}
+	}
+
+	// Check for subcommands first
+	if len(args) > 1 && args[1] == "test-rules" {
+		return subcmdTestRules(args[2:], envs)
+	}
+
 	flags, args := parseFlags(args)
 	if len(args) != 0 {
 		return fmt.Errorf("unexpected arguments: %v", args)
-	}
-
-	if envs == nil {
-		envs = &osEnvs{}
 	}
 
 	config, err := loadConfig(flags.ConfigFile, flags.BuildkiteDir, envs)
