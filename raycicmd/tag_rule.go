@@ -21,9 +21,6 @@ type TagRule struct {
 	Files []string
 	// Patterns is a list of glob patterns (converted to regex patterns) to match.
 	Patterns []*regexp.Regexp
-	// Fallthrough means this rule's tags are always included, and matching
-	// continues to find more specific rules. Used with \fallthrough directive.
-	Fallthrough bool
 }
 
 // globToRegexp converts a glob pattern to an equivalent regex pattern.
@@ -56,14 +53,7 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 
 // Match returns true if the given file path matches any of the rule's
 // directories, files, or glob patterns.
-// A rule with Fallthrough=true and no paths also matches any file.
 func (r *TagRule) Match(changedFilePath string) bool {
-	// Fallthrough rules without paths match everything
-	hasNoPaths := len(r.Dirs) == 0 && len(r.Files) == 0 && len(r.Patterns) == 0
-	if r.Fallthrough && hasNoPaths {
-		return true
-	}
-
 	if slices.ContainsFunc(r.Dirs, func(dir string) bool {
 		return changedFilePath == dir ||
 			strings.HasPrefix(changedFilePath, dir+"/")
@@ -122,23 +112,14 @@ func (s *TagRuleSet) ValidateRules() error {
 	return nil
 }
 
-// MatchTags returns the accumulated tags for rules matching the given file path.
-// For fallthrough rules, tags are accumulated and matching continues.
-// For non-fallthrough rules, tags are added and matching stops.
-// The returned bool indicates whether a non-fallthrough rule matched.
+// MatchTags returns the tags for the first rule matching the given file path.
+// Rules are evaluated in order, and the first matching rule determines the tags.
+// The returned bool indicates whether any rule matched.
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
-	tags := []string{}
-	terminatingRuleMatched := false
-
 	for _, rule := range s.rules {
 		if rule.Match(changedFilePath) {
-			tags = append(tags, rule.Tags...)
-			if !rule.Fallthrough {
-				terminatingRuleMatched = true
-				break // Stop on first non-fallthrough match
-			}
+			return rule.Tags, true
 		}
 	}
-
-	return tags, terminatingRuleMatched
+	return []string{}, false
 }

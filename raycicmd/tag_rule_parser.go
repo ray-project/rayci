@@ -31,12 +31,10 @@ type TagRuleConfig struct {
 //	file                # File to match
 //	dir/*.py            # Pattern to match, using glob pattern
 //	*                   # Matches any file (catch-all)
-//	\fallthrough        # Tags are always included, matching continues
 //	@ tag1 tag2         # Tags to emit for a rule. A rule without tags is a skipping rule.
 //	;                   # Semicolon to separate rules
 //
-// Rules are evaluated in order, and the first matched rule will be used
-// (unless it has \fallthrough, which continues matching).
+// Rules are evaluated in order, and the first matched rule will be used.
 func ParseTagRuleConfig(ruleContent string) (*TagRuleConfig, error) {
 	p := &tagRuleParser{}
 	if err := p.parse(ruleContent); err != nil {
@@ -61,21 +59,17 @@ type pendingRule struct {
 	// patterns is the list of glob patterns (converted to regex patterns) seen
 	// in the order they were parsed.
 	patterns []*regexp.Regexp
-	// fallthrough means this rule's tags are always included.
-	fallthrough_ bool
 	// seenTags is true if we've seen @ tags in this rule.
-	// Directives must come before tags.
 	seenTags bool
 }
 
 func (pr *pendingRule) flush(lineno int) *TagRule {
 	rule := &TagRule{
-		Tags:        pr.tags,
-		Lineno:      lineno,
-		Dirs:        pr.dirs,
-		Files:       pr.files,
-		Patterns:    pr.patterns,
-		Fallthrough: pr.fallthrough_,
+		Tags:     pr.tags,
+		Lineno:   lineno,
+		Dirs:     pr.dirs,
+		Files:    pr.files,
+		Patterns: pr.patterns,
 	}
 	*pr = pendingRule{} // reset all fields
 	return rule
@@ -84,7 +78,7 @@ func (pr *pendingRule) flush(lineno int) *TagRule {
 func (pr *pendingRule) isEmpty() bool {
 	return len(pr.tags) == 0 && len(pr.dirs) == 0 &&
 		len(pr.files) == 0 && len(pr.patterns) == 0 &&
-		!pr.fallthrough_ && !pr.seenTags
+		!pr.seenTags
 }
 
 // tagRuleParser holds the intermediate state while parsing rule config content.
@@ -162,27 +156,10 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 	return nil
 }
 
-// handleDirective handles rule directives that modify rule behavior.
-// Supported directives:
-//   - \fallthrough: Tags are always included, matching continues to next rule
-//
-// Directives must appear before @ tags within a rule.
+// handleDirective handles rule directives.
+// No directives are currently supported.
 func (p *tagRuleParser) handleDirective(line string) error {
-	// Directives must come before tags
-	if p.pending.seenTags {
-		return fmt.Errorf(
-			"directive on line %d must appear before @ tags",
-			p.lineno,
-		)
-	}
-	directive := strings.TrimPrefix(line, "\\")
-	switch directive {
-	case "fallthrough":
-		p.pending.fallthrough_ = true
-	default:
-		return fmt.Errorf("unknown directive on line %d: %s", p.lineno, line)
-	}
-	return nil
+	return fmt.Errorf("unknown directive on line %d: %s", p.lineno, line)
 }
 
 // handleTags takes all tags separated by whitespace and adds them to the pending rule's tags list.

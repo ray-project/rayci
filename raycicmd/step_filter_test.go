@@ -350,16 +350,15 @@ func TestFilterFromRuleFiles(t *testing.T) {
 	})
 
 	t.Run("with filterConfig", func(t *testing.T) {
-		// Rules with a fallthrough rule for src/mydir/ and a catch-all for always/lint.
-		// The fallthrough directive means matching continues, so the catch-all also applies.
+		// Rules with a specific rule for src/mydir/ and a catch-all for always/lint.
+		// First matching rule wins - src/mydir/ files get mytag, others get always/lint.
 		joinLines := func(lines ...string) string {
 			return strings.Join(lines, "\n")
 		}
 
 		rules := joinLines("! mytag always lint",
 			"src/mydir/",
-			"\\fallthrough",
-			"@ mytag",
+			"@ mytag always lint",
 			";",
 			"*",
 			"@ always lint",
@@ -377,7 +376,7 @@ func TestFilterFromRuleFiles(t *testing.T) {
 			t.Errorf("runAll: got true, want false")
 		}
 
-		// Should have "mytag" from the matching rule plus "always" and "lint" from the catch-all.
+		// Should have "mytag", "always", and "lint" from the src/mydir/ rule.
 		for _, tag := range []string{"mytag", "always", "lint"} {
 			if !got.tags[tag] {
 				t.Errorf("missing tag %q in %v", tag, got.tags)
