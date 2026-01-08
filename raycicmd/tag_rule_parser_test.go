@@ -629,58 +629,42 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_FallthroughDirective(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		wantRules   int
-		wantTags    [][]string
-		wantTagDefs []string
-	}{
-		{
-			name:        "fallthrough directive",
-			input:       "! tag1\n\\fallthrough\n@ tag1\n;",
-			wantRules:   1,
-			wantTags:    [][]string{{"tag1"}},
-			wantTagDefs: []string{"tag1"},
-		},
-		{
-			name:        "fallthrough with catch-all",
-			input:       "! tag1 tag2\n\\fallthrough\n@ tag1\n;\n*\n@ tag2\n;",
-			wantRules:   2,
-			wantTags:    [][]string{{"tag1"}, {"tag2"}},
-			wantTagDefs: []string{"tag1", "tag2"},
-		},
-		{
-			name:        "catch-all rule at end",
-			input:       "! tag1 fallback\npython/\n@ tag1\n;\n*\n@ fallback\n;",
-			wantRules:   2,
-			wantTags:    [][]string{{"tag1"}, {"fallback"}},
-			wantTagDefs: []string{"tag1", "fallback"},
-		},
+func TestTagRuleParserParse_FallthroughDirectiveError(t *testing.T) {
+	// \fallthrough directive is no longer supported
+	inputs := []string{
+		"! tag1\n\\fallthrough\n@ tag1\n;",
+		"! tag1 tag2\n\\fallthrough\n@ tag1\n;\n*\n@ tag2\n;",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := ParseTagRuleConfig(tt.input)
-			if err != nil {
-				t.Fatalf("Parse() error: %v", err)
-			}
+	for _, input := range inputs {
+		_, err := ParseTagRuleConfig(input)
+		if err == nil {
+			t.Errorf("expected error for input %q, got nil", input)
+		}
+	}
+}
 
-			if len(cfg.Rules) != tt.wantRules {
-				t.Fatalf("got %d rules, want %d", len(cfg.Rules), tt.wantRules)
-			}
+func TestTagRuleParserParse_CatchAllRule(t *testing.T) {
+	input := "! tag1 fallback\npython/\n@ tag1\n;\n*\n@ fallback\n;"
+	cfg, err := ParseTagRuleConfig(input)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
 
-			for i, rule := range cfg.Rules {
-				if !reflect.DeepEqual(rule.Tags, tt.wantTags[i]) {
-					t.Errorf("rule %d: Tags = %v, want %v", i, rule.Tags, tt.wantTags[i])
-				}
-			}
+	if len(cfg.Rules) != 2 {
+		t.Fatalf("got %d rules, want 2", len(cfg.Rules))
+	}
 
-			if tt.wantTagDefs != nil && !reflect.DeepEqual(cfg.TagDefs, tt.wantTagDefs) {
-				t.Errorf("TagDefs = %v, want %v", cfg.TagDefs, tt.wantTagDefs)
-			}
-		})
+	wantTags := [][]string{{"tag1"}, {"fallback"}}
+	for i, rule := range cfg.Rules {
+		if !reflect.DeepEqual(rule.Tags, wantTags[i]) {
+			t.Errorf("rule %d: Tags = %v, want %v", i, rule.Tags, wantTags[i])
+		}
+	}
+
+	wantTagDefs := []string{"tag1", "fallback"}
+	if !reflect.DeepEqual(cfg.TagDefs, wantTagDefs) {
+		t.Errorf("TagDefs = %v, want %v", cfg.TagDefs, wantTagDefs)
 	}
 }
 
@@ -706,30 +690,18 @@ func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_DirectiveMustComeBeforeTags(t *testing.T) {
-	// Directives must come before @ tags
-	errorInputs := []string{
-		"! tag1\n@ tag1\n\\fallthrough\n;",
-		"! tag1\n@ tag1\n\\fallthrough",
+func TestTagRuleParserParse_DirectiveAlwaysErrors(t *testing.T) {
+	// All directives are now errors (no supported directives)
+	inputs := []string{
+		"! tag1\n\\fallthrough\n@ tag1\n;",
+		"! tag1\n\\default\n@ tag1\n;",
+		"! tag1\n\\unknown\n@ tag1\n;",
 	}
 
-	for _, input := range errorInputs {
+	for _, input := range inputs {
 		_, err := ParseTagRuleConfig(input)
 		if err == nil {
 			t.Errorf("expected error for input %q, got nil", input)
-		}
-	}
-
-	// Valid: directive before tags
-	validInputs := []string{
-		"! tag1\n\\fallthrough\n@ tag1\n;",
-		"! tag1 tag2\n\\fallthrough\n@ tag1\n@ tag2\n;",
-	}
-
-	for _, input := range validInputs {
-		_, err := ParseTagRuleConfig(input)
-		if err != nil {
-			t.Errorf("unexpected error for input %q: %v", input, err)
 		}
 	}
 }

@@ -16,20 +16,20 @@ import (
 
 const testsYAML = `
 ci/pipeline/test_conditional_testing.py: lint tools
-python/ray/data/__init__.py: lint data ml train
+python/ray/data/__init__.py: data lint ml train
 doc/index.md: lint
 
-python/ray/air/__init__.py: lint ml train tune data linux_wheels
+python/ray/air/__init__.py: data lint linux_wheels ml train tune
 python/ray/llm/llm.py: lint llm
 python/ray/workflow/workflow.py: lint workflow
-python/ray/tune/tune.py: lint ml train tune linux_wheels
-python/ray/train/train.py: lint ml train linux_wheels
-python/ray/util/dask/dask.py: lint python dask
+python/ray/tune/tune.py: lint linux_wheels ml train tune
+python/ray/train/train.py: lint linux_wheels ml train
+python/ray/util/dask/dask.py: dask lint python
 .buildkite/ml.rayci.yml: lint ml train tune
-rllib/rllib.py: lint rllib rllib_gpu rllib_directly
+rllib/rllib.py: lint rllib rllib_directly rllib_gpu
 
-python/ray/serve/serve.py: lint serve linux_wheels java
-python/ray/dashboard/dashboard.py: lint dashboard linux_wheels python
+python/ray/serve/serve.py: java lint linux_wheels serve
+python/ray/dashboard/dashboard.py: dashboard lint linux_wheels python
 python/core.py:
     - lint ml tune train data
     - python dashboard linux_wheels macos_wheels java
@@ -47,18 +47,18 @@ python/ray/dag/dag.py:
 python/ray/experimental/gpu_object_manager/gpu_object_manager.py:
     - lint python cgraphs_direct_transport
 
-.buildkite/core.rayci.yml: lint python core_cpp
-java/ray.java: lint java
-.buildkite/others.rayci.yml: lint java
-cpp/ray.cc: lint cpp
-docker/Dockerfile.ray: lint docker linux_wheels
+.buildkite/core.rayci.yml: core_cpp lint python
+java/ray.java: java lint
+.buildkite/others.rayci.yml: java lint
+cpp/ray.cc: cpp lint
+docker/Dockerfile.ray: docker lint linux_wheels
 
-.readthedocs.yaml: lint doc
-doc/code.py: lint doc
-doc/example.ipynb: lint doc
-doc/tutorial.rst: lint doc
-.vale.ini: lint doc
-.vale/styles/config/vocabularies/Core/accept.txt: lint doc
+.readthedocs.yaml: doc lint
+doc/code.py: doc lint
+doc/example.ipynb: doc lint
+doc/tutorial.rst: doc lint
+.vale.ini: doc lint
+.vale/styles/config/vocabularies/Core/accept.txt: doc lint
 
 ci/docker/doctest.build.Dockerfile: lint
 release/requirements.txt: lint release_tests
@@ -68,11 +68,11 @@ ci/lint/lint.sh: lint tools
 .buildkite/lint.rayci.yml: lint tools
 .buildkite/macos.rayci.yml: lint macos_wheels
 ci/ray_ci/tester.py: lint tools
-.buildkite/base.rayci.yml: lint docker linux_wheels tools
+.buildkite/base.rayci.yml: docker lint linux_wheels tools
 ci/ci.sh: lint tools
 
 src/ray.cpp:
-    - lint core_cpp cpp java python
+    - core_cpp cpp java lint python
     - linux_wheels macos_wheels dashboard release_tests
 
 .github/CODEOWNERS: lint
@@ -311,6 +311,11 @@ var testRulesSnapshot = filepath.Join(
 	"test_rules.txt",
 )
 
+var testRulesAlwaysSnapshot = filepath.Join(
+	"testdata",
+	"test_rules_always.txt",
+)
+
 func runCommandFromDirectory(cmd *exec.Cmd, dir string) ([]byte, error) {
 	cmd.Dir = dir
 	output, err := cmd.Output()
@@ -373,10 +378,6 @@ type TestTagMap map[string]TestTagSet
 // Mimicking test_conditional_testing_pull_request from
 // https://github.com/ray-project/ray/blob/c963d646f0197947429b374cb06f831b47aab5dd/ci/pipeline/test_conditional_testing.py#L87
 func TestWithTestRulesSnapshot(t *testing.T) {
-	// Default tags from the snapshot config file (via \fallthrough\default rule)
-	// These are always included in results via the fallthrough rule.
-	configDefaultTags := []string{"always", "lint"}
-
 	raw := TestTagMap{}
 
 	if err := yaml.Unmarshal([]byte(testsYAML), &raw); err != nil {
@@ -452,7 +453,7 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		})
 
 		tags, err := RunTagAnalysis(
-			[]string{testRulesSnapshot},
+			[]string{testRulesAlwaysSnapshot, testRulesSnapshot},
 			envs,
 			&GitChangeLister{WorkDir: workDir, BaseBranch: "master", Commit: commit},
 		)
@@ -461,7 +462,6 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		}
 
 		want := append([]string{}, tc.Tags...)
-		want = append(want, configDefaultTags...)
 		sort.Strings(want)
 		want = slices.Compact(want)
 

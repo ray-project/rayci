@@ -11,7 +11,6 @@
 #   file  # File to match
 #   dir/*.py  # Pattern to match, using fnmatch, matches dir/a.py dir/dir/b.py or dir/.py
 #   @ tag1 tag2 tag3  # Tags to emit for a rule. A rule without tags is a skipping rule.
-#   \fallthrough      # Tags are always included, matching continues to next rule
 #   *                 # Matches any file (catch-all)
 #
 #   ;  # Semicolon to separate rules
@@ -22,11 +21,6 @@
 ! data dask serve ml tune train llm rllib rllib_gpu rllib_directly
 ! linux_wheels macos_wheels docker doc python_dependencies tools
 ! release_tests spark_on_ray
-
-# Default tags are always included via this fallthrough rule
-\fallthrough
-@ always lint
-;
 
 python/ray/air/
 @ ml train tune data linux_wheels
