@@ -1,4 +1,4 @@
-# Ray CI conditional testing rules definition files
+# Ray CI conditional testing rules definition file
 #
 # Comment content, after '#', will be ignored.
 # Empty lines will be ignored too.
@@ -13,24 +13,8 @@
 #
 #   ;  # Semicolon to separate rules
 
-! wanda raycicmd raycirun reefd
-
-wanda/
-@ wanda
-;
-
-raycicmd/
-@ raycicmd
-;
-
-raycirun/
-@ raycirun
-;
-
-reefd/
-@ reefd
-;
+! always lint
 
 *
-# skip
+@ always lint
 ;

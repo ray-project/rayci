@@ -128,23 +128,20 @@ func TestRunTagAnalysis_MultipleConfigFilesNoneExist(t *testing.T) {
 	}
 }
 
-func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
-	// Create two temporary config files
-	// Note: Rules are merged in order, so fallthrough rules should be at the start
-	// of the first config file to ensure they apply to all subsequent rules.
+func TestLoadTagRuleConfigs_MultipleConfigFiles(t *testing.T) {
+	// Each config is evaluated independently and results are merged
 	dir := t.TempDir()
 
 	config1 := filepath.Join(dir, "config1.txt")
 	config1Content := strings.Join([]string{
-		"! always lint tag1 tag2",
-		"",
-		"# Fallthrough rule: always includes these tags (matches everything)",
-		"\\fallthrough",
-		"@ always lint",
-		";",
+		"! tag1 tag2",
 		"",
 		"python/",
 		"@ tag1",
+		";",
+		"",
+		"java/",
+		"@ tag2",
 		";",
 	}, "\n")
 	if err := os.WriteFile(config1, []byte(config1Content), 0644); err != nil {
@@ -167,58 +164,55 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 		t.Fatalf("write config2: %v", err)
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs([]string{config1, config2})
+	ruleSets, err := loadTagRuleConfigs([]string{config1, config2})
 	if err != nil {
-		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
+		t.Fatalf("loadTagRuleConfigs: %v", err)
 	}
 
-	// Rules should be combined (4 total: 1 fallthrough + python/ + java/ + cpp/)
-	if len(merged.RuleSet.rules) != 4 {
-		t.Errorf("len(rules) = %d, want 4", len(merged.RuleSet.rules))
+	// Should have 2 separate rule sets
+	if len(ruleSets) != 2 {
+		t.Errorf("len(ruleSets) = %d, want 2", len(ruleSets))
 	}
 
-	// Test tagsForChangedFiles for python file (includes fallthrough + specific rule tags)
-	pythonTags := tagsForChangedFiles(merged.RuleSet, []string{"python/foo.py"})
+	// Test tagsForChangedFiles for python file (matches only config1)
+	pythonTags := tagsForChangedFiles(ruleSets, []string{"python/foo.py"})
 	sort.Strings(pythonTags)
-	wantPythonTags := []string{"always", "lint", "tag1"}
+	wantPythonTags := []string{"tag1"}
 	if !reflect.DeepEqual(pythonTags, wantPythonTags) {
 		t.Errorf("tagsForChangedFiles(python/foo.py) = %v, want %v", pythonTags, wantPythonTags)
 	}
 
-	// Test tagsForChangedFiles for java file
-	javaTags := tagsForChangedFiles(merged.RuleSet, []string{"java/Main.java"})
+	// Test tagsForChangedFiles for java file (matches both configs - tags are unioned)
+	javaTags := tagsForChangedFiles(ruleSets, []string{"java/Main.java"})
 	sort.Strings(javaTags)
-	wantJavaTags := []string{"always", "lint", "tag3"}
+	wantJavaTags := []string{"tag2", "tag3"}
 	if !reflect.DeepEqual(javaTags, wantJavaTags) {
 		t.Errorf("tagsForChangedFiles(java/Main.java) = %v, want %v", javaTags, wantJavaTags)
 	}
 
-	// Test tagsForChangedFiles for cpp file
-	cppTags := tagsForChangedFiles(merged.RuleSet, []string{"cpp/main.cc"})
+	// Test tagsForChangedFiles for cpp file (matches only config2)
+	cppTags := tagsForChangedFiles(ruleSets, []string{"cpp/main.cc"})
 	sort.Strings(cppTags)
-	wantCppTags := []string{"always", "lint", "tag4"}
+	wantCppTags := []string{"tag4"}
 	if !reflect.DeepEqual(cppTags, wantCppTags) {
 		t.Errorf("tagsForChangedFiles(cpp/main.cc) = %v, want %v", cppTags, wantCppTags)
 	}
-
-	// No \default rules in these configs, so DefaultTags should be empty
-	// (fallthrough rules don't contribute to DefaultTags)
-	if len(merged.DefaultTags) != 0 {
-		t.Errorf("DefaultTags = %v, want empty", merged.DefaultTags)
-	}
 }
 
-func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
-	// Test that default tags from multiple configs are unioned
+func TestLoadTagRuleConfigs_IndependentEvaluation(t *testing.T) {
+	// Test that each config is evaluated independently for each file
 	dir := t.TempDir()
 
 	config1 := filepath.Join(dir, "config1.txt")
 	config1Content := strings.Join([]string{
-		"! always lint debug",
+		"! a b",
 		"",
-		"# Default catch-all rule",
-		"\\default",
-		"@ always lint",
+		"src/",
+		"@ a",
+		";",
+		"",
+		"# Skip other files",
+		"*",
 		";",
 	}, "\n")
 	if err := os.WriteFile(config1, []byte(config1Content), 0644); err != nil {
@@ -227,28 +221,44 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 
 	config2 := filepath.Join(dir, "config2.txt")
 	config2Content := strings.Join([]string{
-		"! debug trace",
+		"! c d",
 		"",
-		"# Default catch-all rule",
-		"\\default",
-		"@ debug trace",
+		"src/",
+		"@ c",
+		";",
+		"",
+		"# Skip other files",
+		"*",
 		";",
 	}, "\n")
 	if err := os.WriteFile(config2, []byte(config2Content), 0644); err != nil {
 		t.Fatalf("write config2: %v", err)
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs([]string{config1, config2})
+	ruleSets, err := loadTagRuleConfigs([]string{config1, config2})
 	if err != nil {
-		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
+		t.Fatalf("loadTagRuleConfigs: %v", err)
 	}
 
-	// DefaultTags should be the union of all \default rule tags
-	wantDefaultTags := []string{"always", "debug", "lint", "trace"}
-	if !reflect.DeepEqual(merged.DefaultTags, wantDefaultTags) {
-		t.Errorf("DefaultTags = %v, want %v", merged.DefaultTags, wantDefaultTags)
+	// src/ file matches first rule in each config
+	tags := tagsForChangedFiles(ruleSets, []string{"src/main.go"})
+	sort.Strings(tags)
+	want := []string{"a", "c"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Errorf("tagsForChangedFiles(src/main.go) = %v, want %v", tags, want)
+	}
+
+	// other file matches skip rule (no tags) in each config
+	otherTags := tagsForChangedFiles(ruleSets, []string{"other/file.txt"})
+	if len(otherTags) != 0 {
+		t.Errorf("tagsForChangedFiles(other/file.txt) = %v, want empty", otherTags)
 	}
 }
+
+var testRulesAlwaysSnapshot = filepath.Join(
+	"testdata",
+	"test_rules_always.txt",
+)
 
 var testRulesSnapshot = filepath.Join(
 	"testdata",
@@ -317,10 +327,6 @@ type TestTagMap map[string]TestTagSet
 // Mimicking test_conditional_testing_pull_request from
 // https://github.com/ray-project/ray/blob/c963d646f0197947429b374cb06f831b47aab5dd/ci/pipeline/test_conditional_testing.py#L87
 func TestWithTestRulesSnapshot(t *testing.T) {
-	// Default tags from the snapshot config file (via \fallthrough\default rule)
-	// These are always included in results via the fallthrough rule.
-	configDefaultTags := []string{"always", "lint"}
-
 	raw := TestTagMap{}
 
 	if err := yaml.Unmarshal([]byte(testsYAML), &raw); err != nil {
@@ -396,7 +402,7 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		})
 
 		tags, err := RunTagAnalysis(
-			[]string{testRulesSnapshot},
+			[]string{testRulesAlwaysSnapshot, testRulesSnapshot},
 			envs,
 			&GitChangeLister{WorkDir: workDir, BaseBranch: "master", Commit: commit},
 		)
@@ -405,7 +411,8 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		}
 
 		want := append([]string{}, tc.Tags...)
-		want = append(want, configDefaultTags...)
+		// Add "always" and "lint" since they're included in every rule
+		want = append(want, "always", "lint")
 		sort.Strings(want)
 		want = slices.Compact(want)
 

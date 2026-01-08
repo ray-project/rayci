@@ -86,10 +86,10 @@ func diffTags(got, want []string) (extra, missing []string) {
 	return extra, missing
 }
 
-func runTestRules(ruleSet *TagRuleSet, testCases []*ruleTestCase) []*testCaseResult {
+func runTestRules(ruleSets []*TagRuleSet, testCases []*ruleTestCase) []*testCaseResult {
 	var failures []*testCaseResult
 	for _, tc := range testCases {
-		got := tagsForChangedFiles(ruleSet, []string{tc.File})
+		got := tagsForChangedFiles(ruleSets, []string{tc.File})
 
 		want := slices.Clone(tc.Tags)
 		sort.Strings(want)
@@ -127,7 +127,8 @@ const testRulesUsage = `usage: rayci test-rules TESTS_FILE
 
 Validates test rules against expected file→tag mappings.
 
-Requires RAYCI_TEST_RULE_FILES environment variable to specify rule files.
+Requires RAYCI_TEST_RULE_FILES environment variable to specify rule files,
+comma-separated list of files.
 
 Test file format:
   # Comments start with #
@@ -149,7 +150,7 @@ func subcmdTestRules(args []string, envs Envs) error {
 		return fmt.Errorf("RAYCI_TEST_RULE_FILES environment variable is required")
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs(rulePaths)
+	ruleSets, err := loadTagRuleConfigs(rulePaths)
 	if err != nil {
 		return fmt.Errorf("load rules: %w", err)
 	}
@@ -162,7 +163,7 @@ func subcmdTestRules(args []string, envs Envs) error {
 		return fmt.Errorf("no test cases found in %s", testsFile)
 	}
 
-	failures := runTestRules(merged.RuleSet, testCases)
+	failures := runTestRules(ruleSets, testCases)
 
 	if len(failures) > 0 {
 		printFailures(failures)

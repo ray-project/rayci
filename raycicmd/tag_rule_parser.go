@@ -10,12 +10,7 @@ import (
 type TagRuleConfig struct {
 	// Rules is the list of tag rules in the order they were defined.
 	// Rules are evaluated in order, and the first matched rule will be used.
-	// This excludes default rules (rules with Default=true).
 	Rules []*TagRule
-
-	// DefaultRules contains rules with Default=true.
-	// These rules match any file and are typically used as catch-all rules.
-	DefaultRules []*TagRule
 
 	// TagDefs is the list of declared tag names in the order they were defined.
 	// These tags are declared with "!" at the start of the file.
@@ -35,33 +30,19 @@ type TagRuleConfig struct {
 //	dir/                # Directory to match
 //	file                # File to match
 //	dir/*.py            # Pattern to match, using glob pattern
-//	\fallthrough        # Tags are always included, matching continues
-//	\default            # Rule matches any file. Used as a final catch-all fallback rule.
 //	@ tag1 tag2         # Tags to emit for a rule. A rule without tags is a skipping rule.
 //	;                   # Semicolon to separate rules
 //
-// Rules are evaluated in order, and the first matched rule will be used
-// (unless it has \fallthrough, which continues matching).
+// Rules are evaluated in order, and the first matched rule will be used.
 func ParseTagRuleConfig(ruleContent string) (*TagRuleConfig, error) {
 	p := &tagRuleParser{}
 	if err := p.parse(ruleContent); err != nil {
 		return nil, err
 	}
 
-	// Separate default rules (Default=true) from regular rules
-	var rules, defaultRules []*TagRule
-	for _, rule := range p.rules {
-		if rule.Default {
-			defaultRules = append(defaultRules, rule)
-		} else {
-			rules = append(rules, rule)
-		}
-	}
-
 	return &TagRuleConfig{
-		Rules:        rules,
-		DefaultRules: defaultRules,
-		TagDefs:      p.tagDefs,
+		Rules:   p.rules,
+		TagDefs: p.tagDefs,
 	}, nil
 }
 
@@ -77,24 +58,17 @@ type pendingRule struct {
 	// patterns is the list of glob patterns (converted to regex patterns) seen
 	// in the order they were parsed.
 	patterns []*regexp.Regexp
-	// fallthrough means this rule's tags are always included.
-	fallthrough_ bool
-	// default_ means this rule matches any file.
-	default_ bool
 	// seenTags is true if we've seen @ tags in this rule.
-	// Directives must come before tags.
 	seenTags bool
 }
 
 func (pr *pendingRule) flush(lineno int) *TagRule {
 	rule := &TagRule{
-		Tags:        pr.tags,
-		Lineno:      lineno,
-		Dirs:        pr.dirs,
-		Files:       pr.files,
-		Patterns:    pr.patterns,
-		Fallthrough: pr.fallthrough_,
-		Default:     pr.default_,
+		Tags:     pr.tags,
+		Lineno:   lineno,
+		Dirs:     pr.dirs,
+		Files:    pr.files,
+		Patterns: pr.patterns,
 	}
 	*pr = pendingRule{} // reset all fields
 	return rule
@@ -102,8 +76,7 @@ func (pr *pendingRule) flush(lineno int) *TagRule {
 
 func (pr *pendingRule) isEmpty() bool {
 	return len(pr.tags) == 0 && len(pr.dirs) == 0 &&
-		len(pr.files) == 0 && len(pr.patterns) == 0 &&
-		!pr.fallthrough_ && !pr.default_ && !pr.seenTags
+		len(pr.files) == 0 && len(pr.patterns) == 0 && !pr.seenTags
 }
 
 // tagRuleParser holds the intermediate state while parsing rule config content.
@@ -118,9 +91,6 @@ type tagRuleParser struct {
 	lineno int
 	// tagDefsEnded is true if the tag definitions have ended.
 	tagDefsEnded bool
-	// seenDefaultRule is true if we've seen a \default rule.
-	// Non-default rules cannot appear after default rules.
-	seenDefaultRule bool
 }
 
 func (p *tagRuleParser) parse(ruleContent string) error {
@@ -151,8 +121,6 @@ func (p *tagRuleParser) parseLine(rawLine string) error {
 		p.handleTags(line)
 	case strings.HasPrefix(line, ";"):
 		return p.handleRuleEnd(line)
-	case strings.HasPrefix(line, "\\"):
-		return p.handleDirective(line)
 	default:
 		return p.handlePathOrPattern(line)
 	}
@@ -184,32 +152,6 @@ func (p *tagRuleParser) handleTagDef(line string) error {
 	return nil
 }
 
-// handleDirective handles rule directives that modify rule behavior.
-// Supported directives:
-//   - \fallthrough: Tags are always included, matching continues to next rule
-//   - \default: Rule matches any file. Used as a final catch-all fallback rule.
-//
-// Directives must appear before @ tags within a rule.
-func (p *tagRuleParser) handleDirective(line string) error {
-	// Directives must come before tags
-	if p.pending.seenTags {
-		return fmt.Errorf(
-			"directive on line %d must appear before @ tags",
-			p.lineno,
-		)
-	}
-	directive := strings.TrimPrefix(line, "\\")
-	switch directive {
-	case "fallthrough":
-		p.pending.fallthrough_ = true
-	case "default":
-		p.pending.default_ = true
-	default:
-		return fmt.Errorf("unknown directive on line %d: %s", p.lineno, line)
-	}
-	return nil
-}
-
 // handleTags takes all tags separated by whitespace and adds them to the pending rule's tags list.
 func (p *tagRuleParser) handleTags(line string) {
 	if fields := strings.Fields(strings.TrimPrefix(line, "@")); len(fields) > 0 {
@@ -218,26 +160,8 @@ func (p *tagRuleParser) handleTags(line string) {
 	}
 }
 
-// validateAndAppendRule validates the pending rule and appends it to the rules list.
+// validateAndAppendRule appends the pending rule to the rules list.
 func (p *tagRuleParser) validateAndAppendRule() error {
-	// Validate that a rule cannot be both default and fallthrough
-	if p.pending.default_ && p.pending.fallthrough_ {
-		return fmt.Errorf(
-			"rule on line %d cannot have both \\default and \\fallthrough",
-			p.lineno,
-		)
-	}
-	// Validate that non-default rules cannot appear after default rules
-	if p.seenDefaultRule && !p.pending.default_ {
-		return fmt.Errorf(
-			"non-default rule on line %d cannot appear after \\default rules",
-			p.lineno,
-		)
-	}
-	// Track that we've seen a default rule
-	if p.pending.default_ {
-		p.seenDefaultRule = true
-	}
 	p.rules = append(p.rules, p.pending.flush(p.lineno))
 	return nil
 }

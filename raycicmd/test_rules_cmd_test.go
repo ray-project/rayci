@@ -81,7 +81,7 @@ func TestParseTestCases_LineNumbers(t *testing.T) {
 	}
 }
 
-func newTestRuleSet(t *testing.T, rulesContent string) *TagRuleSet {
+func newTestRuleSets(t *testing.T, rulesContent string) []*TagRuleSet {
 	t.Helper()
 	cfg, err := ParseTagRuleConfig(rulesContent)
 	if err != nil {
@@ -89,14 +89,13 @@ func newTestRuleSet(t *testing.T, rulesContent string) *TagRuleSet {
 	}
 
 	ruleSet := &TagRuleSet{
-		tagDefs:      make(map[string]struct{}),
-		rules:        cfg.Rules,
-		defaultRules: cfg.DefaultRules,
+		tagDefs: make(map[string]struct{}),
+		rules:   cfg.Rules,
 	}
 	for _, tag := range cfg.TagDefs {
 		ruleSet.tagDefs[tag] = struct{}{}
 	}
-	return ruleSet
+	return []*TagRuleSet{ruleSet}
 }
 
 func TestParseTestCases_InvalidFormat(t *testing.T) {
@@ -129,23 +128,19 @@ func TestRunTestRules_AllPass(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint data",
 		"",
-		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
 		"python/ray/data/",
-		"@ data",
+		"@ always lint data",
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSets := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
 		{File: "python/ray/data/dataset.py", Tags: []string{"always", "lint", "data"}, Lineno: 2},
 	}
 
-	failures := runTestRules(ruleSet, testCases)
+	failures := runTestRules(ruleSets, testCases)
 
 	if len(failures) != 0 {
 		t.Errorf("len(failures) = %d, want 0", len(failures))
@@ -156,16 +151,12 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint data",
 		"",
-		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
 		"python/ray/data/",
-		"@ data",
+		"@ always lint data",
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSets := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
@@ -173,7 +164,7 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 		{File: "python/ray/data/dataset.py", Tags: []string{"always", "lint", "daat"}, Lineno: 2},
 	}
 
-	failures := runTestRules(ruleSet, testCases)
+	failures := runTestRules(ruleSets, testCases)
 
 	if len(failures) != 1 {
 		t.Errorf("len(failures) = %d, want 1", len(failures))
@@ -277,18 +268,19 @@ func TestRunTestRules_DuplicateTagsInExpected(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint",
 		"",
-		"\\fallthrough",
+		"# Catch-all rule",
+		"*",
 		"@ always lint",
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSets := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "foo.py", Tags: []string{"always", "lint", "always", "lint"}, Lineno: 1},
 	}
 
-	failures := runTestRules(ruleSet, testCases)
+	failures := runTestRules(ruleSets, testCases)
 
 	if len(failures) != 0 {
 		t.Errorf("len(failures) = %d, want 0 (duplicates should be deduplicated)", len(failures))
@@ -299,14 +291,15 @@ func TestRunTestRules_EmptyTestCases(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always",
 		"",
-		"\\fallthrough",
+		"# Catch-all rule",
+		"*",
 		"@ always",
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSets := newTestRuleSets(t, rulesContent)
 
-	failures := runTestRules(ruleSet, nil)
+	failures := runTestRules(ruleSets, nil)
 
 	if len(failures) != 0 {
 		t.Errorf("len(failures) = %d, want 0", len(failures))
