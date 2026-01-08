@@ -81,7 +81,7 @@ func TestParseTestCases_LineNumbers(t *testing.T) {
 	}
 }
 
-func newTestRuleSet(t *testing.T, rulesContent string) *TagRuleSet {
+func newTestRuleSets(t *testing.T, rulesContent string) []*TagRuleSet {
 	t.Helper()
 	cfg, err := ParseTagRuleConfig(rulesContent)
 	if err != nil {
@@ -96,7 +96,7 @@ func newTestRuleSet(t *testing.T, rulesContent string) *TagRuleSet {
 	for _, tag := range cfg.TagDefs {
 		ruleSet.tagDefs[tag] = struct{}{}
 	}
-	return ruleSet
+	return []*TagRuleSet{ruleSet}
 }
 
 func TestParseTestCases_InvalidFormat(t *testing.T) {
@@ -138,7 +138,7 @@ func TestRunTestRules_AllPass(t *testing.T) {
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSet := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
@@ -165,7 +165,7 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSet := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "python/ray/data/__init__.py", Tags: []string{"always", "lint", "data"}, Lineno: 1},
@@ -282,7 +282,7 @@ func TestRunTestRules_DuplicateTagsInExpected(t *testing.T) {
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSet := newTestRuleSets(t, rulesContent)
 
 	testCases := []*ruleTestCase{
 		{File: "foo.py", Tags: []string{"always", "lint", "always", "lint"}, Lineno: 1},
@@ -304,7 +304,7 @@ func TestRunTestRules_EmptyTestCases(t *testing.T) {
 		";",
 	}, "\n")
 
-	ruleSet := newTestRuleSet(t, rulesContent)
+	ruleSet := newTestRuleSets(t, rulesContent)
 
 	failures := runTestRules(ruleSet, nil)
 

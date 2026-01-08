@@ -8,26 +8,10 @@ import (
 	"strings"
 )
 
-// mergedTagRuleConfig holds the result of merging multiple tag rule config files.
-type mergedTagRuleConfig struct {
-	// RuleSet contains the merged rules for matching files to tags.
-	RuleSet *TagRuleSet
-	// DefaultTags contains the union of all default tags across all configs.
-	// These are tags from default rules (\default).
-	DefaultTags []string
-}
-
-// loadAndMergeTagRuleConfigs loads and merges tag rule configurations from multiple files.
-// Tag definitions and rules from all files are combined into a single TagRuleSet.
-// Default tags (from \default rules) are unioned across all configs.
-func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, error) {
-	merged := &mergedTagRuleConfig{
-		RuleSet: &TagRuleSet{
-			tagDefs: make(map[string]struct{}),
-		},
-	}
-
-	defaultTagSet := make(map[string]struct{})
+// loadTagRuleConfigs loads tag rule configurations from multiple files.
+// Each config file is loaded into its own TagRuleSet for independent evaluation.
+func loadTagRuleConfigs(configPaths []string) ([]*TagRuleSet, error) {
+	var ruleSets []*TagRuleSet
 
 	for _, configPath := range configPaths {
 		ruleContent, err := os.ReadFile(configPath)
@@ -40,32 +24,23 @@ func loadAndMergeTagRuleConfigs(configPaths []string) (*mergedTagRuleConfig, err
 			return nil, err
 		}
 
+		ruleSet := &TagRuleSet{
+			tagDefs:      make(map[string]struct{}),
+			rules:        cfg.Rules,
+			defaultRules: cfg.DefaultRules,
+		}
 		for _, tagDef := range cfg.TagDefs {
-			merged.RuleSet.tagDefs[tagDef] = struct{}{}
+			ruleSet.tagDefs[tagDef] = struct{}{}
 		}
-		merged.RuleSet.rules = append(merged.RuleSet.rules, cfg.Rules...)
-		merged.RuleSet.defaultRules = append(merged.RuleSet.defaultRules, cfg.DefaultRules...)
 
-		// Collect default tags from default rules
-		for _, rule := range cfg.DefaultRules {
-			for _, tag := range rule.Tags {
-				defaultTagSet[tag] = struct{}{}
-			}
+		if err := ruleSet.ValidateRules(); err != nil {
+			return nil, fmt.Errorf("validate tag rule config %s: %w", configPath, err)
 		}
+
+		ruleSets = append(ruleSets, ruleSet)
 	}
 
-	// Convert default tag set to sorted slice
-	merged.DefaultTags = make([]string, 0, len(defaultTagSet))
-	for tag := range defaultTagSet {
-		merged.DefaultTags = append(merged.DefaultTags, tag)
-	}
-	sort.Strings(merged.DefaultTags)
-
-	if err := merged.RuleSet.ValidateRules(); err != nil {
-		return nil, err
-	}
-
-	return merged, nil
+	return ruleSets, nil
 }
 
 // isPullRequest returns true if the current build is for a pull request.
@@ -95,40 +70,28 @@ func needRunAllTags(env Envs) (bool, string) {
 }
 
 // tagsForChangedFiles determines which tags to run based on changed files.
-// For each file, rules are evaluated in order:
-//   - If a rule matches, its tags are added to the result
-//   - If the rule has Fallthrough=true, continue to the next rule
-//   - Otherwise, stop processing rules for this file
-//
-// If no non-fallthrough rule matches a file, default rules are applied.
-// Fallthrough rules add tags but don't prevent default rule fallback.
-func tagsForChangedFiles(ruleSet *TagRuleSet, files []string) []string {
+// Each rule set is evaluated independently for each file. The first matching
+// rule in each rule set determines the tags for that file from that config.
+// Tags from all rule sets are unioned together.
+func tagsForChangedFiles(ruleSets []*TagRuleSet, files []string) []string {
 	tagSet := make(map[string]struct{})
 
 	for _, file := range files {
-		terminatingRuleMatched := false
-		for _, rule := range ruleSet.rules {
-			if rule.Match(file) {
-				for _, tag := range rule.Tags {
+		fileMatched := false
+		for _, ruleSet := range ruleSets {
+			tags, matched := ruleSet.MatchTags(file)
+			// Include tags if either:
+			// - A terminating rule matched (matched=true), or
+			// - Default rules provided tags (matched=false but tags non-empty)
+			if matched || len(tags) > 0 {
+				fileMatched = true
+				for _, tag := range tags {
 					tagSet[tag] = struct{}{}
-				}
-				if !rule.Fallthrough {
-					terminatingRuleMatched = true
-					break // stop processing rules for this file
 				}
 			}
 		}
-		// If no terminating rule matched, apply default rules from all configs
-		if !terminatingRuleMatched {
-			if len(ruleSet.defaultRules) > 0 {
-				for _, rule := range ruleSet.defaultRules {
-					for _, tag := range rule.Tags {
-						tagSet[tag] = struct{}{}
-					}
-				}
-			} else {
-				log.Printf("unhandled file (no matching rule): %s", file)
-			}
+		if !fileMatched {
+			log.Printf("unhandled file (no matching rule): %s", file)
 		}
 	}
 
@@ -187,7 +150,7 @@ func RunTagAnalysis(
 		)
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs(configPaths)
+	ruleSets, err := loadTagRuleConfigs(configPaths)
 	if err != nil {
 		return nil, fmt.Errorf("load tag rules: %w", err)
 	}
@@ -200,7 +163,7 @@ func RunTagAnalysis(
 	log.Printf("base branch: %s, commit: %s", baseBranch, commit)
 	log.Printf("changed files: %v", changedFiles)
 
-	tags := tagsForChangedFiles(merged.RuleSet, changedFiles)
+	tags := tagsForChangedFiles(ruleSets, changedFiles)
 	log.Printf("selected tags: %s", strings.Join(tags, " "))
 
 	return tags, nil

@@ -10,17 +10,10 @@
 #   file  # File to match
 #   dir/*.py  # Pattern to match, using fnmatch, matches dir/a.py dir/dir/b.py or dir/.py
 #   @ tag1 tag2 tag3  # Tags to emit for a rule. A rule without tags is a skipping rule.
-#   \fallthrough      # Tags are always included, matching continues to next rule
-#   \default          # Rule matches any file (catch-all)
 #
 #   ;  # Semicolon to separate rules
 
-! always lint
 ! wanda raycicmd raycirun reefd
-
-\fallthrough
-@ always lint
-;
 
 wanda/
 @ wanda
@@ -38,6 +31,6 @@ reefd/
 @ reefd
 ;
 
-\default
-@ wanda raycicmd raycirun reefd
+*
+# skip - files not matching above rules get no tags from this config
 ;

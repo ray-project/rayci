@@ -128,23 +128,20 @@ func TestRunTagAnalysis_MultipleConfigFilesNoneExist(t *testing.T) {
 	}
 }
 
-func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
-	// Create two temporary config files
-	// Note: Rules are merged in order, so fallthrough rules should be at the start
-	// of the first config file to ensure they apply to all subsequent rules.
+func TestLoadTagRuleConfigs_MultipleConfigFiles(t *testing.T) {
+	// Each config is evaluated independently and results are merged
 	dir := t.TempDir()
 
 	config1 := filepath.Join(dir, "config1.txt")
 	config1Content := strings.Join([]string{
-		"! always lint tag1 tag2",
-		"",
-		"# Fallthrough rule: always includes these tags (matches everything)",
-		"\\fallthrough",
-		"@ always lint",
-		";",
+		"! always lint tag1",
 		"",
 		"python/",
-		"@ tag1",
+		"@ always lint tag1",
+		";",
+		"",
+		"*",
+		"@ always lint",
 		";",
 	}, "\n")
 	if err := os.WriteFile(config1, []byte(config1Content), 0644); err != nil {
@@ -167,18 +164,20 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 		t.Fatalf("write config2: %v", err)
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs([]string{config1, config2})
+	ruleSets, err := loadTagRuleConfigs([]string{config1, config2})
 	if err != nil {
-		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
+		t.Fatalf("loadTagRuleConfigs: %v", err)
 	}
 
-	// Rules should be combined (4 total: 1 fallthrough + python/ + java/ + cpp/)
-	if len(merged.RuleSet.rules) != 4 {
-		t.Errorf("len(rules) = %d, want 4", len(merged.RuleSet.rules))
+	// Should have 2 separate rule sets
+	if len(ruleSets) != 2 {
+		t.Errorf("len(ruleSets) = %d, want 2", len(ruleSets))
 	}
 
-	// Test tagsForChangedFiles for python file (includes fallthrough + specific rule tags)
-	pythonTags := tagsForChangedFiles(merged.RuleSet, []string{"python/foo.py"})
+	// Test tagsForChangedFiles for python file
+	// config1: python/ matches (always, lint, tag1)
+	// config2: no match (no catch-all rule)
+	pythonTags := tagsForChangedFiles(ruleSets, []string{"python/foo.py"})
 	sort.Strings(pythonTags)
 	wantPythonTags := []string{"always", "lint", "tag1"}
 	if !reflect.DeepEqual(pythonTags, wantPythonTags) {
@@ -186,7 +185,9 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 	}
 
 	// Test tagsForChangedFiles for java file
-	javaTags := tagsForChangedFiles(merged.RuleSet, []string{"java/Main.java"})
+	// config1: * catch-all matches (always, lint)
+	// config2: java/ matches (tag3)
+	javaTags := tagsForChangedFiles(ruleSets, []string{"java/Main.java"})
 	sort.Strings(javaTags)
 	wantJavaTags := []string{"always", "lint", "tag3"}
 	if !reflect.DeepEqual(javaTags, wantJavaTags) {
@@ -194,21 +195,75 @@ func TestLoadTagRuleSet_MultipleConfigFiles(t *testing.T) {
 	}
 
 	// Test tagsForChangedFiles for cpp file
-	cppTags := tagsForChangedFiles(merged.RuleSet, []string{"cpp/main.cc"})
+	// config1: * catch-all matches (always, lint)
+	// config2: cpp/ matches (tag4)
+	cppTags := tagsForChangedFiles(ruleSets, []string{"cpp/main.cc"})
 	sort.Strings(cppTags)
 	wantCppTags := []string{"always", "lint", "tag4"}
 	if !reflect.DeepEqual(cppTags, wantCppTags) {
 		t.Errorf("tagsForChangedFiles(cpp/main.cc) = %v, want %v", cppTags, wantCppTags)
 	}
+}
 
-	// No \default rules in these configs, so DefaultTags should be empty
-	// (fallthrough rules don't contribute to DefaultTags)
-	if len(merged.DefaultTags) != 0 {
-		t.Errorf("DefaultTags = %v, want empty", merged.DefaultTags)
+func TestLoadTagRuleConfigs_IndependentEvaluation(t *testing.T) {
+	// Test that each config is evaluated independently for each file
+	dir := t.TempDir()
+
+	config1 := filepath.Join(dir, "config1.txt")
+	config1Content := strings.Join([]string{
+		"! a b",
+		"",
+		"src/",
+		"@ a",
+		";",
+		"",
+		"*",
+		"@ b",
+		";",
+	}, "\n")
+	if err := os.WriteFile(config1, []byte(config1Content), 0644); err != nil {
+		t.Fatalf("write config1: %v", err)
+	}
+
+	config2 := filepath.Join(dir, "config2.txt")
+	config2Content := strings.Join([]string{
+		"! c d",
+		"",
+		"src/",
+		"@ c",
+		";",
+		"",
+		"*",
+		"@ d",
+		";",
+	}, "\n")
+	if err := os.WriteFile(config2, []byte(config2Content), 0644); err != nil {
+		t.Fatalf("write config2: %v", err)
+	}
+
+	ruleSets, err := loadTagRuleConfigs([]string{config1, config2})
+	if err != nil {
+		t.Fatalf("loadTagRuleConfigs: %v", err)
+	}
+
+	// src/ file matches src/ rule in both configs
+	tags := tagsForChangedFiles(ruleSets, []string{"src/main.go"})
+	sort.Strings(tags)
+	want := []string{"a", "c"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Errorf("tagsForChangedFiles(src/main.go) = %v, want %v", tags, want)
+	}
+
+	// other file hits catch-all rule in both configs
+	otherTags := tagsForChangedFiles(ruleSets, []string{"other/file.txt"})
+	sort.Strings(otherTags)
+	wantOther := []string{"b", "d"}
+	if !reflect.DeepEqual(otherTags, wantOther) {
+		t.Errorf("tagsForChangedFiles(other/file.txt) = %v, want %v", otherTags, wantOther)
 	}
 }
 
-func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
+func TestLoadTagRuleConfigs_DefaultTagsUnion(t *testing.T) {
 	// Test that default tags from multiple configs are unioned
 	dir := t.TempDir()
 
@@ -238,15 +293,16 @@ func TestLoadTagRuleSet_DefaultTagsUnion(t *testing.T) {
 		t.Fatalf("write config2: %v", err)
 	}
 
-	merged, err := loadAndMergeTagRuleConfigs([]string{config1, config2})
+	ruleSets, err := loadTagRuleConfigs([]string{config1, config2})
 	if err != nil {
-		t.Fatalf("loadAndMergeTagRuleConfigs: %v", err)
+		t.Fatalf("loadTagRuleConfigs: %v", err)
 	}
 
-	// DefaultTags should be the union of all \default rule tags
-	wantDefaultTags := []string{"always", "debug", "lint", "trace"}
-	if !reflect.DeepEqual(merged.DefaultTags, wantDefaultTags) {
-		t.Errorf("DefaultTags = %v, want %v", merged.DefaultTags, wantDefaultTags)
+	// Evaluate a file that doesn't match any specific rule - should get union of default tags
+	tags := tagsForChangedFiles(ruleSets, []string{"any/file.txt"})
+	wantTags := []string{"always", "debug", "lint", "trace"}
+	if !reflect.DeepEqual(tags, wantTags) {
+		t.Errorf("tagsForChangedFiles(any/file.txt) = %v, want %v", tags, wantTags)
 	}
 }
 
