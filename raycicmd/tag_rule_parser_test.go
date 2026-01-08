@@ -629,21 +629,6 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_FallthroughDirectiveError(t *testing.T) {
-	// \fallthrough directive is no longer supported
-	inputs := []string{
-		"! tag1\n\\fallthrough\n@ tag1\n;",
-		"! tag1 tag2\n\\fallthrough\n@ tag1\n;\n*\n@ tag2\n;",
-	}
-
-	for _, input := range inputs {
-		_, err := ParseTagRuleConfig(input)
-		if err == nil {
-			t.Errorf("expected error for input %q, got nil", input)
-		}
-	}
-}
-
 func TestTagRuleParserParse_CatchAllRule(t *testing.T) {
 	input := "! tag1 fallback\npython/\n@ tag1\n;\n*\n@ fallback\n;"
 	cfg, err := ParseTagRuleConfig(input)
@@ -668,40 +653,23 @@ func TestTagRuleParserParse_CatchAllRule(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_DefaultDirectiveError(t *testing.T) {
-	// \default directive is no longer supported - use * glob pattern instead
-	inputs := []string{
-		"! tag1\n\\default\n@ tag1\n;",
-		"! tag1 tag2\npython/\n@ tag1\n;\n\\default\n@ tag2\n;",
+func TestTagRuleParserParse_DirectiveLikeStringIsFilePath(t *testing.T) {
+	// Test that a line that looks like a directive is now treated as a file path.
+	input := "! tag1\n\\fallthrough\n@ tag1\n;"
+	cfg, err := ParseTagRuleConfig(input)
+	if err != nil {
+		t.Fatalf("Parse() unexpected error: %v", err)
 	}
 
-	for _, input := range inputs {
-		_, err := ParseTagRuleConfig(input)
-		if err == nil {
-			t.Errorf("expected error for input %q, got nil", input)
-		}
-	}
-}
-
-func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
-	_, err := ParseTagRuleConfig("! tag1\n\\unknown\n@ tag1\n;")
-	if err == nil {
-		t.Error("expected error for unknown directive, got nil")
-	}
-}
-
-func TestTagRuleParserParse_DirectiveAlwaysErrors(t *testing.T) {
-	// All directives are now errors (no supported directives)
-	inputs := []string{
-		"! tag1\n\\fallthrough\n@ tag1\n;",
-		"! tag1\n\\default\n@ tag1\n;",
-		"! tag1\n\\unknown\n@ tag1\n;",
+	if len(cfg.Rules) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(cfg.Rules))
 	}
 
-	for _, input := range inputs {
-		_, err := ParseTagRuleConfig(input)
-		if err == nil {
-			t.Errorf("expected error for input %q, got nil", input)
-		}
+	rule := cfg.Rules[0]
+	if len(rule.Files) != 1 || rule.Files[0] != "\\fallthrough" {
+		t.Errorf("expected file path '\\fallthrough', got %v", rule.Files)
+	}
+	if !reflect.DeepEqual(rule.Tags, []string{"tag1"}) {
+		t.Errorf("expected tags ['tag1'], got %v", rule.Tags)
 	}
 }
