@@ -1,4 +1,4 @@
-# Ray CI conditional testing rules definition file
+# Ray CI conditional testing rule definition file
 #
 # This file provides base tag (lint) that apply to ALL files.
 # It is evaluated independently from other rule files, and tags are unioned.
