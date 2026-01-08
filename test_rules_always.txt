@@ -1,0 +1,17 @@
+# Ray CI conditional testing rules definition file
+#
+# This file provides base tags (always, lint) that apply to ALL files.
+# It is evaluated independently from other rule files, and tags are unioned.
+#
+#   ! tag1 tag2 tag3  # Declares a tag. A tag must be declared first to be used.
+#   dir/              # Directory to match
+#   file              # File to match
+#   dir/*.py          # Pattern to match
+#   @ tag1 tag2 tag3  # Tags to emit for a rule
+#   ;                 # Semicolon to separate rules
+
+! always lint
+
+*
+@ always lint
+;
