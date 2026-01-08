@@ -12,7 +12,7 @@
 #   dir/*.py  # Pattern to match, using fnmatch, matches dir/a.py dir/dir/b.py or dir/.py
 #   @ tag1 tag2 tag3  # Tags to emit for a rule. A rule without tags is a skipping rule.
 #   \fallthrough      # Tags are always included, matching continues to next rule
-#   \default          # Rule matches any file (catch-all)
+#   *                 # Matches any file (catch-all)
 #
 #   ;  # Semicolon to separate rules
 
@@ -268,7 +268,7 @@ setup_hooks.sh
 
 # Fallback rule: matches any file not matched by previous rules
 # These tags are added for unhandled files as a catch-all
-\default
+*
 @ ml tune train data serve
 @ core_cpp cpp java python doc
 @ linux_wheels macos_wheels dashboard tools release_tests

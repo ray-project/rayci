@@ -629,53 +629,34 @@ func TestTagRuleParserParse_FlushFinalRuleOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
+func TestTagRuleParserParse_FallthroughDirective(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            string
-		wantRules        int // regular rules count
-		wantDefaultRules int // default rules count (Default=true)
-		wantTagDefs      []string
-		// Expected regular rules (non-default)
-		wantRegularTags [][]string
-		// Expected default rules (Default=true)
-		wantDefaultTags [][]string
+		name        string
+		input       string
+		wantRules   int
+		wantTags    [][]string
+		wantTagDefs []string
 	}{
 		{
-			name:             "fallthrough directive only",
-			input:            "! tag1\n\\fallthrough\n@ tag1\n;",
-			wantRules:        1, // fallthrough without default goes to regular rules
-			wantDefaultRules: 0,
-			wantRegularTags:  [][]string{{"tag1"}},
-			wantDefaultTags:  nil,
-			wantTagDefs:      []string{"tag1"},
+			name:        "fallthrough directive",
+			input:       "! tag1\n\\fallthrough\n@ tag1\n;",
+			wantRules:   1,
+			wantTags:    [][]string{{"tag1"}},
+			wantTagDefs: []string{"tag1"},
 		},
 		{
-			name:             "default directive only",
-			input:            "! tag1\n\\default\n@ tag1\n;",
-			wantRules:        0,
-			wantDefaultRules: 1, // default goes to DefaultRules
-			wantRegularTags:  nil,
-			wantDefaultTags:  [][]string{{"tag1"}},
-			wantTagDefs:      []string{"tag1"},
+			name:        "fallthrough with catch-all",
+			input:       "! tag1 tag2\n\\fallthrough\n@ tag1\n;\n*\n@ tag2\n;",
+			wantRules:   2,
+			wantTags:    [][]string{{"tag1"}, {"tag2"}},
+			wantTagDefs: []string{"tag1", "tag2"},
 		},
 		{
-			name:             "multiple rules with fallthrough then default",
-			input:            "! tag1 tag2\n\\fallthrough\n@ tag1\n;\n\\default\n@ tag2\n;",
-			wantRules:        1, // fallthrough rule
-			wantDefaultRules: 1, // default rule
-			wantRegularTags:  [][]string{{"tag1"}},
-			wantDefaultTags:  [][]string{{"tag2"}},
-			wantTagDefs:      []string{"tag1", "tag2"},
-		},
-		{
-			name:             "default rule at end for catch-all",
-			input:            "! tag1 fallback\npython/\n@ tag1\n;\n\\default\n@ fallback\n;",
-			wantRules:        1, // python/ rule
-			wantDefaultRules: 1, // default catch-all rule
-			wantRegularTags:  [][]string{{"tag1"}},
-			wantDefaultTags:  [][]string{{"fallback"}},
-			wantTagDefs:      []string{"tag1", "fallback"},
+			name:        "catch-all rule at end",
+			input:       "! tag1 fallback\npython/\n@ tag1\n;\n*\n@ fallback\n;",
+			wantRules:   2,
+			wantTags:    [][]string{{"tag1"}, {"fallback"}},
+			wantTagDefs: []string{"tag1", "fallback"},
 		},
 	}
 
@@ -687,27 +668,12 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 			}
 
 			if len(cfg.Rules) != tt.wantRules {
-				t.Fatalf("got %d regular rules, want %d", len(cfg.Rules), tt.wantRules)
+				t.Fatalf("got %d rules, want %d", len(cfg.Rules), tt.wantRules)
 			}
 
-			if len(cfg.DefaultRules) != tt.wantDefaultRules {
-				t.Fatalf("got %d default rules, want %d", len(cfg.DefaultRules), tt.wantDefaultRules)
-			}
-
-			// Check regular rules
 			for i, rule := range cfg.Rules {
-				if !reflect.DeepEqual(rule.Tags, tt.wantRegularTags[i]) {
-					t.Errorf("regular rule %d: Tags = %v, want %v", i, rule.Tags, tt.wantRegularTags[i])
-				}
-			}
-
-			// Check default rules
-			for i, rule := range cfg.DefaultRules {
-				if !rule.Default {
-					t.Errorf("default rule %d: expected Default=true, got Default=%v", i, rule.Default)
-				}
-				if !reflect.DeepEqual(rule.Tags, tt.wantDefaultTags[i]) {
-					t.Errorf("default rule %d: Tags = %v, want %v", i, rule.Tags, tt.wantDefaultTags[i])
+				if !reflect.DeepEqual(rule.Tags, tt.wantTags[i]) {
+					t.Errorf("rule %d: Tags = %v, want %v", i, rule.Tags, tt.wantTags[i])
 				}
 			}
 
@@ -718,50 +684,17 @@ func TestTagRuleParserParse_FallthroughAndDefaultDirectives(t *testing.T) {
 	}
 }
 
-func TestTagRuleParserParse_DefaultAndFallthroughError(t *testing.T) {
-	// A rule cannot have both \default and \fallthrough
+func TestTagRuleParserParse_DefaultDirectiveError(t *testing.T) {
+	// \default directive is no longer supported - use * glob pattern instead
 	inputs := []string{
-		"! tag1\n\\fallthrough\n\\default\n@ tag1\n;",
-		"! tag1\n\\default\n\\fallthrough\n@ tag1\n;",
-		"! tag1\n\\fallthrough\n\\default\n@ tag1", // without semicolon
+		"! tag1\n\\default\n@ tag1\n;",
+		"! tag1 tag2\npython/\n@ tag1\n;\n\\default\n@ tag2\n;",
 	}
 
 	for _, input := range inputs {
 		_, err := ParseTagRuleConfig(input)
 		if err == nil {
 			t.Errorf("expected error for input %q, got nil", input)
-		}
-	}
-}
-
-func TestTagRuleParserParse_DefaultMustBeLast(t *testing.T) {
-	// Non-default rules cannot appear after default rules
-	errorInputs := []string{
-		// default rule followed by non-default rule
-		"! tag1 tag2\n\\default\n@ tag1\n;\npython/\n@ tag2\n;",
-		// default rule followed by non-default rule (without semicolon)
-		"! tag1 tag2\n\\default\n@ tag1\n;\npython/\n@ tag2",
-	}
-
-	for _, input := range errorInputs {
-		_, err := ParseTagRuleConfig(input)
-		if err == nil {
-			t.Errorf("expected error for input %q, got nil", input)
-		}
-	}
-
-	// Valid: multiple default rules at the end
-	validInputs := []string{
-		// non-default followed by default
-		"! tag1 tag2\npython/\n@ tag1\n;\n\\default\n@ tag2\n;",
-		// multiple default rules at the end
-		"! tag1 tag2 tag3\npython/\n@ tag1\n;\n\\default\n@ tag2\n;\n\\default\n@ tag3\n;",
-	}
-
-	for _, input := range validInputs {
-		_, err := ParseTagRuleConfig(input)
-		if err != nil {
-			t.Errorf("unexpected error for input %q: %v", input, err)
 		}
 	}
 }
@@ -776,10 +709,7 @@ func TestTagRuleParserParse_UnknownDirective(t *testing.T) {
 func TestTagRuleParserParse_DirectiveMustComeBeforeTags(t *testing.T) {
 	// Directives must come before @ tags
 	errorInputs := []string{
-		// directive after tags
 		"! tag1\n@ tag1\n\\fallthrough\n;",
-		"! tag1\n@ tag1\n\\default\n;",
-		// directive after tags (without semicolon)
 		"! tag1\n@ tag1\n\\fallthrough",
 	}
 
@@ -793,9 +723,7 @@ func TestTagRuleParserParse_DirectiveMustComeBeforeTags(t *testing.T) {
 	// Valid: directive before tags
 	validInputs := []string{
 		"! tag1\n\\fallthrough\n@ tag1\n;",
-		"! tag1\n\\default\n@ tag1\n;",
-		// Multiple @ lines after directive
-		"! tag1 tag2\n\\default\n@ tag1\n@ tag2\n;",
+		"! tag1 tag2\n\\fallthrough\n@ tag1\n@ tag2\n;",
 	}
 
 	for _, input := range validInputs {

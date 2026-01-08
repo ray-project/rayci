@@ -24,9 +24,6 @@ type TagRule struct {
 	// Fallthrough means this rule's tags are always included, and matching
 	// continues to find more specific rules. Used with \fallthrough directive.
 	Fallthrough bool
-	// Default means this rule matches any file. Used as a catch-all with \default
-	// directive.
-	Default bool
 }
 
 // globToRegexp converts a glob pattern to an equivalent regex pattern.
@@ -59,13 +56,8 @@ func globToRegexp(pattern string) (*regexp.Regexp, error) {
 
 // Match returns true if the given file path matches any of the rule's
 // directories, files, or glob patterns.
-// A rule with Default=true matches any file.
 // A rule with Fallthrough=true and no paths also matches any file.
 func (r *TagRule) Match(changedFilePath string) bool {
-	if r.Default {
-		return true
-	}
-
 	// Fallthrough rules without paths match everything
 	hasNoPaths := len(r.Dirs) == 0 && len(r.Files) == 0 && len(r.Patterns) == 0
 	if r.Fallthrough && hasNoPaths {
@@ -107,17 +99,13 @@ func (r *TagRule) MatchTags(changedFilePath string) ([]string, bool) {
 type TagRuleSet struct {
 	// tagDefs is the set of all defined tags.
 	tagDefs map[string]struct{}
-	// rules is a list of non-default TagRule instances in the order they were parsed.
+	// rules is a list of TagRule instances in the order they were parsed.
 	rules []*TagRule
-	// defaultRules is a list of default (catch-all) TagRule instances.
-	// These are used when no other rule matches.
-	defaultRules []*TagRule
 }
 
 // ValidateRules validates that all tags used in the rules are defined.
 func (s *TagRuleSet) ValidateRules() error {
-	allRules := append(s.rules, s.defaultRules...)
-	for _, rule := range allRules {
+	for _, rule := range s.rules {
 		if len(rule.Tags) == 0 {
 			continue
 		}
@@ -137,9 +125,7 @@ func (s *TagRuleSet) ValidateRules() error {
 // MatchTags returns the accumulated tags for rules matching the given file path.
 // For fallthrough rules, tags are accumulated and matching continues.
 // For non-fallthrough rules, tags are added and matching stops.
-// If no non-fallthrough rule matches, tags from all default rules are also returned.
-// The returned bool indicates whether a non-fallthrough rule matched (true) or
-// if default rules had to be used (false).
+// The returned bool indicates whether a non-fallthrough rule matched.
 func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
 	tags := []string{}
 	terminatingRuleMatched := false
@@ -151,14 +137,6 @@ func (s *TagRuleSet) MatchTags(changedFilePath string) ([]string, bool) {
 				terminatingRuleMatched = true
 				break // Stop on first non-fallthrough match
 			}
-		}
-	}
-
-	// If no terminating (non-fallthrough) rule matched, use default rules
-	// Fallthrough rules add tags but don't prevent default rule fallback
-	if !terminatingRuleMatched && len(s.defaultRules) > 0 {
-		for _, rule := range s.defaultRules {
-			tags = append(tags, rule.Tags...)
 		}
 	}
 

@@ -89,9 +89,8 @@ func newTestRuleSets(t *testing.T, rulesContent string) []*TagRuleSet {
 	}
 
 	ruleSet := &TagRuleSet{
-		tagDefs:      make(map[string]struct{}),
-		rules:        cfg.Rules,
-		defaultRules: cfg.DefaultRules,
+		tagDefs: make(map[string]struct{}),
+		rules:   cfg.Rules,
 	}
 	for _, tag := range cfg.TagDefs {
 		ruleSet.tagDefs[tag] = struct{}{}

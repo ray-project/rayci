@@ -263,16 +263,16 @@ func TestLoadTagRuleConfigs_IndependentEvaluation(t *testing.T) {
 	}
 }
 
-func TestLoadTagRuleConfigs_DefaultTagsUnion(t *testing.T) {
-	// Test that default tags from multiple configs are unioned
+func TestLoadTagRuleConfigs_CatchAllTagsUnion(t *testing.T) {
+	// Test that catch-all tags from multiple configs are unioned
 	dir := t.TempDir()
 
 	config1 := filepath.Join(dir, "config1.txt")
 	config1Content := strings.Join([]string{
 		"! always lint debug",
 		"",
-		"# Default catch-all rule",
-		"\\default",
+		"# Catch-all rule",
+		"*",
 		"@ always lint",
 		";",
 	}, "\n")
@@ -284,8 +284,8 @@ func TestLoadTagRuleConfigs_DefaultTagsUnion(t *testing.T) {
 	config2Content := strings.Join([]string{
 		"! debug trace",
 		"",
-		"# Default catch-all rule",
-		"\\default",
+		"# Catch-all rule",
+		"*",
 		"@ debug trace",
 		";",
 	}, "\n")
@@ -298,7 +298,7 @@ func TestLoadTagRuleConfigs_DefaultTagsUnion(t *testing.T) {
 		t.Fatalf("loadTagRuleConfigs: %v", err)
 	}
 
-	// Evaluate a file that doesn't match any specific rule - should get union of default tags
+	// Evaluate a file - should get union of catch-all tags from both configs
 	tags := tagsForChangedFiles(ruleSets, []string{"any/file.txt"})
 	wantTags := []string{"always", "debug", "lint", "trace"}
 	if !reflect.DeepEqual(tags, wantTags) {

@@ -334,8 +334,8 @@ func TestStepFilter_selectsAndTags(t *testing.T) {
 }
 
 func TestFilterFromRuleFiles(t *testing.T) {
-	t.Run("default star triggers runAll", func(t *testing.T) {
-		rules := "! *\n\\default\n@ *\n;\n"
+	t.Run("star tag triggers runAll", func(t *testing.T) {
+		rules := "! *\n*\n@ *\n;\n"
 		rulesPath := writeTestRules(t, rules)
 		repo := setupTestGitRepo(t, []string{"src/any/file.py"})
 
@@ -350,8 +350,8 @@ func TestFilterFromRuleFiles(t *testing.T) {
 	})
 
 	t.Run("with filterConfig", func(t *testing.T) {
-		// Rules with a fallthrough rule for src/mydir/ and default rules for always/lint.
-		// The fallthrough directive means matching continues, so default rules also apply.
+		// Rules with a fallthrough rule for src/mydir/ and a catch-all for always/lint.
+		// The fallthrough directive means matching continues, so the catch-all also applies.
 		joinLines := func(lines ...string) string {
 			return strings.Join(lines, "\n")
 		}
@@ -361,7 +361,7 @@ func TestFilterFromRuleFiles(t *testing.T) {
 			"\\fallthrough",
 			"@ mytag",
 			";",
-			"\\default",
+			"*",
 			"@ always lint",
 			";",
 		)
@@ -377,7 +377,7 @@ func TestFilterFromRuleFiles(t *testing.T) {
 			t.Errorf("runAll: got true, want false")
 		}
 
-		// Should have "mytag" from the matching rule plus default tags "always" and "lint".
+		// Should have "mytag" from the matching rule plus "always" and "lint" from the catch-all.
 		for _, tag := range []string{"mytag", "always", "lint"} {
 			if !got.tags[tag] {
 				t.Errorf("missing tag %q in %v", tag, got.tags)

@@ -25,9 +25,8 @@ func loadTagRuleConfigs(configPaths []string) ([]*TagRuleSet, error) {
 		}
 
 		ruleSet := &TagRuleSet{
-			tagDefs:      make(map[string]struct{}),
-			rules:        cfg.Rules,
-			defaultRules: cfg.DefaultRules,
+			tagDefs: make(map[string]struct{}),
+			rules:   cfg.Rules,
 		}
 		for _, tagDef := range cfg.TagDefs {
 			ruleSet.tagDefs[tagDef] = struct{}{}
