@@ -292,17 +292,16 @@ func TestTagRuleSetMatchTags(t *testing.T) {
 	}
 }
 
-func TestTagRuleSetMatchTags_Fallthrough(t *testing.T) {
+func TestTagRuleSetMatchTags_FirstMatchWins(t *testing.T) {
 	set := &TagRuleSet{
-		tagDefs: map[string]struct{}{"always": {}, "lint": {}, "python": {}, "ml": {}},
+		tagDefs: map[string]struct{}{"python": {}, "ml": {}, "generic": {}},
 		rules: []*TagRule{
-			// Fallthrough rule for python/ - matches python files and continues
-			{Tags: []string{"always", "lint"}, Fallthrough: true,
-				Lineno: 1, Dirs: []string{"python", "ml"}},
-			// Python directory rule (more specific)
-			{Tags: []string{"python"}, Lineno: 2, Dirs: []string{"python"}},
+			// Python directory rule
+			{Tags: []string{"python"}, Lineno: 1, Dirs: []string{"python"}},
 			// ML directory rule
-			{Tags: []string{"ml"}, Lineno: 3, Dirs: []string{"ml"}},
+			{Tags: []string{"ml"}, Lineno: 2, Dirs: []string{"ml"}},
+			// Generic rule that also matches python (but should never be reached)
+			{Tags: []string{"generic"}, Lineno: 3, Dirs: []string{"python", "ml"}},
 		},
 	}
 
@@ -313,15 +312,15 @@ func TestTagRuleSetMatchTags_Fallthrough(t *testing.T) {
 		wantBool        bool
 	}{
 		{
-			name:            "fallthrough accumulates tags from python",
+			name:            "first rule wins for python",
 			changedFilePath: "python/foo.py",
-			want:            []string{"always", "lint", "python"},
+			want:            []string{"python"},
 			wantBool:        true,
 		},
 		{
-			name:            "fallthrough accumulates tags from ml",
+			name:            "second rule wins for ml",
 			changedFilePath: "ml/model.py",
-			want:            []string{"always", "lint", "ml"},
+			want:            []string{"ml"},
 			wantBool:        true,
 		},
 		{
@@ -345,16 +344,16 @@ func TestTagRuleSetMatchTags_Fallthrough(t *testing.T) {
 	}
 }
 
-func TestTagRuleSetMatchTags_DefaultRules(t *testing.T) {
+func TestTagRuleSetMatchTags_CatchAllRule(t *testing.T) {
+	// Build a regex for * pattern (matches any file)
+	starPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{"python": {}, "fallback": {}, "catchall": {}},
 		rules: []*TagRule{
 			// Python directory rule
 			{Tags: []string{"python"}, Lineno: 1, Dirs: []string{"python"}},
-		},
-		defaultRules: []*TagRule{
-			// Default catch-all rule
-			{Tags: []string{"fallback", "catchall"}, Lineno: 2, Default: true},
+			// Catch-all rule using * pattern
+			{Tags: []string{"fallback", "catchall"}, Lineno: 2, Patterns: []*regexp.Regexp{starPattern}},
 		},
 	}
 
@@ -365,16 +364,16 @@ func TestTagRuleSetMatchTags_DefaultRules(t *testing.T) {
 		wantBool        bool
 	}{
 		{
-			name:            "matched file uses matched rule",
+			name:            "matched file uses first matching rule",
 			changedFilePath: "python/foo.py",
 			want:            []string{"python"},
 			wantBool:        true,
 		},
 		{
-			name:            "unmatched file uses default rules",
+			name:            "unmatched file uses catch-all rule",
 			changedFilePath: "other/file.txt",
 			want:            []string{"fallback", "catchall"},
-			wantBool:        false, // matched=false when default rules are used
+			wantBool:        true, // catch-all is a terminating rule
 		},
 	}
 
@@ -391,23 +390,18 @@ func TestTagRuleSetMatchTags_DefaultRules(t *testing.T) {
 	}
 }
 
-func TestTagRuleSetMatchTags_FallthroughDoesNotPreventDefault(t *testing.T) {
-	// This test verifies that fallthrough rules add their tags but do NOT
-	// prevent default rules from being applied. Only terminating (non-fallthrough)
-	// rules should prevent default rule fallback.
+func TestTagRuleSetMatchTags_RuleOrderMatters(t *testing.T) {
+	// This test verifies that first matching rule wins, with catch-all as fallback.
+	starPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{
-			"always": {}, "lint": {}, "python": {}, "fallback": {},
+			"python": {}, "fallback": {},
 		},
 		rules: []*TagRule{
-			// Fallthrough rule that matches everything (no paths = match all)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
-			// Python directory rule (terminating)
-			{Tags: []string{"python"}, Lineno: 2, Dirs: []string{"python"}},
-		},
-		defaultRules: []*TagRule{
-			// Default catch-all rule
-			{Tags: []string{"fallback"}, Lineno: 3, Default: true},
+			// Python directory rule
+			{Tags: []string{"python"}, Lineno: 1, Dirs: []string{"python"}},
+			// Catch-all rule
+			{Tags: []string{"fallback"}, Lineno: 2, Patterns: []*regexp.Regexp{starPattern}},
 		},
 	}
 
@@ -418,22 +412,16 @@ func TestTagRuleSetMatchTags_FallthroughDoesNotPreventDefault(t *testing.T) {
 		wantBool        bool
 	}{
 		{
-			// Python file: fallthrough matches, then python/ matches (terminating)
-			// Result: fallthrough tags + python tags, no default tags
-			// wantBool=true because a terminating rule matched
-			name:            "terminating rule prevents default",
+			name:            "python rule matches first",
 			changedFilePath: "python/foo.py",
-			want:            []string{"always", "lint", "python"},
+			want:            []string{"python"},
 			wantBool:        true,
 		},
 		{
-			// Other file: fallthrough matches, no terminating rule matches
-			// Result: fallthrough tags + default tags
-			// wantBool=false because no terminating rule matched
-			name:            "fallthrough alone triggers default",
+			name:            "catch-all matches other files",
 			changedFilePath: "other/file.txt",
-			want:            []string{"always", "lint", "fallback"},
-			wantBool:        false,
+			want:            []string{"fallback"},
+			wantBool:        true,
 		},
 	}
 
@@ -450,22 +438,18 @@ func TestTagRuleSetMatchTags_FallthroughDoesNotPreventDefault(t *testing.T) {
 	}
 }
 
-func TestTagRuleSetMatchTags_MultipleFallthroughWithDefault(t *testing.T) {
-	// Test multiple fallthrough rules combined with default rules
+func TestTagRuleSetMatchTags_MultipleRulesFirstWins(t *testing.T) {
+	// Test that first matching rule is used even when multiple rules could match
+	starPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{
-			"always": {}, "lint": {}, "debug": {}, "trace": {}, "fallback": {},
+			"src": {}, "fallback": {},
 		},
 		rules: []*TagRule{
-			// First fallthrough rule (matches everything)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
-			// Second fallthrough rule with specific path
-			{Tags: []string{"debug"}, Lineno: 2, Fallthrough: true, Dirs: []string{"src"}},
-			// Third fallthrough rule (matches everything)
-			{Tags: []string{"trace"}, Lineno: 3, Fallthrough: true},
-		},
-		defaultRules: []*TagRule{
-			{Tags: []string{"fallback"}, Lineno: 4, Default: true},
+			// Specific rule for src/
+			{Tags: []string{"src"}, Lineno: 1, Dirs: []string{"src"}},
+			// Catch-all rule
+			{Tags: []string{"fallback"}, Lineno: 2, Patterns: []*regexp.Regexp{starPattern}},
 		},
 	}
 
@@ -476,18 +460,16 @@ func TestTagRuleSetMatchTags_MultipleFallthroughWithDefault(t *testing.T) {
 		wantBool        bool
 	}{
 		{
-			// src file: all fallthrough rules that match + default
-			name:            "multiple fallthrough with default",
+			name:            "src rule matches first",
 			changedFilePath: "src/main.go",
-			want:            []string{"always", "lint", "debug", "trace", "fallback"},
-			wantBool:        false,
+			want:            []string{"src"},
+			wantBool:        true,
 		},
 		{
-			// other file: only global fallthrough rules + default
-			name:            "global fallthrough with default",
+			name:            "catch-all for other files",
 			changedFilePath: "other/file.txt",
-			want:            []string{"always", "lint", "trace", "fallback"},
-			wantBool:        false,
+			want:            []string{"fallback"},
+			wantBool:        true,
 		},
 	}
 
@@ -504,41 +486,13 @@ func TestTagRuleSetMatchTags_MultipleFallthroughWithDefault(t *testing.T) {
 	}
 }
 
-func TestTagRuleSetMatchTags_TerminatingRulePreventsDefault(t *testing.T) {
-	// Verify that a terminating rule (non-fallthrough) prevents default rules
-	set := &TagRuleSet{
-		tagDefs: map[string]struct{}{
-			"always": {}, "lint": {}, "java": {}, "fallback": {},
-		},
-		rules: []*TagRule{
-			// Fallthrough rule (matches everything)
-			{Tags: []string{"always", "lint"}, Lineno: 1, Fallthrough: true},
-			// Terminating rule for java/
-			{Tags: []string{"java"}, Lineno: 2, Dirs: []string{"java"}},
-		},
-		defaultRules: []*TagRule{
-			{Tags: []string{"fallback"}, Lineno: 3, Default: true},
-		},
-	}
-
-	// Java file: fallthrough + java (terminating) -> no default
-	got, gotBool := set.MatchTags("java/Main.java")
-	want := []string{"always", "lint", "java"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("MatchTags() got = %v, want %v", got, want)
-	}
-	if !gotBool {
-		t.Errorf("MatchTags() gotBool = %v, want true (terminating rule matched)", gotBool)
-	}
-}
-
-func TestTagRuleSetMatchTags_NoRulesUsesDefault(t *testing.T) {
-	// When there are no regular rules at all, default rules should apply
+func TestTagRuleSetMatchTags_OnlyCatchAll(t *testing.T) {
+	// When there is only a catch-all rule, it should match
+	starPattern, _ := globToRegexp("*")
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{"fallback": {}, "catchall": {}},
-		rules:   []*TagRule{},
-		defaultRules: []*TagRule{
-			{Tags: []string{"fallback", "catchall"}, Lineno: 1, Default: true},
+		rules: []*TagRule{
+			{Tags: []string{"fallback", "catchall"}, Lineno: 1, Patterns: []*regexp.Regexp{starPattern}},
 		},
 	}
 
@@ -547,26 +501,24 @@ func TestTagRuleSetMatchTags_NoRulesUsesDefault(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("MatchTags() got = %v, want %v", got, want)
 	}
-	if gotBool {
-		t.Errorf("MatchTags() gotBool = %v, want false (default rules used)", gotBool)
+	if !gotBool {
+		t.Errorf("MatchTags() gotBool = %v, want true (catch-all matched)", gotBool)
 	}
 }
 
-func TestTagRuleSetMatchTags_MultipleDefaultRules(t *testing.T) {
-	// Multiple default rules should all contribute their tags
+func TestTagRuleSetMatchTags_NoMatchingRules(t *testing.T) {
+	// When no rules match, return empty tags
 	set := &TagRuleSet{
 		tagDefs: map[string]struct{}{"fb1": {}, "fb2": {}, "fb3": {}},
-		rules:   []*TagRule{},
-		defaultRules: []*TagRule{
-			{Tags: []string{"fb1"}, Lineno: 1, Default: true},
-			{Tags: []string{"fb2", "fb3"}, Lineno: 2, Default: true},
+		rules: []*TagRule{
+			{Tags: []string{"fb1"}, Lineno: 1, Dirs: []string{"python"}},
+			{Tags: []string{"fb2", "fb3"}, Lineno: 2, Dirs: []string{"java"}},
 		},
 	}
 
-	got, gotBool := set.MatchTags("any/file.txt")
-	want := []string{"fb1", "fb2", "fb3"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("MatchTags() got = %v, want %v", got, want)
+	got, gotBool := set.MatchTags("other/file.txt")
+	if len(got) != 0 {
+		t.Errorf("MatchTags() got = %v, want empty", got)
 	}
 	if gotBool {
 		t.Errorf("MatchTags() gotBool = %v, want false", gotBool)

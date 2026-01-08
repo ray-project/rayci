@@ -89,9 +89,8 @@ func newTestRuleSets(t *testing.T, rulesContent string) []*TagRuleSet {
 	}
 
 	ruleSet := &TagRuleSet{
-		tagDefs:      make(map[string]struct{}),
-		rules:        cfg.Rules,
-		defaultRules: cfg.DefaultRules,
+		tagDefs: make(map[string]struct{}),
+		rules:   cfg.Rules,
 	}
 	for _, tag := range cfg.TagDefs {
 		ruleSet.tagDefs[tag] = struct{}{}
@@ -129,12 +128,8 @@ func TestRunTestRules_AllPass(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint data",
 		"",
-		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
 		"python/ray/data/",
-		"@ data",
+		"@ always lint data",
 		";",
 	}, "\n")
 
@@ -156,12 +151,8 @@ func TestRunTestRules_SomeFail(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint data",
 		"",
-		"\\fallthrough",
-		"@ always lint",
-		";",
-		"",
 		"python/ray/data/",
-		"@ data",
+		"@ always lint data",
 		";",
 	}, "\n")
 
@@ -277,7 +268,7 @@ func TestRunTestRules_DuplicateTagsInExpected(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always lint",
 		"",
-		"\\fallthrough",
+		"*",
 		"@ always lint",
 		";",
 	}, "\n")
@@ -299,7 +290,7 @@ func TestRunTestRules_EmptyTestCases(t *testing.T) {
 	rulesContent := strings.Join([]string{
 		"! always",
 		"",
-		"\\fallthrough",
+		"*",
 		"@ always",
 		";",
 	}, "\n")
