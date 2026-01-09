@@ -1,6 +1,8 @@
 package raycicmd
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -301,5 +303,126 @@ func TestRunTestRules_EmptyTestCases(t *testing.T) {
 
 	if len(failures) != 0 {
 		t.Errorf("len(failures) = %d, want 0", len(failures))
+	}
+}
+
+func TestRunTestRulesCmd_AutoDiscover(t *testing.T) {
+	tmp := t.TempDir()
+	bkDir := filepath.Join(tmp, ".buildkite")
+	if err := os.MkdirAll(bkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create rules file
+	rulesContent := strings.Join([]string{
+		"! mytag",
+		"src/",
+		"@ mytag",
+		";",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(bkDir, "test.rules.txt"), []byte(rulesContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create companion test file
+	testContent := "src/foo.py: mytag\n"
+	if err := os.WriteFile(filepath.Join(bkDir, "test.rules.test.txt"), []byte(testContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change to temp dir so .buildkite is found
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tmp)
+
+	cfg := &config{}
+	err := runTestRulesCmd(nil, cfg)
+	if err != nil {
+		t.Errorf("runTestRulesCmd() error = %v, want nil", err)
+	}
+}
+
+func TestRunTestRulesCmd_ExplicitRulesFiles(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Create rules file (not in .buildkite)
+	rulesContent := strings.Join([]string{
+		"! explicit",
+		"src/",
+		"@ explicit",
+		";",
+	}, "\n")
+	rulesPath := filepath.Join(tmp, "explicit.rules.txt")
+	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create companion test file
+	testContent := "src/foo.py: explicit\n"
+	testPath := filepath.Join(tmp, "explicit.rules.test.txt")
+	if err := os.WriteFile(testPath, []byte(testContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config{
+		TestRulesFiles: []string{rulesPath},
+	}
+	err := runTestRulesCmd(nil, cfg)
+	if err != nil {
+		t.Errorf("runTestRulesCmd() error = %v, want nil", err)
+	}
+}
+
+func TestRunTestRulesCmd_ExplicitTakesPrecedence(t *testing.T) {
+	tmp := t.TempDir()
+	bkDir := filepath.Join(tmp, ".buildkite")
+	if err := os.MkdirAll(bkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create auto-discoverable rules file that would FAIL
+	autoRulesContent := strings.Join([]string{
+		"! autotag",
+		"src/",
+		"@ autotag",
+		";",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(bkDir, "auto.rules.txt"), []byte(autoRulesContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Companion test expects wrong tag - would fail if auto-discovered
+	autoTestContent := "src/foo.py: wrongtag\n"
+	if err := os.WriteFile(filepath.Join(bkDir, "auto.rules.test.txt"), []byte(autoTestContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create explicit rules file that will PASS
+	explicitRulesContent := strings.Join([]string{
+		"! explicit",
+		"src/",
+		"@ explicit",
+		";",
+	}, "\n")
+	explicitPath := filepath.Join(tmp, "explicit.rules.txt")
+	if err := os.WriteFile(explicitPath, []byte(explicitRulesContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	explicitTestContent := "src/foo.py: explicit\n"
+	if err := os.WriteFile(filepath.Join(tmp, "explicit.rules.test.txt"), []byte(explicitTestContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change to temp dir
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tmp)
+
+	// With explicit TestRulesFiles, should use those and pass (not auto-discover the failing one)
+	cfg := &config{
+		TestRulesFiles: []string{explicitPath},
+	}
+	err := runTestRulesCmd(nil, cfg)
+	if err != nil {
+		t.Errorf("runTestRulesCmd() error = %v, want nil (explicit should take precedence)", err)
 	}
 }

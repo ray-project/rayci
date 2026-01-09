@@ -137,6 +137,9 @@ companion *.rules.test.txt files if they exist.
 
 Example: go.rules.txt is tested by go.rules.test.txt
 
+If test_rules_files is set in config (or RAYCI_TEST_RULE_FILES env var),
+only those files are tested (no auto-discovery).
+
 Test file format:
   # Comments start with #
   file_path: tag1 tag2 tag3
@@ -147,38 +150,43 @@ Example:
 `
 
 func runTestRulesCmd(args []string, config *config) error {
+	// Use explicit TestRulesFiles if set, otherwise auto-discover
+	rulesFiles := config.TestRulesFiles
+	if len(rulesFiles) == 0 {
+		for _, dir := range config.buildkiteDirs() {
+			files, err := listRulesFiles(dir)
+			if err != nil {
+				return fmt.Errorf("list rules files in %s: %w", dir, err)
+			}
+			rulesFiles = append(rulesFiles, files...)
+		}
+	}
+
 	totalCases := 0
 	var allFailures []*testCaseResult
 
-	for _, dir := range config.buildkiteDirs() {
-		rulesFiles, err := listRulesFiles(dir)
+	for _, rulesFile := range rulesFiles {
+		testFile := companionTestFile(rulesFile)
+		if _, err := os.Stat(testFile); os.IsNotExist(err) {
+			continue
+		}
+
+		cases, err := parseTestCasesFile(testFile)
 		if err != nil {
-			return fmt.Errorf("list rules files in %s: %w", dir, err)
+			return err
+		}
+		if len(cases) == 0 {
+			continue
 		}
 
-		for _, rulesFile := range rulesFiles {
-			testFile := companionTestFile(rulesFile)
-			if _, err := os.Stat(testFile); os.IsNotExist(err) {
-				continue
-			}
-
-			cases, err := parseTestCasesFile(testFile)
-			if err != nil {
-				return err
-			}
-			if len(cases) == 0 {
-				continue
-			}
-
-			ruleSets, err := loadTagRuleConfigs([]string{rulesFile})
-			if err != nil {
-				return fmt.Errorf("load rules %s: %w", rulesFile, err)
-			}
-
-			failures := runTestRules(ruleSets, cases)
-			totalCases += len(cases)
-			allFailures = append(allFailures, failures...)
+		ruleSets, err := loadTagRuleConfigs([]string{rulesFile})
+		if err != nil {
+			return fmt.Errorf("load rules %s: %w", rulesFile, err)
 		}
+
+		failures := runTestRules(ruleSets, cases)
+		totalCases += len(cases)
+		allFailures = append(allFailures, failures...)
 	}
 
 	if totalCases == 0 {
