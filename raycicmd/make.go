@@ -129,10 +129,8 @@ func makePipeline(ctx *pipelineContext) (
 
 	c := newConverter(ctx.config, ctx.info)
 
-	bkDirs := ctx.config.BuildkiteDirs
-	if len(bkDirs) == 0 {
-		bkDirs = []string{".buildkite"}
-	}
+	// Build steps for CI.
+	bkDirs := ctx.config.buildkiteDirs()
 
 	testRulesFiles := ctx.config.TestRulesFiles
 	if len(testRulesFiles) == 0 {

@@ -175,6 +175,13 @@ func builderAgent(config *config, instanceType string) string {
 	return ""
 }
 
+func (c *config) buildkiteDirs() []string {
+	if len(c.BuildkiteDirs) == 0 {
+		return []string{".buildkite"}
+	}
+	return c.BuildkiteDirs
+}
+
 func localDefaultConfig(envs Envs) *config {
 	return &config{
 		CITemp: filepath.Join(getEnv(envs, "HOME"), ".cache/rayci"),

@@ -147,15 +147,10 @@ Example:
 `
 
 func runTestRulesCmd(args []string, config *config) error {
-	bkDirs := config.BuildkiteDirs
-	if len(bkDirs) == 0 {
-		bkDirs = []string{".buildkite"}
-	}
-
 	totalCases := 0
 	var allFailures []*testCaseResult
 
-	for _, dir := range bkDirs {
+	for _, dir := range config.buildkiteDirs() {
 		rulesFiles, err := listRulesFiles(dir)
 		if err != nil {
 			return fmt.Errorf("list rules files in %s: %w", dir, err)
