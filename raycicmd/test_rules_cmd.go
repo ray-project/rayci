@@ -14,17 +14,8 @@ type ruleTestCase struct {
 	Lineno int
 }
 
-func parseTestCasesFile(path string) ([]*ruleTestCase, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return parseTestCases(string(content))
-}
-
 func parseTestCases(content string) ([]*ruleTestCase, error) {
 	var cases []*ruleTestCase
-
 	for lineno, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -49,6 +40,20 @@ func parseTestCases(content string) ([]*ruleTestCase, error) {
 	}
 
 	return cases, nil
+}
+
+func parseTestCasesFile(path string) ([]*ruleTestCase, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return parseTestCases(string(content))
+}
+
+// companionTestFile returns the companion test file for a rules file.
+// e.g., "go.rules.txt" -> "go.rules.test.txt"
+func companionTestFile(rulesFile string) string {
+	return strings.TrimSuffix(rulesFile, ".txt") + ".test.txt"
 }
 
 type testCaseResult struct {
@@ -123,50 +128,72 @@ func printFailures(failures []*testCaseResult) {
 	}
 }
 
-const testRulesUsage = `usage: rayci test-rules TESTS_FILE
+const testRulesUsage = `usage: rayci [-buildkite-dir DIR] test-rules
 
 Validates test rules against expected file→tag mappings.
 
-Requires RAYCI_TEST_RULE_FILES environment variable to specify rule files.
+Discovers *.rules.txt files in buildkite directories and runs their
+companion *.rules.test.txt files if they exist.
+
+Example: go.rules.txt is tested by go.rules.test.txt
 
 Test file format:
   # Comments start with #
   file_path: tag1 tag2 tag3
 
 Example:
-  python/ray/data/__init__.py: always lint data ml
-  README.md: always lint
+  wanda/main.go: wanda
+  raycicmd/main.go: raycicmd
 `
 
-func subcmdTestRules(args []string, envs Envs) error {
-	if len(args) != 1 {
-		return fmt.Errorf(testRulesUsage)
-	}
-	testsFile := args[0]
-
-	rulePaths := testRuleFilesFromEnv(envs)
-	if len(rulePaths) == 0 {
-		return fmt.Errorf("RAYCI_TEST_RULE_FILES environment variable is required")
+func runTestRulesCmd(args []string, config *config) error {
+	bkDirs := config.BuildkiteDirs
+	if len(bkDirs) == 0 {
+		bkDirs = []string{".buildkite"}
 	}
 
-	ruleSets, err := loadTagRuleConfigs(rulePaths)
-	if err != nil {
-		return fmt.Errorf("load rules: %w", err)
+	totalCases := 0
+	var allFailures []*testCaseResult
+
+	for _, dir := range bkDirs {
+		rulesFiles, err := listRulesFiles(dir)
+		if err != nil {
+			return fmt.Errorf("list rules files in %s: %w", dir, err)
+		}
+
+		for _, rulesFile := range rulesFiles {
+			testFile := companionTestFile(rulesFile)
+			if _, err := os.Stat(testFile); os.IsNotExist(err) {
+				continue
+			}
+
+			cases, err := parseTestCasesFile(testFile)
+			if err != nil {
+				return err
+			}
+			if len(cases) == 0 {
+				continue
+			}
+
+			ruleSets, err := loadTagRuleConfigs([]string{rulesFile})
+			if err != nil {
+				return fmt.Errorf("load rules %s: %w", rulesFile, err)
+			}
+
+			failures := runTestRules(ruleSets, cases)
+			totalCases += len(cases)
+			allFailures = append(allFailures, failures...)
+		}
 	}
 
-	testCases, err := parseTestCasesFile(testsFile)
-	if err != nil {
-		return fmt.Errorf("load tests: %w", err)
-	}
-	if len(testCases) == 0 {
-		return fmt.Errorf("no test cases found in %s", testsFile)
+	if totalCases == 0 {
+		fmt.Fprintf(os.Stderr, "warning: no test cases found (add *.rules.test.txt companion files)\n")
+		return nil
 	}
 
-	failures := runTestRules(ruleSets, testCases)
-
-	if len(failures) > 0 {
-		printFailures(failures)
-		return fmt.Errorf("%d/%d test(s) failed", len(failures), len(testCases))
+	if len(allFailures) > 0 {
+		printFailures(allFailures)
+		return fmt.Errorf("%d/%d test(s) failed", len(allFailures), totalCases)
 	}
 
 	return nil

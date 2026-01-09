@@ -1,0 +1,16 @@
+# Test cases for other.rules.txt
+# Tests ecosystem_ci tagging and skip rules
+
+# ecosystem_ci directory gets the ecosystem_ci tag
+ecosystem_ci/test.py: ecosystem_ci
+ecosystem_ci/config.yaml: ecosystem_ci
+
+# Explicitly skipped files get no tags
+README.md:
+.gitignore:
+.flake8:
+
+# Other files also get no tags from this rules file
+wanda/main.go:
+go.mod:
+some/random/file.txt:

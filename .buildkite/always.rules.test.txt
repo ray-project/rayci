@@ -1,0 +1,12 @@
+# Test cases for always.rules.txt
+# Tests that all files get base tags (always, lint)
+
+# All files get always and lint tags
+wanda/main.go: always lint
+raycicmd/main.go: always lint
+README.md: always lint
+.gitignore: always lint
+go.mod: always lint
+some/random/file.txt: always lint
+ecosystem_ci/test.py: always lint
+.buildkite/pipeline.yaml: always lint

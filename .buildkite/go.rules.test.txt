@@ -1,0 +1,19 @@
+# Test cases for go.rules.txt
+# Tests Go module directory tagging
+
+# Go module directories get their module tag
+wanda/main.go: wanda
+wanda/cmd/wanda/main.go: wanda
+raycicmd/main.go: raycicmd
+raycicmd/config.go: raycicmd
+raycicmd/test_rules_cmd.go: raycicmd
+raycirun/main.go: raycirun
+raycirun/run.go: raycirun
+reefd/main.go: reefd
+reefd/server.go: reefd
+
+# Files outside Go modules get no tags from this rules file
+README.md:
+.gitignore:
+go.mod:
+some/random/file.txt:

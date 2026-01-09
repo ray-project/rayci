@@ -132,6 +132,63 @@ func TestListCIYamlFiles(t *testing.T) {
 	}
 }
 
+func TestListRulesFiles(t *testing.T) {
+	t.Run("mixed files", func(t *testing.T) {
+		tmp := t.TempDir()
+
+		for _, f := range []string{
+			"go.rules.txt",
+			"python.rules.txt",
+			"foo.rayci.yaml",
+			"other.txt",
+			"dir/nested.rules.txt",
+		} {
+			dir := filepath.Join(tmp, filepath.Dir(f))
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				t.Fatalf("mkdir for %q: %v", f, err)
+			}
+			if err := os.WriteFile(filepath.Join(tmp, f), nil, 0o600); err != nil {
+				t.Fatalf("write file %q: %v", f, err)
+			}
+		}
+
+		got, err := listRulesFiles(tmp)
+		if err != nil {
+			t.Fatalf("listRulesFiles: %v", err)
+		}
+
+		want := []string{
+			filepath.Join(tmp, "go.rules.txt"),
+			filepath.Join(tmp, "python.rules.txt"),
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("empty directory", func(t *testing.T) {
+		tmp := t.TempDir()
+
+		got, err := listRulesFiles(tmp)
+		if err != nil {
+			t.Fatalf("listRulesFiles: %v", err)
+		}
+		if got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
+	})
+
+	t.Run("non-existent directory", func(t *testing.T) {
+		got, err := listRulesFiles("/nonexistent/path")
+		if err != nil {
+			t.Fatalf("listRulesFiles: %v", err)
+		}
+		if got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
+	})
+}
+
 const goodTestPipeline = `
 group: g
 key: k
@@ -541,6 +598,166 @@ func TestMakePipeline(t *testing.T) {
 		}
 		if len(got.Notify) == 0 || got.Notify[0].Email != email || got.Notify[0].If != `build.state == "failing"` {
 			t.Errorf(`got %v, want email %v, want if build.state == "failing"`, got.Notify, email)
+		}
+	})
+}
+
+func TestMakePipelineAutoDiscoverRules(t *testing.T) {
+	multi := func(s ...string) string {
+		return strings.Join(s, "\n")
+	}
+
+	t.Run("auto_discover", func(t *testing.T) {
+		tmp := t.TempDir()
+
+		// Create pipeline file with a tagged step.
+		pipelineContent := multi(
+			`group: g`,
+			`steps:`,
+			`  - label: "tagged test"`,
+			`    key: "test1"`,
+			`    tags: "mytag"`,
+			`    commands: [ "echo test1" ]`,
+			`  - label: "untagged test"`,
+			`    key: "test2"`,
+			`    commands: [ "echo test2" ]`,
+		)
+		if err := os.MkdirAll(filepath.Join(tmp, ".buildkite"), 0o700); err != nil {
+			t.Fatalf("mkdir .buildkite: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(tmp, ".buildkite/test.rayci.yaml"), []byte(pipelineContent), 0o600); err != nil {
+			t.Fatalf("write pipeline: %v", err)
+		}
+
+		// Create auto-discoverable rules file in .buildkite/.
+		rulesContent := multi(
+			"! mytag",
+			"src/mytag/",
+			"@ mytag",
+			";",
+		)
+		if err := os.WriteFile(filepath.Join(tmp, ".buildkite/test.rules.txt"), []byte(rulesContent), 0o600); err != nil {
+			t.Fatalf("write rules: %v", err)
+		}
+
+		// Set up git repo with a changed file matching the rule.
+		lister, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/mytag/file.py"})
+
+		config := &config{
+			ArtifactsBucket: "artifacts",
+			CITemp:          "s3://ci-temp",
+			CIWorkRepo:      "fakeecr",
+			BuilderQueues:   map[string]string{"builder": "builder_queue"},
+			RunnerQueues:    map[string]string{"default": "runner_x"},
+			// TestRulesFiles is empty - should auto-discover.
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       config,
+			info:         &buildInfo{buildID: "test"},
+			envs:         testEnvs,
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+
+		// Should only have the tagged step (mytag), not the untagged one.
+		totalSteps := 0
+		for _, g := range got.Steps {
+			totalSteps += len(g.Steps)
+		}
+		if want := 1; totalSteps != want {
+			t.Errorf("got %d steps, want %d (auto-discovered rules should filter)", totalSteps, want)
+		}
+	})
+
+	t.Run("explicit_takes_precedence", func(t *testing.T) {
+		tmp := t.TempDir()
+
+		// Create pipeline file with tagged steps.
+		pipelineContent := multi(
+			`group: g`,
+			`steps:`,
+			`  - label: "tagged A"`,
+			`    key: "testA"`,
+			`    tags: "tagA"`,
+			`    commands: [ "echo testA" ]`,
+			`  - label: "tagged B"`,
+			`    key: "testB"`,
+			`    tags: "tagB"`,
+			`    commands: [ "echo testB" ]`,
+		)
+		if err := os.MkdirAll(filepath.Join(tmp, ".buildkite"), 0o700); err != nil {
+			t.Fatalf("mkdir .buildkite: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(tmp, ".buildkite/test.rayci.yaml"), []byte(pipelineContent), 0o600); err != nil {
+			t.Fatalf("write pipeline: %v", err)
+		}
+
+		// Create auto-discoverable rules file for tagA.
+		autoRulesContent := multi(
+			"! tagA",
+			"src/",
+			"@ tagA",
+			";",
+		)
+		if err := os.WriteFile(filepath.Join(tmp, ".buildkite/auto.rules.txt"), []byte(autoRulesContent), 0o600); err != nil {
+			t.Fatalf("write auto rules: %v", err)
+		}
+
+		// Create explicit rules file for tagB (outside .buildkite/).
+		explicitRulesContent := multi(
+			"! tagB",
+			"src/",
+			"@ tagB",
+			";",
+		)
+		explicitRulesPath := filepath.Join(tmp, "explicit_rules.txt")
+		if err := os.WriteFile(explicitRulesPath, []byte(explicitRulesContent), 0o600); err != nil {
+			t.Fatalf("write explicit rules: %v", err)
+		}
+
+		// Set up git repo with a changed file.
+		lister, testEnvs := setupGitRepoInDir(t, tmp, []string{"src/file.py"})
+
+		config := &config{
+			ArtifactsBucket: "artifacts",
+			CITemp:          "s3://ci-temp",
+			CIWorkRepo:      "fakeecr",
+			BuilderQueues:   map[string]string{"builder": "builder_queue"},
+			RunnerQueues:    map[string]string{"default": "runner_x"},
+			// Explicit TestRulesFiles - should NOT auto-discover.
+			TestRulesFiles: []string{explicitRulesPath},
+		}
+
+		got, err := makePipeline(&pipelineContext{
+			repoDir:      tmp,
+			changeLister: lister,
+			config:       config,
+			info:         &buildInfo{buildID: "test"},
+			envs:         testEnvs,
+		})
+		if err != nil {
+			t.Fatalf("makePipeline: %v", err)
+		}
+
+		// Should only have tagB step (from explicit rules), not tagA (from auto-discovered).
+		totalSteps := 0
+		var keys []string
+		for _, g := range got.Steps {
+			for _, s := range g.Steps {
+				totalSteps++
+				step := s.(map[string]any)
+				keys = append(keys, stepKey(step))
+			}
+		}
+		if want := 1; totalSteps != want {
+			t.Errorf("got %d steps, want %d", totalSteps, want)
+		}
+		if want := []string{"testB"}; !reflect.DeepEqual(keys, want) {
+			t.Errorf("got step keys %v, want %v (explicit rules should take precedence)", keys, want)
 		}
 	})
 }
