@@ -14,25 +14,46 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Build builds a container image from the given specification file.
+// Build builds a container image from the given specification file, and builds
+// all its dependencies in topological order.
+// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
+// the root is built.
 func Build(specFile string, config *ForgeConfig) error {
 	if config == nil {
 		config = &ForgeConfig{}
 	}
 
-	spec, err := parseSpecFile(specFile)
+	graph, err := buildDepGraph(specFile, os.LookupEnv)
 	if err != nil {
-		return fmt.Errorf("parse spec file: %w", err)
+		return fmt.Errorf("build dep graph: %w", err)
 	}
 
-	// Expand env variable.
-	spec = spec.expandVar(os.LookupEnv)
+	if err := graph.validateDeps(); err != nil {
+		return fmt.Errorf("validate deps: %w", err)
+	}
 
 	forge, err := NewForge(config)
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)
 	}
-	return forge.Build(spec)
+
+	// In RayCI mode, only build the root (deps built by prior pipeline steps).
+	order := graph.Order
+	if config.RayCI {
+		order = []string{graph.Root}
+	}
+
+	for _, name := range order {
+		rs := graph.Specs[name]
+
+		log.Printf("building %s (from %s)", name, rs.Path)
+
+		if err := forge.Build(rs.Spec); err != nil {
+			return fmt.Errorf("build %s: %w", name, err)
+		}
+	}
+
+	return nil
 }
 
 // Forge is a forge to build container images.
@@ -95,13 +116,26 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	namePrefix := f.config.NamePrefix
 
 	for _, from := range froms {
-		if strings.HasPrefix(from, "@") { // A local image.
+		if strings.HasPrefix(from, "@") { // A sourceable image name.
 			name := strings.TrimPrefix(from, "@")
-			src, err := resolveDockerImage(f.docker, from, name)
-			if err != nil {
-				return nil, fmt.Errorf("resolve local image %s: %w", from, err)
+
+			if f.isRemote() {
+				// CI mode: deps were built by prior pipeline steps and pushed
+				// to the work repo. Resolve @name to {work_repo}:{build_id}-{name}.
+				workTag := f.workTag(name)
+				src, err := resolveRemoteImage(from, workTag, f.remoteOpts...)
+				if err != nil {
+					return nil, fmt.Errorf("resolve remote dep @%s: %w", name, err)
+				}
+				m[from] = src
+			} else {
+				// Local mode: resolve from local docker
+				src, err := resolveDockerImage(f.docker, from, name)
+				if err != nil {
+					return nil, fmt.Errorf("resolve local dep @%s: %w", name, err)
+				}
+				m[from] = src
 			}
-			m[from] = src
 			continue
 		}
 
@@ -188,13 +222,18 @@ func (f *Forge) Build(spec *Spec) error {
 	in.addTag(cacheTag)
 
 	// When running on rayCI, we only need the workTag and the cacheTag.
-	// Otherwise, add extra tags.
+	// Otherwise, add extra tags for local use.
 	if !f.config.RayCI {
 		// Name tag is the tag we use to reference the image locally.
 		// It is also what can be referenced by following steps.
 		if f.config.NamePrefix != "" {
 			nameTag := f.config.NamePrefix + spec.Name
 			in.addTag(nameTag)
+		} else {
+			// Tag with plain name so @name references can resolve it.
+			// e.g., if spec.Name is "dep-base", a dependent spec with
+			// froms: ["@dep-base"] will look up the image by "dep-base".
+			in.addTag(spec.Name)
 		}
 		for _, tag := range spec.Tags { // And add extra tags.
 			in.addTag(tag)
