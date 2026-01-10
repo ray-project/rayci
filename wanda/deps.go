@@ -1,73 +1,57 @@
 package wanda
 
 import (
+	"container/heap"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
+	"sync"
 )
 
-// ResolvedSpec contains a parsed and expanded spec along with its file path.
-type ResolvedSpec struct {
+// depGraph represents a dependency graph of wanda specs.
+type depGraph struct {
+	// Specs maps expanded name to resolved spec.
+	Specs map[string]*resolvedSpec
+
+	// Order is the topological build order (dependencies first, root last).
+	Order []string
+
+	// Root is the name of the root spec (the one requested to build).
+	Root string
+
+	// discovery state (unexported)
+	searchRoot string    // repo root or spec dir for discovery
+	index      specIndex // lazily populated name -> path index
+	lookup     lookupFunc
+}
+
+// resolvedSpec contains a parsed and expanded spec along with its file path.
+type resolvedSpec struct {
 	Spec *Spec
-	Path string // original file path
+	Path string
 }
 
-// DepGraph represents a dependency graph of wanda specs.
-type DepGraph struct {
-	// specs maps expanded name to resolved spec
-	specs map[string]*ResolvedSpec
-
-	// order is the topological build order (dependencies first)
-	order []string
-
-	// root is the name of the root spec (the one requested to build)
-	root string
-}
-
-// Order returns the build order (dependencies first, root last).
-func (g *DepGraph) Order() []string {
-	return g.order
-}
-
-// Root returns the name of the root spec.
-func (g *DepGraph) Root() string {
-	return g.root
-}
-
-// Specs returns all resolved specs in the graph.
-func (g *DepGraph) Specs() map[string]*ResolvedSpec {
-	return g.specs
-}
-
-// Get returns the resolved spec for the given name.
-func (g *DepGraph) Get(name string) *ResolvedSpec {
-	return g.specs[name]
-}
-
-// BuildDepGraph parses a spec and all its dependencies, returning a dependency graph
-// with specs in topological build order.
-func BuildDepGraph(specPath string, lookup lookupFunc) (*DepGraph, error) {
-	g := &DepGraph{
-		specs: make(map[string]*ResolvedSpec),
-	}
-
-	if err := g.loadSpec(specPath, lookup); err != nil {
-		return nil, fmt.Errorf("load root spec: %w", err)
-	}
-
+// buildDepGraph parses a spec and all its dependencies, returning a dependency graph
+// with specs in deterministic topological build order.
+func buildDepGraph(specPath string, lookup lookupFunc) (*depGraph, error) {
 	absPath, err := filepath.Abs(specPath)
 	if err != nil {
-		return nil, fmt.Errorf("abs path for root: %w", err)
+		return nil, fmt.Errorf("abs path: %w", err)
 	}
-	for name, rs := range g.specs {
-		rsAbs, err := filepath.Abs(rs.Path)
-		if err != nil {
-			return nil, fmt.Errorf("abs path for spec %q: %w", rs.Path, err)
-		}
-		if rsAbs == absPath {
-			g.root = name
-			break
-		}
+	specDir := filepath.Dir(absPath)
+
+	g := &depGraph{
+		Specs:      make(map[string]*resolvedSpec),
+		searchRoot: findRepoRoot(specDir),
+		lookup:     lookup,
+	}
+
+	if err := g.loadSpec(absPath, true /* isRoot */); err != nil {
+		return nil, fmt.Errorf("load root spec: %w", err)
 	}
 
 	if err := g.topoSort(); err != nil {
@@ -77,38 +61,61 @@ func BuildDepGraph(specPath string, lookup lookupFunc) (*DepGraph, error) {
 	return g, nil
 }
 
-func (g *DepGraph) loadSpec(specPath string, lookup lookupFunc) error {
-	spec, err := ParseSpecFile(specPath)
+func (g *depGraph) loadSpec(specPath string, isRoot bool) error {
+	spec, err := parseSpecFile(specPath)
 	if err != nil {
 		return fmt.Errorf("parse %s: %w", specPath, err)
 	}
-	spec = spec.expandVar(lookup)
+	spec = spec.expandVar(g.lookup)
 
 	if err := checkUnexpandedVars(spec, specPath); err != nil {
 		return err
 	}
 
-	if _, exists := g.specs[spec.Name]; exists {
+	// Root is simply the spec we were asked to build.
+	if isRoot {
+		g.Root = spec.Name
+	}
+
+	// If we've already loaded this spec by name, don't re-walk it.
+	if _, exists := g.Specs[spec.Name]; exists {
 		return nil
 	}
 
-	g.specs[spec.Name] = &ResolvedSpec{
+	g.Specs[spec.Name] = &resolvedSpec{
 		Spec: spec,
 		Path: specPath,
 	}
 
-	specDir := filepath.Dir(specPath)
-	for _, depPath := range spec.Deps {
-		fullDepPath := depPath
-		if !filepath.IsAbs(depPath) {
-			fullDepPath = filepath.Join(specDir, depPath)
+	// Resolve @name references via discovery.
+	for _, depName := range localDeps(spec) {
+		if _, exists := g.Specs[depName]; exists {
+			continue
 		}
-		if err := g.loadSpec(fullDepPath, lookup); err != nil {
-			return fmt.Errorf("load dep %s: %w", depPath, err)
+		if err := g.discoverAndLoad(depName); err != nil {
+			return fmt.Errorf("resolve @%s: %w", depName, err)
 		}
 	}
 
 	return nil
+}
+
+func (g *depGraph) discoverAndLoad(name string) error {
+	// Lazy index initialization.
+	if g.index == nil {
+		var err error
+		g.index, err = discoverSpecs(g.searchRoot, g.lookup)
+		if err != nil {
+			return fmt.Errorf("discover specs: %w", err)
+		}
+	}
+
+	specPath, ok := g.index[name]
+	if !ok {
+		return fmt.Errorf("no spec found with name %q", name)
+	}
+
+	return g.loadSpec(specPath, false /* isRoot */)
 }
 
 // localDeps extracts @-prefixed dependency names from a spec's Froms.
@@ -122,66 +129,94 @@ func localDeps(spec *Spec) []string {
 	return deps
 }
 
-// topoSort performs topological sort using Kahn's algorithm.
-func (g *DepGraph) topoSort() error {
-	inDegree := make(map[string]int)
-	dependents := make(map[string][]string)
+type stringHeap []string
 
-	for name := range g.specs {
+func (h stringHeap) Len() int           { return len(h) }
+func (h stringHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h stringHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *stringHeap) Push(x any)        { *h = append(*h, x.(string)) }
+func (h *stringHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
+// topoSort performs a deterministic topological sort using Kahn's algorithm.
+// When multiple nodes are available, it picks lexicographically smallest first.
+func (g *depGraph) topoSort() error {
+	inDegree := make(map[string]int, len(g.Specs))
+	dependents := make(map[string][]string, len(g.Specs))
+
+	// Init all nodes.
+	for name := range g.Specs {
 		inDegree[name] = 0
 	}
 
-	for name, rs := range g.specs {
+	// Build edges: dep -> dependent
+	for name, rs := range g.Specs {
 		for _, depName := range localDeps(rs.Spec) {
-			if _, exists := g.specs[depName]; exists {
+			if _, exists := g.Specs[depName]; exists {
 				inDegree[name]++
 				dependents[depName] = append(dependents[depName], name)
 			}
 		}
 	}
 
-	var queue []string
+	// Stable traversal over dependents.
+	for k := range dependents {
+		sort.Strings(dependents[k])
+	}
+
+	// Stable ready-set: min-heap by name.
+	h := &stringHeap{}
+	heap.Init(h)
 	for name, degree := range inDegree {
 		if degree == 0 {
-			queue = append(queue, name)
+			heap.Push(h, name)
 		}
 	}
 
-	var order []string
-	head := 0
-	for head < len(queue) {
-		current := queue[head]
-		head++
+	order := make([]string, 0, len(g.Specs))
+	for h.Len() > 0 {
+		current := heap.Pop(h).(string)
 		order = append(order, current)
 
 		for _, dependent := range dependents[current] {
 			inDegree[dependent]--
 			if inDegree[dependent] == 0 {
-				queue = append(queue, dependent)
+				heap.Push(h, dependent)
 			}
 		}
 	}
 
-	if len(order) != len(g.specs) {
-		var cycleNodes []string
+	if len(order) != len(g.Specs) {
+		cycleNodes := make([]string, 0)
 		for name, degree := range inDegree {
 			if degree > 0 {
 				cycleNodes = append(cycleNodes, name)
 			}
 		}
+		sort.Strings(cycleNodes) // stable error output too
 		return fmt.Errorf("dependency cycle detected involving: %v", cycleNodes)
 	}
 
-	g.order = order
+	g.Order = order
 	return nil
 }
 
-// ValidateDeps checks that all @-prefixed references in Froms have corresponding
-// entries in the deps list (i.e., they're in the graph).
-func (g *DepGraph) ValidateDeps() error {
-	for name, rs := range g.specs {
+func (g *depGraph) validateDeps() error {
+	names := make([]string, 0, len(g.Specs))
+	for name := range g.Specs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		rs := g.Specs[name]
 		for _, depName := range localDeps(rs.Spec) {
-			if _, exists := g.specs[depName]; !exists {
+			if _, exists := g.Specs[depName]; !exists {
 				return fmt.Errorf(
 					"spec %q references @%s in froms, but no dep provides image %q",
 					name, depName, depName,
@@ -201,11 +236,6 @@ func checkUnexpandedVars(spec *Spec, specPath string) error {
 		missing = append(missing, vars...)
 	}
 	for _, s := range spec.Froms {
-		if vars := findUnexpandedVars(s); len(vars) > 0 {
-			missing = append(missing, vars...)
-		}
-	}
-	for _, s := range spec.Deps {
 		if vars := findUnexpandedVars(s); len(vars) > 0 {
 			missing = append(missing, vars...)
 		}
@@ -261,4 +291,144 @@ func findUnexpandedVars(s string) []string {
 		}
 	}
 	return vars
+}
+
+// findRepoRoot walks up from startDir looking for a .git directory.
+// Returns the repo root path, or startDir if no .git is found.
+func findRepoRoot(startDir string) string {
+	dir := startDir
+	for {
+		gitPath := filepath.Join(dir, ".git")
+		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return startDir
+		}
+		dir = parent
+	}
+}
+
+// specIndex maps expanded spec names to their file paths.
+type specIndex map[string]string
+
+type discovered struct {
+	name string
+	path string
+	// skipped indicates “ignore this file” (unparseable / unexpanded vars / etc.)
+	skipped bool
+}
+
+// discoverSpecs scans searchRoot for *.wanda.yaml files and builds a name index.
+// Names are expanded using the provided lookup function.
+// Returns an error if two specs expand to the same name.
+func discoverSpecs(searchRoot string, lookup lookupFunc) (specIndex, error) {
+	index := make(specIndex)
+
+	// For conflicts we want name -> unique paths
+	conflicts := make(map[string]map[string]struct{})
+	var minConflictName string // track smallest conflict name without sorting everything
+
+	pathsCh := make(chan string, 256)
+	outCh := make(chan discovered, 256)
+
+	// 1) Workers parse concurrently
+	workers := runtime.GOMAXPROCS(0) // or runtime.NumCPU()
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for path := range pathsCh {
+				spec, err := parseSpecFile(path)
+				if err != nil {
+					outCh <- discovered{skipped: true}
+					continue
+				}
+				spec = spec.expandVar(lookup)
+
+				if vars := findUnexpandedVars(spec.Name); len(vars) > 0 {
+					outCh <- discovered{skipped: true}
+					continue
+				}
+				outCh <- discovered{name: spec.Name, path: path}
+			}
+		}()
+	}
+
+	// 2) Close outCh when workers finish
+	go func() {
+		wg.Wait()
+		close(outCh)
+	}()
+
+	// 3) Walk directory (single goroutine) and feed candidate files
+	walkErr := filepath.WalkDir(searchRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip inaccessible paths
+		}
+		if d.IsDir() {
+			name := d.Name()
+			// Skip common non-source directories
+			if name == ".git" || name == "node_modules" || name == "vendor" {
+				return filepath.SkipDir
+			}
+			// Skip hidden and underscore-prefixed directories (but not the root)
+			if path != searchRoot && len(name) > 0 && (name[0] == '.' || name[0] == '_') {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Slightly cheaper than suffix on full path: check the entry name first.
+		if !strings.HasSuffix(d.Name(), ".wanda.yaml") {
+			return nil
+		}
+		pathsCh <- path
+		return nil
+	})
+	close(pathsCh)
+
+	if walkErr != nil {
+		return nil, fmt.Errorf("walk %s: %w", searchRoot, walkErr)
+	}
+
+	// 4) Aggregate results (single goroutine => no locking)
+	for r := range outCh {
+		if r.skipped {
+			continue
+		}
+
+		if existing, ok := index[r.name]; ok && existing != r.path {
+			// record conflict paths uniquely
+			m := conflicts[r.name]
+			if m == nil {
+				m = make(map[string]struct{}, 2)
+				conflicts[r.name] = m
+			}
+			m[existing] = struct{}{}
+			m[r.path] = struct{}{}
+
+			if minConflictName == "" || r.name < minConflictName {
+				minConflictName = r.name
+			}
+			continue
+		}
+		index[r.name] = r.path
+	}
+
+	if len(conflicts) > 0 {
+		// Use the smallest conflicting name (deterministic) without sorting all names.
+		name := minConflictName
+		m := conflicts[name]
+		paths := make([]string, 0, len(m))
+		for p := range m {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths) // optional, just for stable error output
+		return nil, fmt.Errorf("multiple specs have name %q: %s", name, strings.Join(paths, ", "))
+	}
+
+	return index, nil
 }

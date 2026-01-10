@@ -1,0 +1,3 @@
+FROM dep-base
+
+COPY world.txt /opt/app/world.txt

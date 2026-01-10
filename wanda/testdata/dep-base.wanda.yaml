@@ -1,2 +1,2 @@
 name: dep-base
-dockerfile: Dockerfile.hello
+dockerfile: Dockerfile.dep-base
