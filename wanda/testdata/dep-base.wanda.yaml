@@ -1,0 +1,2 @@
+name: dep-base
+dockerfile: Dockerfile.dep-base

@@ -1,0 +1,5 @@
+name: dep-middle
+froms: ["cr.ray.io/rayproject/dep-base"]
+dockerfile: Dockerfile.dep-middle
+srcs:
+  - world.txt
