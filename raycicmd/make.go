@@ -59,6 +59,34 @@ func listCIYamlFiles(dir string) ([]string, error) {
 	return names, nil
 }
 
+const rulesFileSuffix = ".rules.txt"
+
+func listRulesFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read rules dir: %w", err)
+	}
+
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		isRulesFile := strings.HasSuffix(name, rulesFileSuffix)
+		if !isRulesFile {
+			continue
+		}
+
+		paths = append(paths, filepath.Join(dir, name))
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
 func parsePipelineFile(file string) (*pipelineGroup, error) {
 	bs, err := os.ReadFile(file)
 	if err != nil {
@@ -101,11 +129,26 @@ func makePipeline(ctx *pipelineContext) (
 
 	c := newConverter(ctx.config, ctx.info)
 
+	// Build steps for CI.
+	bkDirs := ctx.config.buildkiteDirs()
+
+	testRulesFiles := ctx.config.TestRulesFiles
+	if len(testRulesFiles) == 0 {
+		for _, bkDir := range bkDirs {
+			fullDir := filepath.Join(ctx.repoDir, bkDir)
+			files, err := listRulesFiles(fullDir)
+			if err != nil {
+				return nil, fmt.Errorf("list rules files in %s: %w", bkDir, err)
+			}
+			testRulesFiles = append(testRulesFiles, files...)
+		}
+	}
+
 	filter, err := newStepFilter(
 		ctx.config.SkipTags,
 		ctx.info.selects,
 		ctx.config.TagFilterCommand,
-		ctx.config.TestRulesFiles,
+		testRulesFiles,
 		ctx.envs,
 		ctx.changeLister,
 	)
@@ -114,12 +157,6 @@ func makePipeline(ctx *pipelineContext) (
 	}
 
 	filter.noTagMeansAlways = ctx.config.NoTagMeansAlways
-
-	// Build steps for CI.
-	bkDirs := ctx.config.BuildkiteDirs
-	if len(bkDirs) == 0 {
-		bkDirs = []string{".buildkite"}
-	}
 
 	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {

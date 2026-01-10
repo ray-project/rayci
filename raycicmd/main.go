@@ -176,19 +176,20 @@ func Main(args []string, envs Envs) error {
 		envs = &osEnvs{}
 	}
 
-	// Check for subcommands first
-	if len(args) > 1 && args[1] == "test-rules" {
-		return subcmdTestRules(args[2:], envs)
-	}
-
-	flags, args := parseFlags(args)
-	if len(args) != 0 {
-		return fmt.Errorf("unexpected arguments: %v", args)
-	}
+	flags, remaining := parseFlags(args)
 
 	config, err := loadConfig(flags.ConfigFile, flags.BuildkiteDir, envs)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+
+	// Handle test-rules command
+	if len(remaining) > 0 && remaining[0] == "test-rules" {
+		return runTestRulesCmd(remaining[1:], config)
+	}
+
+	if len(remaining) != 0 {
+		return fmt.Errorf("unexpected arguments: %v", remaining)
 	}
 
 	info, err := makeBuildInfo(flags, envs)

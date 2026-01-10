@@ -92,8 +92,6 @@ func makePRPipelineConfig(name string) *config {
 		},
 		HookEnvKeys: []string{"RAYCI_CHECKOUT_DIR"},
 
-		TestRulesFiles: []string{"ci/pipeline/test_rules.txt"},
-
 		SkipTags: []string{"disabled", "skip-on-premerge"},
 
 		ConcurrencyGroupPrefixes: []string{},
