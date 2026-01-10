@@ -138,7 +138,7 @@ func TestParseSpecFile(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	got, err := parseSpecFile(specFile)
+	got, err := ParseSpecFile(specFile)
 	if err != nil {
 		t.Fatalf("parse spec file: %v", err)
 	}

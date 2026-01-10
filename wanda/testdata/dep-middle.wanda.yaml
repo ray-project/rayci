@@ -1,0 +1,6 @@
+name: dep-middle
+deps: [dep-base.wanda.yaml]
+froms: ["@dep-base"]
+dockerfile: Dockerfile.world
+srcs:
+  - world.txt

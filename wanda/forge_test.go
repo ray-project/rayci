@@ -310,7 +310,7 @@ func TestForge_noCache(t *testing.T) {
 		t.Fatalf("make new forge: %v", err)
 	}
 
-	helloSpec, err := parseSpecFile("testdata/hello-nocache.wanda.yaml")
+	helloSpec, err := ParseSpecFile("testdata/hello-nocache.wanda.yaml")
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		t.Fatalf("make new forge: %v", err)
 	}
 
-	helloSpec, err := parseSpecFile("testdata/hello.wanda.yaml")
+	helloSpec, err := ParseSpecFile("testdata/hello.wanda.yaml")
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
@@ -518,7 +518,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		t.Fatalf("make new forge: %v", err)
 	}
 
-	helloSpec, err := parseSpecFile("testdata/hello.wanda.yaml")
+	helloSpec, err := ParseSpecFile("testdata/hello.wanda.yaml")
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
