@@ -19,9 +19,15 @@ function build_wanda {
 	GOOS="$RAYCI_OS" GOARCH="$RAYCI_ARCH" go build -trimpath -o "_release/wanda-${RAYCI_OS}-${RAYCI_ARCH}" ./wanda/wanda
 }
 
+function build_rayapp {
+	GOOS="$1" GOARCH="$2" go build -trimpath -o "_release/rayapp-${RAYCI_OS}-${RAYCI_ARCH}" ./rayapp/rayapp
+}
+
 build_rayci linux amd64
 
 build_wanda darwin arm64
 build_wanda linux amd64
 build_wanda linux arm64
 build_wanda windows amd64
+
+build_rayapp linux amd64
