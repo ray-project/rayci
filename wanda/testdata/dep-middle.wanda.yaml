@@ -1,0 +1,5 @@
+name: dep-middle
+froms: ["@dep-base"]
+dockerfile: Dockerfile.dep-middle
+srcs:
+  - world.txt

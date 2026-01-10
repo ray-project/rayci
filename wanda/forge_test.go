@@ -172,7 +172,7 @@ func TestForge_withHints(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/hello"
+	const tag = "cr.ray.io/rayproject/hello-hint"
 
 	ref, err := name.ParseReference(tag)
 	if err != nil {

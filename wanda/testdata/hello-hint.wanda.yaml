@@ -1,4 +1,4 @@
-name: hello
+name: hello-hint
 dockerfile: Dockerfile.hello
 build_hint_args:
   - MESSAGE=hint message
