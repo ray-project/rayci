@@ -14,6 +14,10 @@ type ForgeConfig struct {
 	BuildID    string
 	Epoch      string
 
+	// Platform specifies the target platform for image resolution (e.g., "linux/arm64").
+	// If empty, defaults to the host OS/arch.
+	Platform string
+
 	RayCI   bool
 	Rebuild bool
 

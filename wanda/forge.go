@@ -55,14 +55,25 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)
 	}
 
+	targetOS := runtime.GOOS
+	targetArch := runtime.GOARCH
+	if config.Platform != "" {
+		parts := strings.SplitN(config.Platform, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return nil, fmt.Errorf("invalid platform format: %q, expected \"os/arch\"", config.Platform)
+		}
+		targetOS = parts[0]
+		targetArch = parts[1]
+	}
+
 	f := &Forge{
 		config:  config,
 		workDir: absWorkDir,
 		remoteOpts: []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
 			remote.WithPlatform(crane.Platform{
-				OS:           runtime.GOOS,
-				Architecture: runtime.GOARCH,
+				OS:           targetOS,
+				Architecture: targetArch,
 			}),
 		},
 	}
