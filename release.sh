@@ -15,8 +15,11 @@ build_go() {
     go build -trimpath -o "_release/${name}-${os}-${arch}" "$pkg"
 }
 
+build_rayapp() { build_go rayapp ./rayapp/rayapp "$1" "$2"; }
 build_rayci()  { build_go rayci  .             "$1" "$2"; }
 build_wanda()  { build_go wanda  ./wanda/wanda "$1" "$2"; }
+
+build_rayapp linux   amd64
 
 build_rayci  linux   amd64
 
