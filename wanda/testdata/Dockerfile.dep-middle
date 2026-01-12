@@ -1,2 +1,2 @@
-FROM dep-base
+FROM cr.ray.io/rayproject/dep-base
 COPY world.txt /opt/

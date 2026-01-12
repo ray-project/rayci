@@ -14,25 +14,46 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Build builds a container image from the given specification file.
+// Build builds a container image from the given specification file, and builds
+// all its dependencies in topological order.
+// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
+// the root is built.
 func Build(specFile string, config *ForgeConfig) error {
 	if config == nil {
 		config = &ForgeConfig{}
 	}
 
-	spec, err := parseSpecFile(specFile)
+	graph, err := buildDepGraph(specFile, os.LookupEnv, config.NamePrefix)
 	if err != nil {
-		return fmt.Errorf("parse spec file: %w", err)
+		return fmt.Errorf("build dep graph: %w", err)
 	}
 
-	// Expand env variable.
-	spec = spec.expandVar(os.LookupEnv)
+	if err := graph.validateDeps(); err != nil {
+		return fmt.Errorf("validate deps: %w", err)
+	}
 
 	forge, err := NewForge(config)
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)
 	}
-	return forge.Build(spec)
+
+	// In RayCI mode, only build the root (deps built by prior pipeline steps).
+	order := graph.Order
+	if config.RayCI {
+		order = []string{graph.Root}
+	}
+
+	for _, name := range order {
+		rs := graph.Specs[name]
+
+		log.Printf("building %s (from %s)", name, rs.Path)
+
+		if err := forge.Build(rs.Spec); err != nil {
+			return fmt.Errorf("build %s: %w", name, err)
+		}
+	}
+
+	return nil
 }
 
 // Forge is a forge to build container images.
