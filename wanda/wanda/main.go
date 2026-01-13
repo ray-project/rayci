@@ -40,6 +40,10 @@ func main() {
 	readOnly := flag.Bool("read_only", false, "read-only cache repository")
 	epoch := flag.String("epoch", "", "epoch for the image tag")
 	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
+	wandaSpecsFile := flag.String(
+		"wanda_specs_file", "",
+		"file listing spec directories; if empty, uses .wandaspecs under work_dir",
+	)
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
@@ -72,12 +76,13 @@ func main() {
 	}
 
 	config := &wanda.ForgeConfig{
-		WorkDir:    *workDir,
-		DockerBin:  *docker,
-		WorkRepo:   *workRepo,
-		NamePrefix: *namePrefix,
-		BuildID:    *buildID,
-		Epoch:      *epoch,
+		WorkDir:        *workDir,
+		DockerBin:      *docker,
+		WorkRepo:       *workRepo,
+		NamePrefix:     *namePrefix,
+		BuildID:        *buildID,
+		Epoch:          *epoch,
+		WandaSpecsFile: *wandaSpecsFile,
 
 		RayCI:   *rayCI,
 		Rebuild: *rebuild,
