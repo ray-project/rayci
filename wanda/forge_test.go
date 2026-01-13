@@ -172,7 +172,7 @@ func TestForge_withHints(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/hello"
+	const tag = "cr.ray.io/rayproject/hello-hint"
 
 	ref, err := name.ParseReference(tag)
 	if err != nil {
@@ -214,11 +214,11 @@ func TestForge(t *testing.T) {
 		NamePrefix: "cr.ray.io/rayproject/",
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := Build("testdata/hello-test.wanda.yaml", config); err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/hello"
+	const tag = "cr.ray.io/rayproject/hello-test"
 
 	ref, err := name.ParseReference(tag)
 	if err != nil {
@@ -283,7 +283,7 @@ func TestForge_noCache(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	const tag = "cr.ray.io/rayproject/hello"
+	const tag = "cr.ray.io/rayproject/hello-nocache"
 
 	ref, err := name.ParseReference(tag)
 	if err != nil {
@@ -362,7 +362,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		Epoch:      "1",
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := Build("testdata/hello-test.wanda.yaml", config); err != nil {
 		t.Fatalf("build hello: %v", err)
 	}
 
@@ -405,7 +405,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		t.Fatalf("make new forge: %v", err)
 	}
 
-	helloSpec, err := parseSpecFile("testdata/hello.wanda.yaml")
+	helloSpec, err := parseSpecFile("testdata/hello-test.wanda.yaml")
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
@@ -420,7 +420,7 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		t.Errorf("got %d cache hits, want 1", hit)
 	}
 
-	hello := fmt.Sprintf("%s/work:def456-hello", crAddr)
+	hello := fmt.Sprintf("%s/work:def456-hello-test", crAddr)
 	helloRef, err := name.ParseReference(hello)
 	if err != nil {
 		t.Fatalf("parse hello reference: %v", err)
@@ -475,7 +475,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		Epoch:      randomEpoch(),
 	}
 
-	if err := Build("testdata/hello.wanda.yaml", config); err != nil {
+	if err := Build("testdata/hello-test.wanda.yaml", config); err != nil {
 		t.Fatalf("build hello: %v", err)
 	}
 
@@ -518,7 +518,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		t.Fatalf("make new forge: %v", err)
 	}
 
-	helloSpec, err := parseSpecFile("testdata/hello.wanda.yaml")
+	helloSpec, err := parseSpecFile("testdata/hello-test.wanda.yaml")
 	if err != nil {
 		t.Fatalf("parse hello spec: %v", err)
 	}
@@ -531,7 +531,7 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 		t.Errorf("got %d cache hits, want 1", hit)
 	}
 
-	hello := "localhost:5000/rayci-work:abc123-hello"
+	hello := "localhost:5000/rayci-work:abc123-hello-test"
 	helloRef, err := name.ParseReference(hello)
 	if err != nil {
 		t.Fatalf("parse hello reference: %v", err)

@@ -1,5 +1,5 @@
 name: world
 dockerfile: Dockerfile.world
-froms: [ "cr.ray.io/rayproject/hello" ]
+froms: [ "cr.ray.io/rayproject/hello-test" ]
 srcs:
   - world.txt
