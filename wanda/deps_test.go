@@ -515,6 +515,70 @@ func TestDiscoverSpecs_WithVariables(t *testing.T) {
 	}
 }
 
+func TestDiscoverSpecs_WithParams(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Spec with params - should be indexed under all expanded names
+	writeSpec(t, tmpDir, "base.wanda.yaml", strings.Join([]string{
+		"name: base$PY",
+		"params:",
+		"  PY:",
+		"    - '3.10'",
+		"    - '3.11'",
+		"    - '3.12'",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	// No env vars needed - params provide the values
+	index, err := discoverSpecs(tmpDir, noopLookup)
+	if err != nil {
+		t.Fatalf("discoverSpecs: %v", err)
+	}
+
+	// All three expanded names should be indexed
+	for _, name := range []string{"base3.10", "base3.11", "base3.12"} {
+		if _, ok := index[name]; !ok {
+			t.Errorf("index missing %q, got: %v", name, index)
+		}
+	}
+
+	// All should point to the same spec file
+	path := index["base3.10"]
+	if index["base3.11"] != path || index["base3.12"] != path {
+		t.Errorf("all names should map to same path, got: %v", index)
+	}
+}
+
+func TestDiscoverSpecs_ParamsAndEnvFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Spec with partial params - one var has params, one needs env
+	writeSpec(t, tmpDir, "base.wanda.yaml", strings.Join([]string{
+		"name: base$PY-$ARCH",
+		"params:",
+		"  PY:",
+		"    - '3.10'",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	lookup := func(key string) (string, bool) {
+		if key == "ARCH" {
+			return "amd64", true
+		}
+		return "", false
+	}
+
+	index, err := discoverSpecs(tmpDir, lookup)
+	if err != nil {
+		t.Fatalf("discoverSpecs: %v", err)
+	}
+
+	// Should be indexed as base3.10-amd64
+	if _, ok := index["base3.10-amd64"]; !ok {
+		t.Errorf("index missing base3.10-amd64, got: %v", index)
+	}
+}
+
 func TestBuildDepGraph_Discovery(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -650,5 +714,135 @@ func TestBuildDepGraph_TransitiveDeps(t *testing.T) {
 
 	if graph.Specs["c"] == nil {
 		t.Error("expected c in graph (transitive dep)")
+	}
+}
+
+func TestBuildDepGraph_ParamsValidation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	writeSpec(t, tmpDir, "spec.wanda.yaml", strings.Join([]string{
+		"name: myimage$PY_VERSION",
+		"params:",
+		"  PY_VERSION:",
+		"    - '3.10'",
+		"    - '3.11'",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	t.Run("valid param value", func(t *testing.T) {
+		lookup := func(k string) (string, bool) {
+			if k == "PY_VERSION" {
+				return "3.10", true
+			}
+			return "", false
+		}
+		_, err := buildDepGraph(filepath.Join(tmpDir, "spec.wanda.yaml"), lookup, "")
+		if err != nil {
+			t.Errorf("unexpected error with valid param: %v", err)
+		}
+	})
+
+	t.Run("invalid param value", func(t *testing.T) {
+		lookup := func(k string) (string, bool) {
+			if k == "PY_VERSION" {
+				return "3.9", true
+			}
+			return "", false
+		}
+		_, err := buildDepGraph(filepath.Join(tmpDir, "spec.wanda.yaml"), lookup, "")
+		if err == nil {
+			t.Error("expected error for invalid param value")
+		}
+		if !strings.Contains(err.Error(), "3.9") {
+			t.Errorf("error should mention invalid value '3.9': %v", err)
+		}
+	})
+}
+
+func TestBuildDepGraph_UnexpandedWithParamsHint(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Spec with params but env var not set
+	writeSpec(t, tmpDir, "spec.wanda.yaml", strings.Join([]string{
+		"name: myimage$PY_VERSION",
+		"params:",
+		"  PY_VERSION:",
+		"    - '3.10'",
+		"    - '3.11'",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	// No env var set - should get helpful error with valid values
+	_, err := buildDepGraph(filepath.Join(tmpDir, "spec.wanda.yaml"), noopLookup, "")
+	if err == nil {
+		t.Fatal("expected error for unexpanded env var")
+	}
+
+	// Error should mention valid values from params
+	errStr := err.Error()
+	if !strings.Contains(errStr, "PY_VERSION") {
+		t.Errorf("error should mention PY_VERSION: %v", err)
+	}
+	if !strings.Contains(errStr, "valid values") {
+		t.Errorf("error should mention valid values: %v", err)
+	}
+	if !strings.Contains(errStr, "3.10") || !strings.Contains(errStr, "3.11") {
+		t.Errorf("error should list valid values 3.10, 3.11: %v", err)
+	}
+}
+
+func TestBuildDepGraph_DiscoveryWithParams(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := os.Mkdir(filepath.Join(tmpDir, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Base spec with params - discoverable via params, loadable with env var
+	baseDir := filepath.Join(tmpDir, "base")
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeSpec(t, baseDir, "base.wanda.yaml", strings.Join([]string{
+		"name: base$PY",
+		"params:",
+		"  PY:",
+		"    - '3.10'",
+		"    - '3.11'",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	// App spec depends on base3.10
+	appDir := filepath.Join(tmpDir, "app")
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeSpec(t, appDir, "app.wanda.yaml", strings.Join([]string{
+		"name: app",
+		`froms: ["cr.ray.io/rayproject/base3.10"]`,
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	// Discovery finds base3.10 via params (no env var needed for discovery).
+	// Loading the spec requires env var to be set for expansion.
+	lookup := func(key string) (string, bool) {
+		if key == "PY" {
+			return "3.10", true
+		}
+		return "", false
+	}
+
+	graph, err := buildDepGraph(filepath.Join(appDir, "app.wanda.yaml"), lookup, testPrefix)
+	if err != nil {
+		t.Fatalf("buildDepGraph: %v", err)
+	}
+
+	// base3.10 was discovered via params and loaded with PY=3.10
+	if graph.Specs["base3.10"] == nil {
+		t.Error("expected base3.10 in graph")
+	}
+
+	if len(graph.Order) != 2 {
+		t.Errorf("Order has %d items, want 2", len(graph.Order))
 	}
 }

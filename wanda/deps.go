@@ -70,9 +70,14 @@ func (g *depGraph) loadSpec(specPath string, isRoot bool) error {
 	if err != nil {
 		return fmt.Errorf("parse %s: %w", specPath, err)
 	}
+
+	if err := spec.ValidateParams(g.lookup); err != nil {
+		return fmt.Errorf("%s: %w", specPath, err)
+	}
+
 	spec = spec.expandVar(g.lookup)
 
-	if err := checkUnexpandedVars(spec, specPath); err != nil {
+	if err := checkUnexpandedVars(spec, specPath, spec.Params); err != nil {
 		return err
 	}
 
@@ -246,69 +251,38 @@ func (g *depGraph) validateDeps() error {
 }
 
 // checkUnexpandedVars checks if a spec has any unexpanded environment variables
-// and returns a helpful error message if so.
-func checkUnexpandedVars(spec *Spec, specPath string) error {
-	var missing []string
-
-	if vars := findUnexpandedVars(spec.Name); len(vars) > 0 {
-		missing = append(missing, vars...)
-	}
-	for _, s := range spec.Froms {
-		if vars := findUnexpandedVars(s); len(vars) > 0 {
-			missing = append(missing, vars...)
-		}
-	}
-
-	if len(missing) == 0 {
+// and returns a helpful error message. If params are declared for a missing var,
+// the valid values are included in the error message.
+func checkUnexpandedVars(spec *Spec, specPath string, params map[string][]string) error {
+	vars := spec.UnexpandedVars()
+	if len(vars) == 0 {
 		return nil
 	}
 
+	// Deduplicate
 	seen := make(map[string]bool)
 	var unique []string
-	for _, v := range missing {
+	for _, v := range vars {
 		if !seen[v] {
 			seen[v] = true
 			unique = append(unique, v)
 		}
 	}
 
-	if len(unique) == 1 {
-		return fmt.Errorf("%s: environment variable %s is not set", specPath, unique[0])
-	}
-	return fmt.Errorf("%s: environment variables not set: %s", specPath, strings.Join(unique, ", "))
-}
-
-// findUnexpandedVars finds $VAR patterns in a string that were not expanded.
-func findUnexpandedVars(s string) []string {
-	var vars []string
-	for i := 0; i < len(s); i++ {
-		if s[i] == '$' && i+1 < len(s) {
-			// Skip $$
-			if s[i+1] == '$' {
-				i++
-				continue
-			}
-			// Find the variable name
-			j := i + 1
-			for j < len(s) {
-				c := s[j]
-				if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' {
-					j++
-					continue
-				}
-				if c >= '0' && c <= '9' && j > i+1 {
-					j++
-					continue
-				}
-				break
-			}
-			if j > i+1 {
-				vars = append(vars, s[i:j])
-			}
-			i = j - 1
+	// Build error message with param hints where available
+	var parts []string
+	for _, v := range unique {
+		if allowed, ok := params[v]; ok && len(allowed) > 0 {
+			parts = append(parts, fmt.Sprintf("$%s (valid values: %s)", v, strings.Join(allowed, ", ")))
+		} else {
+			parts = append(parts, "$"+v)
 		}
 	}
-	return vars
+
+	if len(parts) == 1 {
+		return fmt.Errorf("%s: environment variable %s is not set", specPath, parts[0])
+	}
+	return fmt.Errorf("%s: environment variables not set: %s", specPath, strings.Join(parts, "; "))
 }
 
 // findRepoRoot walks up from startDir looking for a .git directory.
@@ -340,7 +314,8 @@ type discovered struct {
 }
 
 // discoverSpecs scans searchRoot for *.wanda.yaml files and builds a name index.
-// Names are expanded using the provided lookup function.
+// Names are expanded using declared params first, then the lookup function.
+// Specs with params will have all param combinations indexed.
 // Returns an error if two specs expand to the same name.
 func discoverSpecs(searchRoot string, lookup lookupFunc) (specIndex, error) {
 	index := make(specIndex)
@@ -365,13 +340,19 @@ func discoverSpecs(searchRoot string, lookup lookupFunc) (specIndex, error) {
 					outCh <- discovered{skipped: true}
 					continue
 				}
-				spec = spec.expandVar(lookup)
 
-				if vars := findUnexpandedVars(spec.Name); len(vars) > 0 {
-					outCh <- discovered{skipped: true}
-					continue
+				// Use params to enumerate all possible names.
+				// For vars without params, try env lookup.
+				sentAny := false
+				for _, name := range spec.ExpandedNames() {
+					if expanded, ok := tryFullyExpand(name, lookup); ok {
+						outCh <- discovered{name: expanded, path: path}
+						sentAny = true
+					}
 				}
-				outCh <- discovered{name: spec.Name, path: path}
+				if !sentAny {
+					outCh <- discovered{skipped: true}
+				}
 			}
 		}()
 	}
