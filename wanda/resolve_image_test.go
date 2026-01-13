@@ -3,6 +3,7 @@ package wanda
 import (
 	"fmt"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 
 	cranename "github.com/google/go-containerregistry/pkg/name"
@@ -13,6 +14,14 @@ import (
 )
 
 func TestResolveLocalImage(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		// Docker Desktop (macOS/Windows) modifies image config when storing,
+		// removing the "author" field and adding "empty_layer: true" to history.
+		// This changes the config digest, causing the test to fail.
+		t.Skip("skipping test on non-linux")
+		return
+	}
+
 	random, err := random.Image(1024, 1)
 	if err != nil {
 		t.Fatal("create random image: ", err)
