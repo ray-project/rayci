@@ -14,10 +14,15 @@ func BuildAll(yamlFile, baseDir, outputDir string) error {
 
 // Build builds a single template.
 func Build(yamlFile, tmplName, baseDir, outputDir string) error {
+	if tmplName == "" {
+		return errTemplateNameRequired
+	}
 	return buildWithFilter(yamlFile, baseDir, outputDir, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
 	})
 }
+
+var errTemplateNameRequired = errors.New("template name is required, use build-all to build all templates")
 
 var errNoTemplateBuilt = errors.New("no template built")
 
