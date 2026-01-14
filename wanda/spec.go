@@ -105,7 +105,7 @@ func expandVar(s string, lookup lookupFunc) string {
 	return buf.String()
 }
 
-func stringsExpanVar(slice []string, lookup lookupFunc) []string {
+func stringsExpandVar(slice []string, lookup lookupFunc) []string {
 	if len(slice) == 0 {
 		return nil
 	}
@@ -120,12 +120,13 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result := new(Spec)
 
 	result.Name = expandVar(s.Name, lookup)
-	result.Tags = stringsExpanVar(s.Tags, lookup)
-	result.Froms = stringsExpanVar(s.Froms, lookup)
-	result.Srcs = stringsExpanVar(s.Srcs, lookup)
+	result.Tags = stringsExpandVar(s.Tags, lookup)
+	result.Froms = stringsExpandVar(s.Froms, lookup)
+	result.Srcs = stringsExpandVar(s.Srcs, lookup)
 	result.Dockerfile = expandVar(s.Dockerfile, lookup)
-	result.BuildArgs = stringsExpanVar(s.BuildArgs, lookup)
-	result.BuildHintArgs = stringsExpanVar(s.BuildHintArgs, lookup)
+	result.BuildArgs = stringsExpandVar(s.BuildArgs, lookup)
+	result.BuildHintArgs = stringsExpandVar(s.BuildHintArgs, lookup)
+	result.DisableCaching = s.DisableCaching
 
 	return result
 }
