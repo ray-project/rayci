@@ -24,12 +24,6 @@ func main() {
 		if err := rayapp.Build(*buildFile, args[1], *base, *output); err != nil {
 			log.Fatal(err)
 		}
-	case "anyscale-cli":
-		output, err := rayapp.RunAnyscaleCLI(args[1:])
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(output)
 	case "help":
 		fmt.Println("Usage: rayapp build-all | build <template-name> | help")
 	default:
