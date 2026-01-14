@@ -1,0 +1,2 @@
+FROM cr.ray.io/rayproject/dep-middle
+COPY Dockerfile.dep-top /opt/

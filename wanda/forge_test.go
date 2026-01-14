@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -452,6 +453,83 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 
 	if hit := forge2.cacheHit(); hit != 0 {
 		t.Errorf("got %d cache hits, want 0", hit)
+	}
+}
+
+func TestBuild_WithDeps(t *testing.T) {
+	// Test: dep-top -> dep-middle -> dep-base
+	// Build should build in order: dep-base, dep-middle, dep-top
+
+	// Create a wandaspecs file pointing to testdata directory.
+	wandaSpecs := filepath.Join(t.TempDir(), ".wandaspecs")
+	absTestdata, err := filepath.Abs("testdata")
+	if err != nil {
+		t.Fatalf("abs testdata: %v", err)
+	}
+	if err := os.WriteFile(wandaSpecs, []byte(absTestdata), 0644); err != nil {
+		t.Fatalf("write wandaspecs: %v", err)
+	}
+
+	config := &ForgeConfig{
+		WorkDir:        "testdata",
+		NamePrefix:     "cr.ray.io/rayproject/",
+		WandaSpecsFile: wandaSpecs,
+	}
+
+	if err := Build("testdata/dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("build with deps: %v", err)
+	}
+
+	// Verify dep-top was built and can be read
+	ref, err := name.ParseReference("cr.ray.io/rayproject/dep-top")
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read dep-top image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+
+	// Should have 3 layers: dep-base, dep-middle, dep-top
+	if got, want := len(layers), 3; got != want {
+		t.Errorf("got %d layers, want %d", got, want)
+	}
+}
+
+func TestBuild_NoDeps(t *testing.T) {
+	// Test backward compatibility: a spec with no deps should work
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+
+	if err := Build("testdata/hello-test.wanda.yaml", config); err != nil {
+		t.Fatalf("build with deps: %v", err)
+	}
+
+	ref, err := name.ParseReference("cr.ray.io/rayproject/hello-test")
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read hello image: %v", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatalf("read layers: %v", err)
+	}
+
+	if got, want := len(layers), 1; got != want {
+		t.Errorf("got %d layers, want %d", got, want)
 	}
 }
 
