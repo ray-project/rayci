@@ -7,12 +7,13 @@ import (
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
-	WorkDir    string
-	DockerBin  string
-	WorkRepo   string
-	NamePrefix string
-	BuildID    string
-	Epoch      string
+	WorkDir        string
+	DockerBin      string
+	WorkRepo       string
+	NamePrefix     string
+	BuildID        string
+	Epoch          string
+	WandaSpecsFile string
 
 	RayCI   bool
 	Rebuild bool
