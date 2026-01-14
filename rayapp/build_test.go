@@ -76,3 +76,13 @@ func TestBuild_notFound(t *testing.T) {
 		t.Fatalf("want error %q, got %q", errNoTemplateBuilt, err)
 	}
 }
+
+func TestBuild_emptyTemplateName(t *testing.T) {
+	tmp := t.TempDir()
+
+	if err := Build(
+		"testdata/BUILD.yaml", "", "testdata", tmp,
+	); err != errTemplateNameRequired {
+		t.Fatalf("want error %q, got %q", errNoTemplateBuilt, err)
+	}
+}
