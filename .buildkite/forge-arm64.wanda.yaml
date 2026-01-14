@@ -6,4 +6,3 @@ srcs:
   - .buildkite/dependencies/python_depset.lock
 build_args:
   - PYTHON_DEPSET=.buildkite/dependencies/python_depset.lock
-  - ARCH=aarch64
