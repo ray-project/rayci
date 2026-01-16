@@ -1,8 +1,6 @@
 ASDFSADFADFSAFSDAFSAFSD
 
 - `rayci`: program that reads test definition files and generates buildkite
-  pipeline definitions
-- `wanda`: program that builds container images using a container registry as
   a content-addressed build cache
 
 This repository also contains scripts that are used on legacy CI/CD pipelines
