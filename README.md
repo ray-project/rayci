@@ -1,4 +1,4 @@
-This repository contains scripts and progresm for Ray CI/CD on buildkite.
+ASDFSADFADFSAFSDAFSAFSD
 
 - `rayci`: program that reads test definition files and generates buildkite
   pipeline definitions
