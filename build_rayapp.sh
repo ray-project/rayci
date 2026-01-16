@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-echo "--- Building rayapp"
 mkdir -p ci/bin
 go build -o ci/bin/rayapp ./rayapp/rayapp
 
