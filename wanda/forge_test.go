@@ -325,6 +325,46 @@ func TestForge_noCache(t *testing.T) {
 	}
 }
 
+func TestForge_noCacheAfterExpandVar(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		BuildID:    "nocache-expand-test",
+	}
+
+	forge, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("make forge: %v", err)
+	}
+
+	spec, err := parseSpecFile("testdata/hello-nocache.wanda.yaml")
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+
+	// Simulate what Build() does: expand variables before building.
+	// This is a regression test to ensure DisableCaching is preserved
+	// through expandVar.
+	spec = spec.expandVar(os.LookupEnv)
+
+	if !spec.DisableCaching {
+		t.Fatal("DisableCaching should be true after expandVar")
+	}
+
+	if err := forge.Build(spec); err != nil {
+		t.Fatalf("first build: %v", err)
+	}
+
+	// Build again - should have 0 cache hits since caching is disabled.
+	if err := forge.Build(spec); err != nil {
+		t.Fatalf("second build: %v", err)
+	}
+
+	if hit := forge.cacheHit(); hit != 0 {
+		t.Errorf("got %d cache hits, want 0", hit)
+	}
+}
+
 func TestForgeWithRemoteWorkRepo(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("skipping test on non-linux")

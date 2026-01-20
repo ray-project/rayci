@@ -121,6 +121,28 @@ func TestSpecExpand(t *testing.T) {
 	}
 }
 
+func TestSpecExpandDisableCaching(t *testing.T) {
+	spec := &Spec{
+		Name:           "$NAME",
+		Dockerfile:     "Dockerfile",
+		DisableCaching: true,
+	}
+
+	expanded := spec.expandVar(func(k string) (string, bool) {
+		if k == "NAME" {
+			return "hello", true
+		}
+		return "", false
+	})
+
+	if expanded.Name != "hello" {
+		t.Errorf("Name = %q, want %q", expanded.Name, "hello")
+	}
+	if !expanded.DisableCaching {
+		t.Errorf("DisableCaching = %v, want %v", expanded.DisableCaching, true)
+	}
+}
+
 func TestParseSpecFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
