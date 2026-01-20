@@ -1,0 +1,110 @@
+package goqualgate
+
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+
+const usage = `goqualgate - Go quality gates for CI
+
+Usage:
+  goqualgate <command> [flags]
+
+Commands:
+	coverage    Run test coverage and check minimum thresholds
+`
+
+const coverageUsage = `goqualgate coverage - Run test coverage checks
+
+Runs 'go test -cover' on all packages and reports coverage.
+Fails if any package is below -min-coverage-pct. 
+
+Usage:
+  goqualgate coverage [flags]
+
+Flags:
+	-min-coverage-pct float
+		Minimum coverage percentage required to pass (default 60).
+
+Improving Coverage (for AI agents):
+
+  1. Run coverage check to identify failing packages:
+       ./goqualgate coverage -min-coverage-pct <target-coverage-pct>
+
+  2. For each failing package, get detailed function-level coverage:
+       go test -coverprofile=cover.out ./<package>/...
+       go tool cover -func=cover.out | grep -v "100.0%"
+
+  3. Focus on functions with lowest coverage first. Common patterns:
+     - Error paths: Create invalid inputs to trigger error returns
+     - Default branches: Test functions with zero/empty values
+     - Edge cases: Test boundary conditions
+
+  4. Testing patterns to follow:
+     - Use t.TempDir() for file-based tests
+     - Format: "got, want" ordering in assertions
+     - Run 'go test ./<package>/...' after each change
+
+  5. Skip functions that require external services (AWS, Docker) unless
+     mocking infrastructure exists. Focus on testable code paths.
+`
+
+// Main is the entry point for the goqualgate CLI, dispatching to the appropriate subcommand
+// based on the first argument.
+func Main() error {
+	if len(os.Args) < 2 {
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "coverage":
+		return cmdCoverage(os.Args[2:])
+	case "-h", "-help", "--help", "help":
+		fmt.Print(usage)
+		return nil
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", os.Args[1], usage)
+		os.Exit(1)
+	}
+	return nil
+}
+
+// CoverageFlags holds the command-line flags for the coverage subcommand.
+type CoverageFlags struct {
+	MinCoveragePct float64 // flag -min-coverage-pct
+}
+
+func parseCoverageFlags(args []string) (*CoverageFlags, error) {
+	set := flag.NewFlagSet("goqualgate coverage", flag.ExitOnError)
+	set.Usage = func() {
+		fmt.Fprint(os.Stderr, coverageUsage)
+		set.PrintDefaults()
+	}
+
+	flags := new(CoverageFlags)
+	set.Float64Var(&flags.MinCoveragePct, "min-coverage-pct", 60,
+		"Minimum coverage percentage required to pass (default 60).")
+
+	set.Parse(args)
+
+	if set.NArg() > 0 {
+		return nil, fmt.Errorf("unexpected arguments: %v", set.Args())
+	}
+
+	return flags, nil
+}
+
+func cmdCoverage(args []string) error {
+	flags, err := parseCoverageFlags(args)
+	if err != nil {
+		return err
+	}
+
+	cfg := CoverageConfig{
+		MinCoveragePct: flags.MinCoveragePct,
+	}
+
+	return cfg.Run()
+}
