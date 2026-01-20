@@ -115,13 +115,144 @@ func stepTags(step map[string]any) []string {
 	return nil
 }
 
+// matrixExpansionContext tracks matrix steps during expansion for later
+// dependency resolution. When a step depends on a matrix step (e.g., "ray-build"),
+// we need to know what keys it expanded into (e.g., ["ray-build-python310", ...]).
+type matrixExpansionContext struct {
+	stepKeyToConfig   map[string]*matrixConfig
+	stepKeyToExpanded map[string][]string
+}
+
+func expandMatrixInGroups(gs []*pipelineGroup) ([]*pipelineGroup, *matrixExpansionContext, error) {
+	ctx := &matrixExpansionContext{
+		stepKeyToConfig:   make(map[string]*matrixConfig),
+		stepKeyToExpanded: make(map[string][]string),
+	}
+	var result []*pipelineGroup
+
+	for _, g := range gs {
+		newGroup := &pipelineGroup{
+			filename:      g.filename,
+			sortKey:       g.sortKey,
+			Group:         g.Group,
+			Key:           g.Key,
+			Tags:          g.Tags,
+			SortKey:       g.SortKey,
+			DependsOn:     g.DependsOn,
+			DefaultJobEnv: g.DefaultJobEnv,
+		}
+
+		for _, step := range g.Steps {
+			matrixDef, hasMatrix := step["matrix"]
+			if !hasMatrix {
+				// No matrix, keep step as-is
+				newGroup.Steps = append(newGroup.Steps, step)
+				continue
+			}
+
+			baseKey := stepKey(step)
+			if baseKey == "" {
+				// No key - pass through to Buildkite for native matrix handling
+				newGroup.Steps = append(newGroup.Steps, step)
+				continue
+			}
+
+			// Parse matrix configuration
+			cfg, err := parseMatrixConfig(matrixDef)
+			if err != nil {
+				return nil, nil, fmt.Errorf("parse matrix in step %q: %w", stepKey(step), err)
+			}
+
+			// Validate label has placeholder
+			if label, ok := step["label"].(string); ok {
+				if !hasMatrixPlaceholder(label) {
+					return nil, nil, fmt.Errorf("matrix step %q: label must contain {{matrix...}} placeholder", baseKey)
+				}
+			}
+
+			// Register for selector expansion
+			ctx.stepKeyToConfig[baseKey] = cfg
+
+			instances := cfg.expand()
+			if len(instances) == 0 {
+				return nil, nil, fmt.Errorf("matrix step %q: no instances after expansion", baseKey)
+			}
+
+			var expandedKeysList []string
+			for _, inst := range instances {
+				expandedStep := inst.substituteValues(step).(map[string]any)
+
+				expandedKey := inst.generateKey(baseKey, cfg)
+				if _, hasName := expandedStep["name"]; hasName {
+					expandedStep["name"] = expandedKey
+				} else {
+					expandedStep["key"] = expandedKey
+				}
+				delete(expandedStep, "matrix")
+
+				originalTags := stepTags(step)
+				matrixTags := inst.generateTags()
+				allTags := append([]string{}, originalTags...)
+				allTags = append(allTags, matrixTags...)
+				if len(allTags) > 0 {
+					expandedStep["tags"] = allTags
+				}
+
+				expandedKeysList = append(expandedKeysList, expandedKey)
+				newGroup.Steps = append(newGroup.Steps, expandedStep)
+			}
+
+			ctx.stepKeyToExpanded[baseKey] = expandedKeysList
+		}
+
+		result = append(result, newGroup)
+	}
+
+	return result, ctx, nil
+}
+
+// expandDependsOnSelectors processes depends_on to expand matrix selectors.
+func expandDependsOnSelectors(dependsOn any, ctx *matrixExpansionContext) ([]string, error) {
+	selectors, err := parseMatrixDependsOn(dependsOn)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []string
+	for _, sel := range selectors {
+		if sel.Matrix == nil {
+			// Simple key reference - check if it's a matrix step
+			if expanded, ok := ctx.stepKeyToExpanded[sel.Key]; ok {
+				// Matrix step: expand to all expanded keys
+				result = append(result, expanded...)
+			} else {
+				// Non-matrix step: use key as-is
+				result = append(result, sel.Key)
+			}
+		} else {
+			matches, err := sel.expand(ctx.stepKeyToConfig, ctx.stepKeyToExpanded)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, matches...)
+		}
+	}
+
+	return result, nil
+}
+
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
+	expandedGroups, matrixCtx, err := expandMatrixInGroups(gs)
+	if err != nil {
+		return nil, fmt.Errorf("expand matrix: %w", err)
+	}
+
 	set := newStepNodeSet()
 	var groupNodes []*stepNode
 
-	for i, g := range gs {
+	for i, g := range expandedGroups {
 		groupNode := &stepNode{
 			id:       fmt.Sprintf("g%d", i),
 			key:      g.Key,
@@ -169,8 +300,20 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		for _, step := range groupNode.subSteps {
 			// Track step dependencies.
 			if dependsOn, ok := step.src["depends_on"]; ok {
-				deps := toStringList(dependsOn)
-				for _, dep := range deps {
+				// Expand matrix selectors in depends_on
+				expandedDeps, err := expandDependsOnSelectors(dependsOn, matrixCtx)
+				if err != nil {
+					return nil, fmt.Errorf("expand depends_on for step %q: %w", step.key, err)
+				}
+
+				// Update the step source with expanded deps for Buildkite output
+				if len(expandedDeps) == 1 {
+					step.src["depends_on"] = expandedDeps[0]
+				} else {
+					step.src["depends_on"] = expandedDeps
+				}
+
+				for _, dep := range expandedDeps {
 					if depNode, ok := set.byKey(dep); ok {
 						set.addDep(step.id, depNode.id)
 					}
