@@ -11,13 +11,15 @@ CI/CD tooling for the Ray project on Buildkite:
 - **rayapp**: Builds Ray application templates (zip artifacts)
 - **raycirun**: Library for triggering Buildkite builds programmatically
 - **reefd**: EC2/database service with reaper functionality
+- **goqualgate**: Go quality gates for CI (test coverage comparison between branches)
 
 If you are unsure where logic lives:
 - pipeline generation + rules + selection: `raycicmd/`
-- Buildkite “step conversion”: likely in `raycicmd/` (strategy converters)
+- Buildkite "step conversion": likely in `raycicmd/` (strategy converters)
 - container build + registry/cache: `wanda/`
 - template zips: `rayapp/`
 - build triggering: `raycirun/`
+- Go quality gates: `goqualgate/`
 
 ---
 
@@ -41,6 +43,9 @@ go build ./wanda/wanda
 
 # Build rayapp
 go build ./rayapp/rayapp
+
+# Build goqualgate
+go build ./goqualgate/goqualgate
 
 # Run all tests
 go test ./...
@@ -72,6 +77,9 @@ bash release.sh
 
 # wanda: build in RayCI mode (uses RAYCI_* env vars)
 ./wanda -rayci
+
+# goqualgate: run Go quality gates (coverage comparison)
+./goqualgate -threshold=0.5 -new-package-threshold=80.0
 ```
 
 ## Architecture
