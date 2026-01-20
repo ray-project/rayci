@@ -16,7 +16,7 @@ func TestDefaultCacheEpoch(t *testing.T) {
 		expected string
 	}{{
 		name:     "saturday",
-		now:      morningOf(2025, time.May, 31), // Saturday
+		now:      morningOf(2025, time.May, 31),
 		expected: "202522b",
 	}, {
 		name:     "sunday",
