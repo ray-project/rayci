@@ -384,16 +384,16 @@ func TestDiscoverSpecs(t *testing.T) {
 		t.Errorf("index has %d entries, want 2", len(index))
 	}
 
-	if path, ok := index["base-image"]; !ok {
+	if entry, ok := index["base-image"]; !ok {
 		t.Error("index missing base-image")
-	} else if !strings.HasSuffix(path, "base.wanda.yaml") {
-		t.Errorf("base-image path = %q, want suffix base.wanda.yaml", path)
+	} else if !strings.HasSuffix(entry.Path, "base.wanda.yaml") {
+		t.Errorf("base-image path = %q, want suffix base.wanda.yaml", entry.Path)
 	}
 
-	if path, ok := index["app-image"]; !ok {
+	if entry, ok := index["app-image"]; !ok {
 		t.Error("index missing app-image")
-	} else if !strings.HasSuffix(path, "app.wanda.yaml") {
-		t.Errorf("app-image path = %q, want suffix app.wanda.yaml", path)
+	} else if !strings.HasSuffix(entry.Path, "app.wanda.yaml") {
+		t.Errorf("app-image path = %q, want suffix app.wanda.yaml", entry.Path)
 	}
 }
 
@@ -540,11 +540,6 @@ func TestBuildDepGraph_ExternalDep(t *testing.T) {
 	}
 	if _, ok := g.Specs["app"]; !ok {
 		t.Error("expected app in graph")
-	}
-
-	// validateDeps should also pass - external deps are skipped
-	if err := g.validateDeps(); err != nil {
-		t.Errorf("validateDeps() unexpected error: %v", err)
 	}
 }
 

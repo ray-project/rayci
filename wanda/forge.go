@@ -33,10 +33,6 @@ func Build(specFile string, config *ForgeConfig) error {
 		return fmt.Errorf("build dep graph: %w", err)
 	}
 
-	if err := graph.validateDeps(); err != nil {
-		return fmt.Errorf("validate deps: %w", err)
-	}
-
 	forge, err := NewForge(config)
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)

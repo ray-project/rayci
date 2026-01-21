@@ -12,21 +12,21 @@ import (
 
 // depGraph represents a dependency graph of wanda specs.
 type depGraph struct {
-	// Specs maps expanded name to resolved spec.
+	// Specs maps name to expanded spec (all discovered specs).
 	Specs map[string]*resolvedSpec
 
 	// Order is the topological build order (dependencies first, root last).
+	// Contains only specs reachable from Root.
 	Order []string
 
 	// Root is the name of the root spec (the one requested to build).
 	Root string
 
 	// discovery state (unexported)
-	baseDir    string    // base directory for resolving relative spec dirs
-	specDirs   []string  // directories to scan for specs (relative to baseDir)
-	index      specIndex // lazily populated name -> path index
-	lookup     lookupFunc
-	namePrefix string // prefix identifying wanda-built images (e.g. "cr.ray.io/rayproject/")
+	baseDir    string     // base directory for resolving spec paths
+	specDirs   []string   // directories to scan for specs (relative to baseDir)
+	lookup     lookupFunc // lookup function for environment variables
+	namePrefix string     // prefix identifying wanda-built images (e.g. "cr.ray.io/rayproject/")
 }
 
 // resolvedSpec contains a parsed and expanded spec along with its file path.
@@ -61,83 +61,102 @@ func buildDepGraph(specPath string, lookup lookupFunc, namePrefix, wandaSpecsFil
 		namePrefix: namePrefix,
 	}
 
-	if err := g.loadSpec(absPath, true /* isRoot */); err != nil {
-		return nil, fmt.Errorf("load root spec: %w", err)
+	spec, err := parseSpecFile(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse root spec: %w", err)
+	}
+	expanded := spec.expandVar(lookup)
+	if err := checkUnexpandedVars(expanded, absPath); err != nil {
+		return nil, fmt.Errorf("check root spec: %w", err)
+	}
+	g.Root = expanded.Name
+	g.Specs[expanded.Name] = &resolvedSpec{Spec: expanded, Path: absPath}
+
+	// Lazily discover and load all dependencies.
+	if err := g.loadDeps(expanded.Name); err != nil {
+		return nil, fmt.Errorf("load deps: %w", err)
 	}
 
-	if err := g.topoSort(); err != nil {
+	// Filter to reachable specs and sort.
+	reachable := g.filterReachable()
+	if err := g.topoSort(reachable); err != nil {
 		return nil, fmt.Errorf("topological sort: %w", err)
 	}
 
 	return g, nil
 }
 
-func (g *depGraph) loadSpec(specPath string, isRoot bool) error {
-	spec, err := parseSpecFile(specPath)
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", specPath, err)
-	}
-	spec = spec.expandVar(g.lookup)
-
-	if err := checkUnexpandedVars(spec, specPath); err != nil {
-		return err
-	}
-
-	// Root is simply the spec we were asked to build.
-	if isRoot {
-		g.Root = spec.Name
-	}
-
-	// If we've already loaded this spec by name, don't re-walk it.
-	if _, exists := g.Specs[spec.Name]; exists {
+// loadDeps recursively loads dependencies for a spec into g.Specs.
+func (g *depGraph) loadDeps(name string) error {
+	spec := g.Specs[name]
+	if spec == nil {
 		return nil
 	}
 
-	g.Specs[spec.Name] = &resolvedSpec{
-		Spec: spec,
-		Path: specPath,
-	}
-
-	// Resolve wanda-built dependencies via discovery.
-	for _, depName := range localDeps(spec, g.namePrefix) {
+	for _, depName := range localDeps(spec.Spec, g.namePrefix) {
 		if _, exists := g.Specs[depName]; exists {
 			continue
 		}
-		if err := g.discoverAndLoad(depName); err != nil {
-			return fmt.Errorf("resolve %s%s: %w", g.namePrefix, depName, err)
+		if err := g.discover(); err != nil {
+			return err
+		}
+		if _, exists := g.Specs[depName]; !exists {
+			log.Printf("warning: no wanda spec found for %s%s, treating as external image", g.namePrefix, depName)
+			continue
+		}
+		if err := g.loadDeps(depName); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
-func (g *depGraph) discoverAndLoad(name string) error {
-	// Lazy index initialization.
-	if g.index == nil {
-		g.index = make(specIndex)
-		for _, dir := range g.specDirs {
-			searchRoot := dir
-			if !filepath.IsAbs(dir) {
-				searchRoot = filepath.Join(g.baseDir, dir)
-			}
-			idx, err := discoverSpecs(searchRoot, g.lookup)
-			if err != nil {
-				return fmt.Errorf("discover specs in %s: %w", dir, err)
-			}
-			for k, v := range idx {
-				g.index[k] = v
+// discover lazily discovers all specs from specDirs into g.Specs.
+func (g *depGraph) discover() error {
+	if g.specDirs == nil {
+		return nil
+	}
+
+	for _, dir := range g.specDirs {
+		searchRoot := dir
+		if !filepath.IsAbs(dir) {
+			searchRoot = filepath.Join(g.baseDir, dir)
+		}
+		idx, err := discoverSpecs(searchRoot, g.lookup)
+		if err != nil {
+			return fmt.Errorf("discover specs in %s: %w", dir, err)
+		}
+		for k, v := range idx {
+			if _, exists := g.Specs[k]; !exists {
+				g.Specs[k] = v
 			}
 		}
 	}
 
-	specPath, ok := g.index[name]
-	if !ok {
-		// No wanda spec found - treat as external image.
-		log.Printf("warning: no wanda spec found for %s%s, treating as external image", g.namePrefix, name)
-		return nil
-	}
+	// Clear the specDirs list to prevent re-discovery.
+	g.specDirs = nil
+	return nil
+}
 
-	return g.loadSpec(specPath, false /* isRoot */)
+// filterReachable returns the set of spec names reachable from Root.
+func (g *depGraph) filterReachable() map[string]bool {
+	reachable := make(map[string]bool)
+	var visit func(name string)
+	visit = func(name string) {
+		if reachable[name] {
+			return
+		}
+		spec := g.Specs[name]
+		if spec == nil {
+			return
+		}
+		reachable[name] = true
+		for _, depName := range localDeps(spec.Spec, g.namePrefix) {
+			visit(depName)
+		}
+	}
+	visit(g.Root)
+	return reachable
 }
 
 // localDeps extracts wanda-built dependency names from a spec's Froms.
@@ -166,19 +185,21 @@ func localDeps(spec *Spec, namePrefix string) []string {
 // topoSort performs a deterministic topological sort layer by layer.
 // Each layer contains nodes whose dependencies are all in previous layers.
 // Within each layer, nodes are sorted alphabetically.
-func (g *depGraph) topoSort() error {
-	inDegree := make(map[string]int, len(g.Specs))
-	dependents := make(map[string][]string, len(g.Specs))
+// Only specs in the reachable set are included in the sort.
+func (g *depGraph) topoSort(reachable map[string]bool) error {
+	inDegree := make(map[string]int, len(reachable))
+	dependents := make(map[string][]string, len(reachable))
 
-	// Init all nodes.
-	for name := range g.Specs {
+	// Init all reachable nodes.
+	for name := range reachable {
 		inDegree[name] = 0
 	}
 
-	// Build edges: dep -> dependent
-	for name, rs := range g.Specs {
+	// Build edges: dep -> dependent (only for reachable specs)
+	for name := range reachable {
+		rs := g.Specs[name]
 		for _, depName := range localDeps(rs.Spec, g.namePrefix) {
-			if _, exists := g.Specs[depName]; exists {
+			if reachable[depName] {
 				inDegree[name]++
 				dependents[depName] = append(dependents[depName], name)
 			}
@@ -186,7 +207,7 @@ func (g *depGraph) topoSort() error {
 	}
 
 	var order []string
-	for len(order) < len(g.Specs) {
+	for len(order) < len(reachable) {
 		// Collect all nodes with in-degree 0.
 		var layer []string
 		for name, degree := range inDegree {
@@ -221,33 +242,6 @@ func (g *depGraph) topoSort() error {
 	}
 
 	g.Order = order
-	return nil
-}
-
-func (g *depGraph) validateDeps() error {
-	names := make([]string, 0, len(g.Specs))
-	for name := range g.Specs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		rs := g.Specs[name]
-		for _, depName := range localDeps(rs.Spec, g.namePrefix) {
-			if _, exists := g.Specs[depName]; !exists {
-				// If dep wasn't in discovery index, it's external - skip validation
-				if g.index != nil {
-					if _, inIndex := g.index[depName]; !inIndex {
-						continue
-					}
-				}
-				return fmt.Errorf(
-					"spec %q references %s%s in froms, but no spec provides image %q",
-					name, g.namePrefix, depName, depName,
-				)
-			}
-		}
-	}
 	return nil
 }
 
@@ -341,11 +335,11 @@ func readWandaSpecs(wandaSpecsFile string) ([]string, error) {
 	return dirs, nil
 }
 
-// specIndex maps expanded spec names to their file paths.
-type specIndex map[string]string
+// specIndex maps spec names to resolved specs.
+type specIndex map[string]*resolvedSpec
 
 // discoverSpecs scans searchRoot for *.wanda.yaml files and builds a name index.
-// Names are expanded using the provided lookup function.
+// Specs are expanded using the provided lookup function.
 // Returns an error if two specs expand to the same name.
 func discoverSpecs(searchRoot string, lookup lookupFunc) (specIndex, error) {
 	index := make(specIndex)
@@ -377,21 +371,21 @@ func discoverSpecs(searchRoot string, lookup lookupFunc) (specIndex, error) {
 			return nil
 		}
 
-		if existing, exists := index[name]; exists && existing != path {
+		if existing, exists := index[name]; exists && existing.Path != path {
 			// Record conflict.
 			m := conflicts[name]
 			if m == nil {
 				m = make(map[string]struct{}, 2)
 				conflicts[name] = m
 			}
-			m[existing] = struct{}{}
+			m[existing.Path] = struct{}{}
 			m[path] = struct{}{}
 			if minConflictName == "" || name < minConflictName {
 				minConflictName = name
 			}
 			return nil
 		}
-		index[name] = path
+		index[name] = &resolvedSpec{Path: path, Spec: expanded}
 		return nil
 	})
 	if err != nil {
