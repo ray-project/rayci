@@ -52,6 +52,10 @@ func (wtc *WorkspaceTestConfig) Run() error {
 			break
 		}
 	}
+	
+	if wtc.template == nil {
+		return fmt.Errorf("template %q not found in %s", wtc.tmplName, wtc.buildFile)
+	}
 
 	// generate workspace name
 	workspaceName := wtc.tmplName + "-" + time.Now().Format("20060102150405")
