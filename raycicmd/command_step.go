@@ -59,17 +59,6 @@ func (c *commandConverter) jobEnvImage(name string) string {
 	return fmt.Sprintf("%s:%s-%s", c.config.CIWorkRepo, c.info.buildID, name)
 }
 
-const (
-	dockerPlugin        = "docker#v5.8.0"
-	awsAssumeRolePlugin = "cultureamp/aws-assume-role#v0.2.0"
-
-	macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
-	macosJobEnv        = "MACOS"
-	macosDenyFileRead  = "/usr/local/etc/buildkite-agent/buildkite-agent.cfg"
-
-	windowsJobEnv = "WINDOWS"
-)
-
 func (c *commandConverter) match(step map[string]any) bool {
 	// This converter is used as a default converter.
 	// All steps that are not matching other steps will be treated as a
@@ -199,41 +188,18 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if dockerNetwork != "" {
 		dockerPluginConfig.network = dockerNetwork
 	}
-	switch jobEnv {
-	case windowsJobEnv: // a special job env for windows
-		result["plugins"] = []any{map[string]any{
-			dockerPlugin: makeRayWindowsDockerPlugin(dockerPluginConfig),
-		}}
-		result["artifact_paths"] = windowsArtifactPaths
-	case macosJobEnv: // a special job env for macos
-		result["plugins"] = []any{map[string]any{
-			macosSandboxPlugin: map[string]string{
-				"deny-file-read": macosDenyFileRead,
-			},
-		}}
-	default:
-		// default Linux Job env.
-		jobEnvImage := c.jobEnvImage(jobEnv)
-		var plugins []any
-		if assumeRole != "" {
-			duration, ok := intInMap(step, "aws_assume_role_duration_seconds")
-			if !ok {
-				duration = 900 // min value to assume role
-			}
-			plugins = append(plugins, map[string]any{
-				awsAssumeRolePlugin: map[string]any{
-					"role":     assumeRole,
-					"duration": duration,
-				},
-			})
-		}
-
-		plugins = append(plugins, map[string]any{
-			dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
-		})
-
-		result["plugins"] = plugins
-		result["artifact_paths"] = defaultArtifactPaths
+	assumeRoleDuration, assumeRoleDurationSet := intInMap(step, "aws_assume_role_duration_seconds")
+	pluginResult := buildPlugins(&pluginBuildParams{
+		jobEnv:                jobEnv,
+		jobEnvImage:           c.jobEnvImage(jobEnv),
+		assumeRole:            assumeRole,
+		assumeRoleDuration:    assumeRoleDuration,
+		assumeRoleDurationSet: assumeRoleDurationSet,
+		dockerPluginConfig:    dockerPluginConfig,
+	})
+	result["plugins"] = pluginResult.plugins
+	if pluginResult.artifactPaths != nil {
+		result["artifact_paths"] = pluginResult.artifactPaths
 	}
 
 	// add step ID into label

@@ -854,6 +854,78 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	}
 }
 
+func TestConvertPipelineGroup_awsAssumeRoleDuration(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+		RunnerQueues:    map[string]string{"default": "fakerunner"},
+	}, info)
+
+	const role = "arn:aws:iam::123456789012:role/test-role"
+
+	for _, test := range []struct {
+		name         string
+		step         map[string]any
+		wantDuration int
+	}{
+		{
+			name: "default duration when not set",
+			step: map[string]any{
+				"commands":        []string{"echo 1"},
+				"aws_assume_role": role,
+			},
+			wantDuration: 900,
+		},
+		{
+			name: "explicit zero duration preserved",
+			step: map[string]any{
+				"commands":                         []string{"echo 1"},
+				"aws_assume_role":                  role,
+				"aws_assume_role_duration_seconds": 0,
+			},
+			wantDuration: 0,
+		},
+		{
+			name: "explicit duration preserved",
+			step: map[string]any{
+				"commands":                         []string{"echo 1"},
+				"aws_assume_role":                  role,
+				"aws_assume_role_duration_seconds": 7200,
+			},
+			wantDuration: 7200,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			g := &pipelineGroup{
+				Group: "test",
+				Steps: []map[string]any{test.step},
+			}
+
+			filter := &stepFilter{runAll: true}
+			bk, err := convertSingleGroup(c, g, filter)
+			if err != nil {
+				t.Fatalf("convert: %v", err)
+			}
+
+			plugins := bk.Steps[0].(map[string]any)["plugins"].([]any)
+			assumeRole, ok := findAWSAssumeRolePlugin(plugins)
+			if !ok {
+				t.Fatalf("aws assume role plugin not found")
+			}
+
+			if got, _ := intInMap(assumeRole, "duration"); got != test.wantDuration {
+				t.Errorf("duration = %d, want %d", got, test.wantDuration)
+			}
+		})
+	}
+}
+
 func TestConvertPipelineGroup(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
