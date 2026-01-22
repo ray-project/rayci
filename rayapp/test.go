@@ -3,6 +3,7 @@ package rayapp
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -14,8 +15,9 @@ func Test(tmplName, buildFile string) error {
 	return nil
 }
 
-const testCmd = "pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake ."
+const testCmd = "pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake . -s -vv"
 
+const workspaceStartWaitTime = 30 * time.Second
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	tmplName      string
@@ -60,6 +62,24 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("create empty workspace failed: %w", err)
 	}
 
+	if err := anyscaleCLI.startWorkspace(wtc); err != nil {
+		return fmt.Errorf("start workspace failed: %w", err)
+	}
+
+	state, err := anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
+	if err != nil {
+		return fmt.Errorf("get workspace state failed: %w", err)
+	}
+
+	for !strings.Contains(state, StateRunning.String()) {
+		state, err = anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
+		if err != nil {
+			return fmt.Errorf("get workspace status failed: %w, retrying...", err)
+		}
+		time.Sleep(workspaceStartWaitTime)
+		fmt.Println("workspace state: ", state)
+	}
+
 	// copy template to workspace
 	if err := anyscaleCLI.copyTemplateToWorkspace(wtc); err != nil {
 		return fmt.Errorf("copy template to workspace failed: %w", err)
@@ -70,10 +90,10 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("run test in workspace failed: %w", err)
 	}
 
-	// terminate workspace
-	// if err := anyscaleCLI.terminateWorkspace(tr.workspaceName); err != nil {
-	// 	return fmt.Errorf("terminate workspace failed: %w", err)
-	// }
+	terminate workspace
+	if err := anyscaleCLI.terminateWorkspace(tr.workspaceName); err != nil {
+		return fmt.Errorf("terminate workspace failed: %w", err)
+	}
 
 	return nil
 }

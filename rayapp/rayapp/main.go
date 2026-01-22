@@ -47,7 +47,7 @@ func main() {
 		testFlags.Parse(os.Args[2:])
 		args := testFlags.Args()
 		if len(args) < 1 {
-			log.Fatal("test requires <template-name>, --workspace flags")
+			log.Fatal("test requires <template-name> flag")
 		}
 		if err := rayapp.Test(args[0], *testBuildFile); err != nil {
 			log.Fatal(err)

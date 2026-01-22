@@ -4,10 +4,29 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+type WorkspaceState int
+
+const (
+    StateTerminated WorkspaceState = iota
+    StateStarting
+    StateRunning
+)
+
+var WorkspaceStateName = map[WorkspaceState]string{
+    StateTerminated: "TERMINATED",
+    StateStarting: "STARTING",
+    StateRunning:  "RUNNING",
+}
+
+func (ws WorkspaceState) String() string {
+    return WorkspaceStateName[ws]
+}
 
 type AnyscaleCLI struct {
 	token string
@@ -34,23 +53,26 @@ func (ac *AnyscaleCLI) Authenticate() error {
 }
 
 // RunAnyscaleCLI runs the anyscale CLI with the given arguments.
-// Returns the stdout output and any error that occurred.
-func (ac *AnyscaleCLI) RunAnyscaleCLI(args []string) (string, error) {
+// Returns the combined output and any error that occurred.
+// Output is displayed to the terminal with colors preserved.
+func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if !isAnyscaleInstalled() {
 		return "", errAnyscaleNotInstalled
 	}
 
-	log.Println("anyscale cli args: ", args)
+	fmt.Println("anyscale cli args: ", args)
 	cmd := exec.Command("anyscale", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+
+	// Capture output while also displaying to terminal with colors
+	var outputBuf bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
 
 	if err := cmd.Run(); err != nil {
-		return stdout.String(), fmt.Errorf("anyscale error: %w\nstderr: %s", err, stderr.String())
+		return outputBuf.String(), fmt.Errorf("anyscale error: %w", err)
 	}
 
-	return stdout.String(), nil
+	return outputBuf.String(), nil
 }
 
 func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
@@ -66,39 +88,56 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 	if config.computeConfig != "" {
 		args = append(args, "--compute-config", "tmpl-test-basic-serverless-aws:1")
 	}
-	output, err := ac.RunAnyscaleCLI(args)
+	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
 		return fmt.Errorf("create empty workspace failed: %w", err)
 	}
-	log.Println("create empty workspace output:\n", output)
+	fmt.Println("create empty workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
-	output, err := ac.RunAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
 	if err != nil {
 		return fmt.Errorf("delete workspace failed: %w", err)
 	}
-	log.Println("terminate workspace output:\n", output)
+	fmt.Println("terminate workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) error {
-	output, err := ac.RunAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
 	if err != nil {
 		return fmt.Errorf("copy template to workspace failed: %w", err)
 	}
-	log.Println("copy template to workspace output:\n", output)
+	fmt.Println("copy template to workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
-	output, err := ac.RunAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
-	log.Println("run command in workspace output:\n", output)
+	fmt.Println("run command in workspace output:\n", output)
 	return nil
+}
+
+func (ac *AnyscaleCLI) startWorkspace(config *WorkspaceTestConfig) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
+	if err != nil {
+		return fmt.Errorf("start workspace failed: %w", err)
+	}
+	fmt.Println("start workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "status", "--name", workspaceName})
+	if err != nil {
+		return "", fmt.Errorf("get workspace state failed: %w", err)
+	}
+	return output, nil
 }
 
 func convertBuildIdToImageURI(buildId string) (string, string, error) {
@@ -132,5 +171,5 @@ func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	minor := versionStr[1:3]
 	patch := versionStr[3:]
 
-	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), versionStr, nil
+	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
 }
