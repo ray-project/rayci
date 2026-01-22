@@ -90,7 +90,7 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("run test in workspace failed: %w", err)
 	}
 
-	terminate workspace
+	// terminate workspace
 	if err := anyscaleCLI.terminateWorkspace(tr.workspaceName); err != nil {
 		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
