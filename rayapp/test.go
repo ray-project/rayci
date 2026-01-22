@@ -3,7 +3,6 @@ package rayapp
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -52,7 +51,7 @@ func (wtc *WorkspaceTestConfig) Run() error {
 			break
 		}
 	}
-	
+
 	if wtc.template == nil {
 		return fmt.Errorf("template %q not found in %s", wtc.tmplName, wtc.buildFile)
 	}
@@ -70,19 +69,23 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("start workspace failed: %w", err)
 	}
 
-	state, err := anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
-	if err != nil {
-		return fmt.Errorf("get workspace state failed: %w", err)
+	if _, err := anyscaleCLI.waitForWorkspaceState(wtc.workspaceName, StateRunning); err != nil {
+		return fmt.Errorf("wait for workspace running state failed: %w", err)
 	}
 
-	for !strings.Contains(state, StateRunning.String()) {
-		state, err = anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
-		if err != nil {
-			return fmt.Errorf("get workspace status failed: %w, retrying...", err)
-		}
-		time.Sleep(workspaceStartWaitTime)
-		fmt.Println("workspace state: ", state)
-	}
+	// state, err := anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
+	// if err != nil {
+	// 	return fmt.Errorf("get workspace state failed: %w", err)
+	// }
+
+	// for !strings.Contains(state, StateRunning.String()) {
+	// 	state, err = anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
+	// 	if err != nil {
+	// 		return fmt.Errorf("get workspace status failed: %w, retrying...", err)
+	// 	}
+	// 	time.Sleep(workspaceStartWaitTime)
+	// 	fmt.Println("workspace state: ", state)
+	// }
 
 	// copy template to workspace
 	if err := anyscaleCLI.copyTemplateToWorkspace(wtc); err != nil {
@@ -95,7 +98,7 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	}
 
 	// terminate workspace
-	if err := anyscaleCLI.terminateWorkspace(tr.workspaceName); err != nil {
+	if err := anyscaleCLI.terminateWorkspace(wtc.workspaceName); err != nil {
 		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
 

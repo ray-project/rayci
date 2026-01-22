@@ -140,6 +140,14 @@ func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) 
 	return output, nil
 }
 
+func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state WorkspaceState) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()})
+	if err != nil {
+		return "", fmt.Errorf("wait for workspace state failed: %w", err)
+	}
+	return output, nil
+}
+
 func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	// Convert build ID like "anyscaleray2441-py312-cu128" to "anyscale/ray:2.44.1-py312-cu128"
 	const prefix = "anyscaleray"
