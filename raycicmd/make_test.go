@@ -152,7 +152,7 @@ func TestListRulesFiles(t *testing.T) {
 			}
 		}
 
-		got, err := listRulesFiles(tmp)
+		got, err := listRulesFiles(tmp, false)
 		if err != nil {
 			t.Fatalf("listRulesFiles: %v", err)
 		}
@@ -166,10 +166,42 @@ func TestListRulesFiles(t *testing.T) {
 		}
 	})
 
+	t.Run("recursive", func(t *testing.T) {
+		tmp := t.TempDir()
+
+		for _, f := range []string{
+			"go.rules.txt",
+			"sub/nested.rules.txt",
+			"sub/deep/deeper.rules.txt",
+		} {
+			dir := filepath.Join(tmp, filepath.Dir(f))
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				t.Fatalf("mkdir for %q: %v", f, err)
+			}
+			if err := os.WriteFile(filepath.Join(tmp, f), nil, 0o600); err != nil {
+				t.Fatalf("write file %q: %v", f, err)
+			}
+		}
+
+		got, err := listRulesFiles(tmp, true)
+		if err != nil {
+			t.Fatalf("listRulesFiles: %v", err)
+		}
+
+		want := []string{
+			filepath.Join(tmp, "go.rules.txt"),
+			filepath.Join(tmp, "sub/deep/deeper.rules.txt"),
+			filepath.Join(tmp, "sub/nested.rules.txt"),
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
 	t.Run("empty directory", func(t *testing.T) {
 		tmp := t.TempDir()
 
-		got, err := listRulesFiles(tmp)
+		got, err := listRulesFiles(tmp, false)
 		if err != nil {
 			t.Fatalf("listRulesFiles: %v", err)
 		}
@@ -179,7 +211,7 @@ func TestListRulesFiles(t *testing.T) {
 	})
 
 	t.Run("non-existent directory", func(t *testing.T) {
-		got, err := listRulesFiles("/nonexistent/path")
+		got, err := listRulesFiles("/nonexistent/path", false)
 		if err != nil {
 			t.Fatalf("listRulesFiles: %v", err)
 		}

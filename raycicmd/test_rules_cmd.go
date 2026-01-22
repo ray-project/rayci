@@ -154,7 +154,7 @@ func runTestRulesCmd(args []string, config *config) error {
 	rulesFiles := config.TestRulesFiles
 	if len(rulesFiles) == 0 {
 		for _, dir := range config.buildkiteDirs() {
-			files, err := listRulesFiles(dir)
+			files, err := listRulesFiles(dir, true)
 			if err != nil {
 				return fmt.Errorf("list rules files in %s: %w", dir, err)
 			}

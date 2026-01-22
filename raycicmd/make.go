@@ -61,7 +61,7 @@ func listCIYamlFiles(dir string) ([]string, error) {
 
 const rulesFileSuffix = ".rules.txt"
 
-func listRulesFiles(dir string) ([]string, error) {
+func listRulesFiles(dir string, recurse bool) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -72,16 +72,20 @@ func listRulesFiles(dir string) ([]string, error) {
 
 	var paths []string
 	for _, entry := range entries {
+		path := filepath.Join(dir, entry.Name())
 		if entry.IsDir() {
+			if recurse {
+				subPaths, err := listRulesFiles(path, true)
+				if err != nil {
+					return nil, err
+				}
+				paths = append(paths, subPaths...)
+			}
 			continue
 		}
-		name := entry.Name()
-		isRulesFile := strings.HasSuffix(name, rulesFileSuffix)
-		if !isRulesFile {
-			continue
+		if strings.HasSuffix(entry.Name(), rulesFileSuffix) {
+			paths = append(paths, path)
 		}
-
-		paths = append(paths, filepath.Join(dir, name))
 	}
 	sort.Strings(paths)
 	return paths, nil
@@ -136,7 +140,7 @@ func makePipeline(ctx *pipelineContext) (
 	if len(testRulesFiles) == 0 {
 		for _, bkDir := range bkDirs {
 			fullDir := filepath.Join(ctx.repoDir, bkDir)
-			files, err := listRulesFiles(fullDir)
+			files, err := listRulesFiles(fullDir, false)
 			if err != nil {
 				return nil, fmt.Errorf("list rules files in %s: %w", bkDir, err)
 			}
