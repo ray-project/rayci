@@ -28,7 +28,21 @@ func Build(specFile string, config *ForgeConfig) error {
 		wandaSpecsFile = filepath.Join(config.WorkDir, ".wandaspecs")
 	}
 
-	graph, err := buildDepGraph(specFile, os.LookupEnv, config.NamePrefix, wandaSpecsFile)
+	lookup := lookupFunc(os.LookupEnv)
+	if config.EnvFile != "" {
+		envfileVars, err := ParseEnvFile(config.EnvFile)
+		if err != nil {
+			return fmt.Errorf("parse envfile: %w", err)
+		}
+		lookup = func(key string) (string, bool) {
+			if v, ok := envfileVars[key]; ok {
+				return v, true
+			}
+			return os.LookupEnv(key)
+		}
+	}
+
+	graph, err := buildDepGraph(specFile, lookup, config.NamePrefix, wandaSpecsFile)
 	if err != nil {
 		return fmt.Errorf("build dep graph: %w", err)
 	}

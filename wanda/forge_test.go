@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -681,5 +682,167 @@ func TestForgeLocal_withNamePrefix(t *testing.T) {
 
 	if hit := forge2.cacheHit(); hit != 0 {
 		t.Errorf("got %d cache hits, want 0", hit)
+	}
+}
+
+func TestBuild_WithEnvfile(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		EnvFile:    "testdata/test.env",
+	}
+
+	if err := Build("testdata/env-file-test.wanda.yaml", config); err != nil {
+		t.Fatalf("build with envfile: %v", err)
+	}
+
+	ref, err := name.ParseReference("cr.ray.io/rayproject/env-file-test")
+	if err != nil {
+		t.Fatalf("parse reference: %v", err)
+	}
+
+	img, err := daemon.Image(ref)
+	if err != nil {
+		t.Fatalf("read image: %v", err)
+	}
+
+	imgConfig, err := img.ConfigFile()
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+
+	// Verify envfile values were expanded into build args
+	msgLabel := imgConfig.Config.Labels["io.ray.wanda.message"]
+	if msgLabel != "from-envfile" {
+		t.Errorf("message label = %q, want %q", msgLabel, "from-envfile")
+	}
+
+	versionLabel := imgConfig.Config.Labels["io.ray.wanda.version"]
+	if versionLabel != "1.0.0" {
+		t.Errorf("version label = %q, want %q", versionLabel, "1.0.0")
+	}
+}
+
+func TestBuild_EnvfileMissing(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		EnvFile:    "testdata/nonexistent.env",
+	}
+
+	err := Build("testdata/env-file-missing.wanda.yaml", config)
+	if err == nil {
+		t.Fatal("expected error for missing envfile, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "nonexistent.env") {
+		t.Errorf("error should mention envfile name, got: %v", err)
+	}
+}
+
+func TestBuild_EnvfileCacheInvalidation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Use random values to avoid cache hits from previous test runs
+	randBytes := make([]byte, 4)
+	if _, err := rand.Read(randBytes); err != nil {
+		t.Fatalf("read random: %v", err)
+	}
+	randSuffix := fmt.Sprintf("%x", randBytes)
+
+	// Create envfile with random suffix to ensure unique cache key
+	envfilePath := filepath.Join(tmpDir, "cache-test.env")
+	if err := os.WriteFile(envfilePath, []byte(fmt.Sprintf("VERSION=1.0.0-%s\n", randSuffix)), 0644); err != nil {
+		t.Fatalf("write envfile: %v", err)
+	}
+
+	// Create Dockerfile
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile.cache")
+	dockerfile := "FROM scratch\nARG VERSION=0.0.0\nLABEL version=${VERSION}\n"
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfile), 0644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	// Create spec (no envfile field - it's now passed via config)
+	specPath := filepath.Join(tmpDir, "cache-test.wanda.yaml")
+	spec := "name: cache-test\ndockerfile: Dockerfile.cache\nbuild_args:\n  - VERSION=$VERSION\n"
+	if err := os.WriteFile(specPath, []byte(spec), 0644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	config := &ForgeConfig{
+		WorkDir:    tmpDir,
+		NamePrefix: "cr.ray.io/rayproject/",
+		EnvFile:    envfilePath,
+	}
+
+	// First build
+	if err := Build(specPath, config); err != nil {
+		t.Fatalf("first build: %v", err)
+	}
+
+	// Second build with same envfile - should cache hit
+	forge1, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("new forge: %v", err)
+	}
+
+	envMap1, err := ParseEnvFile(envfilePath)
+	if err != nil {
+		t.Fatalf("parse envfile: %v", err)
+	}
+	lookup1 := func(key string) (string, bool) {
+		if v, ok := envMap1[key]; ok {
+			return v, true
+		}
+		return os.LookupEnv(key)
+	}
+
+	parsedSpec1, err := parseSpecFile(specPath)
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	expandedSpec1 := parsedSpec1.expandVar(lookup1)
+
+	if err := forge1.Build(expandedSpec1); err != nil {
+		t.Fatalf("second build: %v", err)
+	}
+	if forge1.cacheHit() != 1 {
+		t.Errorf("expected cache hit on unchanged envfile, got %d hits", forge1.cacheHit())
+	}
+
+	// Update envfile with a different version
+	if err := os.WriteFile(envfilePath, []byte(fmt.Sprintf("VERSION=2.0.0-%s\n", randSuffix)), 0644); err != nil {
+		t.Fatalf("update envfile: %v", err)
+	}
+
+	// Third build with changed envfile - should cache miss
+	forge2, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("new forge: %v", err)
+	}
+
+	envMap2, err := ParseEnvFile(envfilePath)
+	if err != nil {
+		t.Fatalf("parse envfile: %v", err)
+	}
+	lookup2 := func(key string) (string, bool) {
+		if v, ok := envMap2[key]; ok {
+			return v, true
+		}
+		return os.LookupEnv(key)
+	}
+
+	parsedSpec2, err := parseSpecFile(specPath)
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	expandedSpec2 := parsedSpec2.expandVar(lookup2)
+
+	if err := forge2.Build(expandedSpec2); err != nil {
+		t.Fatalf("third build: %v", err)
+	}
+	if forge2.cacheHit() != 0 {
+		t.Errorf("expected cache miss on changed envfile, got %d hits", forge2.cacheHit())
 	}
 }
