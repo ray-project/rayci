@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+var anyscaleCLI *AnyscaleCLI
+
 // setupMockAnyscale creates a mock anyscale script and returns a cleanup function.
 func setupMockAnyscale(t *testing.T, script string) {
 	t.Helper()
@@ -40,19 +42,19 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		},
 		{
 			name:       "success",
-			script:     "#!/bin/sh\necho \"output: $@\"",
+			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"output: $@\"",
 			args:       []string{"service", "deploy"},
 			wantSubstr: "output: service deploy",
 		},
 		{
 			name:       "empty args",
-			script:     "#!/bin/sh\necho \"help\"",
+			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"help\"",
 			args:       []string{},
 			wantSubstr: "help",
 		},
 		{
 			name:       "command fails with stderr",
-			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
+			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
 			wantSubstr: "error msg",
 			wantErr:    errors.New("anyscale error"),
@@ -63,7 +65,7 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			setupMockAnyscale(t, tt.script)
 
-			output, err := RunAnyscaleCLI(tt.args)
+			output, err := anyscaleCLI.RunAnyscaleCLI(tt.args)
 
 			if tt.wantErr != nil {
 				if err == nil {
