@@ -189,6 +189,15 @@ func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) erro
 	return nil
 }
 
+func (ac *AnyscaleCLI) pushFileToWorkspace(workspaceName, localFilePath string) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-file", localFilePath})
+	if err != nil {
+		return fmt.Errorf("push file to workspace failed: %w", err)
+	}
+	fmt.Println("push file to workspace output:\n", output)
+	return nil
+}
+
 func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
 	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
 	if err != nil {

@@ -3,6 +3,7 @@ package rayapp
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -45,9 +46,14 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("read templates failed: %w", err)
 	}
 
+	// Get the directory containing the build file to resolve relative paths
+	buildDir := filepath.Dir(wtc.buildFile)
+
 	for _, tmpl := range tmpls {
 		if tmpl.Name == wtc.tmplName {
 			wtc.template = tmpl
+			// Resolve template directory relative to build file
+			wtc.template.Dir = filepath.Join(buildDir, tmpl.Dir)
 			break
 		}
 	}
@@ -96,9 +102,21 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	// 	fmt.Println("workspace state: ", state)
 	// }
 
-	// copy template to workspace
-	if err := anyscaleCLI.copyTemplateToWorkspace(wtc); err != nil {
-		return fmt.Errorf("copy template to workspace failed: %w", err)
+	// zip template directory and push to workspace
+	zipFileName := wtc.tmplName + ".zip"
+	if err := zipDirectory(wtc.template.Dir, zipFileName); err != nil {
+		return fmt.Errorf("zip template directory failed: %w", err)
+	}
+	defer os.Remove(zipFileName) // clean up zip file after push
+
+	// Get absolute path to the zip file for pushing
+	zipPath, err := filepath.Abs(zipFileName)
+	if err != nil {
+		return fmt.Errorf("get absolute path for zip file failed: %w", err)
+	}
+
+	if err := anyscaleCLI.pushFileToWorkspace(wtc.workspaceName, zipPath); err != nil {
+		return fmt.Errorf("push zip to workspace failed: %w", err)
 	}
 
 	// run test in workspace

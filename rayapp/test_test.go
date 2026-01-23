@@ -188,8 +188,8 @@ echo "ok"
 	if err == nil {
 		t.Fatal("expected error when copy template fails")
 	}
-	if !strings.Contains(err.Error(), "copy template to workspace failed") {
-		t.Errorf("error %q should contain 'copy template to workspace failed'", err.Error())
+	if !strings.Contains(err.Error(), "push zip to workspace failed") {
+		t.Errorf("error %q should contain 'push zip to workspace failed'", err.Error())
 	}
 }
 
