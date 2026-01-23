@@ -92,6 +92,61 @@ func parseComputeConfigName(awsConfigPath string) string {
 	return configDir + "-" + filename
 }
 
+// CreateComputeConfig creates a new compute config from a YAML file if it doesn't already exist.
+// name: the name for the compute config (without version tag)
+// configFile: path to the YAML config file
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string, error) {
+	// Check if compute config already exists
+	if output, err := ac.GetComputeConfig(name); err == nil {
+		fmt.Printf("Compute config %q already exists, skipping creation\n", name)
+		return output, nil
+	}
+
+	// Create the compute config since it doesn't exist
+	args := []string{"compute-config", "create", "-n", name, "-f", configFilePath}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("create compute config failed: %w", err)
+	}
+	return output, nil
+}
+
+// GetComputeConfig retrieves the details of a compute config by name.
+// name: the name of the compute config (optionally with version tag, e.g., "name:1")
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
+	args := []string{"compute-config", "get", "-n", name}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("get compute config failed: %w", err)
+	}
+	return output, nil
+}
+
+// ListComputeConfigs lists compute configs with optional filters.
+// name: filter by name (optional, empty string for no filter)
+// includeShared: include shared compute configs
+// maxItems: maximum number of items to return (0 for no limit)
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) ListComputeConfigs(name string, includeShared bool, maxItems int) (string, error) {
+	args := []string{"compute-config", "list"}
+	if name != "" {
+		args = append(args, "-n", name)
+	}
+	if includeShared {
+		args = append(args, "--include-shared")
+	}
+	if maxItems > 0 {
+		args = append(args, "--max-items", fmt.Sprintf("%d", maxItems))
+	}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("list compute configs failed: %w", err)
+	}
+	return output, nil
+}
+
 func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 	args := []string{"workspace_v2", "create"}
 	// get image URI and ray version from build ID

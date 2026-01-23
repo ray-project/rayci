@@ -56,9 +56,13 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("template %q not found in %s", wtc.tmplName, wtc.buildFile)
 	}
 
-	// Parse compute config name from template's AWS config path
+	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
 		wtc.computeConfig = parseComputeConfigName(awsConfigPath)
+		// Create compute config if it doesn't already exist
+		if _, err := anyscaleCLI.CreateComputeConfig(wtc.computeConfig, awsConfigPath); err != nil {
+			return fmt.Errorf("create compute config failed: %w", err)
+		}
 	}
 
 	// generate workspace name

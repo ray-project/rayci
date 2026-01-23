@@ -276,6 +276,14 @@ echo "ok"
 func TestWorkspaceTestConfigRun_Success(t *testing.T) {
 	// Mock script that succeeds for all operations
 	script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
+    echo "config not found"
+    exit 1
+fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
+    echo "created compute config"
+    exit 0
+fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
     echo "created"
     exit 0
@@ -330,6 +338,14 @@ exit 1
 func TestTest_Success(t *testing.T) {
 	// Mock script that succeeds for all operations
 	script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
+    echo "config not found"
+    exit 1
+fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
+    echo "created"
+    exit 0
+fi
 if [ "$1" = "workspace_v2" ]; then
     echo "success"
     exit 0
