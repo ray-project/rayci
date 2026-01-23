@@ -102,20 +102,20 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	// 	fmt.Println("workspace state: ", state)
 	// }
 
-	// zip template directory and push to workspace
-	zipFileName := wtc.tmplName + ".zip"
+	// Create temp directory for the zip file
+	templateZipDir, err := os.MkdirTemp("", "template_zip")
+	if err != nil {
+		return fmt.Errorf("create temp directory failed: %w", err)
+	}
+	defer os.RemoveAll(templateZipDir) // clean up temp directory after push
+
+	// Zip template directory to the temp directory
+	zipFileName := filepath.Join(templateZipDir, wtc.tmplName+".zip")
 	if err := zipDirectory(wtc.template.Dir, zipFileName); err != nil {
 		return fmt.Errorf("zip template directory failed: %w", err)
 	}
-	defer os.Remove(zipFileName) // clean up zip file after push
 
-	// Get absolute path to the zip file for pushing
-	zipPath, err := filepath.Abs(zipFileName)
-	if err != nil {
-		return fmt.Errorf("get absolute path for zip file failed: %w", err)
-	}
-
-	if err := anyscaleCLI.pushFileToWorkspace(wtc.workspaceName, zipPath); err != nil {
+	if err := anyscaleCLI.pushTemplateToWorkspace(wtc.workspaceName, templateZipDir); err != nil {
 		return fmt.Errorf("push zip to workspace failed: %w", err)
 	}
 
