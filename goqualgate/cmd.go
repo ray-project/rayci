@@ -6,13 +6,16 @@ import (
 	"os"
 )
 
+const runAll = "all"
 const usage = `goqualgate - Go quality gates for CI
 
 Usage:
   goqualgate <command> [flags]
 
 Commands:
+	all         Run all quality gates with default settings
 	coverage    Run test coverage and check minimum thresholds
+	filelength  Check that Go files don't exceed line limit
 `
 
 const coverageUsage = `goqualgate coverage - Run test coverage checks
@@ -50,41 +53,77 @@ Improving Coverage (for AI agents):
      mocking infrastructure exists. Focus on testable code paths.
 `
 
+const filelengthUsage = `goqualgate filelength - Check Go file lengths against limits
+
+Finds all .go files in the current directory (recursive) and checks their
+line counts against -max-lines. Test files, generated files,
+vendor/, and symlinks are excluded.
+
+Usage:
+  goqualgate filelength [flags]
+
+Flags:
+	-max-lines int
+		Maximum allowed lines per file (default 500).
+`
+
+type subcommand struct {
+	name string
+	run  func([]string) error
+}
+
+var subcommands = []*subcommand{
+	{"coverage", cmdCoverage},
+	{"filelength", cmdFilelength},
+}
+
 // Main is the entry point for the goqualgate CLI, dispatching to the appropriate subcommand
 // based on the first argument.
-func Main() error {
-	if len(os.Args) < 2 {
+func Main(args []string) (int, error) {
+	if len(args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
-		os.Exit(1)
+		return 1, nil
 	}
 
-	switch os.Args[1] {
-	case "coverage":
-		return cmdCoverage(os.Args[2:])
+	cmd := args[1]
+	subArgs := args[2:]
+
+	switch cmd {
 	case "-h", "-help", "--help", "help":
 		fmt.Print(usage)
-		return nil
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", os.Args[1], usage)
-		os.Exit(1)
+		return 0, nil
 	}
-	return nil
+
+	matched := false
+	for i, sub := range subcommands {
+		if sub.name == cmd || cmd == runAll {
+			if cmd == runAll && i > 0 {
+				// Print a separator between commands
+				fmt.Println()
+			}
+			if err := sub.run(subArgs); err != nil {
+				return 1, err
+			}
+			matched = true
+		}
+	}
+	if matched {
+		return 0, nil
+	}
+
+	fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", cmd, usage)
+	return 1, nil
 }
 
-// CoverageFlags holds the command-line flags for the coverage subcommand.
-type CoverageFlags struct {
-	MinCoveragePct float64 // flag -min-coverage-pct
-}
-
-func parseCoverageFlags(args []string) (*CoverageFlags, error) {
+func parseCoverageConfig(args []string) (*CoverageConfig, error) {
 	set := flag.NewFlagSet("goqualgate coverage", flag.ExitOnError)
 	set.Usage = func() {
 		fmt.Fprint(os.Stderr, coverageUsage)
 		set.PrintDefaults()
 	}
 
-	flags := new(CoverageFlags)
-	set.Float64Var(&flags.MinCoveragePct, "min-coverage-pct", 60,
+	cfg := new(CoverageConfig)
+	set.Float64Var(&cfg.MinCoveragePct, "min-coverage-pct", 60,
 		"Minimum coverage percentage required to pass (default 60).")
 
 	set.Parse(args)
@@ -93,18 +132,41 @@ func parseCoverageFlags(args []string) (*CoverageFlags, error) {
 		return nil, fmt.Errorf("unexpected arguments: %v", set.Args())
 	}
 
-	return flags, nil
+	return cfg, nil
 }
 
 func cmdCoverage(args []string) error {
-	flags, err := parseCoverageFlags(args)
+	cfg, err := parseCoverageConfig(args)
 	if err != nil {
 		return err
 	}
+	return cfg.Run()
+}
 
-	cfg := CoverageConfig{
-		MinCoveragePct: flags.MinCoveragePct,
+func parseFileLengthConfig(args []string) (*FileLengthConfig, error) {
+	set := flag.NewFlagSet("goqualgate filelength", flag.ExitOnError)
+	set.Usage = func() {
+		fmt.Fprint(os.Stderr, filelengthUsage)
+		set.PrintDefaults()
 	}
 
+	cfg := new(FileLengthConfig)
+	set.IntVar(&cfg.MaxLines, "max-lines", 500,
+		"Maximum allowed lines per file (default 500).")
+
+	set.Parse(args)
+
+	if set.NArg() > 0 {
+		return nil, fmt.Errorf("unexpected arguments: %v", set.Args())
+	}
+
+	return cfg, nil
+}
+
+func cmdFilelength(args []string) error {
+	cfg, err := parseFileLengthConfig(args)
+	if err != nil {
+		return err
+	}
 	return cfg.Run()
 }
