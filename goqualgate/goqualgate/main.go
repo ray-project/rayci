@@ -1,13 +1,16 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	"github.com/ray-project/rayci/goqualgate"
 )
 
 func main() {
-	if err := goqualgate.Main(); err != nil {
-		log.Fatal(err)
+	code, err := goqualgate.Main(os.Args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
+	os.Exit(code)
 }

@@ -78,9 +78,16 @@ bash release.sh
 # wanda: build in RayCI mode (uses RAYCI_* env vars)
 ./wanda -rayci
 
-# goqualgate: run coverage checks (default minimum 60%)
+# goqualgate: run all quality gates with defaults
+./goqualgate all
+
+# goqualgate: run coverage checks (default minimum 80%)
 ./goqualgate coverage
-./goqualgate coverage -min-coverage-pct=80
+./goqualgate coverage -min-coverage-pct=90
+
+# goqualgate: check file lengths (default max 500 lines)
+./goqualgate filelength
+./goqualgate filelength -max-lines=400
 ```
 
 ## Architecture
