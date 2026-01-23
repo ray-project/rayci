@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -75,6 +76,22 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	return outputBuf.String(), nil
 }
 
+// parseComputeConfigName parses the AWS config path and converts it to a config name.
+// e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
+func parseComputeConfigName(awsConfigPath string) string {
+	// Get the directory and filename
+	dir := filepath.Dir(awsConfigPath)           // "configs/basic-single-node"
+	base := filepath.Base(awsConfigPath)         // "aws.yaml"
+	ext := filepath.Ext(base)                    // ".yaml"
+	filename := strings.TrimSuffix(base, ext)    // "aws"
+
+	// Get the last directory component (the config name)
+	configDir := filepath.Base(dir) // "basic-single-node"
+
+	// Combine: "basic-single-node-aws"
+	return configDir + "-" + filename
+}
+
 func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 	args := []string{"workspace_v2", "create"}
 	// get image URI and ray version from build ID
@@ -85,9 +102,12 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 	args = append(args, "--name", config.workspaceName)
 	args = append(args, "--image-uri", imageURI)
 	args = append(args, "--ray-version", rayVersion)
+
+	// Use compute config name if set
 	if config.computeConfig != "" {
-		args = append(args, "--compute-config", "tmpl-test-basic-serverless-aws:1")
+		args = append(args, "--compute-config", config.computeConfig)
 	}
+
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
 		return fmt.Errorf("create empty workspace failed: %w", err)

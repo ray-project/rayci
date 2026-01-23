@@ -56,6 +56,11 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("template %q not found in %s", wtc.tmplName, wtc.buildFile)
 	}
 
+	// Parse compute config name from template's AWS config path
+	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
+		wtc.computeConfig = parseComputeConfigName(awsConfigPath)
+	}
+
 	// generate workspace name
 	workspaceName := wtc.tmplName + "-" + time.Now().Format("20060102150405")
 	wtc.workspaceName = workspaceName
