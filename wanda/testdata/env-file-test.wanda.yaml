@@ -1,0 +1,5 @@
+name: env-file-test
+dockerfile: Dockerfile.env-file
+build_args:
+  - MESSAGE=$MESSAGE
+  - VERSION=$VERSION

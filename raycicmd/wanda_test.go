@@ -89,3 +89,56 @@ func TestWandaStep_priority(t *testing.T) {
 		t.Errorf("got priority %d, want 5", got)
 	}
 }
+
+func TestWandaStep_envfile(t *testing.T) {
+	tests := []struct {
+		name          string
+		envFile       string
+		wantSet       bool
+		expectedValue string
+	}{
+		{
+			name:          "with envfile",
+			envFile:       "ci/build.env",
+			wantSet:       true,
+			expectedValue: "ci/build.env",
+		},
+		{
+			name:    "without envfile",
+			envFile: "",
+			wantSet: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &wandaStep{
+				name:    "forge",
+				file:    "ci/forge.wanda.yaml",
+				envFile: tt.envFile,
+				buildID: "abc123",
+				envs:    map[string]string{"RAYCI_BRANCH": "stable"},
+				ciConfig: &config{
+					BuilderQueues: map[string]string{"builder": "mybuilder"},
+				},
+			}
+
+			bk := s.buildkiteStep()
+			envs := bk["env"].(map[string]string)
+
+			got, ok := envs["RAYCI_ENV_FILE"]
+			if tt.wantSet {
+				if !ok {
+					t.Fatal("expected RAYCI_ENV_FILE to be set, but it was not")
+				}
+				if got != tt.expectedValue {
+					t.Errorf("RAYCI_ENV_FILE = %q, want %q", got, tt.expectedValue)
+				}
+			} else {
+				if ok {
+					t.Errorf("expected RAYCI_ENV_FILE to not be set, but it was set to %q", got)
+				}
+			}
+		})
+	}
+}
