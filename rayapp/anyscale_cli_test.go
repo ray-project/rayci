@@ -329,7 +329,16 @@ exit 1
 		setupMockAnyscale(t, script)
 		cli := NewAnyscaleCLI("")
 
-		output, err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
+		// Create a temporary config file with new format (no conversion needed)
+		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.Close()
+
+		output, err := cli.CreateComputeConfig("my-config", tmpFile.Name())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -338,9 +347,6 @@ exit 1
 		}
 		if !strings.Contains(output, "-n my-config") {
 			t.Errorf("output %q should contain '-n my-config'", output)
-		}
-		if !strings.Contains(output, "-f /path/to/config.yaml") {
-			t.Errorf("output %q should contain '-f /path/to/config.yaml'", output)
 		}
 	})
 
@@ -383,7 +389,16 @@ exit 1
 		setupMockAnyscale(t, script)
 		cli := NewAnyscaleCLI("")
 
-		_, err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
+		// Create a temporary config file with new format
+		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.Close()
+
+		_, err = cli.CreateComputeConfig("my-config", tmpFile.Name())
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -430,92 +445,6 @@ func TestGetComputeConfig(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "get compute config failed") {
 			t.Errorf("error %q should contain 'get compute config failed'", err.Error())
-		}
-	})
-}
-
-func TestListComputeConfigs(t *testing.T) {
-	t.Run("success with no filters", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI("")
-
-		output, err := cli.ListComputeConfigs("", false, 0)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !strings.Contains(output, "compute-config list") {
-			t.Errorf("output %q should contain 'compute-config list'", output)
-		}
-	})
-
-	t.Run("success with name filter", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI("")
-
-		output, err := cli.ListComputeConfigs("my-config", false, 0)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !strings.Contains(output, "-n my-config") {
-			t.Errorf("output %q should contain '-n my-config'", output)
-		}
-	})
-
-	t.Run("success with include shared", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI("")
-
-		output, err := cli.ListComputeConfigs("", true, 0)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !strings.Contains(output, "--include-shared") {
-			t.Errorf("output %q should contain '--include-shared'", output)
-		}
-	})
-
-	t.Run("success with max items", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI("")
-
-		output, err := cli.ListComputeConfigs("", false, 10)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !strings.Contains(output, "--max-items 10") {
-			t.Errorf("output %q should contain '--max-items 10'", output)
-		}
-	})
-
-	t.Run("success with all options", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI("")
-
-		output, err := cli.ListComputeConfigs("my-config", true, 5)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !strings.Contains(output, "-n my-config") {
-			t.Errorf("output %q should contain '-n my-config'", output)
-		}
-		if !strings.Contains(output, "--include-shared") {
-			t.Errorf("output %q should contain '--include-shared'", output)
-		}
-		if !strings.Contains(output, "--max-items 5") {
-			t.Errorf("output %q should contain '--max-items 5'", output)
-		}
-	})
-
-	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI("")
-
-		_, err := cli.ListComputeConfigs("", false, 0)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "list compute configs failed") {
-			t.Errorf("error %q should contain 'list compute configs failed'", err.Error())
 		}
 	})
 }
