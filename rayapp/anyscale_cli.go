@@ -28,19 +28,19 @@ type WorkspaceTestConfig struct {
 }
 
 const (
-    StateTerminated WorkspaceState = iota
-    StateStarting
-    StateRunning
+	StateTerminated WorkspaceState = iota
+	StateStarting
+	StateRunning
 )
 
 var WorkspaceStateName = map[WorkspaceState]string{
-    StateTerminated: "TERMINATED",
-    StateStarting: "STARTING",
-    StateRunning:  "RUNNING",
+	StateTerminated: "TERMINATED",
+	StateStarting:   "STARTING",
+	StateRunning:    "RUNNING",
 }
 
 func (ws WorkspaceState) String() string {
-    return WorkspaceStateName[ws]
+	return WorkspaceStateName[ws]
 }
 
 type AnyscaleCLI struct {
@@ -94,10 +94,10 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
 func parseComputeConfigName(awsConfigPath string) string {
 	// Get the directory and filename
-	dir := filepath.Dir(awsConfigPath)           // "configs/basic-single-node"
-	base := filepath.Base(awsConfigPath)         // "aws.yaml"
-	ext := filepath.Ext(base)                    // ".yaml"
-	filename := strings.TrimSuffix(base, ext)    // "aws"
+	dir := filepath.Dir(awsConfigPath)        // "configs/basic-single-node"
+	base := filepath.Base(awsConfigPath)      // "aws.yaml"
+	ext := filepath.Ext(base)                 // ".yaml"
+	filename := strings.TrimSuffix(base, ext) // "aws"
 
 	// Get the last directory component (the config name)
 	configDir := filepath.Base(dir) // "basic-single-node"
@@ -281,7 +281,7 @@ func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state Workspa
 
 // OldComputeConfig represents the old compute config format
 type OldComputeConfig struct {
-	HeadNodeType    OldHeadNodeType    `yaml:"head_node_type"`
+	HeadNodeType    OldHeadNodeType     `yaml:"head_node_type"`
 	WorkerNodeTypes []OldWorkerNodeType `yaml:"worker_node_types"`
 }
 
