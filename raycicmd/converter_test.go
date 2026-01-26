@@ -1,11 +1,11 @@
 package raycicmd
 
 import (
-	"testing"
-
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
+	"testing"
 )
 
 func TestParseStepEnvs(t *testing.T) {
@@ -994,5 +994,290 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}
 	if len(bk1.Steps) != 2 {
 		t.Errorf("convertPipelineGroup: got %d steps, want 2", len(bk1.Steps))
+	}
+}
+
+func TestConvertPipelineGroups_MatrixExpansion(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{matrix.python}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{matrix.python}}"},
+			"matrix": map[string]any{
+				"setup": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+		}},
+	}}
+
+	filter := &stepFilter{runAll: true}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups() error = %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("got %d groups, want 1", len(bk))
+	}
+
+	// Should have 2 expanded steps (no meta wait-step)
+	if len(bk[0].Steps) != 2 {
+		t.Fatalf("got %d steps, want 2", len(bk[0].Steps))
+	}
+
+	// Check expanded step keys (periods removed for valid Buildkite keys)
+	step0 := bk[0].Steps[0].(map[string]any)
+	if got := step0["key"]; got != "build-step-python310" {
+		t.Errorf("step[0].key = %q, want %q", got, "build-step-python310")
+	}
+
+	step1 := bk[0].Steps[1].(map[string]any)
+	if got := step1["key"]; got != "build-step-python311" {
+		t.Errorf("step[1].key = %q, want %q", got, "build-step-python311")
+	}
+}
+
+func TestConvertPipelineGroups_MatrixSelectorDependsOn(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{matrix.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"matrix": map[string]any{
+					"setup": map[string]any{
+						"python": []any{"3.10", "3.11"},
+					},
+				},
+			},
+			{
+				"label":    "Test 3.11 only",
+				"key":      "test-step",
+				"commands": []any{"echo test"},
+				"depends_on": []any{
+					map[string]any{
+						"key": "build-step",
+						"matrix": map[string]any{
+							"python": "3.11",
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	filter := &stepFilter{runAll: true}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups() error = %v", err)
+	}
+
+	// Find the test step and check its depends_on
+	var testStep map[string]any
+	for _, s := range bk[0].Steps {
+		step := s.(map[string]any)
+		if step["key"] == "test-step" {
+			testStep = step
+			break
+		}
+	}
+
+	if testStep == nil {
+		t.Fatal("test-step not found")
+	}
+
+	// depends_on should be expanded to the specific python 3.11 key (periods removed)
+	dependsOn := testStep["depends_on"]
+	want := "build-step-python311"
+	if got, ok := dependsOn.(string); ok {
+		if got != want {
+			t.Errorf("depends_on = %q, want %q", got, want)
+		}
+	} else if gotSlice, ok := dependsOn.([]string); ok {
+		if len(gotSlice) != 1 || gotSlice[0] != want {
+			t.Errorf("depends_on = %v, want [%q]", gotSlice, want)
+		}
+	} else {
+		t.Errorf("depends_on unexpected type %T", dependsOn)
+	}
+}
+
+func TestConvertPipelineGroups_MatrixTagFiltering(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{matrix.python}}",
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"matrix": map[string]any{
+				"setup": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+		}},
+	}}
+
+	// Filter to only python-3.11 using auto-generated tag
+	filter := &stepFilter{tags: stringSet("python-3.11")}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups() error = %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("got %d groups, want 1", len(bk))
+	}
+
+	// Should have only 1 expanded step (python-3.11) + meta wait-step = 2 steps
+	// Note: meta step may or may not be included depending on whether anything depends on it
+	// In this case with no dependents, it should be filtered out
+	if len(bk[0].Steps) != 1 {
+		t.Fatalf("got %d steps, want 1 (only python-3.11 step)", len(bk[0].Steps))
+	}
+
+	step0 := bk[0].Steps[0].(map[string]any)
+	if got := step0["key"]; got != "build-step-python311" {
+		t.Errorf("step[0].key = %q, want %q", got, "build-step-python311")
+	}
+}
+
+func TestConvertPipelineGroups_MatrixLabelPlaceholderRequired(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build step", // No {{matrix...}} placeholder
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"matrix": map[string]any{
+				"setup": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+		}},
+	}}
+
+	filter := &stepFilter{runAll: true}
+	_, err := c.convertGroups(groups, filter)
+	if err == nil {
+		t.Fatal("expected error for missing placeholder, got nil")
+	}
+	if !strings.Contains(err.Error(), "placeholder") {
+		t.Errorf("error = %q, want to contain \"placeholder\"", err.Error())
+	}
+}
+
+func TestConvertPipelineGroups_MatrixBaseKeyDependencyExpansion(t *testing.T) {
+	// Verify that when a downstream step depends on the base key,
+	// the dependency is expanded to all expanded keys directly.
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{matrix.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"matrix": map[string]any{
+					"setup": map[string]any{
+						"python": []any{"3.10", "3.11"},
+					},
+				},
+			},
+			{
+				"label":      "Final validation",
+				"key":        "final-step",
+				"commands":   []any{"echo final"},
+				"tags":       []any{"run-me"},
+				"depends_on": "build-step", // Depends on base key
+			},
+		},
+	}}
+
+	// Filter to only "run-me" tag - this selects final-step,
+	// which should pull in all expanded steps via dependency propagation
+	filter := &stepFilter{tags: stringSet("run-me")}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups() error = %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("got %d groups, want 1", len(bk))
+	}
+
+	// Should have: 2 expanded steps + 1 final step = 3 steps (no meta-step)
+	if len(bk[0].Steps) != 3 {
+		var keys []string
+		for _, s := range bk[0].Steps {
+			step := s.(map[string]any)
+			if k, ok := step["key"]; ok {
+				keys = append(keys, k.(string))
+			}
+		}
+		t.Fatalf("got %d steps %v, want 3 (2 expanded + final)", len(bk[0].Steps), keys)
+	}
+
+	// Find final-step and verify its depends_on was expanded
+	var finalStep map[string]any
+	for _, s := range bk[0].Steps {
+		step := s.(map[string]any)
+		if step["key"] == "final-step" {
+			finalStep = step
+			break
+		}
+	}
+	if finalStep == nil {
+		t.Fatal("final-step not found")
+	}
+
+	// depends_on should be expanded to both python versions
+	dependsOn, ok := finalStep["depends_on"].([]string)
+	if !ok {
+		t.Fatalf("depends_on is %T, want []string", finalStep["depends_on"])
+	}
+	if len(dependsOn) != 2 {
+		t.Errorf("depends_on has %d elements, want 2: %v", len(dependsOn), dependsOn)
 	}
 }

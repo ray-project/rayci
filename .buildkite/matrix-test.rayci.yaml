@@ -1,0 +1,42 @@
+group: matrix selection test
+sort_key: "99"
+tags:
+  - matrix-test
+steps:
+  # Matrix step with 5 values - only "selected-1" and "selected-2" should be run
+  # when filtered (others are skipped)
+  - label: "Matrix {{matrix.variant}}"
+    key: matrix-step
+    command: |
+      echo "Running variant: {{matrix.variant}}"
+      if [ "{{matrix.variant}}" != "selected-1" ] && [ "{{matrix.variant}}" != "selected-2" ]; then
+        echo "ERROR: This variant should not have been spawned!"
+        echo "Only 'selected-1' and 'selected-2' variants should run when matrix-test tag is used."
+        exit 1
+      fi
+      echo "Correct variant spawned."
+    depends_on: forge
+    matrix:
+      setup:
+        variant:
+          - "selected-1"
+          - "selected-2"
+          - "skipped-1"
+          - "skipped-2"
+          - "skipped-3"
+
+  # This step depends on only the "selected" variants
+  - label: "Depends on selected only"
+    key: depends-on-selected
+    command: echo "This step depends on only the selected variants"
+    depends_on:
+      - key: matrix-step
+        matrix:
+          variant: ["selected-1", "selected-2"]
+      - forge
+
+  - label: "Final validation"
+    tags: always
+    key: final-validation
+    command: echo "Final validation"
+    depends_on: depends-on-selected
