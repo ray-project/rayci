@@ -3,73 +3,14 @@ package wanda
 import (
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
-	cranename "github.com/google/go-containerregistry/pkg/name"
 	crane "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
-
-// Build builds a container image from the given specification file, and builds
-// all its dependencies in topological order.
-// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
-// the root is built.
-func Build(specFile string, config *ForgeConfig) error {
-	if config == nil {
-		config = &ForgeConfig{}
-	}
-
-	wandaSpecsFile := config.WandaSpecsFile
-	if wandaSpecsFile == "" {
-		wandaSpecsFile = filepath.Join(config.WorkDir, ".wandaspecs")
-	}
-
-	lookup := lookupFunc(os.LookupEnv)
-	if config.EnvFile != "" {
-		envfileVars, err := ParseEnvFile(config.EnvFile)
-		if err != nil {
-			return fmt.Errorf("parse envfile: %w", err)
-		}
-		lookup = func(key string) (string, bool) {
-			if v, ok := envfileVars[key]; ok {
-				return v, true
-			}
-			return os.LookupEnv(key)
-		}
-	}
-
-	graph, err := buildDepGraph(specFile, lookup, config.NamePrefix, wandaSpecsFile)
-	if err != nil {
-		return fmt.Errorf("build dep graph: %w", err)
-	}
-
-	forge, err := NewForge(config)
-	if err != nil {
-		return fmt.Errorf("make forge: %w", err)
-	}
-
-	// In RayCI mode, only build the root (deps built by prior pipeline steps).
-	order := graph.Order
-	if config.RayCI {
-		order = []string{graph.Root}
-	}
-
-	for _, name := range order {
-		rs := graph.Specs[name]
-
-		log.Printf("building %s (from %s)", name, rs.Path)
-
-		if err := forge.Build(rs.Spec); err != nil {
-			return fmt.Errorf("build %s: %w", name, err)
-		}
-	}
-
-	return nil
-}
 
 // Forge is a forge to build container images.
 type Forge struct {
@@ -238,49 +179,18 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 
 	if caching && !f.config.Rebuild {
+		var hit bool
+		var err error
 		if f.isRemote() {
-			ct, err := cranename.NewTag(cacheTag)
-			if err != nil {
-				return fmt.Errorf("parse cache tag %q: %w", cacheTag, err)
-			}
-			wt, err := cranename.NewTag(workTag)
-			if err != nil {
-				return fmt.Errorf("parse work tag %q: %w", workTag, err)
-			}
-
-			desc, err := remote.Get(ct, f.remoteOpts...)
-			if err != nil {
-				log.Printf("cache image miss: %v", err)
-			} else {
-				log.Printf("cache hit: %s", desc.Digest)
-				f.cacheHitCount++
-
-				log.Printf("tag output as %s", workTag)
-				if err := remote.Tag(wt, desc, f.remoteOpts...); err != nil {
-					return fmt.Errorf("tag cache image: %w", err)
-				}
-
-				return nil // and we are done.
-			}
+			hit, err = f.checkRemoteCache(cacheTag, workTag)
 		} else {
-			info, err := f.docker.inspectImage(cacheTag)
-			if err != nil {
-				return fmt.Errorf("check cache image: %w", err)
-			}
-			if info != nil {
-				log.Printf("cache hit: %s", info.ID)
-				f.cacheHitCount++
-
-				for _, tag := range in.tagList() {
-					log.Printf("tag output as %s", tag)
-					if tag != cacheTag {
-						if err := f.docker.tag(cacheTag, tag); err != nil {
-							return fmt.Errorf("tag cache image: %w", err)
-						}
-					}
-				}
-				return nil // and we are done.
-			}
+			hit, err = f.checkLocalCache(cacheTag, in.tagList())
+		}
+		if err != nil {
+			return err
+		}
+		if hit {
+			return nil // and we are done.
 		}
 	}
 
