@@ -43,14 +43,12 @@ func (ws WorkspaceState) String() string {
 	return WorkspaceStateName[ws]
 }
 
-type AnyscaleCLI struct {
-	token string
-}
+type AnyscaleCLI struct{}
 
 var errAnyscaleNotInstalled = errors.New("anyscale is not installed")
 
-func NewAnyscaleCLI(token string) *AnyscaleCLI {
-	return &AnyscaleCLI{token: token}
+func NewAnyscaleCLI() *AnyscaleCLI {
+	return &AnyscaleCLI{}
 }
 
 func isAnyscaleInstalled() bool {
