@@ -2,6 +2,7 @@ package reefd
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sort"
 	"strings"
@@ -293,5 +294,158 @@ func TestListAndReapDeadWindowsInstances(t *testing.T) {
 	ids = ec2.ids()
 	if !reflect.DeepEqual(ids, wantIDs) {
 		t.Fatalf("got %v left, want %v", ids, wantIDs)
+	}
+}
+
+// errorEC2 is a fake EC2 client that returns configurable errors
+type errorEC2 struct {
+	describeErr  error
+	terminateErr error
+}
+
+func (e *errorEC2) DescribeInstances(
+	ctx context.Context, in *ec2.DescribeInstancesInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	if e.describeErr != nil {
+		return nil, e.describeErr
+	}
+	return &ec2.DescribeInstancesOutput{}, nil
+}
+
+func (e *errorEC2) TerminateInstances(
+	ctx context.Context, in *ec2.TerminateInstancesInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.TerminateInstancesOutput, error) {
+	return nil, e.terminateErr
+}
+
+func TestListDeadWindowsInstancesError(t *testing.T) {
+	wantErr := errors.New("AWS API error")
+	r := newReaper(&errorEC2{describeErr: wantErr})
+
+	ctx := context.Background()
+	_, err := r.listDeadWindowsInstances(ctx)
+	if err == nil {
+		t.Fatal("listDeadWindowsInstances() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "describe instances") {
+		t.Errorf("listDeadWindowsInstances() error = %q, want error containing 'describe instances'", err)
+	}
+}
+
+func TestTerminateInstancesError(t *testing.T) {
+	wantErr := errors.New("terminate failed")
+	r := newReaper(&errorEC2{terminateErr: wantErr})
+
+	ctx := context.Background()
+	err := r.terminateInstances(ctx, []string{"i-123"})
+	if err == nil {
+		t.Fatal("terminateInstances() error = nil, want error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("terminateInstances() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestTerminateInstancesEmpty(t *testing.T) {
+	r := newReaper(&errorEC2{terminateErr: errors.New("should not be called")})
+
+	ctx := context.Background()
+	err := r.terminateInstances(ctx, []string{})
+	if err != nil {
+		t.Errorf("terminateInstances() with empty ids error = %v, want nil", err)
+	}
+
+	err = r.terminateInstances(ctx, nil)
+	if err != nil {
+		t.Errorf("terminateInstances() with nil ids error = %v, want nil", err)
+	}
+}
+
+// terminateErrorEC2 returns instances to describe but fails on terminate
+type terminateErrorEC2 struct {
+	instances    []*fakeEC2Instance
+	terminateErr error
+}
+
+func (e *terminateErrorEC2) DescribeInstances(
+	ctx context.Context, in *ec2.DescribeInstancesInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	out := &ec2.DescribeInstancesOutput{}
+	for _, i := range e.instances {
+		if instanceMatchFilters(i, in.Filters) {
+			out.Reservations = append(out.Reservations, ec2types.Reservation{
+				Instances: []ec2types.Instance{{
+					InstanceId: aws.String(i.id),
+					LaunchTime: aws.Time(i.launchTime),
+				}},
+			})
+		}
+	}
+	return out, nil
+}
+
+func (e *terminateErrorEC2) TerminateInstances(
+	ctx context.Context, in *ec2.TerminateInstancesInput,
+	optFns ...func(*ec2.Options),
+) (*ec2.TerminateInstancesOutput, error) {
+	return nil, e.terminateErr
+}
+
+func TestListAndReapDeadWindowsInstancesTerminateError(t *testing.T) {
+	now := time.Now()
+	wantErr := errors.New("terminate failed")
+
+	ec2Client := &terminateErrorEC2{
+		instances: []*fakeEC2Instance{{
+			id:         "i-w1",
+			stateCode:  "16",
+			launchTime: now.Add(-8 * time.Hour),
+			tags:       map[string]string{"BuildkiteQueue": "bk-windows-pr"},
+		}},
+		terminateErr: wantErr,
+	}
+
+	r := newReaper(ec2Client)
+	r.setNowFunc(func() time.Time { return now })
+
+	ctx := context.Background()
+	n, err := r.listAndReapDeadWindowsInstances(ctx)
+	if err == nil {
+		t.Fatal("listAndReapDeadWindowsInstances() error = nil, want error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("listAndReapDeadWindowsInstances() error = %v, want %v", err, wantErr)
+	}
+	if n != 0 {
+		t.Errorf("listAndReapDeadWindowsInstances() n = %d, want 0 on error", n)
+	}
+}
+
+func TestListAndReapDeadWindowsInstancesDescribeError(t *testing.T) {
+	wantErr := errors.New("describe failed")
+	r := newReaper(&errorEC2{describeErr: wantErr})
+
+	ctx := context.Background()
+	n, err := r.listAndReapDeadWindowsInstances(ctx)
+	if err == nil {
+		t.Fatal("listAndReapDeadWindowsInstances() error = nil, want error")
+	}
+	if n != 0 {
+		t.Errorf("listAndReapDeadWindowsInstances() n = %d, want 0 on error", n)
+	}
+}
+
+func TestReaperNowDefault(t *testing.T) {
+	r := newReaper(newFakeEC2())
+	// nowFunc is nil by default, so now() should return current time
+	before := time.Now()
+	got := r.now()
+	after := time.Now()
+
+	if got.Before(before) || got.After(after) {
+		t.Errorf("now() = %v, want time between %v and %v", got, before, after)
 	}
 }

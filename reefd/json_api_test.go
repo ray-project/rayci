@@ -65,3 +65,90 @@ func TestJSONAPI(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }
+
+func TestJSONAPIMethodNotAllowed(t *testing.T) {
+	h := jsonAPI(func(ctx context.Context, req *struct{}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("got status %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestJSONAPIWrongAcceptHeader(t *testing.T) {
+	h := jsonAPI(func(ctx context.Context, req *struct{}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{}`))
+	req.Header.Set("Accept", "text/html")
+	req.Header.Set("Content-Type", reefclient.JSONContentType)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("got status %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+	}
+	if !strings.Contains(rec.Body.String(), "must accept application/json") {
+		t.Errorf("got body %q, want error about Accept header", rec.Body.String())
+	}
+}
+
+func TestJSONAPIWrongContentType(t *testing.T) {
+	h := jsonAPI(func(ctx context.Context, req *struct{}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{}`))
+	req.Header.Set("Accept", reefclient.JSONContentType)
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("got status %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+	}
+	if !strings.Contains(rec.Body.String(), "must use application/json") {
+		t.Errorf("got body %q, want error about Content-Type", rec.Body.String())
+	}
+}
+
+func TestJSONAPIMalformedJSON(t *testing.T) {
+	h := jsonAPI(func(ctx context.Context, req *struct{}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{invalid json`))
+	req.Header.Set("Accept", reefclient.JSONContentType)
+	req.Header.Set("Content-Type", reefclient.JSONContentType)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("got status %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestJSONAPIExtraData(t *testing.T) {
+	h := jsonAPI(func(ctx context.Context, req *struct{}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{}extra`))
+	req.Header.Set("Accept", reefclient.JSONContentType)
+	req.Header.Set("Content-Type", reefclient.JSONContentType)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("got status %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), "extra data") {
+		t.Errorf("got body %q, want error about extra data", rec.Body.String())
+	}
+}
