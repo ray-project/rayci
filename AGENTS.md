@@ -85,7 +85,7 @@ bash release.sh
 ./goqualgate coverage
 ./goqualgate coverage -min-coverage-pct=90
 
-# goqualgate: check file lengths (default max 500 lines)
+# goqualgate: check file lengths (default max 300 lines)
 ./goqualgate filelength
 ./goqualgate filelength -max-lines=400
 ```

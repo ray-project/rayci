@@ -64,7 +64,7 @@ Usage:
 
 Flags:
 	-max-lines int
-		Maximum allowed lines per file (default 500).
+		Maximum allowed lines per file (default 300).
 `
 
 type subcommand struct {
@@ -151,8 +151,8 @@ func parseFileLengthConfig(args []string) (*FileLengthConfig, error) {
 	}
 
 	cfg := new(FileLengthConfig)
-	set.IntVar(&cfg.MaxLines, "max-lines", 500,
-		"Maximum allowed lines per file (default 500).")
+	set.IntVar(&cfg.MaxLines, "max-lines", 300,
+		"Maximum allowed lines per file (default 300).")
 
 	set.Parse(args)
 
