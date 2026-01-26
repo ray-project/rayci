@@ -28,7 +28,7 @@ Usage:
 
 Flags:
 	-min-coverage-pct float
-		Minimum coverage percentage required to pass (default 60).
+		Minimum coverage percentage required to pass (default 80).
 
 Improving Coverage (for AI agents):
 
