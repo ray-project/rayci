@@ -254,7 +254,7 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
 	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
 	if err != nil {
-		return fmt.Errorf("delete workspace failed: %w", err)
+return fmt.Errorf("terminate workspace failed: %w", err)
 	}
 	fmt.Println("terminate workspace output:\n", output)
 	return nil
