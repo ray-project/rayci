@@ -9,3 +9,12 @@ steps:
     queue: small
     docker_publish_tcp_ports: "5555"
     depends_on: forge
+
+  - label: Go file length check
+    tags:
+      - always
+    command:
+      - go build -o /tmp/goqualgate ./goqualgate/goqualgate
+      - /tmp/goqualgate filelength
+    queue: small
+    depends_on: forge
