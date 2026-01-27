@@ -145,19 +145,19 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		},
 		{
 			name:       "success",
-			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"output: $@\"",
+			script:     "#!/bin/sh\necho \"output: $@\"",
 			args:       []string{"service", "deploy"},
 			wantSubstr: "output: service deploy",
 		},
 		{
 			name:       "empty args",
-			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"help\"",
+			script:     "#!/bin/sh\necho \"help\"",
 			args:       []string{},
 			wantSubstr: "help",
 		},
 		{
 			name:       "command fails with stderr",
-			script:     "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\necho \"error msg\" >&2; exit 1",
+			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
 			wantSubstr: "error msg",
 			wantErr:    errors.New("anyscale error"),
@@ -207,28 +207,6 @@ func TestIsAnyscaleInstalled(t *testing.T) {
 		setupMockAnyscale(t, "#!/bin/sh\necho mock")
 		if !isAnyscaleInstalled() {
 			t.Error("should return true when in PATH")
-		}
-	})
-}
-
-func TestAuthenticate(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\nexit 1")
-		cli := NewAnyscaleCLI()
-		if err := cli.Authenticate(); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
-		err := cli.Authenticate()
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "anyscale auth login failed") {
-			t.Errorf("error %q should contain 'anyscale auth login failed'", err.Error())
 		}
 	})
 }
