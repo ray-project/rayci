@@ -2,6 +2,7 @@ package reefd
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -91,5 +92,104 @@ func TestDatabase(t *testing.T) {
 
 	if err := db.Close(); err != nil {
 		t.Fatalf("failed to close database: %v", err)
+	}
+}
+
+// failingStore is a store that returns configurable errors
+type failingStore struct {
+	createErr  error
+	destroyErr error
+}
+
+func (s *failingStore) create(ctx context.Context) error  { return s.createErr }
+func (s *failingStore) destroy(ctx context.Context) error { return s.destroyErr }
+
+func TestCreateAllPropagatesError(t *testing.T) {
+	wantErr := errors.New("create failed")
+	stores := []store{
+		&failingStore{createErr: wantErr},
+	}
+
+	ctx := context.Background()
+	err := createAll(ctx, stores)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("createAll() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestCreateAllStopsOnFirstError(t *testing.T) {
+	firstErr := errors.New("first failed")
+	secondErr := errors.New("second failed")
+	stores := []store{
+		&failingStore{createErr: firstErr},
+		&failingStore{createErr: secondErr},
+	}
+
+	ctx := context.Background()
+	err := createAll(ctx, stores)
+	if !errors.Is(err, firstErr) {
+		t.Errorf("createAll() error = %v, want %v (first error)", err, firstErr)
+	}
+}
+
+func TestDestroyAllPropagatesError(t *testing.T) {
+	wantErr := errors.New("destroy failed")
+	stores := []store{
+		&failingStore{destroyErr: wantErr},
+	}
+
+	ctx := context.Background()
+	err := destroyAll(ctx, stores)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("destroyAll() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestDestroyAllStopsOnFirstError(t *testing.T) {
+	firstErr := errors.New("first failed")
+	secondErr := errors.New("second failed")
+	stores := []store{
+		&failingStore{destroyErr: firstErr},
+		&failingStore{destroyErr: secondErr},
+	}
+
+	ctx := context.Background()
+	err := destroyAll(ctx, stores)
+	if !errors.Is(err, firstErr) {
+		t.Errorf("destroyAll() error = %v, want %v (first error)", err, firstErr)
+	}
+}
+
+func TestDatabaseDB(t *testing.T) {
+	db, err := newSqliteDB("")
+	if err != nil {
+		t.Fatalf("newSqliteDB() error = %v", err)
+	}
+	defer db.Close()
+
+	sqlDB := db.DB()
+	if sqlDB == nil {
+		t.Error("DB() returned nil")
+	}
+
+	// Verify the returned DB is functional
+	if err := sqlDB.Ping(); err != nil {
+		t.Errorf("DB().Ping() error = %v", err)
+	}
+}
+
+func TestCreateAllEmptyStores(t *testing.T) {
+	ctx := context.Background()
+	err := createAll(ctx, []store{})
+	if err != nil {
+		t.Errorf("createAll() with empty stores error = %v, want nil", err)
+	}
+}
+
+func TestDestroyAllEmptyStores(t *testing.T) {
+	ctx := context.Background()
+	err := destroyAll(ctx, []store{})
+	if err != nil {
+		t.Errorf("destroyAll() with empty stores error = %v, want nil", err)
 	}
 }
