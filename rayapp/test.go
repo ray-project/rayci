@@ -18,6 +18,7 @@ func Test(tmplName, buildFile string) error {
 const testCmd = "pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake . -s -vv"
 
 const workspaceStartWaitTime = 30 * time.Second
+
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	tmplName      string
