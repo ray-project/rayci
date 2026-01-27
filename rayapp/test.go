@@ -39,7 +39,7 @@ func NewWorkspaceTestConfig(tmplName, buildFile string) *WorkspaceTestConfig {
 // Run creates an empty workspace and copies the template to it.
 func (wtc *WorkspaceTestConfig) Run() error {
 	// init anyscale cli
-	anyscaleCLI := NewAnyscaleCLI(os.Getenv("ANYSCALE_CLI_TOKEN"))
+	anyscaleCLI := NewAnyscaleCLI()
 
 	// read build file and get template details
 	tmpls, err := readTemplates(wtc.buildFile)
@@ -66,8 +66,10 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
 		wtc.computeConfig = parseComputeConfigName(awsConfigPath)
+		// Resolve compute config path relative to build file directory
+		resolvedConfigPath := filepath.Join(buildDir, awsConfigPath)
 		// Create compute config if it doesn't already exist
-		if _, err := anyscaleCLI.CreateComputeConfig(wtc.computeConfig, awsConfigPath); err != nil {
+		if _, err := anyscaleCLI.CreateComputeConfig(wtc.computeConfig, resolvedConfigPath); err != nil {
 			return fmt.Errorf("create compute config failed: %w", err)
 		}
 	}
