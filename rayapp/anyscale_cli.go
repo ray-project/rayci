@@ -15,18 +15,6 @@ import (
 
 type WorkspaceState int
 
-// WorkspaceTestConfig contains all the details to test a workspace.
-type WorkspaceTestConfig struct {
-	tmplName      string
-	buildFile     string
-	workspaceName string
-	configFile    string
-	computeConfig string
-	imageURI      string
-	rayVersion    string
-	template      *Template
-}
-
 const (
 	StateTerminated WorkspaceState = iota
 	StateStarting
