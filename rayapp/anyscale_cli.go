@@ -9,10 +9,24 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // WorkspaceState represents the state of a workspace.
 type WorkspaceState int
+
+// WorkspaceTestConfig contains all the details to test a workspace.
+type WorkspaceTestConfig struct {
+	tmplName      string
+	buildFile     string
+	workspaceName string
+	configFile    string
+	computeConfig string
+	imageURI      string
+	rayVersion    string
+	template      *Template
+}
 
 const (
 	StateTerminated WorkspaceState = iota
@@ -125,9 +139,32 @@ func parseComputeConfigName(awsConfigPath string) string {
 	return configDir + "-" + filename
 }
 
+// isOldComputeConfigFormat checks if a YAML file uses the old compute config format
+// by looking for old-style keys like "head_node_type" or "worker_node_types".
+func isOldComputeConfigFormat(configFilePath string) (bool, error) {
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Parse into a generic map to check for old-style keys
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(data, &configMap); err != nil {
+		return false, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Check for old format keys
+	_, hasHeadNodeType := configMap["head_node_type"]
+	_, hasWorkerNodeTypes := configMap["worker_node_types"]
+
+	return hasHeadNodeType || hasWorkerNodeTypes, nil
+}
+
 // CreateComputeConfig creates a new compute config from a YAML file if it doesn't already exist.
+// If the config file uses the old format (head_node_type, worker_node_types), it will be
+// automatically converted to the new format before creation.
 // name: the name for the compute config (without version tag)
-// configFilePath: path to the YAML config file
+// configFile: path to the YAML config file
 // Returns the output from the CLI and any error.
 func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string, error) {
 	// Check if compute config already exists
@@ -136,8 +173,41 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string,
 		return output, nil
 	}
 
+	// Check if the config file uses the old format
+	isOldFormat, err := isOldComputeConfigFormat(configFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check config format: %w", err)
+	}
+
+	// If old format, convert to new format and use a temp file
+	actualConfigPath := configFilePath
+	if isOldFormat {
+		fmt.Printf("Detected old compute config format, converting to new format...\n")
+
+		newConfigData, err := ConvertComputeConfig(configFilePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert old config: %w", err)
+		}
+
+		// Create a temp file for the converted config
+		tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp file: %w", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		if _, err := tmpFile.Write(newConfigData); err != nil {
+			tmpFile.Close()
+			return "", fmt.Errorf("failed to write temp file: %w", err)
+		}
+		tmpFile.Close()
+
+		actualConfigPath = tmpFile.Name()
+		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
+	}
+
 	// Create the compute config
-	args := []string{"compute-config", "create", "-n", name, "-f", configFilePath}
+	args := []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
 		return output, fmt.Errorf("create compute config failed: %w", err)
@@ -155,4 +225,170 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 		return output, fmt.Errorf("get compute config failed: %w", err)
 	}
 	return output, nil
+}
+
+func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
+	args := []string{"workspace_v2", "create"}
+	// get image URI and ray version from build ID
+	imageURI, rayVersion, err := convertBuildIdToImageURI(config.template.ClusterEnv.BuildID)
+	if err != nil {
+		return fmt.Errorf("convert build ID to image URI failed: %w", err)
+	}
+	args = append(args, "--name", config.workspaceName)
+	args = append(args, "--image-uri", imageURI)
+	args = append(args, "--ray-version", rayVersion)
+
+	// Use compute config name if set
+	if config.computeConfig != "" {
+		args = append(args, "--compute-config", config.computeConfig)
+	}
+
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return fmt.Errorf("create empty workspace failed: %w", err)
+	}
+	fmt.Println("create empty workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
+	if err != nil {
+		return fmt.Errorf("delete workspace failed: %w", err)
+	}
+	fmt.Println("terminate workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
+	if err != nil {
+		return fmt.Errorf("copy template to workspace failed: %w", err)
+	}
+	fmt.Println("copy template to workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) pushTemplateToWorkspace(workspaceName, localFilePath string) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
+	if err != nil {
+		return fmt.Errorf("push file to workspace failed: %w", err)
+	}
+	fmt.Println("push file to workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
+	if err != nil {
+		return fmt.Errorf("run command in workspace failed: %w", err)
+	}
+	fmt.Println("run command in workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) startWorkspace(config *WorkspaceTestConfig) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
+	if err != nil {
+		return fmt.Errorf("start workspace failed: %w", err)
+	}
+	fmt.Println("start workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "status", "--name", workspaceName})
+	if err != nil {
+		return "", fmt.Errorf("get workspace state failed: %w", err)
+	}
+	return output, nil
+}
+
+func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state WorkspaceState) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()})
+	if err != nil {
+		return "", fmt.Errorf("wait for workspace state failed: %w", err)
+	}
+	return output, nil
+}
+
+// OldComputeConfig represents the old compute config format
+type OldComputeConfig struct {
+	HeadNodeType    OldHeadNodeType     `yaml:"head_node_type"`
+	WorkerNodeTypes []OldWorkerNodeType `yaml:"worker_node_types"`
+}
+
+// OldHeadNodeType represents the head node configuration in old format
+type OldHeadNodeType struct {
+	Name         string `yaml:"name"`
+	InstanceType string `yaml:"instance_type"`
+}
+
+// OldWorkerNodeType represents a worker node configuration in old format
+type OldWorkerNodeType struct {
+	Name         string `yaml:"name"`
+	InstanceType string `yaml:"instance_type"`
+}
+
+// NewComputeConfig represents the new compute config format
+type NewComputeConfig struct {
+	HeadNode               NewHeadNode `yaml:"head_node"`
+	AutoSelectWorkerConfig bool        `yaml:"auto_select_worker_config"`
+}
+
+// NewHeadNode represents the head node configuration in new format
+type NewHeadNode struct {
+	InstanceType string `yaml:"instance_type"`
+}
+
+// ConvertComputeConfig converts an old format compute config to the new format.
+// It reads the old YAML file, transforms the structure, and returns the new YAML content.
+func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
+	// Read the old config file
+	data, err := os.ReadFile(oldConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read old config file: %w", err)
+	}
+
+	// Parse the old format
+	var oldConfig OldComputeConfig
+	if err := yaml.Unmarshal(data, &oldConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse old config: %w", err)
+	}
+
+	// Convert to new format
+	newConfig := NewComputeConfig{
+		HeadNode: NewHeadNode{
+			InstanceType: oldConfig.HeadNodeType.InstanceType,
+		},
+		AutoSelectWorkerConfig: true,
+	}
+
+	// Marshal to YAML
+	newData, err := yaml.Marshal(&newConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal new config: %w", err)
+	}
+
+	return newData, nil
+}
+
+// ConvertComputeConfigFile converts an old format compute config file to a new format file.
+// If outputPath is empty, the new config is written to stdout.
+func ConvertComputeConfigFile(oldConfigPath, newConfigPath string) error {
+	newData, err := ConvertComputeConfig(oldConfigPath)
+	if err != nil {
+		return err
+	}
+
+	if newConfigPath == "" {
+		fmt.Print(string(newData))
+		return nil
+	}
+
+	if err := os.WriteFile(newConfigPath, newData, 0644); err != nil {
+		return fmt.Errorf("failed to write new config file: %w", err)
+	}
+
+	return nil
 }

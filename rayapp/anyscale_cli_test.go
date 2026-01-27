@@ -397,3 +397,286 @@ func TestGetComputeConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestCreateEmptyWorkspace(t *testing.T) {
+	tests := []struct {
+		name          string
+		script        string
+		config        *WorkspaceTestConfig
+		wantErr       bool
+		errContains   string
+		wantArgSubstr string
+	}{
+		{
+			name:   "success without compute config",
+			script: "#!/bin/sh\necho \"args: $@\"",
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+				template: &Template{
+					ClusterEnv: &ClusterEnv{
+						BuildID: "anyscaleray2441-py312-cu128",
+					},
+				},
+			},
+			wantArgSubstr: "workspace_v2 create",
+		},
+		{
+			name:   "success with compute config name",
+			script: "#!/bin/sh\necho \"args: $@\"",
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+				computeConfig: "basic-single-node-aws",
+				template: &Template{
+					ClusterEnv: &ClusterEnv{
+						BuildID: "anyscaleray2441-py312-cu128",
+					},
+				},
+			},
+			wantArgSubstr: "--compute-config",
+		},
+		{
+			name:   "invalid build ID",
+			script: "#!/bin/sh\necho \"args: $@\"",
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+				template: &Template{
+					ClusterEnv: &ClusterEnv{
+						BuildID: "invalid-build-id",
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "convert build ID to image URI failed",
+		},
+		{
+			name:   "CLI error",
+			script: "#!/bin/sh\nexit 1",
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+				template: &Template{
+					ClusterEnv: &ClusterEnv{
+						BuildID: "anyscaleray2441-py312-cu128",
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "create empty workspace failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupMockAnyscale(t, tt.script)
+			cli := NewAnyscaleCLI()
+
+			err := cli.createEmptyWorkspace(tt.config)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTerminateWorkspace(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"terminating $@\"")
+		cli := NewAnyscaleCLI()
+
+		err := cli.terminateWorkspace("my-workspace")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+
+		err := cli.terminateWorkspace("my-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "delete workspace failed") {
+			t.Errorf("error %q should contain 'delete workspace failed'", err.Error())
+		}
+	})
+}
+
+func TestCopyTemplateToWorkspace(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"pushing $@\"")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+			template: &Template{
+				Dir: "/path/to/template",
+			},
+		}
+
+		err := cli.copyTemplateToWorkspace(config)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+			template: &Template{
+				Dir: "/path/to/template",
+			},
+		}
+
+		err := cli.copyTemplateToWorkspace(config)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "copy template to workspace failed") {
+			t.Errorf("error %q should contain 'copy template to workspace failed'", err.Error())
+		}
+	})
+}
+
+func TestRunCmdInWorkspace(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"running: $@\"")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+		}
+
+		err := cli.runCmdInWorkspace(config, "echo hello")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+		}
+
+		err := cli.runCmdInWorkspace(config, "failing-command")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "run command in workspace failed") {
+			t.Errorf("error %q should contain 'run command in workspace failed'", err.Error())
+		}
+	})
+}
+
+func TestStartWorkspace(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"starting $@\"")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+		}
+
+		err := cli.startWorkspace(config)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+		config := &WorkspaceTestConfig{
+			workspaceName: "test-workspace",
+		}
+
+		err := cli.startWorkspace(config)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "start workspace failed") {
+			t.Errorf("error %q should contain 'start workspace failed'", err.Error())
+		}
+	})
+}
+
+func TestGetWorkspaceStatus(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"RUNNING\"")
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.getWorkspaceStatus("test-workspace")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "RUNNING") {
+			t.Errorf("output %q should contain 'RUNNING'", output)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+
+		_, err := cli.getWorkspaceStatus("test-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "get workspace state failed") {
+			t.Errorf("error %q should contain 'get workspace state failed'", err.Error())
+		}
+	})
+}
+
+func TestWaitForWorkspaceState(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"state reached\"")
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "state reached") {
+			t.Errorf("output %q should contain 'state reached'", output)
+		}
+	})
+
+	t.Run("wait for terminated", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"terminated\"")
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.waitForWorkspaceState("test-workspace", StateTerminated)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "terminated") {
+			t.Errorf("output %q should contain 'terminated'", output)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+
+		_, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "wait for workspace state failed") {
+			t.Errorf("error %q should contain 'wait for workspace state failed'", err.Error())
+		}
+	})
+}
