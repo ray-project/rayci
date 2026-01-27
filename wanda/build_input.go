@@ -9,14 +9,19 @@ import (
 	"strings"
 )
 
-func resolveBuildArgs(buildArgs []string) map[string]string {
+func resolveBuildArgs(buildArgs []string, lookup lookupFunc) map[string]string {
 	m := make(map[string]string)
 	for _, s := range buildArgs {
 		k, v, ok := strings.Cut(s, "=")
 		if ok {
 			m[k] = v
 		} else {
-			m[s] = os.Getenv(s)
+			if lookup != nil {
+				v, _ := lookup(s)
+				m[s] = v
+			} else {
+				m[s] = os.Getenv(s)
+			}
 		}
 	}
 	return m
@@ -73,7 +78,7 @@ type buildInputCore struct {
 	OS       string `json:",omitempty"` // "linux" (empty string) or GOOS
 }
 
-func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
+func (i *buildInput) makeCore(dockerfile string, lookup lookupFunc) (*buildInputCore, error) {
 	context := ""
 	if i.context != nil {
 		d, err := i.context.digest()
@@ -88,7 +93,7 @@ func (i *buildInput) makeCore(dockerfile string) (*buildInputCore, error) {
 		froms[name] = src.id
 	}
 
-	buildArgs := resolveBuildArgs(i.buildArgs)
+	buildArgs := resolveBuildArgs(i.buildArgs, lookup)
 
 	platform := runtime.GOARCH
 	if platform == "amd64" {
@@ -124,8 +129,8 @@ type buildInputHints struct {
 	BuildArgs map[string]string
 }
 
-func newBuildInputHints(buildArgs []string) *buildInputHints {
+func newBuildInputHints(buildArgs []string, lookup lookupFunc) *buildInputHints {
 	return &buildInputHints{
-		BuildArgs: resolveBuildArgs(buildArgs),
+		BuildArgs: resolveBuildArgs(buildArgs, lookup),
 	}
 }

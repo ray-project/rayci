@@ -51,6 +51,7 @@ func Build(specFile string, config *ForgeConfig) error {
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)
 	}
+	forge.lookup = lookup
 
 	// In RayCI mode, only build the root (deps built by prior pipeline steps).
 	order := graph.Order
@@ -82,6 +83,8 @@ type Forge struct {
 	cacheHitCount int
 
 	docker *dockerCmd
+
+	lookup lookupFunc
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -200,7 +203,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 	in.froms = froms
 
-	inputCore, err := in.makeCore(spec.Dockerfile)
+	inputCore, err := in.makeCore(spec.Dockerfile, f.lookup)
 	if err != nil {
 		return fmt.Errorf("make build input core: %w", err)
 	}
@@ -284,7 +287,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
-	inputHints := newBuildInputHints(spec.BuildHintArgs)
+	inputHints := newBuildInputHints(spec.BuildHintArgs, f.lookup)
 
 	// Now we can build the image.
 	// Always use a new dockerCmd so that it can run in its own environment.

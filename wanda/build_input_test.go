@@ -32,7 +32,7 @@ func TestBuildInputCore(t *testing.T) {
 	in := newBuildInput(ts, []string{"MESSAGE=test=msg"})
 	in.addTag("myimage")
 
-	core, err := in.makeCore("Dockerfile.hello")
+	core, err := in.makeCore("Dockerfile.hello", nil)
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}
@@ -58,4 +58,51 @@ func TestBuildInputCore(t *testing.T) {
 		t.Errorf("same digest after change: %q vs %q", digest, digest2)
 	}
 
+}
+
+func TestResolveBuildArgsWithLookup(t *testing.T) {
+	envfileVars := map[string]string{
+		"MANYLINUX_VERSION": "260103.868e54c",
+		"HOSTTYPE":          "x86_64",
+	}
+	lookup := func(key string) (string, bool) {
+		v, ok := envfileVars[key]
+		return v, ok
+	}
+
+	buildArgs := []string{
+		"MANYLINUX_VERSION",     // no value, should come from lookup
+		"HOSTTYPE",              // no value, should come from lookup
+		"EXPLICIT_VAR=explicit", // has value, should use as-is
+		"MISSING_VAR",           // no value, not in lookup or env
+	}
+
+	result := resolveBuildArgs(buildArgs, lookup)
+
+	if got, want := result["MANYLINUX_VERSION"], "260103.868e54c"; got != want {
+		t.Errorf("MANYLINUX_VERSION = %q, want %q", got, want)
+	}
+	if got, want := result["HOSTTYPE"], "x86_64"; got != want {
+		t.Errorf("HOSTTYPE = %q, want %q", got, want)
+	}
+	if got, want := result["EXPLICIT_VAR"], "explicit"; got != want {
+		t.Errorf("EXPLICIT_VAR = %q, want %q", got, want)
+	}
+	// MISSING_VAR should be empty (not in lookup or env)
+	if got := result["MISSING_VAR"]; got != "" {
+		t.Errorf("MISSING_VAR = %q, want empty string", got)
+	}
+}
+
+func TestResolveBuildArgsWithNilLookup(t *testing.T) {
+	// When lookup is nil, should fall back to os.Getenv.
+	buildArgs := []string{
+		"EXPLICIT_VAR=explicit",
+	}
+
+	result := resolveBuildArgs(buildArgs, nil)
+
+	if got, want := result["EXPLICIT_VAR"], "explicit"; got != want {
+		t.Errorf("EXPLICIT_VAR = %q, want %q", got, want)
+	}
 }

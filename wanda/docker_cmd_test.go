@@ -21,7 +21,7 @@ func TestDockerCmdBuild(t *testing.T) {
 	input := newBuildInput(ts, buildArgs)
 	input.addTag(tag)
 
-	core, err := input.makeCore("Dockerfile.hello")
+	core, err := input.makeCore("Dockerfile.hello", nil)
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestDockerCmdBuild(t *testing.T) {
 	hints := newBuildInputHints([]string{
 		"REMOTE_CACHE_URL=http://localhost:5000",
 		"MESSAGE=does not matter", // will be shadowed by the build args
-	})
+	}, nil)
 
 	if err := cmd.build(input, core, hints); err != nil {
 		t.Fatalf("build: %v", err)
@@ -84,7 +84,7 @@ func TestDockerCmdBuild_withHints(t *testing.T) {
 	input := newBuildInput(ts, nil)
 	input.addTag(tag)
 
-	core, err := input.makeCore("Dockerfile.hello")
+	core, err := input.makeCore("Dockerfile.hello", nil)
 	if err != nil {
 		t.Fatalf("make build input core: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestDockerCmdBuild_withHints(t *testing.T) {
 	hints := newBuildInputHints([]string{
 		"REMOTE_CACHE_URL=http://localhost:5000",
 		"MESSAGE=hint message", // will be shadowed by the build args
-	})
+	}, nil)
 
 	if err := cmd.build(input, core, hints); err != nil {
 		t.Fatalf("build: %v", err)
