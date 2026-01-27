@@ -69,6 +69,11 @@ Flags:
 		Maximum allowed lines per file (default %d).
 `, defaultMaxLines)
 
+const installHint = `
+To install and run goqualgate locally, download 'goqualgate' from the latest release:
+  https://github.com/ray-project/rayci/releases/latest
+`
+
 type subcommand struct {
 	name string
 	run  func([]string) error
@@ -104,6 +109,7 @@ func Main(args []string) (int, error) {
 				fmt.Println()
 			}
 			if err := sub.run(subArgs); err != nil {
+				fmt.Fprint(os.Stderr, installHint)
 				return 1, err
 			}
 			matched = true
