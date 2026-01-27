@@ -7,8 +7,30 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
+
+// WorkspaceState represents the state of a workspace.
+type WorkspaceState int
+
+const (
+	StateTerminated WorkspaceState = iota
+	StateStarting
+	StateRunning
+)
+
+// WorkspaceStateName maps WorkspaceState values to their string representations.
+var WorkspaceStateName = map[WorkspaceState]string{
+	StateTerminated: "TERMINATED",
+	StateStarting:   "STARTING",
+	StateRunning:    "RUNNING",
+}
+
+// String returns the string representation of a WorkspaceState.
+func (ws WorkspaceState) String() string {
+	return WorkspaceStateName[ws]
+}
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct{}
@@ -85,4 +107,52 @@ func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	patch := versionStr[3:]
 
 	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+}
+
+// parseComputeConfigName parses the AWS config path and converts it to a config name.
+// e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
+func parseComputeConfigName(awsConfigPath string) string {
+	// Get the directory and filename
+	dir := filepath.Dir(awsConfigPath)        // "configs/basic-single-node"
+	base := filepath.Base(awsConfigPath)      // "aws.yaml"
+	ext := filepath.Ext(base)                 // ".yaml"
+	filename := strings.TrimSuffix(base, ext) // "aws"
+
+	// Get the last directory component (the config name)
+	configDir := filepath.Base(dir) // "basic-single-node"
+
+	// Combine: "basic-single-node-aws"
+	return configDir + "-" + filename
+}
+
+// CreateComputeConfig creates a new compute config from a YAML file if it doesn't already exist.
+// name: the name for the compute config (without version tag)
+// configFilePath: path to the YAML config file
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string, error) {
+	// Check if compute config already exists
+	if output, err := ac.GetComputeConfig(name); err == nil {
+		fmt.Printf("Compute config %q already exists, skipping creation\n", name)
+		return output, nil
+	}
+
+	// Create the compute config
+	args := []string{"compute-config", "create", "-n", name, "-f", configFilePath}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("create compute config failed: %w", err)
+	}
+	return output, nil
+}
+
+// GetComputeConfig retrieves the details of a compute config by name.
+// name: the name of the compute config (optionally with version tag, e.g., "name:1")
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
+	args := []string{"compute-config", "get", "-n", name}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("get compute config failed: %w", err)
+	}
+	return output, nil
 }

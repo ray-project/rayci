@@ -113,6 +113,25 @@ func TestRunAnyscaleCLI(t *testing.T) {
 	}
 }
 
+func TestWorkspaceStateString(t *testing.T) {
+	tests := []struct {
+		state WorkspaceState
+		want  string
+	}{
+		{StateTerminated, "TERMINATED"},
+		{StateStarting, "STARTING"},
+		{StateRunning, "RUNNING"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.state.String(); got != tt.want {
+				t.Errorf("WorkspaceState.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConvertBuildIdToImageURI(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -197,4 +216,184 @@ func TestConvertBuildIdToImageURI(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseComputeConfigName(t *testing.T) {
+	tests := []struct {
+		name           string
+		awsConfigPath  string
+		wantConfigName string
+	}{
+		{
+			name:           "basic-single-node config",
+			awsConfigPath:  "configs/basic-single-node/aws.yaml",
+			wantConfigName: "basic-single-node-aws",
+		},
+		{
+			name:           "simple configs directory",
+			awsConfigPath:  "configs/aws.yaml",
+			wantConfigName: "configs-aws",
+		},
+		{
+			name:           "nested directory",
+			awsConfigPath:  "configs/compute/production/aws.yaml",
+			wantConfigName: "production-aws",
+		},
+		{
+			name:           "gcp config",
+			awsConfigPath:  "configs/basic-single-node/gcp.yaml",
+			wantConfigName: "basic-single-node-gcp",
+		},
+		{
+			name:           "yaml extension",
+			awsConfigPath:  "configs/my-config/aws.yaml",
+			wantConfigName: "my-config-aws",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseComputeConfigName(tt.awsConfigPath)
+			if got != tt.wantConfigName {
+				t.Errorf("parseComputeConfigName(%q) = %q, want %q", tt.awsConfigPath, got, tt.wantConfigName)
+			}
+		})
+	}
+}
+
+func TestCreateComputeConfig(t *testing.T) {
+	t.Run("creates when config does not exist", func(t *testing.T) {
+		// Mock: get fails (not found), create succeeds
+		script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
+    echo "config not found"
+    exit 1
+fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
+    echo "created compute config: $@"
+    exit 0
+fi
+exit 1
+`
+		setupMockAnyscale(t, script)
+		cli := NewAnyscaleCLI()
+
+		// Create a temporary config file
+		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.Close()
+
+		output, err := cli.CreateComputeConfig("my-config", tmpFile.Name())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "compute-config create") {
+			t.Errorf("output %q should contain 'compute-config create'", output)
+		}
+		if !strings.Contains(output, "-n my-config") {
+			t.Errorf("output %q should contain '-n my-config'", output)
+		}
+	})
+
+	t.Run("skips creation when config exists", func(t *testing.T) {
+		// Mock: get succeeds (config found)
+		script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
+    echo "name: my-config"
+    exit 0
+fi
+exit 1
+`
+		setupMockAnyscale(t, script)
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "name: my-config") {
+			t.Errorf("output %q should contain 'name: my-config'", output)
+		}
+		// Should NOT contain create since it was skipped
+		if strings.Contains(output, "compute-config create") {
+			t.Errorf("output %q should NOT contain 'compute-config create' when config exists", output)
+		}
+	})
+
+	t.Run("failure when create fails", func(t *testing.T) {
+		// Mock: get fails (not found), create also fails
+		script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
+    exit 1
+fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
+    exit 1
+fi
+exit 1
+`
+		setupMockAnyscale(t, script)
+		cli := NewAnyscaleCLI()
+
+		// Create a temporary config file
+		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.Close()
+
+		_, err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "create compute config failed") {
+			t.Errorf("error %q should contain 'create compute config failed'", err.Error())
+		}
+	})
+}
+
+func TestGetComputeConfig(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"")
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.GetComputeConfig("my-config")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "name: my-config") {
+			t.Errorf("output %q should contain 'name: my-config'", output)
+		}
+	})
+
+	t.Run("success with version", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
+		cli := NewAnyscaleCLI()
+
+		output, err := cli.GetComputeConfig("my-config:2")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(output, "-n my-config:2") {
+			t.Errorf("output %q should contain '-n my-config:2'", output)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+		cli := NewAnyscaleCLI()
+
+		_, err := cli.GetComputeConfig("nonexistent-config")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "get compute config failed") {
+			t.Errorf("error %q should contain 'get compute config failed'", err.Error())
+		}
+	})
 }
