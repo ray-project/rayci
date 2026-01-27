@@ -247,28 +247,6 @@ func TestRunAnyscaleCLI(t *testing.T) {
 	}
 }
 
-func TestAuthenticate(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nif [ \"$1\" = \"login\" ]; then exit 0; fi\nexit 1")
-		cli := NewAnyscaleCLI()
-		if err := cli.Authenticate(); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
-		err := cli.Authenticate()
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "anyscale auth login failed") {
-			t.Errorf("error %q should contain 'anyscale auth login failed'", err.Error())
-		}
-	})
-}
-
 func TestParseComputeConfigName(t *testing.T) {
 	tests := []struct {
 		name           string

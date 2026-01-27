@@ -45,16 +45,7 @@ func isAnyscaleInstalled() bool {
 	return err == nil
 }
 
-func (ac *AnyscaleCLI) Authenticate() error {
-	cmd := exec.Command("anyscale", "login")
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("anyscale auth login failed, please set ANYSCALE_CLI_TOKEN & ANYSCALE_HOST env variables: %w", err)
-	}
-	return nil
-}
-
-// runAnyscaleCLI runs the anyscale CLI with the given arguments.
+// RunAnyscaleCLI runs the anyscale CLI with the given arguments.
 // Returns the combined output and any error that occurred.
 // Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
