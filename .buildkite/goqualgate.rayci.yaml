@@ -1,0 +1,20 @@
+group: go checks
+steps:
+  - label: Go coverage gate
+    tags:
+      - always
+    command:
+      - go build -o /tmp/goqualgate ./goqualgate/goqualgate
+      - WANDA_TEST_CR_PORT=5555 /tmp/goqualgate coverage
+    queue: small
+    docker_publish_tcp_ports: "5555"
+    depends_on: forge
+
+  - label: Go file length check
+    tags:
+      - always
+    command:
+      - go build -o /tmp/goqualgate ./goqualgate/goqualgate
+      - /tmp/goqualgate filelength
+    queue: small
+    depends_on: forge
