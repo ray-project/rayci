@@ -7,6 +7,8 @@ import (
 )
 
 const runAll = "all"
+const defaultMinCoveragePct = 80.0
+const defaultMaxLines = 500
 const usage = `goqualgate - Go quality gates for CI
 
 Usage:
@@ -18,17 +20,17 @@ Commands:
 	filelength  Check that Go files don't exceed line limit
 `
 
-const coverageUsage = `goqualgate coverage - Run test coverage checks
+var coverageUsage = fmt.Sprintf(`goqualgate coverage - Run test coverage checks
 
 Runs 'go test -cover' on all packages and reports coverage.
-Fails if any package is below -min-coverage-pct. 
+Fails if any package is below -min-coverage-pct.
 
 Usage:
   goqualgate coverage [flags]
 
 Flags:
 	-min-coverage-pct float
-		Minimum coverage percentage required to pass (default 60).
+		Minimum coverage percentage required to pass (default %.f).`, defaultMinCoveragePct) + `
 
 Improving Coverage (for AI agents):
 
@@ -53,7 +55,7 @@ Improving Coverage (for AI agents):
      mocking infrastructure exists. Focus on testable code paths.
 `
 
-const filelengthUsage = `goqualgate filelength - Check Go file lengths against limits
+var filelengthUsage = fmt.Sprintf(`goqualgate filelength - Check Go file lengths against limits
 
 Finds all .go files in the current directory (recursive) and checks their
 line counts against -max-lines. Test files, generated files,
@@ -64,8 +66,8 @@ Usage:
 
 Flags:
 	-max-lines int
-		Maximum allowed lines per file (default 500).
-`
+		Maximum allowed lines per file (default %d).
+`, defaultMaxLines)
 
 type subcommand struct {
 	name string
@@ -123,8 +125,8 @@ func parseCoverageConfig(args []string) (*CoverageConfig, error) {
 	}
 
 	cfg := new(CoverageConfig)
-	set.Float64Var(&cfg.MinCoveragePct, "min-coverage-pct", 60,
-		"Minimum coverage percentage required to pass (default 60).")
+	set.Float64Var(&cfg.MinCoveragePct, "min-coverage-pct", defaultMinCoveragePct,
+		fmt.Sprintf("Minimum coverage percentage required to pass (default %.f).", defaultMinCoveragePct))
 
 	set.Parse(args)
 
@@ -151,8 +153,8 @@ func parseFileLengthConfig(args []string) (*FileLengthConfig, error) {
 	}
 
 	cfg := new(FileLengthConfig)
-	set.IntVar(&cfg.MaxLines, "max-lines", 500,
-		"Maximum allowed lines per file (default 500).")
+	set.IntVar(&cfg.MaxLines, "max-lines", defaultMaxLines,
+		fmt.Sprintf("Maximum allowed lines per file (default %d).", defaultMaxLines))
 
 	set.Parse(args)
 
