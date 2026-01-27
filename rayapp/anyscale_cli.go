@@ -196,11 +196,13 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string,
 		}
 		defer os.Remove(tmpFile.Name())
 
-		if _, err := tmpFile.Write(newConfigData); err != nil {
-			tmpFile.Close()
-			return "", fmt.Errorf("failed to write temp file: %w", err)
-		}
-		tmpFile.Close()
+if _, err := tmpFile.Write(newConfigData); err != nil {
+	tmpFile.Close()
+	return "", fmt.Errorf("failed to write temp file: %w", err)
+}
+if err := tmpFile.Close(); err != nil {
+	return "", fmt.Errorf("failed to close temp file: %w", err)
+}
 
 		actualConfigPath = tmpFile.Name()
 		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
