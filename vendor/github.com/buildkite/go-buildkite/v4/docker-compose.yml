@@ -1,0 +1,8 @@
+version: '3.5'
+
+services:
+  app:
+    image: golang:1.22
+    volumes:
+      - .:/work
+    working_dir: /work
