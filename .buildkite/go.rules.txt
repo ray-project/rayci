@@ -16,6 +16,7 @@
 ! wanda raycicmd raycirun reefd
 
 wanda/
+wheels/raymake/
 @ wanda
 ;
 
