@@ -4,6 +4,8 @@
 # Go module directories get their module tag
 wanda/main.go: wanda
 wanda/cmd/wanda/main.go: wanda
+wheels/wanda/build_wheels.py: wanda
+wheels/wanda/pyproject.toml: wanda
 raycicmd/main.go: raycicmd
 raycicmd/config.go: raycicmd
 raycicmd/test_rules_cmd.go: raycicmd
