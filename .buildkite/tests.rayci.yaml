@@ -44,6 +44,16 @@ steps:
     depends_on:
       - python-base
       - forge
+  - label: Wanda wheel tests
+    tags: wanda
+    command:
+      - pip install uv
+      - cd pypi/wanda
+      - uv run build_wheels.py --platform linux-amd64 --output-dir dist
+      - uv run pytest build_wheels_test.py -v
+    queue: small
+    depends_on: forge
+
   - label: "Failing test"
     tags: disabled
     command: exit 1

@@ -1,0 +1,26 @@
+[project]
+name = "wanda-bin"
+dynamic = ["version"]
+description = "Container image builder using registry as content-addressed cache"
+requires-python = ">=3.8"
+
+[build-system]
+# tomli needed for Python < 3.11 (before tomllib was added to stdlib)
+requires = ["pdm-backend", "wheel", "tomli; python_version < '3.11'"]
+build-backend = "pdm.backend"
+
+[tool.pdm.version]
+source = "file"
+path = "VERSION"
+
+[tool.pdm.build]
+is-purelib = false
+source-includes = []
+excludes = ["bin/*", "*.py", "*_test.py", "!wanda_bin/__init__.py", ".gitignore", "VERSION"]
+
+[tool.pdm.build.wheel-data]
+scripts = ["${BUILD_DIR}/bin/*"]
+
+# Configuration for pdm_build.py hook
+[tool.wanda]
+bin_name = "wanda"  # Name of the Go binary to build and install
