@@ -17,6 +17,10 @@ build_go() {
     go build -trimpath -o "$OUTPUT_DIR/${name}-${os}-${arch}" "$pkg"
 }
 
+build_wheels() {
+  uv run wheels/raymake/build_wheels.py --output-dir "$OUTPUT_DIR"
+}
+
 build_goqualgate() { build_go goqualgate ./goqualgate/goqualgate "$1" "$2"; }
 build_rayapp()     { build_go rayapp     ./rayapp/rayapp         "$1" "$2"; }
 build_rayci()      { build_go rayci      .                       "$1" "$2"; }
@@ -34,3 +38,5 @@ build_wanda  darwin  arm64
 build_wanda  linux   amd64
 build_wanda  linux   arm64
 build_wanda  windows amd64
+
+build_wheels
