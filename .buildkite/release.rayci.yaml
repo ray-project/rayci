@@ -9,6 +9,8 @@ steps:
       - raycicmd
     instance_type: release
     commands:
+      - pip install uv
+      - export PATH="$(python -m site --user-base)/bin:$PATH"
       - bash release.sh
       - cp _release/* /artifact-mount
     depends_on: forge
