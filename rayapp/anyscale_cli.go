@@ -223,15 +223,6 @@ func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
 	return nil
 }
 
-func (ac *AnyscaleCLI) deleteWorkspace(workspaceName string) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "delete", "--name", workspaceName})
-	if err != nil {
-		return fmt.Errorf("delete workspace failed: %w", err)
-	}
-	fmt.Println("delete workspace output:\n", output)
-	return nil
-}
-
 // deleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
 // It uses the ANYSCALE_HOST environment variable for the API host and
 // ANYSCALE_CLI_TOKEN for authentication.
