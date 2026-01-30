@@ -196,13 +196,13 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string,
 		}
 		defer os.Remove(tmpFile.Name())
 
-if _, err := tmpFile.Write(newConfigData); err != nil {
-	tmpFile.Close()
-	return "", fmt.Errorf("failed to write temp file: %w", err)
-}
-if err := tmpFile.Close(); err != nil {
-	return "", fmt.Errorf("failed to close temp file: %w", err)
-}
+		if _, err := tmpFile.Write(newConfigData); err != nil {
+			tmpFile.Close()
+			return "", fmt.Errorf("failed to write temp file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			return "", fmt.Errorf("failed to close temp file: %w", err)
+		}
 
 		actualConfigPath = tmpFile.Name()
 		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
@@ -256,7 +256,7 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
 	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
 	if err != nil {
-return fmt.Errorf("terminate workspace failed: %w", err)
+		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
 	fmt.Println("terminate workspace output:\n", output)
 	return nil
