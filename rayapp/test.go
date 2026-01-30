@@ -135,6 +135,10 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
 
+	if _, err := anyscaleCLI.waitForWorkspaceState(wtc.workspaceName, StateTerminated); err != nil {
+		return fmt.Errorf("wait for workspace terminated state failed: %w", err)
+	}
+
 	if err := anyscaleCLI.deleteWorkspaceByID(wtc.workspaceID); err != nil {
 		return fmt.Errorf("delete workspace failed: %w", err)
 	}
