@@ -24,6 +24,7 @@ type WorkspaceTestConfig struct {
 	tmplName      string
 	buildFile     string
 	workspaceName string
+	workspaceID   string
 	configFile    string
 	computeConfig string
 	imageURI      string
@@ -79,9 +80,11 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	wtc.workspaceName = workspaceName
 
 	// create empty workspace
-	if err := anyscaleCLI.createEmptyWorkspace(wtc); err != nil {
+	workspaceID, err := anyscaleCLI.createEmptyWorkspace(wtc)
+	if err != nil {
 		return fmt.Errorf("create empty workspace failed: %w", err)
 	}
+	wtc.workspaceID = workspaceID
 
 	if err := anyscaleCLI.startWorkspace(wtc); err != nil {
 		return fmt.Errorf("start workspace failed: %w", err)
