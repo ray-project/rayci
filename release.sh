@@ -2,8 +2,14 @@
 
 set -euxo pipefail
 
-mkdir -p _release
-rm -f _release/*
+OUTPUT_DIR="_release"
+
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" == "/" ]]; then
+  echo "Aborting: unsafe OUTPUT_DIR value: '$OUTPUT_DIR'" >&2
+  exit 1
+fi
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
 
 build_go() {
   local name="$1"
@@ -12,7 +18,7 @@ build_go() {
   local arch="$4"
 
   GOOS="$os" GOARCH="$arch" \
-    go build -trimpath -o "_release/${name}-${os}-${arch}" "$pkg"
+    go build -trimpath -o "$OUTPUT_DIR/${name}-${os}-${arch}" "$pkg"
 }
 
 build_goqualgate() { build_go goqualgate ./goqualgate/goqualgate "$1" "$2"; }
