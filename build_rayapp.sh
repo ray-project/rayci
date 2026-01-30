@@ -8,4 +8,4 @@ go build -o ci/bin/rayapp ./rayapp/rayapp
 
 echo "--- Building template releases"
 rm -rf _build
-exec ci/bin/rayapp "$@"
+mv ci/bin/rayapp ../rayapp
