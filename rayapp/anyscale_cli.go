@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -38,6 +40,17 @@ var WorkspaceStateName = map[WorkspaceState]string{
 
 func (ws WorkspaceState) String() string {
 	return WorkspaceStateName[ws]
+}
+
+// extractWorkspaceID extracts the workspace ID from the CLI output.
+// Expected format: "Workspace created successfully id: expwrk_xxx"
+func extractWorkspaceID(output string) (string, error) {
+	re := regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
+	matches := re.FindStringSubmatch(output)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("could not extract workspace ID from output: %s", output)
+	}
+	return matches[1], nil
 }
 
 func isAnyscaleInstalled() bool {
@@ -171,12 +184,12 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 	return output, nil
 }
 
-func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
+func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string, error) {
 	args := []string{"workspace_v2", "create"}
 	// get image URI and ray version from build ID
 	imageURI, rayVersion, err := convertBuildIdToImageURI(config.template.ClusterEnv.BuildID)
 	if err != nil {
-		return fmt.Errorf("convert build ID to image URI failed: %w", err)
+		return "", fmt.Errorf("convert build ID to image URI failed: %w", err)
 	}
 	args = append(args, "--name", config.workspaceName)
 	args = append(args, "--image-uri", imageURI)
@@ -189,10 +202,16 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) error {
 
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
-		return fmt.Errorf("create empty workspace failed: %w", err)
+		return "", fmt.Errorf("create empty workspace failed: %w", err)
 	}
 	fmt.Println("create empty workspace output:\n", output)
-	return nil
+
+	workspaceID, err := extractWorkspaceID(output)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract workspace ID: %w", err)
+	}
+
+	return workspaceID, nil
 }
 
 func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
@@ -201,6 +220,59 @@ func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
 		return fmt.Errorf("delete workspace failed: %w", err)
 	}
 	fmt.Println("terminate workspace output:\n", output)
+	return nil
+}
+
+func (ac *AnyscaleCLI) deleteWorkspace(workspaceName string) error {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "delete", "--name", workspaceName})
+	if err != nil {
+		return fmt.Errorf("delete workspace failed: %w", err)
+	}
+	fmt.Println("delete workspace output:\n", output)
+	return nil
+}
+
+// deleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
+// It uses the ANYSCALE_HOST environment variable for the API host and
+// ANYSCALE_CLI_TOKEN for authentication.
+func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
+	anyscaleHost := os.Getenv("ANYSCALE_HOST")
+	if anyscaleHost == "" {
+		return errors.New("ANYSCALE_HOST environment variable is not set")
+	}
+
+	apiToken := os.Getenv("ANYSCALE_CLI_TOKEN")
+	if apiToken == "" {
+		return errors.New("ANYSCALE_CLI_TOKEN environment variable is not set")
+	}
+
+	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/%s", anyscaleHost, workspaceID)
+
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("delete workspace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
 	return nil
 }
 

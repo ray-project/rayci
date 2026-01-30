@@ -438,7 +438,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 	}{
 		{
 			name:   "success without compute config",
-			script: "#!/bin/sh\necho \"args: $@\"",
+			script: "#!/bin/sh\necho \"args: $@\"\necho \"(anyscale +1.0s) Workspace created successfully id: expwrk_testid123\"",
 			config: &WorkspaceTestConfig{
 				workspaceName: "test-workspace",
 				template: &Template{
@@ -451,7 +451,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 		},
 		{
 			name:   "success with compute config name",
-			script: "#!/bin/sh\necho \"args: $@\"",
+			script: "#!/bin/sh\necho \"args: $@\"\necho \"(anyscale +1.0s) Workspace created successfully id: expwrk_testid123\"",
 			config: &WorkspaceTestConfig{
 				workspaceName: "test-workspace",
 				computeConfig: "basic-single-node-aws",
@@ -498,7 +498,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 			setupMockAnyscale(t, tt.script)
 			cli := NewAnyscaleCLI()
 
-			err := cli.createEmptyWorkspace(tt.config)
+			workspaceID, err := cli.createEmptyWorkspace(tt.config)
 
 			if tt.wantErr {
 				if err == nil {
@@ -512,6 +512,10 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if workspaceID == "" {
+				t.Error("expected workspace ID, got empty string")
 			}
 		})
 	}
