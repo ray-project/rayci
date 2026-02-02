@@ -1,0 +1,5 @@
+name: artifact-glob-notrail
+dockerfile: Dockerfile.artifact
+artifacts:
+  - src: "/build/dist/*.whl"
+    dst: wheels

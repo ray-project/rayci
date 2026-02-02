@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	cranename "github.com/google/go-containerregistry/pkg/name"
@@ -66,6 +67,17 @@ func Build(specFile string, config *ForgeConfig) error {
 
 		if err := forge.Build(rs.Spec); err != nil {
 			return fmt.Errorf("build %s: %w", name, err)
+		}
+	}
+
+	// Extract artifacts only for the root spec.
+	if config.ArtifactsDir != "" {
+		rootSpec := graph.Specs[graph.Root].Spec
+		if len(rootSpec.Artifacts) > 0 {
+			rootTag := forge.workTag(rootSpec.Name)
+			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
+				return fmt.Errorf("extract artifacts: %w", err)
+			}
 		}
 	}
 
@@ -180,6 +192,122 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		m[from] = src
 	}
 	return m, nil
+}
+
+// ExtractArtifacts copies Artifacts from a built image to ArtifactsDir.
+// Supports glob patterns in src paths (e.g., "/*.whl").
+//
+// NOTE(andrew-anyscale): We use `docker cp` for copying file-by-file rather than
+// a single more efficient method of extracting from `docker export` because
+// docker cp handles cross-platform issues reliably. If this becomes a bottleneck
+// indicated by the log-line below, we can consider using a different approach.
+func (f *Forge) ExtractArtifacts(spec *Spec, imageTag string) error {
+	d := f.newDockerCmd()
+	artifactsDir := f.config.ArtifactsDir
+
+	// In RayCI mode, clear the artifacts directory to avoid stale artifacts.
+	if f.config.RayCI {
+		if err := os.RemoveAll(artifactsDir); err != nil {
+			return fmt.Errorf("clear artifacts dir: %w", err)
+		}
+	}
+
+	if err := os.MkdirAll(artifactsDir, 0755); err != nil {
+		return fmt.Errorf("create artifacts dir: %w", err)
+	}
+
+	log.Printf("extracting %d artifact(s) from %s", len(spec.Artifacts), imageTag)
+	extractStart := time.Now()
+
+	// In remote mode, pull the image first (it may only exist in registry after
+	// cache hit).
+	if f.isRemote() {
+		if err := d.run("pull", imageTag); err != nil {
+			return fmt.Errorf("pull image for extraction: %w", err)
+		}
+	}
+
+	containerID, err := d.createContainer(imageTag)
+	if err != nil {
+		return fmt.Errorf("create container: %w", err)
+	}
+	defer func() {
+		if err := d.removeContainer(containerID); err != nil {
+			log.Printf("warning: failed to remove container %s: %v", containerID, err)
+		}
+	}()
+
+	// Lazily list container files only if needed for glob matching.
+	var containerFiles []string
+	var extracted []string
+
+	for _, a := range spec.Artifacts {
+		if err := a.Validate(); err != nil {
+			return fmt.Errorf("invalid artifact: %w", err)
+		}
+
+		if a.HasGlob() && containerFiles == nil {
+			var err error
+			containerFiles, err = d.listContainerFiles(containerID)
+			if err != nil {
+				return fmt.Errorf("list container files: %w", err)
+			}
+		}
+
+		srcs := a.ResolveSrcs(containerFiles)
+		if len(srcs) == 0 {
+			if a.Optional {
+				log.Printf("warning: no files matched pattern: %s", a.Src)
+				continue
+			}
+			return fmt.Errorf("no files matched pattern: %s", a.Src)
+		}
+
+		dstBase, err := a.ResolveDst(artifactsDir)
+		if err != nil {
+			return fmt.Errorf("resolve artifact dst: %w", err)
+		}
+
+		// Treat dst as a directory (preserving original filenames) when:
+		// - dst ends with "/" (explicit directory), or
+		// - multiple source files (can't rename all to one name)
+		dstIsDir := strings.HasSuffix(a.Dst, "/") || len(srcs) > 1
+
+		if dstIsDir {
+			if err := os.MkdirAll(dstBase, 0755); err != nil {
+				return fmt.Errorf("create dir for artifact %s: %w", a.Dst, err)
+			}
+		} else {
+			if err := os.MkdirAll(filepath.Dir(dstBase), 0755); err != nil {
+				return fmt.Errorf("create dir for artifact %s: %w", a.Dst, err)
+			}
+		}
+
+		for _, src := range srcs {
+			dst := dstBase
+			if dstIsDir {
+				dst = filepath.Join(dstBase, filepath.Base(src))
+			}
+
+			if err := d.copyFromContainer(containerID, src, dst); err != nil {
+				if a.Optional {
+					log.Printf("warning: optional artifact not found: %s", src)
+					continue
+				}
+				return fmt.Errorf("copy artifact %s: %w", src, err)
+			}
+			if abs, err := filepath.Abs(dst); err == nil {
+				dst = abs
+			}
+			extracted = append(extracted, dst)
+		}
+	}
+
+	log.Printf("extracted %d artifact(s) in %v:", len(extracted), time.Since(extractStart).Round(time.Millisecond))
+	for _, f := range extracted {
+		log.Printf("  %s", f)
+	}
+	return nil
 }
 
 // Build builds a container image from the given specification.

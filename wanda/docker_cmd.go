@@ -1,9 +1,11 @@
 package wanda
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -124,6 +126,68 @@ func (c *dockerCmd) inspectImage(tag string) (*dockerImageInfo, error) {
 
 func (c *dockerCmd) tag(src, asTag string) error {
 	return c.run("tag", src, asTag)
+}
+
+// createContainer creates a container from an image without starting it.
+// Returns the container ID. A dummy command is provided for images without
+// CMD/ENTRYPOINT. The command doesn't need to exist since the container is
+// never started.
+func (c *dockerCmd) createContainer(image string) (string, error) {
+	cmd := c.cmd("create", image, "unused")
+	buf := new(bytes.Buffer)
+	cmd.Stdout = buf
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
+}
+
+// copyFromContainer copies a file or directory from a container to the host.
+func (c *dockerCmd) copyFromContainer(containerID, src, dst string) error {
+	return c.run("cp", containerID+":"+src, dst)
+}
+
+// removeContainer removes a container quietly (no stdout).
+func (c *dockerCmd) removeContainer(containerID string) error {
+	cmd := exec.Command(c.bin, "rm", containerID)
+	cmd.Env = c.envs
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// listContainerFiles lists all files in a container using docker export.
+func (c *dockerCmd) listContainerFiles(containerID string) ([]string, error) {
+	exportCmd := exec.Command(c.bin, "export", containerID)
+	exportCmd.Env = c.envs
+
+	stdout, err := exportCmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("create stdout pipe: %w", err)
+	}
+
+	if err := exportCmd.Start(); err != nil {
+		return nil, fmt.Errorf("start docker export: %w", err)
+	}
+
+	var files []string
+	tr := tar.NewReader(stdout)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			exportCmd.Process.Kill()
+			return nil, fmt.Errorf("read tar stream: %w", err)
+		}
+		files = append(files, "/"+strings.TrimPrefix(header.Name, "/"))
+	}
+
+	if err := exportCmd.Wait(); err != nil {
+		return nil, fmt.Errorf("docker export: %w", err)
+	}
+
+	return files, nil
 }
 
 func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
