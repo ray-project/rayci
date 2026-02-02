@@ -178,3 +178,120 @@ func TestParseSpecFile(t *testing.T) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
+
+func TestParseSpecFileWithArtifacts(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	specFile := filepath.Join(tmpDir, "spec.yaml")
+	spec := strings.Join([]string{
+		"name: wheel-builder",
+		"froms: [python:3.11]",
+		"dockerfile: Dockerfile",
+		"artifacts:",
+		"  - src: /build/dist/*.whl",
+		"    dst: ./wheels/",
+		"  - src: /build/docs/",
+		"    dst: ./docs-output/",
+		"  - src: /app/bin/myapp",
+		"    dst: ./bin/myapp",
+	}, "\n") + "\n"
+
+	if err := os.WriteFile(specFile, []byte(spec), 0644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	got, err := parseSpecFile(specFile)
+	if err != nil {
+		t.Fatalf("parse spec file: %v", err)
+	}
+
+	want := &Spec{
+		Name:       "wheel-builder",
+		Froms:      []string{"python:3.11"},
+		Dockerfile: "Dockerfile",
+		Artifacts: []*Artifact{
+			{Src: "/build/dist/*.whl", Dst: "./wheels/"},
+			{Src: "/build/docs/", Dst: "./docs-output/"},
+			{Src: "/app/bin/myapp", Dst: "./bin/myapp"},
+		},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestSpecExpandWithArtifacts(t *testing.T) {
+	spec := &Spec{
+		Name:       "wheel-builder",
+		Froms:      []string{"python:$PYTHON_VERSION"},
+		Dockerfile: "Dockerfile",
+		Artifacts: []*Artifact{
+			{Src: "/build/$PROJECT/dist/*.whl", Dst: "$OUTPUT_DIR/wheels/"},
+			{Src: "/build/docs/", Dst: "./docs/"},
+		},
+	}
+
+	envs := map[string]string{
+		"PYTHON_VERSION": "3.11",
+		"PROJECT":        "myproject",
+		"OUTPUT_DIR":     "/tmp/artifacts",
+	}
+
+	expanded := spec.expandVar(func(k string) (string, bool) {
+		v, ok := envs[k]
+		return v, ok
+	})
+
+	want := &Spec{
+		Name:       "wheel-builder",
+		Froms:      []string{"python:3.11"},
+		Dockerfile: "Dockerfile",
+		Artifacts: []*Artifact{
+			{Src: "/build/myproject/dist/*.whl", Dst: "/tmp/artifacts/wheels/"},
+			{Src: "/build/docs/", Dst: "./docs/"},
+		},
+	}
+
+	if !reflect.DeepEqual(expanded, want) {
+		t.Errorf("got %+v, want %+v", expanded, want)
+	}
+}
+
+func TestSpecMarshalLoopbackWithArtifacts(t *testing.T) {
+	spec := &Spec{
+		Name:       "test",
+		Froms:      []string{"ubuntu:22.04"},
+		Dockerfile: "Dockerfile",
+		Artifacts: []*Artifact{
+			{Src: "/app/output.bin", Dst: "./output/"},
+			{Src: "/app/data.txt", Dst: "./data/"},
+		},
+	}
+
+	bs, err := yaml.Marshal(spec)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	loopback := new(Spec)
+	if err := yaml.Unmarshal(bs, loopback); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if spec.Name != loopback.Name {
+		t.Errorf("Name: got %q, want %q", loopback.Name, spec.Name)
+	}
+	if spec.Dockerfile != loopback.Dockerfile {
+		t.Errorf("Dockerfile: got %q, want %q", loopback.Dockerfile, spec.Dockerfile)
+	}
+	if len(spec.Artifacts) != len(loopback.Artifacts) {
+		t.Fatalf("Artifacts length: got %d, want %d", len(loopback.Artifacts), len(spec.Artifacts))
+	}
+	for i, a := range spec.Artifacts {
+		lb := loopback.Artifacts[i]
+		if a.Src != lb.Src || a.Dst != lb.Dst {
+			t.Errorf("Artifacts[%d]: got %+v, want %+v", i, lb, a)
+		}
+	}
+}

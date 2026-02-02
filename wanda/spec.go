@@ -8,6 +8,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Artifact defines a file or directory to extract from the built image.
+type Artifact struct {
+	// Src is the path inside the container to extract.
+	// Can be a file, directory, or glob pattern (e.g., "/build/*.whl").
+	// Supports variable expansion.
+	Src string `yaml:"src"`
+
+	// Dst is the destination path on the host filesystem.
+	// If it ends with "/", src is copied into the directory.
+	// Otherwise, src is copied as the file/directory named dst.
+	// Relative paths are relative to ArtifactsDir.
+	Dst string `yaml:"dst"`
+
+	// Optional marks this artifact as best-effort.
+	// If true, extraction failure will be logged but won't fail the build.
+	Optional bool `yaml:"optional,omitempty"`
+}
+
 // Spec is a specification for a container image.
 type Spec struct {
 	Name string `yaml:"name,omitempty"`
@@ -28,6 +46,9 @@ type Spec struct {
 
 	// DisableCaching disables use of caching.
 	DisableCaching bool `yaml:"disable_caching,omitempty"`
+
+	// Artifacts defines files and directories to extract from the built image.
+	Artifacts []*Artifact `yaml:"artifacts,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
@@ -116,6 +137,21 @@ func stringsExpandVar(slice []string, lookup lookupFunc) []string {
 	return result
 }
 
+func artifactsExpandVar(artifacts []*Artifact, lookup lookupFunc) []*Artifact {
+	if len(artifacts) == 0 {
+		return nil
+	}
+	result := make([]*Artifact, len(artifacts))
+	for i, a := range artifacts {
+		result[i] = &Artifact{
+			Src:      expandVar(a.Src, lookup),
+			Dst:      expandVar(a.Dst, lookup),
+			Optional: a.Optional,
+		}
+	}
+	return result
+}
+
 func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result := new(Spec)
 
@@ -127,6 +163,7 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result.BuildArgs = stringsExpandVar(s.BuildArgs, lookup)
 	result.BuildHintArgs = stringsExpandVar(s.BuildHintArgs, lookup)
 	result.DisableCaching = s.DisableCaching
+	result.Artifacts = artifactsExpandVar(s.Artifacts, lookup)
 
 	return result
 }
