@@ -1,0 +1,8 @@
+name: artifact-optional
+dockerfile: Dockerfile.artifact
+artifacts:
+  - src: /app/bin/myapp
+    dst: bin/myapp
+  - src: /nonexistent/optional-file.txt
+    dst: optional.txt
+    optional: true

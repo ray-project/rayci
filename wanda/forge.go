@@ -69,6 +69,17 @@ func Build(specFile string, config *ForgeConfig) error {
 		}
 	}
 
+	// Extract artifacts only for the root spec.
+	if config.ArtifactsDir != "" {
+		rootSpec := graph.Specs[graph.Root].Spec
+		if len(rootSpec.Artifacts) > 0 {
+			rootTag := forge.workTag(rootSpec.Name)
+			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
+				return fmt.Errorf("extract artifacts: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -182,7 +193,34 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	return m, nil
 }
 
+// ExtractArtifacts extracts artifacts from a built image to the artifacts directory.
+func (f *Forge) ExtractArtifacts(spec *Spec, imageTag string) error {
+	d := f.newDockerCmd()
+	artifactsDir := f.config.ArtifactsDir
+
+	if err := os.MkdirAll(artifactsDir, 0755); err != nil {
+		return fmt.Errorf("create artifacts dir: %w", err)
+	}
+
+	script, err := buildExtractionScript(spec.Artifacts, artifactsDir)
+	if err != nil {
+		return fmt.Errorf("build extraction script: %w", err)
+	}
+
+	log.Printf("extracting %d artifact(s) from %s", len(spec.Artifacts), imageTag)
+	for _, a := range spec.Artifacts {
+		log.Printf("  %s -> %s", a.Src, a.Dst)
+	}
+
+	if err := d.runExtract(imageTag, artifactsDir, script); err != nil {
+		return fmt.Errorf("extract artifacts: %w", err)
+	}
+
+	return nil
+}
+
 // Build builds a container image from the given specification.
+// If the spec has artifacts defined, they will be extracted after build.
 func (f *Forge) Build(spec *Spec) error {
 	// Prepare the tar stream.
 	ts := newTarStream()
@@ -282,6 +320,7 @@ func (f *Forge) Build(spec *Spec) error {
 						}
 					}
 				}
+
 				return nil // and we are done.
 			}
 		}

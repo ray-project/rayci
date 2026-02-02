@@ -1,9 +1,9 @@
 package wanda
 
 import (
-	"testing"
-
+	"os"
 	"strings"
+	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
@@ -133,5 +133,75 @@ func TestDockerCmdBuild_withHints(t *testing.T) {
 
 	if messageEnv != "MESSAGE=hint message" {
 		t.Errorf("MESSAGE env got %q, want `MESSAGE=hint message`", messageEnv)
+	}
+}
+
+func TestDockerCmdRunExtract(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	script := strings.Join([]string{
+		"mkdir -p /artifacts/etc",
+		"cp /etc/alpine-release /artifacts/etc/ || echo 'warning: not found'",
+		"cp /etc/*.conf /artifacts/etc/ || echo 'warning: not found'",
+	}, "\n")
+
+	if err := cmd.runExtract(testImage, tmpDir, script); err != nil {
+		t.Fatalf("runExtract: %v", err)
+	}
+
+	if _, err := os.Stat(tmpDir + "/etc/alpine-release"); os.IsNotExist(err) {
+		t.Error("alpine-release was not copied")
+	}
+
+	entries, err := os.ReadDir(tmpDir + "/etc")
+	if err != nil {
+		t.Fatalf("read dir: %v", err)
+	}
+
+	foundConf := false
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".conf") {
+			foundConf = true
+			break
+		}
+	}
+
+	if !foundConf {
+		t.Error("no .conf files were copied")
+	}
+}
+
+func TestDockerCmdRunExtract_bestEffort(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	// Missing files should not fail - extraction is best-effort
+	script := strings.Join([]string{
+		"mkdir -p /artifacts/etc",
+		"cp /etc/alpine-release /artifacts/etc/ || echo 'warning: not found'",
+		"cp /nonexistent/file /artifacts/ || echo 'warning: not found'",
+	}, "\n")
+
+	if err := cmd.runExtract(testImage, tmpDir, script); err != nil {
+		t.Fatalf("runExtract should not fail (best-effort): %v", err)
+	}
+
+	if _, err := os.Stat(tmpDir + "/etc/alpine-release"); os.IsNotExist(err) {
+		t.Error("alpine-release was not copied")
 	}
 }

@@ -126,6 +126,10 @@ func (c *dockerCmd) tag(src, asTag string) error {
 	return c.run("tag", src, asTag)
 }
 
+func (c *dockerCmd) runExtract(image, hostDir, script string) error {
+	return c.run("run", "--rm", "-v", hostDir+":/artifacts", image, "sh", "-c", script)
+}
+
 func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
 	if hints == nil {
 		hints = newBuildInputHints(nil, nil)
