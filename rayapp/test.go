@@ -15,7 +15,7 @@ func Test(tmplName, buildFile string) error {
 	return nil
 }
 
-const testCmd = "pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake . -s -vv"
+const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv"
 
 const workspaceStartWaitTime = 30 * time.Second
 
@@ -121,8 +121,12 @@ func (wtc *WorkspaceTestConfig) Run() error {
 		return fmt.Errorf("zip template directory failed: %w", err)
 	}
 
-	if err := anyscaleCLI.pushTemplateToWorkspace(wtc.workspaceName, templateZipDir); err != nil {
+	if err := anyscaleCLI.pushFolderToWorkspace(wtc.workspaceName, templateZipDir); err != nil {
 		return fmt.Errorf("push zip to workspace failed: %w", err)
+	}
+
+	if err := anyscaleCLI.runCmdInWorkspace(wtc, "unzip -o "+wtc.tmplName+".zip"); err != nil {
+		return fmt.Errorf("unzip template failed: %w", err)
 	}
 
 	// run test in workspace

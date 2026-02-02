@@ -276,7 +276,7 @@ func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) erro
 	return nil
 }
 
-func (ac *AnyscaleCLI) pushTemplateToWorkspace(workspaceName, localFilePath string) error {
+func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
 	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
 	if err != nil {
 		return fmt.Errorf("push file to workspace failed: %w", err)
