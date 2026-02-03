@@ -673,8 +673,8 @@ func TestTerminateWorkspace(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "delete workspace failed") {
-			t.Errorf("error %q should contain 'delete workspace failed'", err.Error())
+		if !strings.Contains(err.Error(), "terminate workspace failed") {
+			t.Errorf("error %q should contain 'terminate workspace failed'", err.Error())
 		}
 	})
 }
