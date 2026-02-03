@@ -107,7 +107,7 @@ func TestWorkspaceTestConfigRun_StartWorkspaceFails(t *testing.T) {
 	// Mock script that succeeds on create but fails on start
 	script := `#!/bin/sh
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -133,7 +133,7 @@ func TestWorkspaceTestConfigRun_WaitForStateFails(t *testing.T) {
 	// Mock script that succeeds on create and start but fails on wait
 	script := `#!/bin/sh
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -163,7 +163,7 @@ func TestWorkspaceTestConfigRun_CopyTemplateFails(t *testing.T) {
 	// Mock script that succeeds until push
 	script := `#!/bin/sh
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -197,7 +197,7 @@ func TestWorkspaceTestConfigRun_RunCommandFails(t *testing.T) {
 	// Mock script that succeeds until run_command
 	script := `#!/bin/sh
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -235,7 +235,7 @@ func TestWorkspaceTestConfigRun_TerminateFails(t *testing.T) {
 	// Mock script that succeeds until terminate
 	script := `#!/bin/sh
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -285,7 +285,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "created"
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -344,6 +344,10 @@ if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
 fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
     echo "created"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
+    echo "Workspace created successfully id: expwrk_testid123"
     exit 0
 fi
 if [ "$1" = "workspace_v2" ]; then
