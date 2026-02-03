@@ -13,6 +13,7 @@ const defaultBuilderType = "builder"
 type wandaStep struct {
 	name         string
 	file         string
+	envFile      string
 	buildID      string
 	label        string
 	instanceType string
@@ -52,6 +53,9 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	}
 	envs["RAYCI_WANDA_NAME"] = s.name
 	envs["RAYCI_WANDA_FILE"] = s.file
+	if s.envFile != "" {
+		envs["RAYCI_ENV_FILE"] = s.envFile
+	}
 
 	label := s.label
 	if label == "" {
@@ -158,6 +162,7 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 	}
 	label, _ := stringInMap(step, "label")
 	instanceType, _ := stringInMap(step, "instance_type")
+	envFile, _ := stringInMap(step, "env_file")
 
 	var priority *int
 	if p, ok := step["priority"]; ok {
@@ -192,6 +197,7 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 		name:           name,
 		label:          label,
 		file:           file,
+		envFile:        envFile,
 		buildID:        c.info.buildID,
 		envs:           envs,
 		ciConfig:       c.config,

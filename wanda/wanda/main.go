@@ -44,6 +44,10 @@ func main() {
 		"wanda_specs_file", "",
 		"file listing spec directories; if empty, uses .wandaspecs under work_dir",
 	)
+	envFile := flag.String(
+		"env_file", "",
+		"env file for variable expansion; values override OS environment variables",
+	)
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
@@ -57,6 +61,7 @@ func main() {
 		*buildID = os.Getenv("RAYCI_BUILD_ID")
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
 		*rebuild = os.Getenv("RAYCI_WANDA_ALWAYS_REBUILD") == "true"
+		*envFile = os.Getenv("RAYCI_ENV_FILE")
 
 		if *epoch == "" {
 			*epoch = wanda.DefaultCacheEpoch()
@@ -83,6 +88,7 @@ func main() {
 		BuildID:        *buildID,
 		Epoch:          *epoch,
 		WandaSpecsFile: *wandaSpecsFile,
+		EnvFile:        *envFile,
 
 		RayCI:   *rayCI,
 		Rebuild: *rebuild,

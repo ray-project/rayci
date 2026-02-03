@@ -128,7 +128,7 @@ func (c *dockerCmd) tag(src, asTag string) error {
 
 func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
 	if hints == nil {
-		hints = newBuildInputHints(nil)
+		hints = newBuildInputHints(nil, nil)
 	}
 
 	// Pull down the required images, and tag them properly.

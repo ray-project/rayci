@@ -14,25 +14,62 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Build builds a container image from the given specification file.
+// Build builds a container image from the given specification file, and builds
+// all its dependencies in topological order.
+// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
+// the root is built.
 func Build(specFile string, config *ForgeConfig) error {
 	if config == nil {
 		config = &ForgeConfig{}
 	}
 
-	spec, err := parseSpecFile(specFile)
-	if err != nil {
-		return fmt.Errorf("parse spec file: %w", err)
+	wandaSpecsFile := config.WandaSpecsFile
+	if wandaSpecsFile == "" {
+		wandaSpecsFile = filepath.Join(config.WorkDir, ".wandaspecs")
 	}
 
-	// Expand env variable.
-	spec = spec.expandVar(os.LookupEnv)
+	lookup := lookupFunc(os.LookupEnv)
+	if config.EnvFile != "" {
+		envfileVars, err := ParseEnvFile(config.EnvFile)
+		if err != nil {
+			return fmt.Errorf("parse envfile: %w", err)
+		}
+		lookup = func(key string) (string, bool) {
+			if v, ok := envfileVars[key]; ok {
+				return v, true
+			}
+			return os.LookupEnv(key)
+		}
+	}
+
+	graph, err := buildDepGraph(specFile, lookup, config.NamePrefix, wandaSpecsFile)
+	if err != nil {
+		return fmt.Errorf("build dep graph: %w", err)
+	}
 
 	forge, err := NewForge(config)
 	if err != nil {
 		return fmt.Errorf("make forge: %w", err)
 	}
-	return forge.Build(spec)
+	forge.lookup = lookup
+
+	// In RayCI mode, only build the root (deps built by prior pipeline steps).
+	order := graph.Order
+	if config.RayCI {
+		order = []string{graph.Root}
+	}
+
+	for _, name := range order {
+		rs := graph.Specs[name]
+
+		log.Printf("building %s (from %s)", name, rs.Path)
+
+		if err := forge.Build(rs.Spec); err != nil {
+			return fmt.Errorf("build %s: %w", name, err)
+		}
+	}
+
+	return nil
 }
 
 // Forge is a forge to build container images.
@@ -46,6 +83,8 @@ type Forge struct {
 	cacheHitCount int
 
 	docker *dockerCmd
+
+	lookup lookupFunc
 }
 
 // NewForge creates a new forge with the given configuration.
@@ -164,7 +203,7 @@ func (f *Forge) Build(spec *Spec) error {
 	}
 	in.froms = froms
 
-	inputCore, err := in.makeCore(spec.Dockerfile)
+	inputCore, err := in.makeCore(spec.Dockerfile, f.lookup)
 	if err != nil {
 		return fmt.Errorf("make build input core: %w", err)
 	}
@@ -248,7 +287,7 @@ func (f *Forge) Build(spec *Spec) error {
 		}
 	}
 
-	inputHints := newBuildInputHints(spec.BuildHintArgs)
+	inputHints := newBuildInputHints(spec.BuildHintArgs, f.lookup)
 
 	// Now we can build the image.
 	// Always use a new dockerCmd so that it can run in its own environment.
