@@ -1,0 +1,12 @@
+name: artifact-test
+froms:
+  - alpine:latest
+dockerfile: .buildkite/artifact-test.Dockerfile
+artifacts:
+  - src: /app/bin/myapp
+    dst: bin/myapp
+  - src: /build/dist/*.whl
+    dst: wheels/
+  - src: /nonexistent/optional-file.txt
+    dst: optional.txt
+    optional: true
