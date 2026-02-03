@@ -15,7 +15,7 @@ func Test(tmplName, buildFile string) error {
 	return nil
 }
 
-const testCmd = "pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake . -s -vv"
+const testCmdFmt = "unzip %s.zip && pip install nbmake==1.5.5 pytest==7.4.0 && pytest --nbmake . -s -vv"
 
 const workspaceStartWaitTime = 30 * time.Second
 
@@ -112,6 +112,7 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	}
 
 	// run test in workspace
+	testCmd := fmt.Sprintf(testCmdFmt, wtc.tmplName)
 	if err := anyscaleCLI.runCmdInWorkspace(wtc, testCmd); err != nil {
 		return fmt.Errorf("run test in workspace failed: %w", err)
 	}

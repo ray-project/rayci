@@ -388,16 +388,19 @@ func TestTest_TemplateNotFound(t *testing.T) {
 	}
 }
 
-func TestTestCmd_Constant(t *testing.T) {
-	// Verify the test command constant is set correctly
-	if testCmd == "" {
-		t.Error("testCmd should not be empty")
+func TestTestCmdFmt_Constant(t *testing.T) {
+	// Verify the test command format constant is set correctly
+	if testCmdFmt == "" {
+		t.Error("testCmdFmt should not be empty")
 	}
-	if !strings.Contains(testCmd, "pytest") {
-		t.Errorf("testCmd %q should contain 'pytest'", testCmd)
+	if !strings.Contains(testCmdFmt, "pytest") {
+		t.Errorf("testCmdFmt %q should contain 'pytest'", testCmdFmt)
 	}
-	if !strings.Contains(testCmd, "nbmake") {
-		t.Errorf("testCmd %q should contain 'nbmake'", testCmd)
+	if !strings.Contains(testCmdFmt, "nbmake") {
+		t.Errorf("testCmdFmt %q should contain 'nbmake'", testCmdFmt)
+	}
+	if !strings.Contains(testCmdFmt, "%s") {
+		t.Errorf("testCmdFmt %q should contain '%%s' format specifier", testCmdFmt)
 	}
 }
 
