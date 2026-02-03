@@ -186,10 +186,9 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 
 func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string, error) {
 	args := []string{"workspace_v2", "create"}
-	// get image URI and ray version from build ID
-	imageURI, rayVersion, err := convertBuildIdToImageURI(config.template.ClusterEnv.BuildID)
+	imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
 	if err != nil {
-		return "", fmt.Errorf("convert build ID to image URI failed: %w", err)
+		return "", fmt.Errorf("cluster env: %w", err)
 	}
 	args = append(args, "--name", config.workspaceName)
 	args = append(args, "--image-uri", imageURI)
@@ -422,14 +421,65 @@ func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	}
 
 	// Parse version: "2441" -> "2.44.1"
-	// Format: first digit = major, next two = minor, rest = patch
-	if len(versionStr) < 4 {
-		return "", "", fmt.Errorf("version string too short: %s", versionStr)
+	// Format: major (1 digit), minor (2 digits), patch (1+ digits)
+	buildIDVersionRe := regexp.MustCompile(`^(\d)(\d{2})(\d+)$`)
+	matches := buildIDVersionRe.FindStringSubmatch(versionStr)
+	if matches == nil {
+		return "", "", fmt.Errorf("version string must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
 	}
-
-	major := versionStr[0:1]
-	minor := versionStr[1:3]
-	patch := versionStr[3:]
+	major, minor, patch := matches[1], matches[2], matches[3]
 
 	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+}
+
+// convertImageURIToBuildID converts an image URI like "anyscale/ray:2.44.1-py312-cu128"
+// to a build ID like "anyscaleray2441-py312-cu128" and returns the ray version "2.44.1".
+func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err error) {
+	const prefix = "anyscale/ray:"
+	if !strings.HasPrefix(imageURI, prefix) {
+		return "", "", fmt.Errorf("image URI must start with %q: %s", prefix, imageURI)
+	}
+	tag := strings.TrimPrefix(imageURI, prefix)
+	hyphenIdx := strings.Index(tag, "-")
+	var versionStr, suffix string
+	if hyphenIdx == -1 {
+		versionStr = tag
+		suffix = ""
+	} else {
+		versionStr = tag[:hyphenIdx]
+		suffix = tag[hyphenIdx:]
+	}
+	// Require exactly 3 parts: major (1 digit).minor (2 digits).patch (1+ digits)
+	imageURIVersionRe := regexp.MustCompile(`^(\d)\.(\d{2})\.(\d+)$`)
+	matches := imageURIVersionRe.FindStringSubmatch(versionStr)
+	if matches == nil {
+		return "", "", fmt.Errorf("image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
+	}
+	major, minor, patch := matches[1], matches[2], matches[3]
+	versionCompact := major + minor + patch
+	return "anyscaleray" + versionCompact + suffix, versionStr, nil
+}
+
+// getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
+// Exactly one of BuildID or ImageURI must be set; it returns an error if both are set or neither is set.
+func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
+	if env == nil {
+		return "", "", fmt.Errorf("cluster_env is required")
+	}
+	hasBuildID := strings.TrimSpace(env.BuildID) != ""
+	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
+	switch {
+	case hasBuildID && hasImageURI:
+		return "", "", fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri, not both")
+	case !hasBuildID && !hasImageURI:
+		return "", "", fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri")
+	case hasBuildID:
+		return convertBuildIdToImageURI(env.BuildID)
+	default:
+		_, rayVersion, err := convertImageURIToBuildID(env.ImageURI)
+		if err != nil {
+			return "", "", err
+		}
+		return env.ImageURI, rayVersion, nil
+	}
 }

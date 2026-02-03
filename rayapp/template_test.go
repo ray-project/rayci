@@ -22,6 +22,17 @@ const testBuildDotYaml = `
     GCP: configs/basic-single-node/gce.yaml
     AWS: configs/basic-single-node/aws.yaml
 
+- name: job-intro-image-uri
+  emoji: 📦
+  title: Intro to Jobs (image URI)
+  description: Same as job-intro but cluster_env uses image_uri
+  dir: templates/intro-jobs
+  cluster_env:
+    image_uri: anyscale/ray:2.34.0-py311
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+
 - name: workspace-intro
   emoji: 🔰
   title: Intro to Workspaces
@@ -56,6 +67,20 @@ func TestReadTemplates(t *testing.T) {
 		Dir:         "templates/intro-jobs",
 		Description: "Introduction on how to use Anyscale Jobs",
 		ClusterEnv:  &ClusterEnv{BuildID: "anyscaleray2340-py311"},
+		ComputeConfig: map[string]string{
+			"GCP": "configs/basic-single-node/gce.yaml",
+			"AWS": "configs/basic-single-node/aws.yaml",
+		},
+	}, {
+		Name:        "job-intro-image-uri",
+		Emoji:       "📦",
+		Title:       "Intro to Jobs (image URI)",
+		Dir:         "templates/intro-jobs",
+		Description: "Same as job-intro but cluster_env uses image_uri",
+		ClusterEnv: &ClusterEnv{
+			ImageURI: "anyscale/ray:2.34.0-py311",
+			BuildID:  "anyscaleray2340-py311", // populated from image_uri during read
+		},
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
