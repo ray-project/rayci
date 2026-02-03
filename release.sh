@@ -2,8 +2,10 @@
 
 set -euxo pipefail
 
-mkdir -p _release
-rm -f _release/*
+OUTPUT_DIR="_release"
+
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
 
 build_go() {
   local name="$1"
@@ -12,7 +14,11 @@ build_go() {
   local arch="$4"
 
   GOOS="$os" GOARCH="$arch" \
-    go build -trimpath -o "_release/${name}-${os}-${arch}" "$pkg"
+    go build -trimpath -o "$OUTPUT_DIR/${name}-${os}-${arch}" "$pkg"
+}
+
+build_wheels() {
+  uv run wheels/raymake/build_wheels.py --output-dir "$OUTPUT_DIR"
 }
 
 build_goqualgate() { build_go goqualgate ./goqualgate/goqualgate "$1" "$2"; }
@@ -32,3 +38,5 @@ build_wanda  darwin  arm64
 build_wanda  linux   amd64
 build_wanda  linux   arm64
 build_wanda  windows amd64
+
+build_wheels
