@@ -43,6 +43,11 @@ func main() {
 		if err := rayapp.Build(*buildFile, args[0], *base, *output); err != nil {
 			log.Fatal(err)
 		}
+	case "test-all":
+		testFlags.Parse(os.Args[2:])
+		if err := rayapp.TestAll(*testBuildFile); err != nil {
+			log.Fatal(err)
+		}
 	case "test":
 		testFlags.Parse(os.Args[2:])
 		args := testFlags.Args()
@@ -65,7 +70,8 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  build-all              Build all templates")
 	fmt.Println("  build <template-name>  Build a specific template")
-	fmt.Println("  test                   Test templates")
+	fmt.Println("  test-all               Test all templates")
+	fmt.Println("  test <template-name>   Test a specific template")
 	fmt.Println("  help                   Show this help message")
 	fmt.Println()
 	fmt.Println("Build flags (build, build-all):")

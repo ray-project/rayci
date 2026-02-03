@@ -4,16 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"log"
+	"strings"
 	"time"
 )
-
-func Test(tmplName, buildFile string) error {
-	runner := NewWorkspaceTestConfig(tmplName, buildFile)
-	if err := runner.Run(); err != nil {
-		return fmt.Errorf("test failed: %w", err)
-	}
-	return nil
-}
 
 const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv"
 
@@ -30,11 +24,78 @@ type WorkspaceTestConfig struct {
 	imageURI      string
 	rayVersion    string
 	template      *Template
+	success       bool
+	err           error
 }
 
 // NewWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
 func NewWorkspaceTestConfig(tmplName, buildFile string) *WorkspaceTestConfig {
-	return &WorkspaceTestConfig{tmplName: tmplName, buildFile: buildFile}
+	return &WorkspaceTestConfig{tmplName: tmplName, buildFile: buildFile, success: false, err: nil}
+}
+
+func TestAll(buildFile string) error {
+	return testWithFilter(buildFile, nil)
+}
+
+func Test(tmplName, buildFile string) error {
+	return testWithFilter(buildFile, func(tmpl *Template) bool {
+		return tmpl.Name == tmplName
+	})
+}
+
+func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
+	// read build file and get template details
+	tmpls, err := readTemplates(buildFile)
+	if err != nil {
+		return fmt.Errorf("read templates failed: %w", err)
+	}
+
+	// Get the directory containing the build file to resolve relative paths
+	buildDir := filepath.Dir(buildFile)
+
+	var testConfigs []*WorkspaceTestConfig
+
+	for _, t := range tmpls {
+		if filter != nil && !filter(t) {
+			continue
+		}
+		log.Println("Testing template:", t.Name)
+
+		runner := NewWorkspaceTestConfig(t.Name, buildFile)
+		runner.template = t
+		runner.template.Dir = filepath.Join(buildDir, t.Dir)
+		testConfigs = append(testConfigs, runner)
+	}
+
+	if len(testConfigs) == 0 {
+		return fmt.Errorf("no templates to test")
+	}
+
+	for _, wtc := range testConfigs {
+		if err := wtc.Run(); err != nil {
+			wtc.err = err
+			wtc.success = false
+		} else {
+			wtc.success = true
+			wtc.err = nil
+		}
+	}
+
+	var failed []string
+	for _, wtc := range testConfigs {
+		log.Println("Template:", wtc.template.Name)
+		log.Println("Success:", wtc.success)
+		if !wtc.success {
+			log.Println("Error:", wtc.err)
+			failed = append(failed, fmt.Sprintf("%s: %v", wtc.template.Name, wtc.err))
+		}
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("test failed for templates: %s", strings.Join(failed, "; "))
+	}
+
+	return nil
 }
 
 // Run creates an empty workspace and copies the template to it.
@@ -42,27 +103,7 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	// init anyscale cli
 	anyscaleCLI := NewAnyscaleCLI()
 
-	// read build file and get template details
-	tmpls, err := readTemplates(wtc.buildFile)
-	if err != nil {
-		return fmt.Errorf("read templates failed: %w", err)
-	}
-
-	// Get the directory containing the build file to resolve relative paths
 	buildDir := filepath.Dir(wtc.buildFile)
-
-	for _, tmpl := range tmpls {
-		if tmpl.Name == wtc.tmplName {
-			wtc.template = tmpl
-			// Resolve template directory relative to build file
-			wtc.template.Dir = filepath.Join(buildDir, tmpl.Dir)
-			break
-		}
-	}
-
-	if wtc.template == nil {
-		return fmt.Errorf("template %q not found in %s", wtc.tmplName, wtc.buildFile)
-	}
 
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {

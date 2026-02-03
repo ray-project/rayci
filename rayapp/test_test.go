@@ -87,34 +87,6 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 	}
 }
 
-func TestWorkspaceTestConfigRun_InvalidBuildFile(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho mock")
-
-	config := NewWorkspaceTestConfig("my-template", "nonexistent/build.yaml")
-	err := config.Run()
-
-	if err == nil {
-		t.Fatal("expected error for nonexistent build file")
-	}
-	if !strings.Contains(err.Error(), "read templates failed") {
-		t.Errorf("error %q should contain 'read templates failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_TemplateNotFound(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho mock")
-
-	config := NewWorkspaceTestConfig("nonexistent-template", "testdata/BUILD.yaml")
-	err := config.Run()
-
-	if err == nil {
-		t.Fatal("expected error for nonexistent template")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error %q should contain 'not found'", err.Error())
-	}
-}
-
 func TestWorkspaceTestConfigRun_CreateWorkspaceFails(t *testing.T) {
 	// Mock script that fails on workspace_v2 create
 	script := `#!/bin/sh
@@ -126,8 +98,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when create workspace fails")
@@ -152,8 +123,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when start workspace fails")
@@ -182,8 +152,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when wait for state fails")
@@ -216,8 +185,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when copy template fails")
@@ -254,8 +222,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when run command fails")
@@ -296,8 +263,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when terminate fails")
@@ -348,25 +314,10 @@ exit 1
 `
 	setupMockAnyscale(t, script)
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	err := config.Run()
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Verify the config was populated correctly
-	if config.template == nil {
-		t.Error("template should be set after successful run")
-	}
-	if config.template != nil && config.template.Name != "reefy-ray" {
-		t.Errorf("template.Name = %q, want %q", config.template.Name, "reefy-ray")
-	}
-	if config.workspaceName == "" {
-		t.Error("workspaceName should be set after successful run")
-	}
-	if !strings.HasPrefix(config.workspaceName, "reefy-ray-") {
-		t.Errorf("workspaceName %q should start with 'reefy-ray-'", config.workspaceName)
 	}
 }
 
@@ -413,19 +364,120 @@ func TestTest_Failure(t *testing.T) {
 	if !strings.Contains(err.Error(), "test failed") {
 		t.Errorf("error %q should contain 'test failed'", err.Error())
 	}
+	if !strings.Contains(err.Error(), "reefy-ray") {
+		t.Errorf("error %q should contain failed template name 'reefy-ray'", err.Error())
+	}
 }
 
-func TestTest_TemplateNotFound(t *testing.T) {
+func TestTest_NoTemplatesToTest(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\necho ok")
 
 	err := Test("nonexistent-template", "testdata/BUILD.yaml")
 
 	if err == nil {
-		t.Fatal("expected error for nonexistent template")
+		t.Fatal("expected error when no templates match filter")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error %q should contain 'not found'", err.Error())
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
+}
+
+func TestTest_ReadTemplatesFailed(t *testing.T) {
+	setupMockAnyscale(t, "#!/bin/sh\necho ok")
+
+	err := Test("reefy-ray", "nonexistent/BUILD.yaml")
+
+	if err == nil {
+		t.Fatal("expected error for invalid build file")
+	}
+	if !strings.Contains(err.Error(), "read templates failed") {
+		t.Errorf("error %q should contain 'read templates failed'", err.Error())
+	}
+}
+
+func TestTest_FilterSelectsSingleTemplate(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
+	script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then echo "config not found"; exit 1; fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
+if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
+echo "unknown"; exit 1
+`
+	setupMockAnyscale(t, script)
+
+	err := Test("fishy-ray", "testdata/BUILD.yaml")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTestAll_Success(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
+	script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then echo "config not found"; exit 1; fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
+if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
+echo "unknown"; exit 1
+`
+	setupMockAnyscale(t, script)
+
+	err := TestAll("testdata/BUILD.yaml")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTestAll_ReadTemplatesFailed(t *testing.T) {
+	setupMockAnyscale(t, "#!/bin/sh\necho ok")
+
+	err := TestAll("nonexistent/BUILD.yaml")
+
+	if err == nil {
+		t.Fatal("expected error for invalid build file")
+	}
+	if !strings.Contains(err.Error(), "read templates failed") {
+		t.Errorf("error %q should contain 'read templates failed'", err.Error())
+	}
+}
+
+func TestTestAll_NoTemplatesToTest(t *testing.T) {
+	setupMockAnyscale(t, "#!/bin/sh\necho ok")
+	f := createEmptyBuildFile(t)
+
+	err := TestAll(f)
+
+	if err == nil {
+		t.Fatal("expected error when build file has no templates")
+	}
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
+	}
+}
+
+func TestTestAll_PartialFailure(t *testing.T) {
+	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+
+	err := TestAll("testdata/BUILD.yaml")
+
+	if err == nil {
+		t.Fatal("expected error when some templates fail")
+	}
+	if !strings.Contains(err.Error(), "test failed for templates") {
+		t.Errorf("error %q should contain 'test failed for templates'", err.Error())
+	}
+}
+
+func createEmptyBuildFile(t *testing.T) string {
+	t.Helper()
+	f := t.TempDir() + "/BUILD.yaml"
+	if err := os.WriteFile(f, []byte("[]"), 0644); err != nil {
+		t.Fatalf("create empty build file: %v", err)
+	}
+	return f
 }
 
 func TestTestCmd_Constant(t *testing.T) {
@@ -463,6 +515,5 @@ func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
 	// Mock that fails immediately so we can test without full execution
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
-	config := NewWorkspaceTestConfig("reefy-ray", "testdata/BUILD.yaml")
-	_ = config.Run() // We don't care about the error, just that it uses the token
+	_ = Test("reefy-ray", "testdata/BUILD.yaml") // We don't care about the error, just that it uses the token
 }
