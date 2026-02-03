@@ -15,7 +15,7 @@ type ClusterEnvBYOD struct {
 
 // ClusterEnv is the cluster environment for Anyscale clusters.
 type ClusterEnv struct {
-	BuildID string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
+	BuildID  string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
 	ImageURI string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"`
 
 	// BYOD is the cluster environment for bring-your-own-docker clusters.
@@ -37,8 +37,8 @@ type Template struct {
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 }
 
-// resolveClusterEnvBuildID populates the missing one of BuildID or ImageURI from the other when exactly one is set.
-func resolveClusterEnvBuildID(env *ClusterEnv) error {
+// validateAndBuildClusterEnv validates ClusterEnv (BYOD or build_id/image_uri) and populates the missing one of BuildID or ImageURI when exactly one is set.
+func validateAndBuildClusterEnv(env *ClusterEnv) error {
 	if env == nil {
 		return nil
 	}
@@ -56,9 +56,12 @@ func resolveClusterEnvBuildID(env *ClusterEnv) error {
 	}
 	if !hasBuildID && !hasImageURI {
 		if env.BYOD != nil {
+			if env.BYOD.DockerImage == "" || env.BYOD.RayVersion == "" {
+				return fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+			}
 			return nil
 		}
-		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod")
+		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
 	}
 	if hasBuildID {
 		imageURI, _, err := convertBuildIdToImageURI(env.BuildID)
@@ -87,7 +90,7 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
 	}
 	for _, tmpl := range tmpls {
-		if err := resolveClusterEnvBuildID(tmpl.ClusterEnv); err != nil {
+		if err := validateAndBuildClusterEnv(tmpl.ClusterEnv); err != nil {
 			return nil, fmt.Errorf("resolve cluster env for template %q: %w", tmpl.Name, err)
 		}
 	}

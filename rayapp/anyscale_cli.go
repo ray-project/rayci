@@ -186,13 +186,15 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 
 func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string, error) {
 	args := []string{"workspace_v2", "create"}
-	imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
-	if err != nil {
-		return "", fmt.Errorf("cluster env: %w", err)
-	}
 	args = append(args, "--name", config.workspaceName)
-	args = append(args, "--image-uri", imageURI)
-	args = append(args, "--ray-version", rayVersion)
+	if config.template.ClusterEnv != nil {
+		imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
+		if err != nil {
+			return "", fmt.Errorf("cluster env: %w", err)
+		}
+		args = append(args, "--image-uri", imageURI)
+		args = append(args, "--ray-version", rayVersion)
+	}
 
 	// Use compute config name if set
 	if config.computeConfig != "" {
@@ -461,16 +463,22 @@ func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err 
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
-// At least one of BuildID or ImageURI must be set; when both are set, ImageURI is used.
+// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI; when both BuildID and ImageURI are set, ImageURI is used.
 func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
 	if env == nil {
 		return "", "", fmt.Errorf("cluster_env is required")
+	}
+	if env.BYOD != nil {
+		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
+			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+		}
+		return env.BYOD.DockerImage, env.BYOD.RayVersion, nil
 	}
 	hasBuildID := strings.TrimSpace(env.BuildID) != ""
 	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
 	switch {
 	case !hasBuildID && !hasImageURI:
-		return "", "", fmt.Errorf("cluster_env: specify at least one of build_id or image_uri")
+		return "", "", fmt.Errorf("cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version")
 	case hasImageURI:
 		_, rayVersion, err := convertImageURIToBuildID(env.ImageURI)
 		if err != nil {

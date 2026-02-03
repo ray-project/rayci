@@ -276,10 +276,16 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			wantRayVersion: "2.44.0",
 		},
 		{
+			name:           "BYOD",
+			env:            &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "cr.ray.io/ray:2340-py311", RayVersion: "2.34.0"}},
+			wantImageURI:   "cr.ray.io/ray:2340-py311",
+			wantRayVersion: "2.34.0",
+		},
+		{
 			name:         "neither set",
 			env:          &ClusterEnv{},
 			wantErr:      true,
-			errContains:  "at least one",
+			errContains:  "build_id or image_uri",
 		},
 		{
 			name:         "nil env",
