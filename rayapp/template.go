@@ -37,15 +37,35 @@ type Template struct {
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 }
 
-// resolveClusterEnvBuildID populates BuildID from ImageURI when only ImageURI is set.
+// resolveClusterEnvBuildID populates the missing one of BuildID or ImageURI from the other when exactly one is set.
 func resolveClusterEnvBuildID(env *ClusterEnv) error {
 	if env == nil {
 		return nil
 	}
-	if env.BuildID != "" {
+	hasBuildID := env.BuildID != ""
+	hasImageURI := env.ImageURI != ""
+	if hasBuildID && hasImageURI {
+		imageURIFromBuildID, _, err := convertBuildIdToImageURI(env.BuildID)
+		if err != nil {
+			return err
+		}
+		if imageURIFromBuildID != env.ImageURI {
+			return fmt.Errorf("build_id and image_uri do not match: build_id %q implies image_uri %q", env.BuildID, imageURIFromBuildID)
+		}
 		return nil
 	}
-	if env.ImageURI == "" {
+	if !hasBuildID && !hasImageURI {
+		if env.BYOD != nil {
+			return nil
+		}
+		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod")
+	}
+	if hasBuildID {
+		imageURI, _, err := convertBuildIdToImageURI(env.BuildID)
+		if err != nil {
+			return err
+		}
+		env.ImageURI = imageURI
 		return nil
 	}
 	buildID, _, err := convertImageURIToBuildID(env.ImageURI)

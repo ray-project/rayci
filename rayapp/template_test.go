@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -66,7 +67,10 @@ func TestReadTemplates(t *testing.T) {
 		Title:       "Intro to Jobs",
 		Dir:         "templates/intro-jobs",
 		Description: "Introduction on how to use Anyscale Jobs",
-		ClusterEnv:  &ClusterEnv{BuildID: "anyscaleray2340-py311"},
+		ClusterEnv: &ClusterEnv{
+			BuildID:  "anyscaleray2340-py311",
+			ImageURI: "anyscale/ray:2.34.0-py311", // populated from build_id during read
+		},
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
@@ -132,5 +136,49 @@ func TestReadTemplates_withError(t *testing.T) {
 	f := filepath.Join(tmp, "BUILD.yaml")
 	if _, err := readTemplates(f); err == nil {
 		t.Error("want error, got nil")
+	}
+}
+
+func TestReadTemplates_buildIDImageURIMismatch(t *testing.T) {
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "BUILD.yaml")
+	yaml := strings.Join([]string{
+		"- name: bad",
+		"  dir: x",
+		"  cluster_env:",
+		"    build_id: anyscaleray2340-py311",
+		"    image_uri: anyscale/ray:2.44.1-py312-cu128",
+		"  compute_config: {}",
+	}, "\n")
+	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	_, err := readTemplates(f)
+	if err == nil {
+		t.Fatal("want error for mismatched build_id and image_uri, got nil")
+	}
+	if !strings.Contains(err.Error(), "do not match") {
+		t.Errorf("error %q should contain %q", err.Error(), "do not match")
+	}
+}
+
+func TestReadTemplates_emptyClusterEnv(t *testing.T) {
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "BUILD.yaml")
+	yaml := strings.Join([]string{
+		"- name: bad",
+		"  dir: x",
+		"  cluster_env: {}",
+		"  compute_config: {}",
+	}, "\n")
+	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	_, err := readTemplates(f)
+	if err == nil {
+		t.Fatal("want error for cluster_env with no build_id, image_uri, or byod, got nil")
+	}
+	if !strings.Contains(err.Error(), "build_id or image_uri") && !strings.Contains(err.Error(), "byod") {
+		t.Errorf("error %q should mention build_id/image_uri or byod", err.Error())
 	}
 }

@@ -214,16 +214,16 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			wantImageURI: "anyscale/ray:2.44.1-py312-cu128", wantRayVersion: "2.44.1",
 		},
 		{
-			name:         "both set",
-			env:          &ClusterEnv{BuildID: "anyscaleray2440", ImageURI: "anyscale/ray:2.44.0"},
-			wantErr:      true,
-			errContains:  "exactly one",
+			name:           "both set",
+			env:            &ClusterEnv{BuildID: "anyscaleray2440", ImageURI: "anyscale/ray:2.44.0"},
+			wantImageURI:   "anyscale/ray:2.44.0",
+			wantRayVersion: "2.44.0",
 		},
 		{
 			name:         "neither set",
 			env:          &ClusterEnv{},
 			wantErr:      true,
-			errContains:  "exactly one",
+			errContains:  "at least one",
 		},
 		{
 			name:         "nil env",

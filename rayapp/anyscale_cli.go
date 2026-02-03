@@ -461,7 +461,7 @@ func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err 
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
-// Exactly one of BuildID or ImageURI must be set; it returns an error if both are set or neither is set.
+// At least one of BuildID or ImageURI must be set; when both are set, ImageURI is used.
 func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
 	if env == nil {
 		return "", "", fmt.Errorf("cluster_env is required")
@@ -469,17 +469,15 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersi
 	hasBuildID := strings.TrimSpace(env.BuildID) != ""
 	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
 	switch {
-	case hasBuildID && hasImageURI:
-		return "", "", fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri, not both")
 	case !hasBuildID && !hasImageURI:
-		return "", "", fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri")
-	case hasBuildID:
-		return convertBuildIdToImageURI(env.BuildID)
-	default:
+		return "", "", fmt.Errorf("cluster_env: specify at least one of build_id or image_uri")
+	case hasImageURI:
 		_, rayVersion, err := convertImageURIToBuildID(env.ImageURI)
 		if err != nil {
 			return "", "", err
 		}
 		return env.ImageURI, rayVersion, nil
+	default:
+		return convertBuildIdToImageURI(env.BuildID)
 	}
 }
