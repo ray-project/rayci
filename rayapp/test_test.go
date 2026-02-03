@@ -1,10 +1,44 @@
 package rayapp
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 )
+
+// setupMockDeleteWorkspaceAPI starts an httptest.Server that accepts DELETE workspace
+// and sets ANYSCALE_HOST/ANYSCALE_CLI_TOKEN so deleteWorkspaceByID succeeds.
+func setupMockDeleteWorkspaceAPI(t *testing.T) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}"))
+	}))
+	t.Cleanup(server.Close)
+
+	origHost := os.Getenv("ANYSCALE_HOST")
+	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
+	t.Cleanup(func() {
+		if origHost == "" {
+			os.Unsetenv("ANYSCALE_HOST")
+		} else {
+			os.Setenv("ANYSCALE_HOST", origHost)
+		}
+		if origToken == "" {
+			os.Unsetenv("ANYSCALE_CLI_TOKEN")
+		} else {
+			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
+		}
+	})
+	os.Setenv("ANYSCALE_HOST", server.URL)
+	os.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
+}
 
 func TestNewWorkspaceTestConfig(t *testing.T) {
 	tests := []struct {
@@ -213,7 +247,7 @@ if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
-    echo "run_command failed" >&2
+    echo "run_command failed: forced failure" >&2
     exit 1
 fi
 echo "ok"
@@ -226,8 +260,8 @@ echo "ok"
 	if err == nil {
 		t.Fatal("expected error when run command fails")
 	}
-	if !strings.Contains(err.Error(), "run test in workspace failed") {
-		t.Errorf("error %q should contain 'run test in workspace failed'", err.Error())
+	if !strings.Contains(err.Error(), "run_command failed") {
+		t.Errorf("error %q should contain 'run_command failed'", err.Error())
 	}
 }
 
@@ -274,6 +308,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_Success(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	// Mock script that succeeds for all operations
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
@@ -336,6 +371,7 @@ exit 1
 }
 
 func TestTest_Success(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	// Mock script that succeeds for all operations
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then

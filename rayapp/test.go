@@ -112,12 +112,12 @@ func (wtc *WorkspaceTestConfig) Run() error {
 	}
 
 	if err := anyscaleCLI.runCmdInWorkspace(wtc, "unzip -o "+wtc.tmplName+".zip"); err != nil {
-		return fmt.Errorf("unzip template failed: %w", err)
+		return fmt.Errorf("run_command failed: %w", err)
 	}
 
 	// run test in workspace
 	if err := anyscaleCLI.runCmdInWorkspace(wtc, testCmd); err != nil {
-		return fmt.Errorf("run test in workspace failed: %w", err)
+		return fmt.Errorf("run_command failed: %w", err)
 	}
 
 	// terminate workspace
