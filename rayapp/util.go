@@ -98,3 +98,54 @@ func buildZip(srcDir string, files []*zipFile, out string) error {
 	}
 	return nil
 }
+
+// zipDirectory creates a zip file containing all files from the source directory.
+// The files are stored with paths relative to the source directory.
+// outPath is the path where the zip file will be created.
+func zipDirectory(srcDir, outPath string) error {
+	outFile, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("create zip file: %w", err)
+	}
+	defer outFile.Close()
+
+	z := zip.NewWriter(outFile)
+	defer z.Close()
+
+	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories - they're created implicitly by file paths
+		if info.IsDir() {
+			return nil
+		}
+
+		// Get the relative path for the zip entry
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return fmt.Errorf("get relative path: %w", err)
+		}
+
+		if err := addFileToZip(z, path, relPath); err != nil {
+			return fmt.Errorf("add file %q to zip: %w", relPath, err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("walk directory: %w", err)
+	}
+
+	if err := z.Close(); err != nil {
+		return fmt.Errorf("close zip writer: %w", err)
+	}
+
+	if err := outFile.Sync(); err != nil {
+		return fmt.Errorf("flush zip file to storage: %w", err)
+	}
+
+	return nil
+}
