@@ -44,6 +44,15 @@ func validateAndBuildClusterEnv(env *ClusterEnv) error {
 	}
 	hasBuildID := env.BuildID != ""
 	hasImageURI := env.ImageURI != ""
+	if env.BYOD != nil {
+		if env.BYOD.DockerImage == "" || env.BYOD.RayVersion == "" {
+			return fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+		}
+		return nil
+	}
+	if !hasBuildID && !hasImageURI {
+		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
+	}
 	if hasBuildID && hasImageURI {
 		imageURIFromBuildID, _, err := convertBuildIdToImageURI(env.BuildID)
 		if err != nil {
@@ -53,15 +62,6 @@ func validateAndBuildClusterEnv(env *ClusterEnv) error {
 			return fmt.Errorf("build_id and image_uri do not match: build_id %q implies image_uri %q", env.BuildID, imageURIFromBuildID)
 		}
 		return nil
-	}
-	if !hasBuildID && !hasImageURI {
-		if env.BYOD != nil {
-			if env.BYOD.DockerImage == "" || env.BYOD.RayVersion == "" {
-				return fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
-			}
-			return nil
-		}
-		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
 	}
 	if hasBuildID {
 		imageURI, _, err := convertBuildIdToImageURI(env.BuildID)

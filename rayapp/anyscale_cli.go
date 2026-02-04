@@ -157,7 +157,9 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string,
 			tmpFile.Close()
 			return "", fmt.Errorf("failed to write temp file: %w", err)
 		}
-		tmpFile.Close()
+		if err := tmpFile.Close(); err != nil {
+			return "", fmt.Errorf("failed to close temp file: %w", err)
+		}
 
 		actualConfigPath = tmpFile.Name()
 		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
@@ -205,7 +207,6 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string
 	if err != nil {
 		return "", fmt.Errorf("create empty workspace failed: %w", err)
 	}
-	fmt.Println("create empty workspace output:\n", output)
 
 	workspaceID, err := extractWorkspaceID(output)
 	if err != nil {
@@ -216,11 +217,10 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string
 }
 
 func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
 	if err != nil {
 		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
-	fmt.Println("terminate workspace output:\n", output)
 	return nil
 }
 
@@ -269,38 +269,34 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 }
 
 func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
 	if err != nil {
 		return fmt.Errorf("copy template to workspace failed: %w", err)
 	}
-	fmt.Println("copy template to workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
 	if err != nil {
 		return fmt.Errorf("push file to workspace failed: %w", err)
 	}
-	fmt.Println("push file to workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
-	fmt.Println("run command in workspace output:\n", output)
 	return nil
 }
 
 func (ac *AnyscaleCLI) startWorkspace(config *WorkspaceTestConfig) error {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
 	if err != nil {
 		return fmt.Errorf("start workspace failed: %w", err)
 	}
-	fmt.Println("start workspace output:\n", output)
 	return nil
 }
 

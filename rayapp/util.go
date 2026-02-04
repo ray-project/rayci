@@ -102,7 +102,7 @@ func buildZip(srcDir string, files []*zipFile, out string) error {
 // zipDirectory creates a zip file containing all files from the source directory.
 // The files are stored with paths relative to the source directory.
 // outPath is the path where the zip file will be created.
-func zipDirectory(srcDir, outPath string) error {
+func zipDirectory(srcDir, outPath string) (err error) {
 	outFile, err := os.Create(outPath)
 	if err != nil {
 		return fmt.Errorf("create zip file: %w", err)
@@ -110,7 +110,6 @@ func zipDirectory(srcDir, outPath string) error {
 	defer outFile.Close()
 
 	z := zip.NewWriter(outFile)
-	defer z.Close()
 
 	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -136,6 +135,7 @@ func zipDirectory(srcDir, outPath string) error {
 	})
 
 	if err != nil {
+		z.Close()
 		return fmt.Errorf("walk directory: %w", err)
 	}
 

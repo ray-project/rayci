@@ -78,9 +78,4 @@ func printUsage() {
 	fmt.Println("  --base string      Base directory (default \".\")")
 	fmt.Println("  --output string    Output directory (default \"_build\")")
 	fmt.Println("  --build string     Build file (default \"BUILD.yaml\")")
-	fmt.Println()
-	fmt.Println("Test flags:")
-	fmt.Println("  --workspace string     Workspace name (required)")
-	fmt.Println("  --template-dir string  Template directory (required)")
-	fmt.Println("  --config string        Config file path (required)")
 }
