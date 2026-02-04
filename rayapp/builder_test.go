@@ -62,9 +62,9 @@ func TestBuilder(t *testing.T) {
 			tmp := t.TempDir()
 
 			tmpl := &Template{
-				Name:  "reefy-ray",
-				Dir:   "reefy-ray",
-				Title: "Ray lives in the REEf",
+				Name:       "reefy-ray",
+				Dir:        "reefy-ray",
+				Title:      "Ray lives in the REEf",
 				ClusterEnv: cc.clusterEnv,
 				ComputeConfig: map[string]string{
 					"AWS": "configs/aws.yaml",

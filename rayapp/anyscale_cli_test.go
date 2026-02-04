@@ -260,13 +260,13 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 		errContains    string
 	}{
 		{
-			name: "only BuildID",
-			env:  &ClusterEnv{BuildID: "anyscaleray2441-py312-cu128"},
+			name:         "only BuildID",
+			env:          &ClusterEnv{BuildID: "anyscaleray2441-py312-cu128"},
 			wantImageURI: "anyscale/ray:2.44.1-py312-cu128", wantRayVersion: "2.44.1",
 		},
 		{
-			name: "only ImageURI",
-			env:  &ClusterEnv{ImageURI: "anyscale/ray:2.44.1-py312-cu128"},
+			name:         "only ImageURI",
+			env:          &ClusterEnv{ImageURI: "anyscale/ray:2.44.1-py312-cu128"},
 			wantImageURI: "anyscale/ray:2.44.1-py312-cu128", wantRayVersion: "2.44.1",
 		},
 		{
@@ -282,16 +282,16 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			wantRayVersion: "2.34.0",
 		},
 		{
-			name:         "neither set",
-			env:          &ClusterEnv{},
-			wantErr:      true,
-			errContains:  "build_id or image_uri",
+			name:        "neither set",
+			env:         &ClusterEnv{},
+			wantErr:     true,
+			errContains: "build_id or image_uri",
 		},
 		{
-			name:         "nil env",
-			env:          nil,
-			wantErr:      true,
-			errContains:  "cluster_env is required",
+			name:        "nil env",
+			env:         nil,
+			wantErr:     true,
+			errContains: "cluster_env is required",
 		},
 	}
 	for _, tt := range tests {

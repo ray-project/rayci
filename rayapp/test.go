@@ -2,9 +2,9 @@ package rayapp
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
-	"log"
 	"strings"
 	"time"
 )
