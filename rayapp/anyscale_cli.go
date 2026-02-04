@@ -402,13 +402,39 @@ func ConvertComputeConfigFile(oldConfigPath, newConfigPath string) error {
 
 func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	// Convert build ID like "anyscaleray2441-py312-cu128" to "anyscale/ray:2.44.1-py312-cu128"
+	// Also handles "anyscaleray-llm2501-py311-cu128" to "anyscale/ray-llm:25.0.1-py311-cu128"
 	const prefix = "anyscaleray"
 	if !strings.HasPrefix(buildId, prefix) {
 		return "", "", fmt.Errorf("build ID must start with %q: %s", prefix, buildId)
 	}
 
-	// Remove the prefix to get "2441-py312-cu128"
+	// Remove the prefix to get "2441-py312-cu128" or "-llm2501-py311-cu128"
 	remainder := strings.TrimPrefix(buildId, prefix)
+
+	// Find where the version number starts (first digit sequence of 4+ chars)
+	// This handles both "ray2441-py312" and "ray-llm2501-py311"
+	versionStartIdx := -1
+	for i := 0; i < len(remainder); i++ {
+		if remainder[i] >= '0' && remainder[i] <= '9' {
+			// Check if this starts a version (4+ digits before hyphen or end)
+			endIdx := i
+			for endIdx < len(remainder) && remainder[endIdx] >= '0' && remainder[endIdx] <= '9' {
+				endIdx++
+			}
+			if endIdx-i >= 4 && (endIdx == len(remainder) || remainder[endIdx] == '-') {
+				versionStartIdx = i
+				break
+			}
+		}
+	}
+
+	if versionStartIdx == -1 {
+		return "", "", fmt.Errorf("version string too short: %s", buildId)
+	}
+
+	// Extract image name suffix (e.g., "" for "ray" or "-llm" for "ray-llm")
+	imageNameSuffix := remainder[:versionStartIdx]
+	remainder = remainder[versionStartIdx:]
 
 	// Find the first hyphen to separate version from suffix
 	hyphenIdx := strings.Index(remainder, "-")
@@ -422,14 +448,22 @@ func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	}
 
 	// Parse version: "2441" -> "2.44.1"
-	// Format: first digit = major, next two = minor, rest = patch
 	if len(versionStr) < 4 {
 		return "", "", fmt.Errorf("version string too short: %s", versionStr)
 	}
 
-	major := versionStr[0:1]
-	minor := versionStr[1:3]
-	patch := versionStr[3:]
+	var major, minor, patch string
+	// For ray-llm and similar images (with suffix), use format XX.Y.Z (2-digit major)
+	// For standard ray images, use format X.YY.Z (1-digit major)
+	if imageNameSuffix != "" {
+		major = versionStr[0:2]
+		minor = versionStr[2:3]
+		patch = versionStr[3:]
+	} else {
+		major = versionStr[0:1]
+		minor = versionStr[1:3]
+		patch = versionStr[3:]
+	}
 
-	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+	return fmt.Sprintf("anyscale/ray%s:%s.%s.%s%s", imageNameSuffix, major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
 }

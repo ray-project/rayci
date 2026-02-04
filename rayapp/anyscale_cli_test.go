@@ -77,6 +77,12 @@ func TestConvertBuildIdToImageURI(t *testing.T) {
 			wantRayVersion: "3.00.1",
 		},
 		{
+			name:           "valid build ID with ray-llm image",
+			buildId:        "anyscaleray-llm2501-py311-cu128",
+			wantImageURI:   "anyscale/ray-llm:25.0.1-py311-cu128",
+			wantRayVersion: "25.0.1",
+		},
+		{
 			name:        "invalid prefix",
 			buildId:     "rayimage2441-py312",
 			wantErr:     true,
