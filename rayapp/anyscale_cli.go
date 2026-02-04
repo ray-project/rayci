@@ -190,12 +190,19 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string
 	args := []string{"workspace_v2", "create"}
 	args = append(args, "--name", config.workspaceName)
 	if config.template.ClusterEnv != nil {
-		imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
-		if err != nil {
-			return "", fmt.Errorf("cluster env: %w", err)
+		env := config.template.ClusterEnv
+		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
+			buildDir := filepath.Dir(config.buildFile)
+			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
+			args = append(args, "--containerfile", resolvedPath, "--ray-version", env.BYOD.RayVersion)
+		} else {
+			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
+			if err != nil {
+				return "", fmt.Errorf("cluster env: %w", err)
+			}
+			args = append(args, "--image-uri", imageURI)
+			args = append(args, "--ray-version", rayVersion)
 		}
-		args = append(args, "--image-uri", imageURI)
-		args = append(args, "--ray-version", rayVersion)
 	}
 
 	// Use compute config name if set
@@ -465,6 +472,9 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersi
 		return "", "", fmt.Errorf("cluster_env is required")
 	}
 	if env.BYOD != nil {
+		if env.BYOD.ContainerFile != "" {
+			return "", "", fmt.Errorf("cluster_env byod: container_file is used via --containerfile; image URI not applicable")
+		}
 		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
 			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
 		}
