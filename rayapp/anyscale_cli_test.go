@@ -47,6 +47,39 @@ func TestIsAnyscaleInstalled(t *testing.T) {
 	})
 }
 
+func TestRunAnyscaleCLI_BufferTruncation(t *testing.T) {
+	// Generate output larger than maxOutputBufferSize (1 MB).
+	// Use a pattern that lets us verify we kept the tail, not the head.
+	// Each line is 100 bytes (including newline), we need >10485 lines for >1MB.
+	script := `#!/bin/bash
+for ((i=1; i<=12000; i++)); do
+    printf "LINE_%05d_" "$i"
+    printf "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"
+done
+`
+	setupMockAnyscale(t, script)
+	cli := NewAnyscaleCLI()
+
+	output, err := cli.runAnyscaleCLI([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(output) > maxOutputBufferSize {
+		t.Errorf("output length = %d, want <= %d", len(output), maxOutputBufferSize)
+	}
+
+	// Verify we kept the tail: last line should be LINE_12000
+	if !strings.Contains(output, "LINE_12000_") {
+		t.Error("output should contain the last line (LINE_12000_)")
+	}
+
+	// Verify the head was truncated: first line should NOT be present
+	if strings.Contains(output, "LINE_00001_") {
+		t.Error("output should not contain the first line (LINE_00001_)")
+	}
+}
+
 func TestRunAnyscaleCLI(t *testing.T) {
 	tests := []struct {
 		name       string

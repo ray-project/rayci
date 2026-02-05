@@ -14,6 +14,8 @@ type AnyscaleCLI struct{}
 
 var errAnyscaleNotInstalled = errors.New("anyscale is not installed")
 
+const maxOutputBufferSize = 1024 * 1024 // 1 MB
+
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
 	return &AnyscaleCLI{}
@@ -35,14 +37,18 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	fmt.Println("anyscale cli args: ", args)
 	cmd := exec.Command("anyscale", args...)
 
-	// Capture output while also displaying to terminal with colors
 	var outputBuf bytes.Buffer
 	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
 	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
 
-	if err := cmd.Run(); err != nil {
-		return outputBuf.String(), fmt.Errorf("anyscale error: %w", err)
+	err := cmd.Run()
+	output := outputBuf.Bytes()
+	if len(output) > maxOutputBufferSize {
+		output = output[len(output)-maxOutputBufferSize:]
 	}
 
-	return outputBuf.String(), nil
+	if err != nil {
+		return string(output), fmt.Errorf("anyscale error: %w", err)
+	}
+	return string(output), nil
 }
