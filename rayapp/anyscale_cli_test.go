@@ -92,7 +92,7 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			name:    "anyscale not installed",
 			script:  "", // empty PATH, no script
 			args:    []string{"--version"},
-			wantErr: errAnyscaleNotInstalled,
+			wantErr: errors.New("anyscale is not installed"),
 		},
 		{
 			name:       "success",
@@ -126,11 +126,7 @@ func TestRunAnyscaleCLI(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if errors.Is(tt.wantErr, errAnyscaleNotInstalled) {
-					if !errors.Is(err, errAnyscaleNotInstalled) {
-						t.Errorf("expected errAnyscaleNotInstalled, got: %v", err)
-					}
-				} else if !strings.Contains(err.Error(), tt.wantErr.Error()) {
+				if !strings.Contains(err.Error(), tt.wantErr.Error()) {
 					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr.Error())
 				}
 				return

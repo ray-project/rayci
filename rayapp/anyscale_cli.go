@@ -12,8 +12,6 @@ import (
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct{}
 
-var errAnyscaleNotInstalled = errors.New("anyscale is not installed")
-
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
@@ -31,7 +29,7 @@ func isAnyscaleInstalled() bool {
 // Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if !isAnyscaleInstalled() {
-		return "", errAnyscaleNotInstalled
+		return "", errors.New("anyscale is not installed")
 	}
 
 	fmt.Println("anyscale cli args: ", args)
