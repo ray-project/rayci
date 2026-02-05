@@ -77,6 +77,11 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if err != nil {
 		return tw.String(), fmt.Errorf("anyscale error: %w", err)
 	}
+	// If outputBuf contains "exec failed with exit code *" return error
+	if strings.Contains(tw.String(), "exec failed with exit code") {
+		return "", fmt.Errorf("anyscale error: command failed: %s", tw.String())
+	}
+
 	return tw.String(), nil
 }
 
