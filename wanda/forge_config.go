@@ -15,6 +15,7 @@ type ForgeConfig struct {
 	Epoch          string
 	WandaSpecsFile string
 	EnvFile        string
+	ArtifactsDir   string
 
 	RayCI   bool
 	Rebuild bool

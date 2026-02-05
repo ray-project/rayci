@@ -1,0 +1,5 @@
+name: artifact-dep-base
+dockerfile: Dockerfile.artifact
+artifacts:
+  - src: /build/docs/README.md
+    dst: docs/readme.md

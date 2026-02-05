@@ -1,0 +1,8 @@
+FROM alpine:latest
+
+RUN mkdir -p /build/dist /build/docs /app/bin \
+    && echo "wheel-content" > /build/dist/mypackage-1.0.0.whl \
+    && echo "wheel-content2" > /build/dist/mypackage-1.0.1.whl \
+    && echo "docs-content" > /build/docs/README.md \
+    && echo "binary-content" > /app/bin/myapp \
+    && chmod +x /app/bin/myapp
