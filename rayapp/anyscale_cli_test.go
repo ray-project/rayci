@@ -294,10 +294,10 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			errContains: "cluster_env is required",
 		},
 		{
-			name:        "BYOD container_file only",
+			name:        "BYOD containerfile only",
 			env:         &ClusterEnv{BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
 			wantErr:     true,
-			errContains: "container_file",
+			errContains: "containerfile",
 		},
 	}
 	for _, tt := range tests {

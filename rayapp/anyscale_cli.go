@@ -473,7 +473,7 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersi
 	}
 	if env.BYOD != nil {
 		if env.BYOD.ContainerFile != "" {
-			return "", "", fmt.Errorf("cluster_env byod: container_file is used via --containerfile; image URI not applicable")
+			return "", "", fmt.Errorf("cluster_env byod: containerfile is used via --containerfile; image URI not applicable")
 		}
 		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
 			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")

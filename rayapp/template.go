@@ -9,7 +9,7 @@ import (
 
 // ClusterEnvBYOD is the cluster environment for BYOD clusters.
 type ClusterEnvBYOD struct {
-	ContainerFile string `yaml:"container_file" json:"container_file"`
+	ContainerFile string `yaml:"containerfile" json:"containerfile"`
 	DockerImage   string `yaml:"docker_image" json:"docker_image"`
 	RayVersion    string `yaml:"ray_version,omitempty" json:"ray_version,omitempty"`
 }
@@ -49,10 +49,10 @@ func validateAndBuildClusterEnv(env *ClusterEnv) error {
 		hasDocker := env.BYOD.DockerImage != ""
 		hasContainer := env.BYOD.ContainerFile != ""
 		if hasDocker && hasContainer {
-			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or container_file, not both")
+			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or containerfile, not both")
 		}
 		if !hasDocker && !hasContainer {
-			return fmt.Errorf("cluster_env byod: specify one of docker_image or container_file")
+			return fmt.Errorf("cluster_env byod: specify one of docker_image or containerfile")
 		}
 		if env.BYOD.RayVersion == "" {
 			return fmt.Errorf("cluster_env byod: ray_version is required")

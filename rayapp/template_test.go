@@ -224,13 +224,13 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			"      docker_image: cr.ray.io/ray:2340",
 			"  compute_config: {}",
 		}, "\n")},
-		{"byod both docker_image and container_file", strings.Join([]string{
+		{"byod both docker_image and containerfile", strings.Join([]string{
 			"- name: x",
 			"  dir: x",
 			"  cluster_env:",
 			"    byod:",
 			"      docker_image: cr.ray.io/ray:2340",
-			"      container_file: Dockerfile",
+			"      containerfile: Dockerfile",
 			"      ray_version: 2.34.0",
 			"  compute_config: {}",
 		}, "\n")},
@@ -247,12 +247,12 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			}
 			switch tt.name {
 			case "byod missing docker_image":
-				if !strings.Contains(err.Error(), "docker_image") && !strings.Contains(err.Error(), "container_file") {
-					t.Errorf("error %q should mention docker_image or container_file", err.Error())
+				if !strings.Contains(err.Error(), "docker_image") && !strings.Contains(err.Error(), "containerfile") {
+					t.Errorf("error %q should mention docker_image or containerfile", err.Error())
 				}
-			case "byod both docker_image and container_file":
+			case "byod both docker_image and containerfile":
 				if !strings.Contains(err.Error(), "exactly one") && !strings.Contains(err.Error(), "not both") {
-					t.Errorf("error %q should mention exactly one of docker_image or container_file, not both", err.Error())
+					t.Errorf("error %q should mention exactly one of docker_image or containerfile, not both", err.Error())
 				}
 			default:
 				if !strings.Contains(err.Error(), "ray_version") {
