@@ -157,20 +157,6 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		return errors
 	}
 
-	// state, err := anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
-	// if err != nil {
-	// 	return fmt.Errorf("get workspace state failed: %w", err)
-	// }
-
-	// for !strings.Contains(state, StateRunning.String()) {
-	// 	state, err = anyscaleCLI.getWorkspaceStatus(wtc.workspaceName)
-	// 	if err != nil {
-	// 		return fmt.Errorf("get workspace status failed: %w, retrying...", err)
-	// 	}
-	// 	time.Sleep(workspaceStartWaitTime)
-	// 	fmt.Println("workspace state: ", state)
-	// }
-
 	// Create temp directory for the zip file
 	templateZipDir, err := os.MkdirTemp("", "template_zip")
 	if err != nil {
