@@ -220,4 +220,7 @@ var (
 
 	defaultArtifactPaths = []string{"/tmp/artifacts/**/*"}
 	windowsArtifactPaths = []string{`C:\tmp\artifacts\**\*`}
+
+	defaultArtifactsMountDir = "/tmp/artifacts"
+	windowsArtifactsMountDir = "/c/tmp/artifacts"
 )

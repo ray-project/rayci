@@ -139,6 +139,11 @@ func TestConvertPipelineStep(t *testing.T) {
 			"broken":  skipQueue,
 		},
 
+		BuilderQueues: map[string]string{
+			"builder":         "fakebuilder",
+			"builder-windows": "fakewinbuilder",
+		},
+
 		Env: map[string]string{
 			"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 		},
@@ -354,15 +359,18 @@ func TestConvertPipelineStep(t *testing.T) {
 			"matrix":     []any{"py36", "py37"},
 		},
 		out: map[string]any{
-			"label":    "my forge",
-			"key":      "forge",
-			"commands": wandaCommands("beta"),
+			"label":          "my forge",
+			"key":            "forge",
+			"commands":       wandaCommands("beta"),
+			"agents":         newBkAgents("fakebuilder"),
+			"artifact_paths": defaultArtifactPaths,
 			"env": map[string]string{
 				"RAYCI_BUILD_ID":            buildID,
 				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
 				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
 				"RAYCI_WORK_REPO":           "fakeecr",
 				"RAYCI_BRANCH":              "beta",
+				"RAYCI_ARTIFACTS_DIR":       "/tmp/artifacts",
 
 				"RAYCI_WANDA_FILE": "ci/forge.wanda.yaml",
 				"RAYCI_WANDA_NAME": "forge",
@@ -377,6 +385,37 @@ func TestConvertPipelineStep(t *testing.T) {
 				"automatic": map[string]any{"limit": 1},
 			},
 			"timeout_in_minutes": 300,
+		},
+	}, {
+		// Windows wanda step
+		in: map[string]any{
+			"name":          "windows-forge",
+			"wanda":         "ci/windows.wanda.yaml",
+			"instance_type": "builder-windows",
+		},
+		out: map[string]any{
+			"label":          "wanda: windows-forge",
+			"key":            "windows-forge",
+			"commands":       wandaCommands("beta"),
+			"artifact_paths": windowsArtifactPaths,
+			"env": map[string]string{
+				"RAYCI_BUILD_ID":            buildID,
+				"RAYCI_TEMP":                "s3://ci-temp/abc123/",
+				"BUILDKITE_BAZEL_CACHE_URL": "https://bazel-build-cache",
+				"RAYCI_WORK_REPO":           "fakeecr",
+				"RAYCI_BRANCH":              "beta",
+				"RAYCI_ARTIFACTS_DIR":       "/c/tmp/artifacts",
+
+				"RAYCI_WANDA_FILE": "ci/windows.wanda.yaml",
+				"RAYCI_WANDA_NAME": "windows-forge",
+
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+			},
+			"retry": map[string]any{
+				"automatic": map[string]any{"limit": 1},
+			},
+			"timeout_in_minutes": 300,
+			"agents":             newBkAgents("fakewinbuilder"),
 		},
 	}, {
 		in: map[string]any{

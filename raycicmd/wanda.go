@@ -5,6 +5,7 @@ import (
 	"log"
 	"path"
 	"sort"
+	"strings"
 )
 
 const rawGitHubURL = "https://raw.githubusercontent.com/"
@@ -70,6 +71,12 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 		"retry":    defaultBuilderRetry,
 
 		"timeout_in_minutes": defaultTimeoutInMinutes,
+	}
+
+	if strings.Contains(instanceType, "windows") {
+		bkStep["artifact_paths"] = windowsArtifactPaths
+	} else {
+		bkStep["artifact_paths"] = defaultArtifactPaths
 	}
 
 	if s.dependsOn != nil {
@@ -191,6 +198,11 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 				envs[entry.k] = entry.v
 			}
 		}
+	}
+	if strings.Contains(instanceType, "windows") {
+		envs["RAYCI_ARTIFACTS_DIR"] = windowsArtifactsMountDir
+	} else {
+		envs["RAYCI_ARTIFACTS_DIR"] = defaultArtifactsMountDir
 	}
 
 	s := &wandaStep{
