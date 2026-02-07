@@ -9,13 +9,15 @@ import (
 
 // ClusterEnvBYOD is the cluster environment for BYOD clusters.
 type ClusterEnvBYOD struct {
-	DockerImage string `yaml:"docker_image" json:"docker_image"`
-	RayVersion  string `yaml:"ray_version,omitempty" json:"ray_version,omitempty"`
+	ContainerFile string `yaml:"containerfile" json:"containerfile"`
+	DockerImage   string `yaml:"docker_image" json:"docker_image"`
+	RayVersion    string `yaml:"ray_version,omitempty" json:"ray_version,omitempty"`
 }
 
 // ClusterEnv is the cluster environment for Anyscale clusters.
 type ClusterEnv struct {
-	BuildID string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
+	BuildID  string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
+	ImageURI string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"`
 
 	// BYOD is the cluster environment for bring-your-own-docker clusters.
 	BYOD *ClusterEnvBYOD `yaml:"byod,omitempty" json:"byod,omitempty"`
@@ -36,6 +38,56 @@ type Template struct {
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 }
 
+// validateAndBuildClusterEnv validates ClusterEnv (BYOD or build_id/image_uri) and populates the missing one of BuildID or ImageURI when exactly one is set.
+func validateAndBuildClusterEnv(env *ClusterEnv) error {
+	if env == nil {
+		return nil
+	}
+	hasBuildID := env.BuildID != ""
+	hasImageURI := env.ImageURI != ""
+	if env.BYOD != nil {
+		hasDocker := env.BYOD.DockerImage != ""
+		hasContainer := env.BYOD.ContainerFile != ""
+		if hasDocker && hasContainer {
+			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or containerfile, not both")
+		}
+		if !hasDocker && !hasContainer {
+			return fmt.Errorf("cluster_env byod: specify one of docker_image or containerfile")
+		}
+		if env.BYOD.RayVersion == "" {
+			return fmt.Errorf("cluster_env byod: ray_version is required")
+		}
+		return nil
+	}
+	if !hasBuildID && !hasImageURI {
+		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
+	}
+	if hasBuildID && hasImageURI {
+		imageURIFromBuildID, _, err := convertBuildIdToImageURI(env.BuildID)
+		if err != nil {
+			return err
+		}
+		if imageURIFromBuildID != env.ImageURI {
+			return fmt.Errorf("build_id and image_uri do not match: build_id %q implies image_uri %q", env.BuildID, imageURIFromBuildID)
+		}
+		return nil
+	}
+	if hasBuildID {
+		imageURI, _, err := convertBuildIdToImageURI(env.BuildID)
+		if err != nil {
+			return err
+		}
+		env.ImageURI = imageURI
+		return nil
+	}
+	buildID, _, err := convertImageURIToBuildID(env.ImageURI)
+	if err != nil {
+		return err
+	}
+	env.BuildID = buildID
+	return nil
+}
+
 func readTemplates(yamlFile string) ([]*Template, error) {
 	var tmpls []*Template
 
@@ -45,6 +97,11 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 	}
 	if err := yaml.Unmarshal(bs, &tmpls); err != nil {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
+	}
+	for _, tmpl := range tmpls {
+		if err := validateAndBuildClusterEnv(tmpl.ClusterEnv); err != nil {
+			return nil, fmt.Errorf("resolve cluster env for template %q: %w", tmpl.Name, err)
+		}
 	}
 	return tmpls, nil
 }

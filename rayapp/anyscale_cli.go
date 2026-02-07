@@ -1,0 +1,381 @@
+package rayapp
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+// AnyscaleCLI provides methods for interacting with the Anyscale CLI.
+type AnyscaleCLI struct{}
+
+const maxOutputBufferSize = 1024 * 1024 // 1 MB
+
+// NewAnyscaleCLI creates a new AnyscaleCLI instance.
+func NewAnyscaleCLI() *AnyscaleCLI {
+	return &AnyscaleCLI{}
+}
+
+type WorkspaceState int
+
+const (
+	StateTerminated WorkspaceState = iota
+	StateStarting
+	StateRunning
+)
+
+var WorkspaceStateName = map[WorkspaceState]string{
+	StateTerminated: "TERMINATED",
+	StateStarting:   "STARTING",
+	StateRunning:    "RUNNING",
+}
+
+func (ws WorkspaceState) String() string {
+	return WorkspaceStateName[ws]
+}
+
+// extractWorkspaceID extracts the workspace ID from the CLI output.
+// Expected format: "Workspace created successfully id: expwrk_xxx"
+func extractWorkspaceID(output string) (string, error) {
+	re := regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
+	matches := re.FindStringSubmatch(output)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("could not extract workspace ID from output: %s", output)
+	}
+	return matches[1], nil
+}
+
+func isAnyscaleInstalled() bool {
+	_, err := exec.LookPath("anyscale")
+	return err == nil
+}
+
+// RunAnyscaleCLI runs the anyscale CLI with the given arguments.
+// Returns the combined output and any error that occurred.
+// Output is displayed to the terminal with colors preserved.
+func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
+	if !isAnyscaleInstalled() {
+		return "", errors.New("anyscale is not installed")
+	}
+
+	fmt.Println("anyscale cli args: ", args)
+	cmd := exec.Command("anyscale", args...)
+
+	tw := newTailWriter(maxOutputBufferSize)
+	cmd.Stdout = io.MultiWriter(os.Stdout, tw)
+	cmd.Stderr = io.MultiWriter(os.Stderr, tw)
+
+	err := cmd.Run()
+	if err != nil {
+		return tw.String(), fmt.Errorf("anyscale error: %w", err)
+	}
+	if strings.Contains(tw.String(), "exec failed with exit code") {
+		return "", fmt.Errorf("anyscale error: command failed: %s", tw.String())
+	}
+
+	return tw.String(), nil
+}
+
+// CreateComputeConfig creates a new compute config from a YAML file if it doesn't already exist.
+// If the config file uses the old format (head_node_type, worker_node_types), it will be
+// automatically converted to the new format before creation.
+// name: the name for the compute config (without version tag)
+// configFile: path to the YAML config file
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string, error) {
+	// Check if compute config already exists
+	if output, err := ac.GetComputeConfig(name); err == nil {
+		fmt.Printf("Compute config %q already exists, skipping creation\n", name)
+		return output, nil
+	}
+
+	// Check if the config file uses the old format
+	isOldFormat, err := isOldComputeConfigFormat(configFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check config format: %w", err)
+	}
+
+	// If old format, convert to new format and use a temp file
+	actualConfigPath := configFilePath
+	if isOldFormat {
+		fmt.Printf("Detected old compute config format, converting to new format...\n")
+
+		newConfigData, err := ConvertComputeConfig(configFilePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert old config: %w", err)
+		}
+
+		// Create a temp file for the converted config
+		tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp file: %w", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		if _, err := tmpFile.Write(newConfigData); err != nil {
+			tmpFile.Close()
+			return "", fmt.Errorf("failed to write temp file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			return "", fmt.Errorf("failed to close temp file: %w", err)
+		}
+
+		actualConfigPath = tmpFile.Name()
+		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
+	}
+
+	// Create the compute config
+	args := []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("create compute config failed: %w", err)
+	}
+	return output, nil
+}
+
+// GetComputeConfig retrieves the details of a compute config by name.
+// name: the name of the compute config (optionally with version tag, e.g., "name:1")
+// Returns the output from the CLI and any error.
+func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
+	args := []string{"compute-config", "get", "-n", name}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return output, fmt.Errorf("get compute config failed: %w", err)
+	}
+	return output, nil
+}
+
+func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string, error) {
+	args := []string{"workspace_v2", "create"}
+	args = append(args, "--name", config.workspaceName)
+	if config.template.ClusterEnv != nil {
+		env := config.template.ClusterEnv
+		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
+			buildDir := filepath.Dir(config.buildFile)
+			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
+			args = append(args, "--containerfile", resolvedPath, "--ray-version", env.BYOD.RayVersion)
+		} else {
+			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
+			if err != nil {
+				return "", fmt.Errorf("cluster env: %w", err)
+			}
+			args = append(args, "--image-uri", imageURI)
+			args = append(args, "--ray-version", rayVersion)
+		}
+	}
+
+	// Use compute config name if set
+	if config.computeConfig != "" {
+		args = append(args, "--compute-config", config.computeConfig)
+	}
+
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return "", fmt.Errorf("create empty workspace failed: %w", err)
+	}
+
+	workspaceID, err := extractWorkspaceID(output)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract workspace ID: %w", err)
+	}
+
+	return workspaceID, nil
+}
+
+func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
+	if err != nil {
+		return fmt.Errorf("terminate workspace failed: %w", err)
+	}
+	return nil
+}
+
+// deleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
+// It uses the ANYSCALE_HOST environment variable for the API host and
+// ANYSCALE_CLI_TOKEN for authentication.
+func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
+	anyscaleHost := os.Getenv("ANYSCALE_HOST")
+	if anyscaleHost == "" {
+		return errors.New("ANYSCALE_HOST environment variable is not set")
+	}
+
+	apiToken := os.Getenv("ANYSCALE_CLI_TOKEN")
+	if apiToken == "" {
+		return errors.New("ANYSCALE_CLI_TOKEN environment variable is not set")
+	}
+
+	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/%s", anyscaleHost, workspaceID)
+
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("delete workspace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
+	return nil
+}
+
+func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
+	if err != nil {
+		return fmt.Errorf("copy template to workspace failed: %w", err)
+	}
+	return nil
+}
+
+func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
+	if err != nil {
+		return fmt.Errorf("push file to workspace failed: %w", err)
+	}
+	return nil
+}
+
+func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
+	if err != nil {
+		return fmt.Errorf("run command in workspace failed: %w", err)
+	}
+	return nil
+}
+
+func (ac *AnyscaleCLI) startWorkspace(config *WorkspaceTestConfig) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
+	if err != nil {
+		return fmt.Errorf("start workspace failed: %w", err)
+	}
+	return nil
+}
+
+func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "status", "--name", workspaceName})
+	if err != nil {
+		return "", fmt.Errorf("get workspace state failed: %w", err)
+	}
+	return output, nil
+}
+
+func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state WorkspaceState) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()})
+	if err != nil {
+		return "", fmt.Errorf("wait for workspace state failed: %w", err)
+	}
+	return output, nil
+}
+
+func convertBuildIdToImageURI(buildId string) (string, string, error) {
+	// Convert build ID like "anyscaleray2441-py312-cu128" to "anyscale/ray:2.44.1-py312-cu128"
+	const prefix = "anyscaleray"
+	if !strings.HasPrefix(buildId, prefix) {
+		return "", "", fmt.Errorf("build ID must start with %q: %s", prefix, buildId)
+	}
+
+	// Remove the prefix to get "2441-py312-cu128"
+	remainder := strings.TrimPrefix(buildId, prefix)
+
+	// Find the first hyphen to separate version from suffix
+	hyphenIdx := strings.Index(remainder, "-")
+	var versionStr, suffix string
+	if hyphenIdx == -1 {
+		versionStr = remainder
+		suffix = ""
+	} else {
+		versionStr = remainder[:hyphenIdx]
+		suffix = remainder[hyphenIdx:] // includes the hyphen
+	}
+
+	// Parse version: "2441" -> "2.44.1"
+	// Format: major (1 digit), minor (2 digits), patch (1+ digits)
+	buildIDVersionRe := regexp.MustCompile(`^(\d)(\d{2})(\d+)$`)
+	matches := buildIDVersionRe.FindStringSubmatch(versionStr)
+	if matches == nil {
+		return "", "", fmt.Errorf("version string must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
+	}
+	major, minor, patch := matches[1], matches[2], matches[3]
+
+	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+}
+
+// convertImageURIToBuildID converts an image URI like "anyscale/ray:2.44.1-py312-cu128"
+// to a build ID like "anyscaleray2441-py312-cu128" and returns the ray version "2.44.1".
+func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err error) {
+	const prefix = "anyscale/ray:"
+	if !strings.HasPrefix(imageURI, prefix) {
+		return "", "", fmt.Errorf("image URI must start with %q: %s", prefix, imageURI)
+	}
+	tag := strings.TrimPrefix(imageURI, prefix)
+	hyphenIdx := strings.Index(tag, "-")
+	var versionStr, suffix string
+	if hyphenIdx == -1 {
+		versionStr = tag
+		suffix = ""
+	} else {
+		versionStr = tag[:hyphenIdx]
+		suffix = tag[hyphenIdx:]
+	}
+	// Require exactly 3 parts: major (1 digit).minor (2 digits).patch (1+ digits)
+	imageURIVersionRe := regexp.MustCompile(`^(\d)\.(\d{2})\.(\d+)$`)
+	matches := imageURIVersionRe.FindStringSubmatch(versionStr)
+	if matches == nil {
+		return "", "", fmt.Errorf("image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
+	}
+	major, minor, patch := matches[1], matches[2], matches[3]
+	versionCompact := major + minor + patch
+	return "anyscaleray" + versionCompact + suffix, versionStr, nil
+}
+
+// getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
+// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI; when both BuildID and ImageURI are set, ImageURI is used.
+func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
+	if env == nil {
+		return "", "", fmt.Errorf("cluster_env is required")
+	}
+	if env.BYOD != nil {
+		if env.BYOD.ContainerFile != "" {
+			return "", "", fmt.Errorf("cluster_env byod: containerfile is used via --containerfile; image URI not applicable")
+		}
+		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
+			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+		}
+		return env.BYOD.DockerImage, env.BYOD.RayVersion, nil
+	}
+	hasBuildID := strings.TrimSpace(env.BuildID) != ""
+	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
+	switch {
+	case !hasBuildID && !hasImageURI:
+		return "", "", fmt.Errorf("cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version")
+	case hasImageURI:
+		_, rayVersion, err := convertImageURIToBuildID(env.ImageURI)
+		if err != nil {
+			return "", "", err
+		}
+		return env.ImageURI, rayVersion, nil
+	default:
+		return convertBuildIdToImageURI(env.BuildID)
+	}
+}

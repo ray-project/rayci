@@ -49,232 +49,242 @@ func TestBuilder(t *testing.T) {
 
 	checkJupyterOrSkipOnLocal(t)
 
-	tmp := t.TempDir()
-
-	tmpl := &Template{
-		Name:  "reefy-ray",
-		Dir:   "reefy-ray",
-		Title: "Ray lives in the REEf",
-		ClusterEnv: &ClusterEnv{
-			BuildID: "anyscaleray2340-py311",
-		},
-		ComputeConfig: map[string]string{
-			"AWS": "configs/aws.yaml",
-			"GCP": "configs/gcp.yaml",
-		},
+	clusterEnvCases := []struct {
+		name       string
+		clusterEnv *ClusterEnv
+	}{
+		{"BuildID", &ClusterEnv{BuildID: "anyscaleray2340-py311"}},
+		{"ImageURI", &ClusterEnv{ImageURI: "anyscale/ray:2.34.0-py311"}},
 	}
 
-	// Build the template, save in tmp dir.
-	b := newBuilder(tmpl, "testdata")
-	if err := b.build(tmp); err != nil {
-		t.Fatal("build: ", err)
-	}
+	for _, cc := range clusterEnvCases {
+		t.Run(cc.name, func(t *testing.T) {
+			tmp := t.TempDir()
 
-	// Check the output files.
-	buildZip := filepath.Join(tmp, buildDotZip)
+			tmpl := &Template{
+				Name:       "reefy-ray",
+				Dir:        "reefy-ray",
+				Title:      "Ray lives in the REEf",
+				ClusterEnv: cc.clusterEnv,
+				ComputeConfig: map[string]string{
+					"AWS": "configs/aws.yaml",
+					"GCP": "configs/gcp.yaml",
+				},
+			}
 
-	z, err := zip.OpenReader(buildZip)
-	if err != nil {
-		t.Fatalf("open built zip: %v", err)
-	}
-	defer z.Close()
+			// Build the template, save in tmp dir.
+			b := newBuilder(tmpl, "testdata")
+			if err := b.build(tmp); err != nil {
+				t.Fatal("build: ", err)
+			}
 
-	gotFiles := make(map[string][]byte)
+			// Check the output files.
+			buildZip := filepath.Join(tmp, buildDotZip)
 
-	for _, f := range z.File {
-		content, err := readFileInZip(f)
-		if err != nil {
-			t.Fatalf("read file %q: %v", f.Name, err)
-		}
-		gotFiles[f.Name] = content
-	}
+			z, err := zip.OpenReader(buildZip)
+			if err != nil {
+				t.Fatalf("open built zip: %v", err)
+			}
+			defer z.Close()
 
-	gotFileNames := fileNameList(gotFiles)
+			gotFiles := make(map[string][]byte)
 
-	srcNotebook, err := os.ReadFile("testdata/reefy-ray/README.ipynb")
-	if err != nil {
-		t.Fatal("read src readme: ", err)
-	}
-	srcReadme, err := os.ReadFile("testdata/reefy-ray/README.md")
-	if err != nil {
-		t.Fatal("read src readme: ", err)
-	}
-	srcPng, err := os.ReadFile("testdata/reefy-ray/a.png")
-	if err != nil {
-		t.Fatal("read src png: ", err)
-	}
+			for _, f := range z.File {
+				content, err := readFileInZip(f)
+				if err != nil {
+					t.Fatalf("read file %q: %v", f.Name, err)
+				}
+				gotFiles[f.Name] = content
+			}
 
-	wantFiles := map[string][]byte{
-		"README.ipynb":       srcNotebook,
-		"README.md":          srcReadme,
-		"a.png":              srcPng,
-		".meta/ray-app.json": nil,
-	}
-	wantFileNames := fileNameList(wantFiles)
+			gotFileNames := fileNameList(gotFiles)
 
-	if !reflect.DeepEqual(gotFileNames, wantFileNames) {
-		t.Fatalf("got files %v, want %v", gotFileNames, wantFileNames)
-	}
+			srcNotebook, err := os.ReadFile("testdata/reefy-ray/README.ipynb")
+			if err != nil {
+				t.Fatal("read src readme: ", err)
+			}
+			srcReadme, err := os.ReadFile("testdata/reefy-ray/README.md")
+			if err != nil {
+				t.Fatal("read src readme: ", err)
+			}
+			srcPng, err := os.ReadFile("testdata/reefy-ray/a.png")
+			if err != nil {
+				t.Fatal("read src png: ", err)
+			}
 
-	for name, want := range wantFiles {
-		if want == nil {
-			continue
-		}
-		got := gotFiles[name]
-		if !bytes.Equal(got, want) {
-			t.Errorf("file %q: got %q, want %q", name, got, want)
-		}
-	}
+			wantFiles := map[string][]byte{
+				"README.ipynb":       srcNotebook,
+				"README.md":          srcReadme,
+				"a.png":              srcPng,
+				".meta/ray-app.json": nil,
+			}
+			wantFileNames := fileNameList(wantFiles)
 
-	// Check the meta file in the zip.
-	metaGot := new(templateMeta)
-	metaGotBytes := gotFiles[".meta/ray-app.json"]
-	if err := json.Unmarshal(metaGotBytes, metaGot); err != nil {
-		t.Fatalf("unmarshal meta json: %v", err)
-	}
+			if !reflect.DeepEqual(gotFileNames, wantFileNames) {
+				t.Fatalf("got files %v, want %v", gotFileNames, wantFileNames)
+			}
 
-	if metaGot.Name != "reefy-ray" {
-		t.Errorf("meta name: got %q, want %q", metaGot.Name, "reefy-ray")
-	}
+			for name, want := range wantFiles {
+				if want == nil {
+					continue
+				}
+				got := gotFiles[name]
+				if !bytes.Equal(got, want) {
+					t.Errorf("file %q: got %q, want %q", name, got, want)
+				}
+			}
 
-	clusterEnv, err := base64.StdEncoding.DecodeString(
-		metaGot.ClusterEnvBase64,
-	)
-	if err != nil {
-		t.Fatalf("decode cluster env: %v", err)
-	}
+			// Check the meta file in the zip.
+			metaGot := new(templateMeta)
+			metaGotBytes := gotFiles[".meta/ray-app.json"]
+			if err := json.Unmarshal(metaGotBytes, metaGot); err != nil {
+				t.Fatalf("unmarshal meta json: %v", err)
+			}
 
-	var clusterEnvGot *ClusterEnv
-	if err := json.Unmarshal(clusterEnv, &clusterEnvGot); err != nil {
-		t.Fatalf("unmarshal cluster env: %v", err)
-	}
-	if !reflect.DeepEqual(clusterEnvGot, tmpl.ClusterEnv) {
-		t.Errorf(
-			"cluster env: got %+v, want %+v",
-			clusterEnvGot, tmpl.ClusterEnv,
-		)
-	}
+			if metaGot.Name != "reefy-ray" {
+				t.Errorf("meta name: got %q, want %q", metaGot.Name, "reefy-ray")
+			}
 
-	// Check the content of the compute configs.
-	gcpComputeConfig, err := os.ReadFile("testdata/configs/gcp.yaml")
-	if err != nil {
-		t.Fatal("read gcp compute config: ", err)
-	}
-	awsComputeConfig, err := os.ReadFile("testdata/configs/aws.yaml")
-	if err != nil {
-		t.Fatal("read aws compute config: ", err)
-	}
-
-	gcpComputeConfigGot, err := base64.StdEncoding.DecodeString(
-		metaGot.ComputeConfigBase64["GCP"],
-	)
-	if err != nil {
-		t.Fatalf("decode gcp compute config: %v", err)
-	}
-	if !bytes.Equal(gcpComputeConfigGot, gcpComputeConfig) {
-		t.Errorf(
-			"gcp compute config: got %q, want %q",
-			gcpComputeConfigGot, gcpComputeConfig,
-		)
-	}
-
-	awsComputeConfigGot, err := base64.StdEncoding.DecodeString(
-		metaGot.ComputeConfigBase64["AWS"],
-	)
-	if err != nil {
-		t.Fatalf("decode aws compute config: %v", err)
-	}
-	if !bytes.Equal(awsComputeConfigGot, awsComputeConfig) {
-		t.Errorf(
-			"aws compute config: got %q, want %q",
-			awsComputeConfigGot, awsComputeConfig,
-		)
-	}
-
-	// Check the external app meta file is the same as the one in the zip.
-	externalAppMeta, err := os.ReadFile(filepath.Join(tmp, rayAppDotJSON))
-	if err != nil {
-		t.Fatalf("read external app meta: %v", err)
-	}
-	if !bytes.Equal(metaGotBytes, externalAppMeta) {
-		t.Errorf(
-			"external app meta: got %q, want %q",
-			metaGotBytes, externalAppMeta,
-		)
-	}
-
-	// Check the generated readme files.
-	// Only perform checks on some critical properties.
-
-	// First check the readme generated for docs.
-	// This is generated from the markdown file.
-	{
-		doc, err := os.ReadFile(filepath.Join(tmp, readmeDocMD))
-		if err != nil {
-			t.Fatalf("read generated readme: %v", err)
-		}
-		if !bytes.Contains(doc, []byte(`print("this is just an example")`)) {
-			t.Errorf("readme for doc %q, missing python code", doc)
-		}
-		if !bytes.Contains(doc, []byte("extra manual line")) {
-			t.Errorf("readme for doc %q, missing the manual line", doc)
-		}
-		if bytes.Contains(doc, []byte("a.png")) {
-			t.Errorf("readme for doc %q, png file not inlined", doc)
-		}
-	}
-
-	// Next check the readme converted from the notebook.
-	{
-		nb, err := os.ReadFile(filepath.Join(tmp, readmeNotebookGitHubMD))
-		if err != nil {
-			t.Fatalf("read generated readme: %v", err)
-		}
-
-		// We are emulating the situation where a user generates the README
-		// from the notebook, and then manually edits it (by appending an
-		// extra line), and saved it in the template's source directory.
-		// As a result, the generated README from the notebook should be a
-		// prefix of the README from the source directory.
-		if !bytes.HasPrefix(srcReadme, nb) {
-			t.Errorf(
-				"readme generated from notebook %q, is not the prefix of %q",
-				nb, srcReadme,
+			clusterEnv, err := base64.StdEncoding.DecodeString(
+				metaGot.ClusterEnvBase64,
 			)
-		}
-		if !bytes.Contains(nb, []byte(`print("this is just an example")`)) {
-			t.Errorf("readme for doc %q, missing python code", nb)
-		}
-	}
+			if err != nil {
+				t.Fatalf("decode cluster env: %v", err)
+			}
 
-	// Finally, check the readme cleaned up for GitHub.
-	// This should be exactly the same as the saved markdown file
-	// from the input.
-	{
-		gh, err := os.ReadFile(filepath.Join(tmp, readmeGitHubMD))
-		if err != nil {
-			t.Fatalf("read generated readme: %v", err)
-		}
+			var clusterEnvGot *ClusterEnv
+			if err := json.Unmarshal(clusterEnv, &clusterEnvGot); err != nil {
+				t.Fatalf("unmarshal cluster env: %v", err)
+			}
+			if !reflect.DeepEqual(clusterEnvGot, tmpl.ClusterEnv) {
+				t.Errorf(
+					"cluster env: got %+v, want %+v",
+					clusterEnvGot, tmpl.ClusterEnv,
+				)
+			}
 
-		if !bytes.Equal(gh, srcReadme) {
-			t.Errorf(
-				"readme for github %q, does not match the saved %q",
-				gh, srcReadme,
+			// Check the content of the compute configs.
+			gcpComputeConfig, err := os.ReadFile("testdata/configs/gcp.yaml")
+			if err != nil {
+				t.Fatal("read gcp compute config: ", err)
+			}
+			awsComputeConfig, err := os.ReadFile("testdata/configs/aws.yaml")
+			if err != nil {
+				t.Fatal("read aws compute config: ", err)
+			}
+
+			gcpComputeConfigGot, err := base64.StdEncoding.DecodeString(
+				metaGot.ComputeConfigBase64["GCP"],
 			)
-		}
-	}
+			if err != nil {
+				t.Fatalf("decode gcp compute config: %v", err)
+			}
+			if !bytes.Equal(gcpComputeConfigGot, gcpComputeConfig) {
+				t.Errorf(
+					"gcp compute config: got %q, want %q",
+					gcpComputeConfigGot, gcpComputeConfig,
+				)
+			}
 
-	previewZip := filepath.Join(tmp, previewDotZip)
-	z, err = zip.OpenReader(previewZip)
-	if err != nil {
-		t.Fatalf("open preview zip: %v", err)
-	}
-	defer z.Close()
+			awsComputeConfigGot, err := base64.StdEncoding.DecodeString(
+				metaGot.ComputeConfigBase64["AWS"],
+			)
+			if err != nil {
+				t.Fatalf("decode aws compute config: %v", err)
+			}
+			if !bytes.Equal(awsComputeConfigGot, awsComputeConfig) {
+				t.Errorf(
+					"aws compute config: got %q, want %q",
+					awsComputeConfigGot, awsComputeConfig,
+				)
+			}
 
-	// Make sure that .meta is empty.
-	for _, f := range z.File {
-		if strings.HasPrefix(f.Name, ".meta/") {
-			t.Fatalf("preview zip contains .meta/ directory")
-		}
+			// Check the external app meta file is the same as the one in the zip.
+			externalAppMeta, err := os.ReadFile(filepath.Join(tmp, rayAppDotJSON))
+			if err != nil {
+				t.Fatalf("read external app meta: %v", err)
+			}
+			if !bytes.Equal(metaGotBytes, externalAppMeta) {
+				t.Errorf(
+					"external app meta: got %q, want %q",
+					metaGotBytes, externalAppMeta,
+				)
+			}
+
+			// Check the generated readme files.
+			// Only perform checks on some critical properties.
+
+			// First check the readme generated for docs.
+			// This is generated from the markdown file.
+			{
+				doc, err := os.ReadFile(filepath.Join(tmp, readmeDocMD))
+				if err != nil {
+					t.Fatalf("read generated readme: %v", err)
+				}
+				if !bytes.Contains(doc, []byte(`print("this is just an example")`)) {
+					t.Errorf("readme for doc %q, missing python code", doc)
+				}
+				if !bytes.Contains(doc, []byte("extra manual line")) {
+					t.Errorf("readme for doc %q, missing the manual line", doc)
+				}
+				if bytes.Contains(doc, []byte("a.png")) {
+					t.Errorf("readme for doc %q, png file not inlined", doc)
+				}
+			}
+
+			// Next check the readme converted from the notebook.
+			{
+				nb, err := os.ReadFile(filepath.Join(tmp, readmeNotebookGitHubMD))
+				if err != nil {
+					t.Fatalf("read generated readme: %v", err)
+				}
+
+				// We are emulating the situation where a user generates the README
+				// from the notebook, and then manually edits it (by appending an
+				// extra line), and saved it in the template's source directory.
+				// As a result, the generated README from the notebook should be a
+				// prefix of the README from the source directory.
+				if !bytes.HasPrefix(srcReadme, nb) {
+					t.Errorf(
+						"readme generated from notebook %q, is not the prefix of %q",
+						nb, srcReadme,
+					)
+				}
+				if !bytes.Contains(nb, []byte(`print("this is just an example")`)) {
+					t.Errorf("readme for doc %q, missing python code", nb)
+				}
+			}
+
+			// Finally, check the readme cleaned up for GitHub.
+			// This should be exactly the same as the saved markdown file
+			// from the input.
+			{
+				gh, err := os.ReadFile(filepath.Join(tmp, readmeGitHubMD))
+				if err != nil {
+					t.Fatalf("read generated readme: %v", err)
+				}
+
+				if !bytes.Equal(gh, srcReadme) {
+					t.Errorf(
+						"readme for github %q, does not match the saved %q",
+						gh, srcReadme,
+					)
+				}
+			}
+
+			previewZip := filepath.Join(tmp, previewDotZip)
+			z, err = zip.OpenReader(previewZip)
+			if err != nil {
+				t.Fatalf("open preview zip: %v", err)
+			}
+			defer z.Close()
+
+			// Make sure that .meta is empty.
+			for _, f := range z.File {
+				if strings.HasPrefix(f.Name, ".meta/") {
+					t.Fatalf("preview zip contains .meta/ directory")
+				}
+			}
+		})
 	}
 }
