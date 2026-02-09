@@ -9,11 +9,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// parseComputeConfigName parses the AWS config path and converts it to a config name.
+// parseComputeConfigName parses the config path and converts it to a config name.
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
-func parseComputeConfigName(awsConfigPath string) string {
-	dir := filepath.Dir(awsConfigPath)
-	base := filepath.Base(awsConfigPath)
+func parseComputeConfigName(configPath string) string {
+	dir := filepath.Dir(configPath)
+	base := filepath.Base(configPath)
 	ext := filepath.Ext(base)
 	filename := strings.TrimSuffix(base, ext)
 	configDir := filepath.Base(dir)
