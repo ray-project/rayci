@@ -40,6 +40,23 @@ type Template struct {
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 }
 
+// Parse version: "2441" -> "2.44.1"
+// Format: major (1 digit), minor (2 digits), patch (1+ digits)
+var buildIDVersionRe = regexp.MustCompile(`^(\d)(\d{2})(\d+)$`)
+
+// Parse version: "2.44.1" -> "2441"
+// Format: major (1 digit).minor (2 digits).patch (1+ digits)
+var imageURIVersionRe = regexp.MustCompile(`^(\d)\.(\d{2})\.(\d+)$`)
+
+// splitOnFirstHyphen returns the part before the first hyphen and the part from the hyphen onward (suffix includes the hyphen).
+func splitOnFirstHyphen(s string) (before, suffix string) {
+	hyphenIdx := strings.Index(s, "-")
+	if hyphenIdx == -1 {
+		return s, ""
+	}
+	return s[:hyphenIdx], s[hyphenIdx:]
+}
+
 func convertBuildIdToImageURI(buildId string) (string, string, error) {
 	// Convert build ID like "anyscaleray2441-py312-cu128" to "anyscale/ray:2.44.1-py312-cu128"
 	const prefix = "anyscaleray"
@@ -49,21 +66,8 @@ func convertBuildIdToImageURI(buildId string) (string, string, error) {
 
 	// Remove the prefix to get "2441-py312-cu128"
 	remainder := strings.TrimPrefix(buildId, prefix)
+	versionStr, suffix := splitOnFirstHyphen(remainder)
 
-	// Find the first hyphen to separate version from suffix
-	hyphenIdx := strings.Index(remainder, "-")
-	var versionStr, suffix string
-	if hyphenIdx == -1 {
-		versionStr = remainder
-		suffix = ""
-	} else {
-		versionStr = remainder[:hyphenIdx]
-		suffix = remainder[hyphenIdx:] // includes the hyphen
-	}
-
-	// Parse version: "2441" -> "2.44.1"
-	// Format: major (1 digit), minor (2 digits), patch (1+ digits)
-	buildIDVersionRe := regexp.MustCompile(`^(\d)(\d{2})(\d+)$`)
 	matches := buildIDVersionRe.FindStringSubmatch(versionStr)
 	if matches == nil {
 		return "", "", fmt.Errorf("version string must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
@@ -81,17 +85,7 @@ func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err 
 		return "", "", fmt.Errorf("image URI must start with %q: %s", prefix, imageURI)
 	}
 	tag := strings.TrimPrefix(imageURI, prefix)
-	hyphenIdx := strings.Index(tag, "-")
-	var versionStr, suffix string
-	if hyphenIdx == -1 {
-		versionStr = tag
-		suffix = ""
-	} else {
-		versionStr = tag[:hyphenIdx]
-		suffix = tag[hyphenIdx:]
-	}
-	// Require exactly 3 parts: major (1 digit).minor (2 digits).patch (1+ digits)
-	imageURIVersionRe := regexp.MustCompile(`^(\d)\.(\d{2})\.(\d+)$`)
+	versionStr, suffix := splitOnFirstHyphen(tag)
 	matches := imageURIVersionRe.FindStringSubmatch(versionStr)
 	if matches == nil {
 		return "", "", fmt.Errorf("image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
