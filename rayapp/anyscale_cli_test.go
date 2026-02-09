@@ -1,7 +1,6 @@
 package rayapp
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
