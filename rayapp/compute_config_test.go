@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,4 +155,137 @@ func TestIsOldComputeConfigFormat(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConvertComputeConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	oldFormat := strings.Join([]string{
+		"head_node_type:",
+		"  name: head",
+		"  instance_type: m5.xlarge",
+		"worker_node_types:",
+		"  - name: worker",
+		"    instance_type: m5.2xlarge",
+	}, "\n")
+
+	t.Run("success", func(t *testing.T) {
+		path := filepath.Join(dir, "old.yaml")
+		if err := os.WriteFile(path, []byte(oldFormat), 0644); err != nil {
+			t.Fatal(err)
+		}
+		got, err := ConvertComputeConfig(path)
+		if err != nil {
+			t.Fatalf("ConvertComputeConfig() error = %v", err)
+		}
+		if !strings.Contains(string(got), "head_node:") {
+			t.Errorf("output should contain head_node, got %s", got)
+		}
+		if !strings.Contains(string(got), "instance_type: m5.xlarge") {
+			t.Errorf("output should contain instance_type from head, got %s", got)
+		}
+		if !strings.Contains(string(got), "auto_select_worker_config: true") {
+			t.Errorf("output should contain auto_select_worker_config, got %s", got)
+		}
+	})
+
+	t.Run("read error", func(t *testing.T) {
+		_, err := ConvertComputeConfig(filepath.Join(dir, "nonexistent.yaml"))
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to read old config file") {
+			t.Errorf("error %q should contain 'failed to read old config file'", err.Error())
+		}
+	})
+
+	t.Run("parse error", func(t *testing.T) {
+		path := filepath.Join(dir, "bad.yaml")
+		if err := os.WriteFile(path, []byte("not: valid: yaml: ["), 0644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := ConvertComputeConfig(path)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to parse old config") {
+			t.Errorf("error %q should contain 'failed to parse old config'", err.Error())
+		}
+	})
+}
+
+func TestConvertComputeConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	oldFormat := strings.Join([]string{
+		"head_node_type:",
+		"  name: head",
+		"  instance_type: m5.large",
+	}, "\n")
+	oldPath := filepath.Join(dir, "old.yaml")
+	if err := os.WriteFile(oldPath, []byte(oldFormat), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("success with output file", func(t *testing.T) {
+		outPath := filepath.Join(dir, "new.yaml")
+		err := ConvertComputeConfigFile(oldPath, outPath)
+		if err != nil {
+			t.Fatalf("ConvertComputeConfigFile() error = %v", err)
+		}
+		data, err := os.ReadFile(outPath)
+		if err != nil {
+			t.Fatalf("read output file: %v", err)
+		}
+		if !strings.Contains(string(data), "head_node:") {
+			t.Errorf("output file should contain head_node, got %s", data)
+		}
+		if !strings.Contains(string(data), "instance_type: m5.large") {
+			t.Errorf("output file should contain instance_type, got %s", data)
+		}
+	})
+
+	t.Run("success with empty output path writes to stdout", func(t *testing.T) {
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		orig := os.Stdout
+		os.Stdout = w
+		t.Cleanup(func() { os.Stdout = orig })
+		err = ConvertComputeConfigFile(oldPath, "")
+		if err != nil {
+			w.Close()
+			t.Fatalf("ConvertComputeConfigFile() error = %v", err)
+		}
+		w.Close()
+		out, _ := io.ReadAll(r)
+		r.Close()
+		if !strings.Contains(string(out), "head_node:") {
+			t.Errorf("stdout should contain head_node, got %q", out)
+		}
+		if !strings.Contains(string(out), "auto_select_worker_config: true") {
+			t.Errorf("stdout should contain auto_select_worker_config, got %q", out)
+		}
+	})
+
+	t.Run("convert error", func(t *testing.T) {
+		err := ConvertComputeConfigFile(filepath.Join(dir, "nonexistent.yaml"), filepath.Join(dir, "out.yaml"))
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to convert compute config") {
+			t.Errorf("error %q should contain 'failed to convert compute config'", err.Error())
+		}
+	})
+
+	t.Run("write error", func(t *testing.T) {
+		outPath := filepath.Join(dir, "subdir", "new.yaml")
+		err := ConvertComputeConfigFile(oldPath, outPath)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to write new config file") {
+			t.Errorf("error %q should contain 'failed to write new config file'", err.Error())
+		}
+	})
 }

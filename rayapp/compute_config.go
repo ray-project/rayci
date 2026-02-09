@@ -17,6 +17,9 @@ func parseComputeConfigName(configPath string) string {
 	ext := filepath.Ext(base)
 	filename := strings.TrimSuffix(base, ext)
 	configDir := filepath.Base(dir)
+	if configDir == "." || configDir == string(filepath.Separator) {
+		return filename
+	}
 	return configDir + "-" + filename
 }
 
@@ -94,7 +97,7 @@ func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
 func ConvertComputeConfigFile(oldConfigPath, newConfigPath string) error {
 	newData, err := ConvertComputeConfig(oldConfigPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to convert compute config: %w", err)
 	}
 	if newConfigPath == "" {
 		fmt.Print(string(newData))
