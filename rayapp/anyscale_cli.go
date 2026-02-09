@@ -13,13 +13,15 @@ import (
 )
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
-type AnyscaleCLI struct{}
+type AnyscaleCLI struct {
+	client *http.Client
+}
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
-	return &AnyscaleCLI{}
+	return &AnyscaleCLI{client: &http.Client{}}
 }
 
 type WorkspaceState int
@@ -40,11 +42,12 @@ func (ws WorkspaceState) String() string {
 	return WorkspaceStateName[ws]
 }
 
+var workspaceIDRe = regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
+
 // extractWorkspaceID extracts the workspace ID from the CLI output.
 // Expected format: "Workspace created successfully id: expwrk_xxx"
 func extractWorkspaceID(output string) (string, error) {
-	re := regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
-	matches := re.FindStringSubmatch(output)
+	matches := workspaceIDRe.FindStringSubmatch(output)
 	if len(matches) < 2 {
 		return "", fmt.Errorf("could not extract workspace ID from output: %s", output)
 	}
@@ -220,8 +223,7 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	req.Header.Set("Authorization", "Bearer "+apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := ac.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
