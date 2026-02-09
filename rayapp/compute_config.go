@@ -68,6 +68,11 @@ type NewHeadNode struct {
 	InstanceType string `yaml:"instance_type"`
 }
 
+// marshalNewConfig marshals NewComputeConfig to YAML. It is a package-level var for testability.
+var marshalNewConfig = func(c *NewComputeConfig) ([]byte, error) {
+	return yaml.Marshal(c)
+}
+
 // ConvertComputeConfig converts an old format compute config to the new format.
 // It reads the old YAML file, transforms the structure, and returns the new YAML content.
 func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
@@ -85,7 +90,7 @@ func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
 		},
 		AutoSelectWorkerConfig: true,
 	}
-	newData, err := yaml.Marshal(&newConfig)
+	newData, err := marshalNewConfig(&newConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal new config: %w", err)
 	}

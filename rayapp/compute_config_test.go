@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -38,6 +39,11 @@ func TestParseComputeConfigName(t *testing.T) {
 			name:           "yaml extension",
 			configPath:     "configs/my-config/aws.yaml",
 			wantConfigName: "my-config-aws",
+		},
+		{
+			name:           "no parent directory",
+			configPath:     "aws.yaml",
+			wantConfigName: "aws",
 		},
 	}
 
@@ -210,6 +216,33 @@ func TestConvertComputeConfig(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "failed to parse old config") {
 			t.Errorf("error %q should contain 'failed to parse old config'", err.Error())
+		}
+	})
+
+	t.Run("marshal error", func(t *testing.T) {
+		path := filepath.Join(dir, "old.yaml")
+		oldFormat := strings.Join([]string{
+			"head_node_type:",
+			"  name: head",
+			"  instance_type: m5.xlarge",
+		}, "\n")
+		if err := os.WriteFile(path, []byte(oldFormat), 0644); err != nil {
+			t.Fatal(err)
+		}
+		orig := marshalNewConfig
+		marshalNewConfig = func(*NewComputeConfig) ([]byte, error) {
+			return nil, errors.New("marshal fail")
+		}
+		t.Cleanup(func() { marshalNewConfig = orig })
+		_, err := ConvertComputeConfig(path)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to marshal new config") {
+			t.Errorf("error %q should contain 'failed to marshal new config'", err.Error())
+		}
+		if !strings.Contains(err.Error(), "marshal fail") {
+			t.Errorf("error %q should contain wrapped cause 'marshal fail'", err.Error())
 		}
 	})
 }
