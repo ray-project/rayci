@@ -136,10 +136,10 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			wantErr:    errors.New("anyscale error"),
 		},
 		{
-			name:       "exec failed with exit code in output",
-			script:     "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
-			args:       []string{"deploy"},
-			wantErr:    errors.New("anyscale error: command failed:"),
+			name:    "exec failed with exit code in output",
+			script:  "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
+			args:    []string{"deploy"},
+			wantErr: errors.New("anyscale error: command failed:"),
 		},
 	}
 
