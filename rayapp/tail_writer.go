@@ -1,6 +1,9 @@
 package rayapp
 
-import "bytes"
+import (
+	"bytes"
+	"sync"
+)
 
 // tailWriter keeps the most recent `limit` bytes written to it.
 // It uses a double-buffer strategy with two bytes.Buffers: writes go
@@ -8,6 +11,7 @@ import "bytes"
 // is discarded and the two are swapped. Initial memory footprint is
 // near zero because bytes.Buffer grows lazily.
 type tailWriter struct {
+	mu     sync.Mutex
 	stale  bytes.Buffer
 	active bytes.Buffer
 	limit  int
@@ -26,6 +30,9 @@ func (w *tailWriter) Write(p []byte) (int, error) {
 	if n == 0 {
 		return 0, nil
 	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// If a single write is >= limit, keep only the last `limit` bytes.
 	if n >= w.limit {
@@ -50,6 +57,9 @@ func (w *tailWriter) rotate() {
 
 // String returns the most recent `limit` bytes as a string.
 func (w *tailWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	staleBytes := w.stale.Bytes()
 	activeBytes := w.active.Bytes()
 	total := len(staleBytes) + len(activeBytes)
