@@ -443,13 +443,13 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 				if !strings.Contains(err.Error(), "docker_image") && !strings.Contains(err.Error(), "containerfile") {
 					t.Errorf("error %q should mention docker_image or containerfile", err.Error())
 				}
+			case "byod missing ray_version":
+				if !strings.Contains(err.Error(), "ray_version") {
+					t.Errorf("error %q should mention ray_version requirement", err.Error())
+				}
 			case "byod both docker_image and containerfile":
 				if !strings.Contains(err.Error(), "exactly one") && !strings.Contains(err.Error(), "not both") {
 					t.Errorf("error %q should mention exactly one of docker_image or containerfile, not both", err.Error())
-				}
-			default:
-				if !strings.Contains(err.Error(), "ray_version") {
-					t.Errorf("error %q should mention ray_version requirement", err.Error())
 				}
 			}
 		})

@@ -131,21 +131,22 @@ func validateAndBuildClusterEnv(env *ClusterEnv) error {
 	if env == nil {
 		return nil
 	}
-	hasBuildID := env.BuildID != ""
-	hasImageURI := env.ImageURI != ""
+ 	hasBuildID := strings.TrimSpace(env.BuildID) != ""
+	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
 	if env.BYOD != nil {
-		hasDocker := env.BYOD.DockerImage != ""
-		hasContainer := env.BYOD.ContainerFile != ""
+		hasDocker := strings.TrimSpace(env.BYOD.DockerImage) != ""
+		hasContainer := strings.TrimSpace(env.BYOD.ContainerFile) != ""
 		if hasDocker && hasContainer {
 			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or containerfile, not both")
 		}
 		if !hasDocker && !hasContainer {
 			return fmt.Errorf("cluster_env byod: specify one of docker_image or containerfile")
 		}
-		if env.BYOD.RayVersion == "" {
+		if strings.TrimSpace(env.BYOD.RayVersion) == "" {
 			return fmt.Errorf("cluster_env byod: ray_version is required")
 		}
 		return nil
+	}
 	}
 	if !hasBuildID && !hasImageURI {
 		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
