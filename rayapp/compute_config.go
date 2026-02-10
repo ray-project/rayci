@@ -9,14 +9,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// parseComputeConfigName parses the AWS config path and converts it to a config name.
+// parseComputeConfigName parses the config path and converts it to a config name.
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
-func parseComputeConfigName(awsConfigPath string) string {
-	dir := filepath.Dir(awsConfigPath)
-	base := filepath.Base(awsConfigPath)
+func parseComputeConfigName(configPath string) string {
+	dir := filepath.Dir(configPath)
+	base := filepath.Base(configPath)
 	ext := filepath.Ext(base)
 	filename := strings.TrimSuffix(base, ext)
 	configDir := filepath.Base(dir)
+	if configDir == "." || configDir == string(filepath.Separator) {
+		return filename
+	}
 	return configDir + "-" + filename
 }
 
@@ -65,6 +68,11 @@ type NewHeadNode struct {
 	InstanceType string `yaml:"instance_type"`
 }
 
+// marshalNewConfig marshals NewComputeConfig to YAML. It is a package-level var for testability.
+var marshalNewConfig = func(c *NewComputeConfig) ([]byte, error) {
+	return yaml.Marshal(c)
+}
+
 // ConvertComputeConfig converts an old format compute config to the new format.
 // It reads the old YAML file, transforms the structure, and returns the new YAML content.
 func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
@@ -82,7 +90,7 @@ func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
 		},
 		AutoSelectWorkerConfig: true,
 	}
-	newData, err := yaml.Marshal(&newConfig)
+	newData, err := marshalNewConfig(&newConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal new config: %w", err)
 	}
@@ -94,7 +102,7 @@ func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
 func ConvertComputeConfigFile(oldConfigPath, newConfigPath string) error {
 	newData, err := ConvertComputeConfig(oldConfigPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to convert compute config: %w", err)
 	}
 	if newConfigPath == "" {
 		fmt.Print(string(newData))
