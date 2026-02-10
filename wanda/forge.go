@@ -83,6 +83,8 @@ func Build(specFile string, config *ForgeConfig) error {
 			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
 				return fmt.Errorf("extract artifacts: %w", err)
 			}
+		} else if rootCacheHit && len(rootSpec.Artifacts) > 0 {
+			log.Printf("skipping artifact extraction: cache hit")
 		}
 	}
 
