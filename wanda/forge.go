@@ -60,15 +60,18 @@ func Build(specFile string, config *ForgeConfig) error {
 		order = []string{graph.Root}
 	}
 
-	cacheHitsBefore := forge.cacheHit()
-
+	var targetCacheHit bool
 	for _, name := range order {
 		rs := graph.Specs[name]
 
 		log.Printf("building %s (from %s)", name, rs.Path)
 
+		hitsBefore := forge.cacheHit()
 		if err := forge.Build(rs.Spec); err != nil {
 			return fmt.Errorf("build %s: %w", name, err)
+		}
+		if name == graph.Root {
+			targetCacheHit = forge.cacheHit() > hitsBefore
 		}
 	}
 
@@ -77,13 +80,12 @@ func Build(specFile string, config *ForgeConfig) error {
 	// remote registry; extracting would require pulling it first.
 	if config.ArtifactsDir != "" {
 		rootSpec := graph.Specs[graph.Root].Spec
-		rootCacheHit := forge.cacheHit() > cacheHitsBefore
-		if len(rootSpec.Artifacts) > 0 && !rootCacheHit {
+		if len(rootSpec.Artifacts) > 0 && !targetCacheHit {
 			rootTag := forge.workTag(rootSpec.Name)
 			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
 				return fmt.Errorf("extract artifacts: %w", err)
 			}
-		} else if rootCacheHit && len(rootSpec.Artifacts) > 0 {
+		} else if targetCacheHit && len(rootSpec.Artifacts) > 0 {
 			log.Printf("skipping artifact extraction: cache hit")
 		}
 	}
