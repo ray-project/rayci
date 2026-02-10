@@ -149,7 +149,12 @@ func (c *dockerCmd) createContainer(image string) (string, error) {
 }
 
 // copyFromContainer copies a file or directory from a container to the host.
+// If src ends with "/", the contents of the directory are copied (not the
+// directory itself) by appending "." per docker cp convention.
 func (c *dockerCmd) copyFromContainer(containerID, src, dst string) error {
+	if strings.HasSuffix(src, "/") {
+		src += "."
+	}
 	return c.run("cp", containerID+":"+src, dst)
 }
 
