@@ -1,19 +1,19 @@
 package rayapp
 
 import (
-	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// setupMockAnyscale creates a mock anyscale script and returns a cleanup function.
-func setupMockAnyscale(t *testing.T, script string) {
+// setupFakeAnyscale creates a fake anyscale script and returns a cleanup function.
+func setupFakeAnyscale(t *testing.T, script string) {
 	t.Helper()
 	tmp := t.TempDir()
 
 	if script != "" {
-		mockScript := tmp + "/anyscale"
+		mockScript := filepath.Join(tmp, "anyscale")
 		if err := os.WriteFile(mockScript, []byte(script), 0755); err != nil {
 			t.Fatalf("failed to create mock script: %v", err)
 		}
@@ -33,14 +33,14 @@ func TestNewAnyscaleCLI(t *testing.T) {
 
 func TestIsAnyscaleInstalled(t *testing.T) {
 	t.Run("not installed", func(t *testing.T) {
-		setupMockAnyscale(t, "")
+		setupFakeAnyscale(t, "")
 		if isAnyscaleInstalled() {
 			t.Error("should return false when not in PATH")
 		}
 	})
 
 	t.Run("installed", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho mock")
+		setupFakeAnyscale(t, "#!/bin/sh\necho mock")
 		if !isAnyscaleInstalled() {
 			t.Error("should return true when in PATH")
 		}
@@ -57,7 +57,7 @@ for ((i=1; i<=12000; i++)); do
     printf "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"
 done
 `
-	setupMockAnyscale(t, script)
+	setupFakeAnyscale(t, script)
 	cli := NewAnyscaleCLI()
 
 	output, err := cli.runAnyscaleCLI([]string{})
@@ -85,14 +85,14 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		name       string
 		script     string
 		args       []string
-		wantErr    error
+		wantErrStr string
 		wantSubstr string
 	}{
 		{
 			name:    "anyscale not installed",
 			script:  "", // empty PATH, no script
 			args:    []string{"--version"},
-			wantErr: errors.New("anyscale is not installed"),
+			wantErrStr: "anyscale is not installed",
 		},
 		{
 			name:       "success",
@@ -111,23 +111,23 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
 			wantSubstr: "error msg",
-			wantErr:    errors.New("anyscale error"),
+			wantErrStr: "anyscale error",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setupMockAnyscale(t, tt.script)
+			setupFakeAnyscale(t, tt.script)
 			cli := NewAnyscaleCLI()
 
 			output, err := cli.runAnyscaleCLI(tt.args)
 
-			if tt.wantErr != nil {
+			if tt.wantErrStr != "" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if !strings.Contains(err.Error(), tt.wantErr.Error()) {
-					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr.Error())
+				if !strings.Contains(err.Error(), tt.wantErrStr) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErrStr)
 				}
 				return
 			}
