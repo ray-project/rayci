@@ -7,21 +7,21 @@ import (
 	"testing"
 )
 
-// setupFakeAnyscale creates a fake anyscale script and returns a cleanup function.
-func setupFakeAnyscale(t *testing.T, script string) {
+// writeFakeAnyscale writes a fake anyscale script to a temp directory
+// and returns its path. If script is empty, returns a path that does not exist.
+func writeFakeAnyscale(t *testing.T, script string) string {
 	t.Helper()
 	tmp := t.TempDir()
+	bin := filepath.Join(tmp, "anyscale")
 
-	if script != "" {
-		mockScript := filepath.Join(tmp, "anyscale")
-		if err := os.WriteFile(mockScript, []byte(script), 0755); err != nil {
-			t.Fatalf("failed to create mock script: %v", err)
-		}
+	if script == "" {
+		return bin // non-existent path
 	}
 
-	origPath := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", origPath) })
-	os.Setenv("PATH", tmp)
+	if err := os.WriteFile(bin, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to create fake script: %v", err)
+	}
+	return bin
 }
 
 func TestNewAnyscaleCLI(t *testing.T) {
@@ -33,16 +33,16 @@ func TestNewAnyscaleCLI(t *testing.T) {
 
 func TestIsAnyscaleInstalled(t *testing.T) {
 	t.Run("not installed", func(t *testing.T) {
-		setupFakeAnyscale(t, "")
-		if isAnyscaleInstalled() {
-			t.Error("should return false when not in PATH")
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "")}
+		if cli.isAnyscaleInstalled() {
+			t.Error("should return false when binary does not exist")
 		}
 	})
 
 	t.Run("installed", func(t *testing.T) {
-		setupFakeAnyscale(t, "#!/bin/sh\necho mock")
-		if !isAnyscaleInstalled() {
-			t.Error("should return true when in PATH")
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho mock")}
+		if !cli.isAnyscaleInstalled() {
+			t.Error("should return true when binary exists")
 		}
 	})
 }
@@ -57,8 +57,7 @@ for ((i=1; i<=12000; i++)); do
     printf "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"
 done
 `
-	setupFakeAnyscale(t, script)
-	cli := NewAnyscaleCLI()
+	cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 	output, err := cli.runAnyscaleCLI([]string{})
 	if err != nil {
@@ -89,9 +88,9 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		wantSubstr string
 	}{
 		{
-			name:    "anyscale not installed",
-			script:  "", // empty PATH, no script
-			args:    []string{"--version"},
+			name:       "anyscale not installed",
+			script:     "", // non-existent binary
+			args:       []string{"--version"},
 			wantErrStr: "anyscale is not installed",
 		},
 		{
@@ -117,8 +116,7 @@ func TestRunAnyscaleCLI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setupFakeAnyscale(t, tt.script)
-			cli := NewAnyscaleCLI()
+			cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, tt.script)}
 
 			output, err := cli.runAnyscaleCLI(tt.args)
 
