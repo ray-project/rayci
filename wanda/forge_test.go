@@ -987,6 +987,69 @@ func TestBuild_WithArtifacts_cacheHit(t *testing.T) {
 	}
 }
 
+func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
+	// Regression test: when a dependency gets a cache hit but the root is
+	// rebuilt, artifacts should still be extracted for the root.
+	// Before the fix, the cache-hit counter was checked globally across
+	// all builds in the loop, so a dep cache hit incorrectly caused
+	// artifact extraction to be skipped for the root.
+
+	wandaSpecs := filepath.Join(t.TempDir(), ".wandaspecs")
+	absTestdata, err := filepath.Abs("testdata")
+	if err != nil {
+		t.Fatalf("abs testdata: %v", err)
+	}
+	if err := os.WriteFile(wandaSpecs, []byte(absTestdata), 0644); err != nil {
+		t.Fatalf("write wandaspecs: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	envFile := filepath.Join(tmpDir, "build.env")
+	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v1\n"), 0644); err != nil {
+		t.Fatalf("write envfile: %v", err)
+	}
+
+	artifactsDir1 := filepath.Join(tmpDir, "artifacts1")
+	config := &ForgeConfig{
+		WorkDir:        "testdata",
+		NamePrefix:     "cr.ray.io/rayproject/",
+		WandaSpecsFile: wandaSpecs,
+		ArtifactsDir:   artifactsDir1,
+		EnvFile:        envFile,
+	}
+
+	// First build: both dep and root are fresh, artifacts extracted.
+	if err := Build("testdata/cache-dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("first build: %v", err)
+	}
+
+	extracted1 := filepath.Join(artifactsDir1, "output.txt")
+	if _, err := os.Stat(extracted1); os.IsNotExist(err) {
+		t.Fatal("first build should have extracted artifact")
+	}
+
+	// Change BUILD_VALUE. This invalidates the root's cache (different
+	// build arg) but NOT the dep's (dep doesn't use BUILD_VALUE).
+	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v2\n"), 0644); err != nil {
+		t.Fatalf("update envfile: %v", err)
+	}
+
+	artifactsDir2 := filepath.Join(tmpDir, "artifacts2")
+	config.ArtifactsDir = artifactsDir2
+
+	// Second build: dep cache hit, root cache miss.
+	// Artifacts SHOULD be extracted because the root was rebuilt.
+	if err := Build("testdata/cache-dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("second build: %v", err)
+	}
+
+	extracted2 := filepath.Join(artifactsDir2, "output.txt")
+	if _, err := os.Stat(extracted2); os.IsNotExist(err) {
+		t.Error("artifact should be extracted when root is rebuilt (dep cache hit)")
+	}
+}
+
 func TestBuild_WithArtifacts_noCmdImage(t *testing.T) {
 	tmpDir := t.TempDir()
 	artifactsDir := filepath.Join(tmpDir, "artifacts")
