@@ -1,6 +1,9 @@
 package rayapp
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestTailWriter(t *testing.T) {
 	t.Run("under limit", func(t *testing.T) {
@@ -79,6 +82,26 @@ func TestTailWriter(t *testing.T) {
 		tw.Write([]byte(""))
 		if got, want := tw.String(), "ab"; got != want {
 			t.Errorf("String() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("concurrent writes", func(t *testing.T) {
+		tw := newTailWriter(256)
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 100; j++ {
+					tw.Write([]byte("abcdefgh"))
+				}
+			}()
+		}
+		wg.Wait()
+
+		got := tw.String()
+		if len(got) > 256 {
+			t.Errorf("String() length = %d, want <= 256", len(got))
 		}
 	})
 }

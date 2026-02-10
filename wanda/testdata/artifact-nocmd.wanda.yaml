@@ -1,0 +1,5 @@
+name: artifact-nocmd
+dockerfile: Dockerfile.nocmd
+artifacts:
+  - src: /output.txt
+    dst: output.txt

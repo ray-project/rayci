@@ -1,0 +1,4 @@
+ARG BASE
+FROM ${BASE}
+
+RUN echo "top-layer-file" > /top-layer.txt

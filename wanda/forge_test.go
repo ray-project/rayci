@@ -846,3 +846,233 @@ func TestBuild_EnvfileCacheInvalidation(t *testing.T) {
 		t.Errorf("expected cache miss on changed envfile, got %d hits", forge2.cacheHit())
 	}
 }
+
+func TestForgeConfigArtifactsDir(t *testing.T) {
+	config := &ForgeConfig{ArtifactsDir: "/custom/artifacts", WorkDir: "/work"}
+	if got := config.ArtifactsDir; got != "/custom/artifacts" {
+		t.Errorf("ArtifactsDir = %q, want %q", got, "/custom/artifacts")
+	}
+}
+
+func TestBuild_WithArtifacts_exact(t *testing.T) {
+	tmpDir := t.TempDir()
+	artifactsDir := filepath.Join(tmpDir, "artifacts")
+
+	config := &ForgeConfig{
+		WorkDir:      "testdata",
+		NamePrefix:   "cr.ray.io/rayproject/",
+		ArtifactsDir: artifactsDir,
+		Rebuild:      true, // force rebuild to test extraction
+	}
+
+	if err := Build("testdata/artifact-exact.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	extractedFile := filepath.Join(artifactsDir, "bin/myapp")
+	content, err := os.ReadFile(extractedFile)
+	if err != nil {
+		t.Fatalf("read extracted file: %v", err)
+	}
+
+	want := "binary-content\n"
+	if got := string(content); got != want {
+		t.Errorf("extracted content = %q, want %q", got, want)
+	}
+}
+
+func TestBuild_WithArtifacts_optional(t *testing.T) {
+	tmpDir := t.TempDir()
+	artifactsDir := filepath.Join(tmpDir, "artifacts")
+
+	config := &ForgeConfig{
+		WorkDir:      "testdata",
+		NamePrefix:   "cr.ray.io/rayproject/",
+		ArtifactsDir: artifactsDir,
+		Rebuild:      true,
+	}
+
+	// Build should succeed even though the optional artifact doesn't exist
+	if err := Build("testdata/artifact-optional.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	// Required artifact should be extracted
+	extractedFile := filepath.Join(artifactsDir, "bin/myapp")
+	content, err := os.ReadFile(extractedFile)
+	if err != nil {
+		t.Fatalf("read extracted file: %v", err)
+	}
+
+	want := "binary-content\n"
+	if got := string(content); got != want {
+		t.Errorf("extracted content = %q, want %q", got, want)
+	}
+
+	// Optional artifact should not exist (since source doesn't exist)
+	optionalFile := filepath.Join(artifactsDir, "optional.txt")
+	if _, err := os.Stat(optionalFile); !os.IsNotExist(err) {
+		t.Errorf("optional file should not exist, but got err: %v", err)
+	}
+}
+
+func TestBuild_WithArtifacts_rootOnly(t *testing.T) {
+	wandaSpecs := filepath.Join(t.TempDir(), ".wandaspecs")
+	absTestdata, err := filepath.Abs("testdata")
+	if err != nil {
+		t.Fatalf("abs testdata: %v", err)
+	}
+	if err := os.WriteFile(wandaSpecs, []byte(absTestdata), 0644); err != nil {
+		t.Fatalf("write wandaspecs: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	artifactsDir := filepath.Join(tmpDir, "artifacts")
+
+	config := &ForgeConfig{
+		WorkDir:        "testdata",
+		NamePrefix:     "cr.ray.io/rayproject/",
+		WandaSpecsFile: wandaSpecs,
+		ArtifactsDir:   artifactsDir,
+		Rebuild:        true,
+	}
+
+	if err := Build("testdata/artifact-dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("build with deps: %v", err)
+	}
+
+	topFile := filepath.Join(artifactsDir, "top.txt")
+	if _, err := os.Stat(topFile); os.IsNotExist(err) {
+		t.Error("root spec artifact should have been extracted")
+	}
+
+	depDocsFile := filepath.Join(artifactsDir, "docs/readme.md")
+	if _, err := os.Stat(depDocsFile); !os.IsNotExist(err) {
+		t.Error("dependency artifact should NOT have been extracted")
+	}
+}
+
+func TestBuild_WithArtifacts_cacheHit(t *testing.T) {
+	tmpDir := t.TempDir()
+	artifactsDir1 := filepath.Join(tmpDir, "artifacts1")
+	artifactsDir2 := filepath.Join(tmpDir, "artifacts2")
+
+	config := &ForgeConfig{
+		WorkDir:      "testdata",
+		NamePrefix:   "cr.ray.io/rayproject/",
+		ArtifactsDir: artifactsDir1,
+		Rebuild:      true, // force build for first run
+	}
+
+	if err := Build("testdata/artifact-exact.wanda.yaml", config); err != nil {
+		t.Fatalf("first build: %v", err)
+	}
+
+	extractedFile1 := filepath.Join(artifactsDir1, "bin/myapp")
+	if _, err := os.Stat(extractedFile1); os.IsNotExist(err) {
+		t.Fatal("first build should have extracted artifact")
+	}
+
+	// Second build should hit cache and skip extraction
+	config.ArtifactsDir = artifactsDir2
+	config.Rebuild = false
+
+	if err := Build("testdata/artifact-exact.wanda.yaml", config); err != nil {
+		t.Fatalf("second build: %v", err)
+	}
+
+	extractedFile2 := filepath.Join(artifactsDir2, "bin/myapp")
+	if _, err := os.Stat(extractedFile2); !os.IsNotExist(err) {
+		t.Error("artifact should NOT be extracted on cache hit")
+	}
+}
+
+func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
+	// Regression test: when a dependency gets a cache hit but the root is
+	// rebuilt, artifacts should still be extracted for the root.
+	// Before the fix, the cache-hit counter was checked globally across
+	// all builds in the loop, so a dep cache hit incorrectly caused
+	// artifact extraction to be skipped for the root.
+
+	wandaSpecs := filepath.Join(t.TempDir(), ".wandaspecs")
+	absTestdata, err := filepath.Abs("testdata")
+	if err != nil {
+		t.Fatalf("abs testdata: %v", err)
+	}
+	if err := os.WriteFile(wandaSpecs, []byte(absTestdata), 0644); err != nil {
+		t.Fatalf("write wandaspecs: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	envFile := filepath.Join(tmpDir, "build.env")
+	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v1\n"), 0644); err != nil {
+		t.Fatalf("write envfile: %v", err)
+	}
+
+	artifactsDir1 := filepath.Join(tmpDir, "artifacts1")
+	config := &ForgeConfig{
+		WorkDir:        "testdata",
+		NamePrefix:     "cr.ray.io/rayproject/",
+		WandaSpecsFile: wandaSpecs,
+		ArtifactsDir:   artifactsDir1,
+		EnvFile:        envFile,
+	}
+
+	// First build: both dep and root are fresh, artifacts extracted.
+	if err := Build("testdata/cache-dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("first build: %v", err)
+	}
+
+	extracted1 := filepath.Join(artifactsDir1, "output.txt")
+	if _, err := os.Stat(extracted1); os.IsNotExist(err) {
+		t.Fatal("first build should have extracted artifact")
+	}
+
+	// Change BUILD_VALUE. This invalidates the root's cache (different
+	// build arg) but NOT the dep's (dep doesn't use BUILD_VALUE).
+	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v2\n"), 0644); err != nil {
+		t.Fatalf("update envfile: %v", err)
+	}
+
+	artifactsDir2 := filepath.Join(tmpDir, "artifacts2")
+	config.ArtifactsDir = artifactsDir2
+
+	// Second build: dep cache hit, root cache miss.
+	// Artifacts SHOULD be extracted because the root was rebuilt.
+	if err := Build("testdata/cache-dep-top.wanda.yaml", config); err != nil {
+		t.Fatalf("second build: %v", err)
+	}
+
+	extracted2 := filepath.Join(artifactsDir2, "output.txt")
+	if _, err := os.Stat(extracted2); os.IsNotExist(err) {
+		t.Error("artifact should be extracted when root is rebuilt (dep cache hit)")
+	}
+}
+
+func TestBuild_WithArtifacts_noCmdImage(t *testing.T) {
+	tmpDir := t.TempDir()
+	artifactsDir := filepath.Join(tmpDir, "artifacts")
+
+	config := &ForgeConfig{
+		WorkDir:      "testdata",
+		NamePrefix:   "cr.ray.io/rayproject/",
+		ArtifactsDir: artifactsDir,
+		Rebuild:      true,
+	}
+
+	if err := Build("testdata/artifact-nocmd.wanda.yaml", config); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	extractedFile := filepath.Join(artifactsDir, "output.txt")
+	content, err := os.ReadFile(extractedFile)
+	if err != nil {
+		t.Fatalf("read extracted file: %v", err)
+	}
+
+	want := "test-content\n"
+	if got := string(content); got != want {
+		t.Errorf("extracted content = %q, want %q", got, want)
+	}
+}
