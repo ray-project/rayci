@@ -9,6 +9,29 @@ import (
 	"testing"
 )
 
+func TestCopyFile(t *testing.T) {
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "src.txt")
+	dst := filepath.Join(tmp, "dst.txt")
+	content := []byte("hello")
+	if err := os.WriteFile(src, content, 0644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := CopyFile(src, dst); err != nil {
+		t.Fatalf("CopyFile() error = %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("CopyFile() destination = %q, want %q", got, content)
+	}
+	if err := CopyFile(filepath.Join(tmp, "nonexistent"), dst); err == nil {
+		t.Error("CopyFile(nonexistent) want error, got nil")
+	}
+}
+
 func TestCheckIsDir(t *testing.T) {
 	tmp := t.TempDir()
 

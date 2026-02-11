@@ -281,6 +281,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
     echo "config not found"
     exit 1
 fi
+if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
     echo "created compute config"
     exit 0
@@ -329,6 +330,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then
     echo "config not found"
     exit 1
 fi
+if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
     echo "created"
     exit 0
@@ -399,6 +401,7 @@ func TestTest_FilterSelectsSingleTemplate(t *testing.T) {
 	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then echo "config not found"; exit 1; fi
+if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
 if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
@@ -417,6 +420,7 @@ func TestTestAll_Success(t *testing.T) {
 	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "get" ]; then echo "config not found"; exit 1; fi
+if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
 if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi

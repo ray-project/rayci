@@ -1,8 +1,6 @@
 package rayapp
 
 import (
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,162 +161,214 @@ func TestIsOldComputeConfigFormat(t *testing.T) {
 	}
 }
 
-func TestConvertComputeConfig(t *testing.T) {
+func TestHasCloudKey(t *testing.T) {
 	dir := t.TempDir()
 
-	oldFormat := strings.Join([]string{
-		"head_node_type:",
-		"  name: head",
-		"  instance_type: m5.xlarge",
-		"worker_node_types:",
-		"  - name: worker",
-		"    instance_type: m5.2xlarge",
-	}, "\n")
-
-	t.Run("success", func(t *testing.T) {
-		path := filepath.Join(dir, "old.yaml")
-		if err := os.WriteFile(path, []byte(oldFormat), 0644); err != nil {
-			t.Fatal(err)
-		}
-		got, err := ConvertComputeConfig(path)
-		if err != nil {
-			t.Fatalf("ConvertComputeConfig() error = %v", err)
-		}
-		if !strings.Contains(string(got), "head_node:") {
-			t.Errorf("output should contain head_node, got %s", got)
-		}
-		if !strings.Contains(string(got), "instance_type: m5.xlarge") {
-			t.Errorf("output should contain instance_type from head, got %s", got)
-		}
-		if !strings.Contains(string(got), "auto_select_worker_config: true") {
-			t.Errorf("output should contain auto_select_worker_config, got %s", got)
-		}
-	})
-
-	t.Run("read error", func(t *testing.T) {
-		_, err := ConvertComputeConfig(filepath.Join(dir, "nonexistent.yaml"))
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "failed to read old config file") {
-			t.Errorf("error %q should contain 'failed to read old config file'", err.Error())
-		}
-	})
-
-	t.Run("parse error", func(t *testing.T) {
-		path := filepath.Join(dir, "bad.yaml")
-		if err := os.WriteFile(path, []byte("not: valid: yaml: ["), 0644); err != nil {
-			t.Fatal(err)
-		}
-		_, err := ConvertComputeConfig(path)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "failed to parse old config") {
-			t.Errorf("error %q should contain 'failed to parse old config'", err.Error())
-		}
-	})
-
-	t.Run("marshal error", func(t *testing.T) {
-		path := filepath.Join(dir, "old.yaml")
-		oldFormat := strings.Join([]string{
-			"head_node_type:",
-			"  name: head",
+	t.Run("returns true when cloud key exists", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"cloud: my-cloud",
+			"head_node:",
 			"  instance_type: m5.xlarge",
 		}, "\n")
-		if err := os.WriteFile(path, []byte(oldFormat), 0644); err != nil {
+		path := filepath.Join(dir, "with-cloud.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0644); err != nil {
 			t.Fatal(err)
 		}
-		orig := marshalNewConfig
-		marshalNewConfig = func(*NewComputeConfig) ([]byte, error) {
-			return nil, errors.New("marshal fail")
+
+		got, err := hasCloudKey(path)
+		if err != nil {
+			t.Fatalf("hasCloudKey() error = %v", err)
 		}
-		t.Cleanup(func() { marshalNewConfig = orig })
-		_, err := ConvertComputeConfig(path)
+		if got != true {
+			t.Errorf("hasCloudKey() = %v, want %v", got, true)
+		}
+	})
+
+	t.Run("returns false when cloud key does not exist", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"head_node:",
+			"  instance_type: m5.xlarge",
+			"auto_select_worker_config: true",
+		}, "\n")
+		path := filepath.Join(dir, "without-cloud.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := hasCloudKey(path)
+		if err != nil {
+			t.Fatalf("hasCloudKey() error = %v", err)
+		}
+		if got != false {
+			t.Errorf("hasCloudKey() = %v, want %v", got, false)
+		}
+	})
+
+	t.Run("returns false for empty YAML", func(t *testing.T) {
+		path := filepath.Join(dir, "empty.yaml")
+		if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := hasCloudKey(path)
+		if err != nil {
+			t.Fatalf("hasCloudKey() error = %v", err)
+		}
+		if got != false {
+			t.Errorf("hasCloudKey() = %v, want %v", got, false)
+		}
+	})
+
+	t.Run("returns true when cloud key has null value", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"cloud: null",
+			"head_node:",
+			"  instance_type: m5.xlarge",
+		}, "\n")
+		path := filepath.Join(dir, "cloud-null.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := hasCloudKey(path)
+		if err != nil {
+			t.Fatalf("hasCloudKey() error = %v", err)
+		}
+		if got != true {
+			t.Errorf("hasCloudKey() = %v, want %v (key exists even with null value)", got, true)
+		}
+	})
+
+	t.Run("read error for nonexistent file", func(t *testing.T) {
+		got, err := hasCloudKey(filepath.Join(dir, "nonexistent.yaml"))
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "failed to marshal new config") {
-			t.Errorf("error %q should contain 'failed to marshal new config'", err.Error())
+		if got != false {
+			t.Errorf("hasCloudKey() = %v, want %v on error", got, false)
 		}
-		if !strings.Contains(err.Error(), "marshal fail") {
-			t.Errorf("error %q should contain wrapped cause 'marshal fail'", err.Error())
+		if !strings.Contains(err.Error(), "failed to read config file") {
+			t.Errorf("error %q should contain 'failed to read config file'", err.Error())
+		}
+	})
+
+	t.Run("parse error for invalid YAML", func(t *testing.T) {
+		path := filepath.Join(dir, "invalid.yaml")
+		if err := os.WriteFile(path, []byte("invalid: yaml: ["), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := hasCloudKey(path)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if got != false {
+			t.Errorf("hasCloudKey() = %v, want %v on error", got, false)
+		}
+		if !strings.Contains(err.Error(), "failed to parse config file") {
+			t.Errorf("error %q should contain 'failed to parse config file'", err.Error())
 		}
 	})
 }
 
-func TestConvertComputeConfigFile(t *testing.T) {
+func TestAddCloudKey(t *testing.T) {
 	dir := t.TempDir()
-	oldFormat := strings.Join([]string{
-		"head_node_type:",
-		"  name: head",
-		"  instance_type: m5.large",
-	}, "\n")
-	oldPath := filepath.Join(dir, "old.yaml")
-	if err := os.WriteFile(oldPath, []byte(oldFormat), 0644); err != nil {
-		t.Fatal(err)
-	}
 
-	t.Run("success with output file", func(t *testing.T) {
-		outPath := filepath.Join(dir, "new.yaml")
-		err := ConvertComputeConfigFile(oldPath, outPath)
-		if err != nil {
-			t.Fatalf("ConvertComputeConfigFile() error = %v", err)
-		}
-		data, err := os.ReadFile(outPath)
-		if err != nil {
-			t.Fatalf("read output file: %v", err)
-		}
-		if !strings.Contains(string(data), "head_node:") {
-			t.Errorf("output file should contain head_node, got %s", data)
-		}
-		if !strings.Contains(string(data), "instance_type: m5.large") {
-			t.Errorf("output file should contain instance_type, got %s", data)
-		}
-	})
-
-	t.Run("success with empty output path writes to stdout", func(t *testing.T) {
-		r, w, err := os.Pipe()
-		if err != nil {
+	t.Run("adds cloud key when missing", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"head_node:",
+			"  instance_type: m5.xlarge",
+			"auto_select_worker_config: true",
+		}, "\n")
+		path := filepath.Join(dir, "config.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0644); err != nil {
 			t.Fatal(err)
 		}
-		orig := os.Stdout
-		os.Stdout = w
-		t.Cleanup(func() { os.Stdout = orig })
-		err = ConvertComputeConfigFile(oldPath, "")
+
+		err := addCloudKey(path, "my-cloud")
 		if err != nil {
-			w.Close()
-			t.Fatalf("ConvertComputeConfigFile() error = %v", err)
+			t.Fatalf("addCloudKey() error = %v", err)
 		}
-		w.Close()
-		out, _ := io.ReadAll(r)
-		r.Close()
-		if !strings.Contains(string(out), "head_node:") {
-			t.Errorf("stdout should contain head_node, got %q", out)
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read config file: %v", err)
 		}
-		if !strings.Contains(string(out), "auto_select_worker_config: true") {
-			t.Errorf("stdout should contain auto_select_worker_config, got %q", out)
+		if !strings.Contains(string(data), "cloud: my-cloud") {
+			t.Errorf("config should contain 'cloud: my-cloud', got %s", data)
+		}
+		if !strings.Contains(string(data), "head_node:") {
+			t.Errorf("config should still contain 'head_node:', got %s", data)
 		}
 	})
 
-	t.Run("convert error", func(t *testing.T) {
-		err := ConvertComputeConfigFile(filepath.Join(dir, "nonexistent.yaml"), filepath.Join(dir, "out.yaml"))
-		if err == nil {
-			t.Fatal("expected error, got nil")
+	t.Run("overwrites when cloud key exists", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"cloud: existing-cloud",
+			"head_node:",
+			"  instance_type: m5.xlarge",
+		}, "\n")
+		path := filepath.Join(dir, "config-with-cloud.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0644); err != nil {
+			t.Fatal(err)
 		}
-		if !strings.Contains(err.Error(), "failed to convert compute config") {
-			t.Errorf("error %q should contain 'failed to convert compute config'", err.Error())
+
+		err := addCloudKey(path, "new-cloud")
+		if err != nil {
+			t.Fatalf("addCloudKey() error = %v", err)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read config file: %v", err)
+		}
+		if !strings.Contains(string(data), "cloud: new-cloud") {
+			t.Errorf("config should contain 'cloud: new-cloud', got %s", data)
 		}
 	})
 
-	t.Run("write error", func(t *testing.T) {
-		outPath := filepath.Join(dir, "subdir", "new.yaml")
-		err := ConvertComputeConfigFile(oldPath, outPath)
+	t.Run("read error", func(t *testing.T) {
+		err := addCloudKey(filepath.Join(dir, "nonexistent.yaml"), "my-cloud")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "failed to write new config file") {
-			t.Errorf("error %q should contain 'failed to write new config file'", err.Error())
+		if !strings.Contains(err.Error(), "failed to read config file") {
+			t.Errorf("error %q should contain 'failed to read config file'", err.Error())
+		}
+	})
+
+	t.Run("invalid YAML", func(t *testing.T) {
+		path := filepath.Join(dir, "invalid.yaml")
+		if err := os.WriteFile(path, []byte("invalid: yaml: ["), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		err := addCloudKey(path, "my-cloud")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to parse config file") {
+			t.Errorf("error %q should contain 'failed to parse config file'", err.Error())
+		}
+	})
+
+	t.Run("write error on read-only file", func(t *testing.T) {
+		configContent := strings.Join([]string{
+			"head_node:",
+			"  instance_type: m5.xlarge",
+		}, "\n")
+		path := filepath.Join(dir, "readonly.yaml")
+		if err := os.WriteFile(path, []byte(configContent), 0444); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(path, 0644) })
+
+		err := addCloudKey(path, "test-cloud")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to write updated config file") {
+			t.Errorf("error %q should contain 'failed to write updated config file'", err.Error())
 		}
 	})
 }

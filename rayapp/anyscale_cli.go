@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
@@ -104,37 +106,47 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string,
 		return "", fmt.Errorf("failed to check config format: %w", err)
 	}
 
-	// If old format, convert to new format and use a temp file
+	// If old format, create a temp copy, add cloud key if missing, then use the copy
 	actualConfigPath := configFilePath
 	if isOldFormat {
-		fmt.Printf("Detected old compute config format, converting to new format...\n")
+		fmt.Printf("Detected old compute config format, using temp copy...\n")
 
-		newConfigData, err := ConvertComputeConfig(configFilePath)
+		hasCloud, err := hasCloudKey(actualConfigPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to convert old config: %w", err)
+			return "", fmt.Errorf("failed to check cloud key: %w", err)
 		}
 
-		// Create a temp file for the converted config
-		tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
-		if err != nil {
-			return "", fmt.Errorf("failed to create temp file: %w", err)
-		}
-		defer os.Remove(tmpFile.Name())
-
-		if _, err := tmpFile.Write(newConfigData); err != nil {
+		if !hasCloud {
+			tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
+			if err != nil {
+				return "", fmt.Errorf("failed to create temp file: %w", err)
+			}
+			tmpPath := tmpFile.Name()
 			tmpFile.Close()
-			return "", fmt.Errorf("failed to write temp file: %w", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			return "", fmt.Errorf("failed to close temp file: %w", err)
-		}
+			defer os.Remove(tmpPath)
 
-		actualConfigPath = tmpFile.Name()
-		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
+			if err := CopyFile(actualConfigPath, tmpPath); err != nil {
+				return "", fmt.Errorf("failed to copy config file: %w", err)
+			}
+			cloudInfo, err := ac.GetDefaultCloud()
+			if err != nil {
+				return "", fmt.Errorf("failed to get default cloud: %w", err)
+			}
+			if err := addCloudKey(tmpPath, cloudInfo.Name); err != nil {
+				return "", fmt.Errorf("failed to add cloud key: %w", err)
+			}
+			actualConfigPath = tmpPath
+		}
+		fmt.Printf("Temp copy: %s\n", actualConfigPath)
 	}
 
 	// Create the compute config
-	args := []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
+	var args []string
+	if isOldFormat {
+		args = []string{"compute-config", "create", "-n", name, actualConfigPath}
+	} else {
+		args = []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
+	}
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
 		return output, fmt.Errorf("create compute config failed: %w", err)
@@ -152,6 +164,29 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 		return output, fmt.Errorf("get compute config failed: %w", err)
 	}
 	return output, nil
+}
+
+// CloudInfo represents the cloud information returned from the CLI.
+type CloudInfo struct {
+	Name string `yaml:"name"`
+	ID   string `yaml:"id"`
+}
+
+// GetDefaultCloud retrieves the default cloud from the Anyscale CLI.
+// Returns the cloud name and ID from the YAML output.
+func (ac *AnyscaleCLI) GetDefaultCloud() (*CloudInfo, error) {
+	args := []string{"cloud", "get-default"}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return nil, fmt.Errorf("get default cloud failed: %w", err)
+	}
+
+	var cloudInfo CloudInfo
+	if err := yaml.Unmarshal([]byte(output), &cloudInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse cloud info: %w", err)
+	}
+
+	return &cloudInfo, nil
 }
 
 func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) (string, error) {
