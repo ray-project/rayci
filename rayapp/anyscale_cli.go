@@ -13,13 +13,15 @@ import (
 )
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
-type AnyscaleCLI struct{}
+type AnyscaleCLI struct {
+	client *http.Client
+}
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
-	return &AnyscaleCLI{}
+	return &AnyscaleCLI{client: &http.Client{}}
 }
 
 type WorkspaceState int
@@ -40,11 +42,12 @@ func (ws WorkspaceState) String() string {
 	return WorkspaceStateName[ws]
 }
 
+var workspaceIDRe = regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
+
 // extractWorkspaceID extracts the workspace ID from the CLI output.
 // Expected format: "Workspace created successfully id: expwrk_xxx"
 func extractWorkspaceID(output string) (string, error) {
-	re := regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
-	matches := re.FindStringSubmatch(output)
+	matches := workspaceIDRe.FindStringSubmatch(output)
 	if len(matches) < 2 {
 		return "", fmt.Errorf("could not extract workspace ID from output: %s", output)
 	}
@@ -56,7 +59,7 @@ func isAnyscaleInstalled() bool {
 	return err == nil
 }
 
-// RunAnyscaleCLI runs the anyscale CLI with the given arguments.
+// runAnyscaleCLI runs the anyscale CLI with the given arguments.
 // Returns the combined output and any error that occurred.
 // Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
@@ -151,17 +154,17 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 	return output, nil
 }
 
-func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string, error) {
+func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) (string, error) {
 	args := []string{"workspace_v2", "create"}
-	args = append(args, "--name", config.workspaceName)
-	if config.template.ClusterEnv != nil {
-		env := config.template.ClusterEnv
+	args = append(args, "--name", wtc.workspaceName)
+	if wtc.template.ClusterEnv != nil {
+		env := wtc.template.ClusterEnv
 		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
-			buildDir := filepath.Dir(config.buildFile)
+			buildDir := filepath.Dir(wtc.buildFile)
 			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
 			args = append(args, "--containerfile", resolvedPath, "--ray-version", env.BYOD.RayVersion)
 		} else {
-			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(config.template.ClusterEnv)
+			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(wtc.template.ClusterEnv)
 			if err != nil {
 				return "", fmt.Errorf("cluster env: %w", err)
 			}
@@ -171,8 +174,8 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(config *WorkspaceTestConfig) (string
 	}
 
 	// Use compute config name if set
-	if config.computeConfig != "" {
-		args = append(args, "--compute-config", config.computeConfig)
+	if wtc.computeConfig != "" {
+		args = append(args, "--compute-config", wtc.computeConfig)
 	}
 
 	output, err := ac.runAnyscaleCLI(args)
@@ -220,8 +223,7 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	req.Header.Set("Authorization", "Bearer "+apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := ac.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -240,14 +242,6 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	return nil
 }
 
-func (ac *AnyscaleCLI) copyTemplateToWorkspace(config *WorkspaceTestConfig) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", config.workspaceName, "--local-dir", config.template.Dir})
-	if err != nil {
-		return fmt.Errorf("copy template to workspace failed: %w", err)
-	}
-	return nil
-}
-
 func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
 	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
 	if err != nil {
@@ -256,16 +250,16 @@ func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string
 	return nil
 }
 
-func (ac *AnyscaleCLI) runCmdInWorkspace(config *WorkspaceTestConfig, cmd string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", config.workspaceName, cmd})
+func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", workspaceName, cmd})
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
 	return nil
 }
 
-func (ac *AnyscaleCLI) startWorkspace(config *WorkspaceTestConfig) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", config.workspaceName})
+func (ac *AnyscaleCLI) startWorkspace(workspaceName string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", workspaceName})
 	if err != nil {
 		return fmt.Errorf("start workspace failed: %w", err)
 	}

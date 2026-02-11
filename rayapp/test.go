@@ -147,7 +147,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		}
 	}()
 
-	if err := anyscaleCLI.startWorkspace(wtc); err != nil {
+	if err := anyscaleCLI.startWorkspace(wtc.workspaceName); err != nil {
 		errors = append(errors, fmt.Errorf("start workspace failed: %w", err))
 		return errors
 	}
@@ -177,13 +177,13 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		return errors
 	}
 
-	if err := anyscaleCLI.runCmdInWorkspace(wtc, "unzip -o "+wtc.tmplName+".zip"); err != nil {
+	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, "unzip -o "+wtc.tmplName+".zip"); err != nil {
 		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
 		return errors
 	}
 
 	// run test in workspace
-	if err := anyscaleCLI.runCmdInWorkspace(wtc, testCmd); err != nil {
+	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, testCmd); err != nil {
 		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
 		return errors
 	}
