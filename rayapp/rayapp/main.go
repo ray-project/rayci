@@ -24,9 +24,6 @@ func main() {
 	// Test command flags
 	testFlags := flag.NewFlagSet("test", flag.ExitOnError)
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
-	// workspaceName := testFlags.String("workspace-name", "", "workspace name (required)")
-	// templateDir := testFlags.String("template-dir", "", "template directory (required)")
-	// config := testFlags.String("config", "config.yml", "config file path (required)")
 
 	switch os.Args[1] {
 	case "build-all":

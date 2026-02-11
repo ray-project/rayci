@@ -183,3 +183,70 @@ func TestBuildZip(t *testing.T) {
 		}
 	}
 }
+
+func TestZipDirectory(t *testing.T) {
+	tmp := t.TempDir()
+
+	srcDir := filepath.Join(tmp, "src")
+	if err := os.MkdirAll(srcDir, 0o700); err != nil {
+		t.Fatalf("create src dir: %v", err)
+	}
+
+	files := map[string][]byte{
+		"root.txt":   []byte("root content"),
+		"sub/a.txt":  []byte("sub a"),
+		"sub/b.txt":  []byte("sub b"),
+		"deep/x/y.z": []byte("nested"),
+	}
+	for path, content := range files {
+		full := filepath.Join(srcDir, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
+			t.Fatalf("create dir for %q: %v", path, err)
+		}
+		if err := os.WriteFile(full, content, 0o600); err != nil {
+			t.Fatalf("write %q: %v", path, err)
+		}
+	}
+
+	outPath := filepath.Join(tmp, "out.zip")
+	if err := zipDirectory(srcDir, outPath); err != nil {
+		t.Fatalf("zipDirectory: %v", err)
+	}
+
+	r, err := zip.OpenReader(outPath)
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	defer r.Close()
+
+	if got, want := len(r.File), len(files); got != want {
+		t.Errorf("zip file count: got %d, want %d", got, want)
+	}
+
+	for _, zf := range r.File {
+		if zf.FileInfo().IsDir() {
+			t.Errorf("zip should not contain directory entries, got %q", zf.Name)
+			continue
+		}
+		wantContent, ok := files[zf.Name]
+		if !ok {
+			t.Errorf("unexpected file in zip: %q", zf.Name)
+			continue
+		}
+		if zf.Modified.Unix() != frozenTime.Unix() {
+			t.Errorf("file %q timestamp: got %s, want %s", zf.Name, zf.Modified, frozenTime)
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			t.Fatalf("open %q in zip: %v", zf.Name, err)
+		}
+		got, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatalf("read %q in zip: %v", zf.Name, err)
+		}
+		if !bytes.Equal(got, wantContent) {
+			t.Errorf("content of %q: got %q, want %q", zf.Name, got, wantContent)
+		}
+	}
+}
