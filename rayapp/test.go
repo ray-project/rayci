@@ -108,7 +108,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
-		wtc.computeConfig = parseComputeConfigName(awsConfigPath)
+		wtc.computeConfig = generateComputeConfigName(awsConfigPath)
 		// Resolve compute config path relative to build file directory
 		resolvedConfigPath := filepath.Join(buildDir, awsConfigPath)
 		// Create compute config if it doesn't already exist

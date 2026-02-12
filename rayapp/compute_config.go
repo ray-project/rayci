@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -38,9 +39,9 @@ type OldWorkerNodeType struct {
 	InstanceType string `yaml:"instance_type"`
 }
 
-// parseComputeConfigName parses the config path and converts it to a config name.
+// generateComputeConfigName converts a config path to a config name.
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
-func parseComputeConfigName(configPath string) string {
+func generateComputeConfigName(configPath string) string {
 	dir := filepath.Dir(configPath)
 	base := filepath.Base(configPath)
 	ext := filepath.Ext(base)
@@ -52,13 +53,27 @@ func parseComputeConfigName(configPath string) string {
 	return configDir + "-" + filename
 }
 
-// isLegacyComputeConfigFormat checks if a YAML file uses the legacy compute config format
-// by looking for old-style keys like "head_node_type" or "worker_node_types".
+// versionLegacyRe matches optional spaces, then "version" = "legacy" (zero or more spaces between each), in a comment line.
+var versionLegacyRe = regexp.MustCompile(` *version *= *legacy`)
+
+// isLegacyComputeConfigFormat checks if a YAML file uses the legacy compute config format.
+// Primary check: a comment line containing "version=legacy".
+// Secondary check: legacy-style keys "head_node_type" or "worker_node_types" in the YAML.
 func isLegacyComputeConfigFormat(configFilePath string) (bool, error) {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to read config file: %w", err)
 	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimLeft(line, " \t")
+		if len(trimmed) > 0 && trimmed[0] == '#' {
+			if versionLegacyRe.MatchString(trimmed[1:]) {
+				return true, nil
+			}
+		}
+	}
+
 	var configMap map[string]any
 	if err := yaml.Unmarshal(data, &configMap); err != nil {
 		return false, fmt.Errorf("failed to parse config file: %w", err)

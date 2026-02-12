@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParseComputeConfigName(t *testing.T) {
+func TestGenerateComputeConfigName(t *testing.T) {
 	tests := []struct {
 		name           string
 		configPath     string
@@ -47,9 +47,9 @@ func TestParseComputeConfigName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseComputeConfigName(tt.configPath)
+			got := generateComputeConfigName(tt.configPath)
 			if got != tt.wantConfigName {
-				t.Errorf("parseComputeConfigName(%q) = %q, want %q", tt.configPath, got, tt.wantConfigName)
+				t.Errorf("generateComputeConfigName(%q) = %q, want %q", tt.configPath, got, tt.wantConfigName)
 			}
 		})
 	}
@@ -108,6 +108,16 @@ func TestIsLegacyComputeConfigFormat(t *testing.T) {
 			name:    "new format",
 			content: newFormat,
 			want:    false,
+		},
+		{
+			name:    "comment version=legacy",
+			content: "# version=legacy\n" + newFormat,
+			want:    true,
+		},
+		{
+			name:    "comment version = legacy with spaces",
+			content: "  #  version = legacy  \n" + newFormat,
+			want:    true,
 		},
 		{
 			name:    "empty YAML",
