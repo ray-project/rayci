@@ -77,16 +77,13 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewWorkspaceTestConfig(tt.tmplName, tt.buildFile)
+			config := NewWorkspaceTestConfig(tt.tmplName)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
 			}
 			if config.tmplName != tt.tmplName {
 				t.Errorf("tmplName = %q, want %q", config.tmplName, tt.tmplName)
-			}
-			if config.buildFile != tt.buildFile {
-				t.Errorf("buildFile = %q, want %q", config.buildFile, tt.buildFile)
 			}
 			// Other fields should be zero values
 			if config.workspaceName != "" {
@@ -567,13 +564,6 @@ func TestTestCmd_Constant(t *testing.T) {
 	}
 	if !strings.Contains(testCmd, "nbmake") {
 		t.Errorf("testCmd %q should contain 'nbmake'", testCmd)
-	}
-}
-
-func TestWorkspaceStartWaitTime_Constant(t *testing.T) {
-	// Verify the wait time constant is reasonable
-	if workspaceStartWaitTime <= 0 {
-		t.Error("workspaceStartWaitTime should be positive")
 	}
 }
 

@@ -15,44 +15,44 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Build command flags (shared by build and build-all)
 	buildFlags := flag.NewFlagSet("build", flag.ExitOnError)
 	base := buildFlags.String("base", ".", "base directory")
 	output := buildFlags.String("output", "_build", "output directory")
 	buildFile := buildFlags.String("build", "BUILD.yaml", "build file")
 
-	// Test command flags
 	testFlags := flag.NewFlagSet("test", flag.ExitOnError)
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
 
 	switch os.Args[1] {
-	case "build-all":
-		buildFlags.Parse(os.Args[2:])
-		if err := rayapp.BuildAll(*buildFile, *base, *output); err != nil {
-			log.Fatal(err)
-		}
 	case "build":
 		buildFlags.Parse(os.Args[2:])
 		args := buildFlags.Args()
 		if len(args) < 1 {
-			log.Fatal("build requires a template name")
+			log.Fatal("build requires a template name or 'all'")
 		}
-		if err := rayapp.Build(*buildFile, args[0], *base, *output); err != nil {
-			log.Fatal(err)
-		}
-	case "test-all":
-		testFlags.Parse(os.Args[2:])
-		if err := rayapp.TestAll(*testBuildFile); err != nil {
-			log.Fatal(err)
+		if args[0] == "all" {
+			if err := rayapp.BuildAll(*buildFile, *base, *output); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			if err := rayapp.Build(*buildFile, args[0], *base, *output); err != nil {
+				log.Fatal(err)
+			}
 		}
 	case "test":
 		testFlags.Parse(os.Args[2:])
 		args := testFlags.Args()
 		if len(args) < 1 {
-			log.Fatal("test requires <template-name> flag")
+			log.Fatal("test requires <template-name> or 'all'")
 		}
-		if err := rayapp.Test(args[0], *testBuildFile); err != nil {
-			log.Fatal(err)
+		if args[0] == "all" {
+			if err := rayapp.TestAll(*testBuildFile); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			if err := rayapp.Test(args[0], *testBuildFile); err != nil {
+				log.Fatal(err)
+			}
 		}
 	case "help":
 		printUsage()
@@ -65,13 +65,11 @@ func printUsage() {
 	fmt.Println("Usage: rayapp <command> [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  build-all              Build all templates")
-	fmt.Println("  build <template-name>  Build a specific template")
-	fmt.Println("  test-all               Test all templates")
-	fmt.Println("  test <template-name>   Test a specific template")
-	fmt.Println("  help                   Show this help message")
+	fmt.Println("  build <template-name|all>  Build a template or all templates")
+	fmt.Println("  test  <template-name|all>  Test a template or all templates")
+	fmt.Println("  help                       Show this help message")
 	fmt.Println()
-	fmt.Println("Build flags (build, build-all):")
+	fmt.Println("Build flags (build):")
 	fmt.Println("  --base string      Base directory (default \".\")")
 	fmt.Println("  --output string    Output directory (default \"_build\")")
 	fmt.Println("  --build string     Build file (default \"BUILD.yaml\")")
