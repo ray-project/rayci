@@ -440,20 +440,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 			errContains: "cluster env",
 		},
 		{
-			name:   "invalid ImageURI",
-			script: "#!/bin/sh\necho \"args: $@\"",
-			config: &WorkspaceTestConfig{
-				workspaceName: "test-workspace",
-				template: &Template{
-					ClusterEnv: &ClusterEnv{
-						ImageURI: "other/ray:2.44.1-py312",
-					},
-				},
-			},
-			wantErr:     true,
-			errContains: "cluster env",
-		},
-		{
 			name:   "CLI error",
 			script: "#!/bin/sh\nexit 1",
 			config: &WorkspaceTestConfig{
