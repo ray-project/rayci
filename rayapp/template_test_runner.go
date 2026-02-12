@@ -29,8 +29,8 @@ type WorkspaceTestConfig struct {
 }
 
 // NewWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
-func NewWorkspaceTestConfig(tmplName, buildFile string) *WorkspaceTestConfig {
-	return &WorkspaceTestConfig{tmplName: tmplName, buildFile: buildFile, success: false, errs: nil}
+func NewWorkspaceTestConfig(tmplName string) *WorkspaceTestConfig {
+	return &WorkspaceTestConfig{tmplName: tmplName, success: false, errs: nil}
 }
 
 func TestAll(buildFile string) error {
@@ -61,8 +61,9 @@ func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 		}
 		log.Println("Testing template:", t.Name)
 
-		runner := NewWorkspaceTestConfig(t.Name, buildFile)
+		runner := NewWorkspaceTestConfig(t.Name)
 		runner.template = t
+		runner.buildFile = buildFile
 		runner.template.Dir = filepath.Join(buildDir, t.Dir)
 		testConfigs = append(testConfigs, runner)
 	}
