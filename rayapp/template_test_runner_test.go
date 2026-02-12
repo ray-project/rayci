@@ -122,6 +122,33 @@ echo "ok"
 	}
 }
 
+func TestWorkspaceTestConfigRun_GetWorkspaceIDFails(t *testing.T) {
+	script := `#!/bin/sh
+if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
+if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
+if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
+    echo "Workspace created successfully id: expwrk_testid123"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo "get failed" >&2
+    exit 1
+fi
+echo "ok"
+`
+	setupMockAnyscale(t, script)
+
+	err := Test("reefy-ray", "testdata/BUILD.yaml")
+
+	if err == nil {
+		t.Fatal("expected error when get workspace ID fails")
+	}
+	if !strings.Contains(err.Error(), "get workspace ID failed") {
+		t.Errorf("error %q should contain 'get workspace ID failed'", err.Error())
+	}
+}
+
 func TestWorkspaceTestConfigRun_StartWorkspaceFails(t *testing.T) {
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
@@ -129,6 +156,10 @@ if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud";
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
     echo "Workspace created successfully id: expwrk_testid123"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -156,6 +187,10 @@ if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud";
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
     echo "Workspace created successfully id: expwrk_testid123"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -197,6 +232,10 @@ if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
     echo "running"
     exit 0
 fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
+    exit 0
+fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
     echo "push failed" >&2
     exit 1
@@ -234,6 +273,10 @@ if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
     echo "pushed"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
@@ -279,6 +322,10 @@ if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
     echo "tests passed"
     exit 0
 fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
+    exit 0
+fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "terminate" ]; then
     echo "terminate failed" >&2
     exit 1
@@ -308,6 +355,10 @@ if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
     echo "Workspace created successfully id: expwrk_testid123"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
     exit 0
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
@@ -353,6 +404,10 @@ if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
 fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
     echo "Workspace created successfully id: expwrk_testid123"
+    exit 0
+fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_testid123", "name": "test"}'
     exit 0
 fi
 if [ "$1" = "workspace_v2" ]; then
@@ -420,6 +475,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], 
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then echo '{"id": "expwrk_testid123", "name": "test"}'; exit 0; fi
 if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
 echo "unknown"; exit 1
 `
@@ -439,6 +495,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], 
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
 if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
 if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then echo '{"id": "expwrk_testid123", "name": "test"}'; exit 0; fi
 if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
 echo "unknown"; exit 1
 `
