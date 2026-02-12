@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv"
-
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	tmplName      string
@@ -168,37 +166,68 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		return errors
 	}
 
-	// Create temp directory for the zip file
+	// Create temp directory for the template zip file
 	templateZipDir, err := os.MkdirTemp("", "template_zip")
 	if err != nil {
 		errors = append(errors, fmt.Errorf("create temp directory failed: %w", err))
 		return errors
 	}
-	defer os.RemoveAll(templateZipDir) // clean up temp directory after push
+	defer os.RemoveAll(templateZipDir)
 
 	// Zip template directory to the temp directory
-	zipFileName := filepath.Join(templateZipDir, wtc.tmplName+".zip")
-	if err := zipDirectory(wtc.template.Dir, zipFileName); err != nil {
+	templateZipFileName := filepath.Join(templateZipDir, wtc.tmplName+".zip")
+	if err := zipDirectory(wtc.template.Dir, templateZipFileName); err != nil {
 		errors = append(errors, fmt.Errorf("zip template directory failed: %w", err))
 		return errors
 	}
 
+	// Push template zip to workspace
 	if err := anyscaleCLI.pushFolderToWorkspace(wtc.workspaceName, templateZipDir); err != nil {
-		errors = append(errors, fmt.Errorf("push zip to workspace failed: %w", err))
+		errors = append(errors, fmt.Errorf("push template zip to workspace failed: %w", err))
 		return errors
 	}
 
+	// Unzip template contents in workspace
 	if err := anyscaleCLI.runCmdInWorkspace(
 		wtc.workspaceName,
 		"unzip -o "+wtc.tmplName+".zip",
 	); err != nil {
-		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
+		errors = append(errors, fmt.Errorf("unzip template in workspace failed: %w", err))
 		return errors
 	}
 
-	// run test in workspace
-	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, testCmd); err != nil {
-		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
+	// If tests_path is provided, zip and push test folder
+	if wtc.template.Test.TestsPath != "" {
+		testsPath := filepath.Join(wtc.buildDir, wtc.template.Test.TestsPath)
+		testZipDir, err := os.MkdirTemp("", "test_zip")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("create test temp directory failed: %w", err))
+			return errors
+		}
+		defer os.RemoveAll(testZipDir)
+
+		testZipFileName := filepath.Join(testZipDir, "tests.zip")
+		if err := zipDirectory(testsPath, testZipFileName); err != nil {
+			errors = append(errors, fmt.Errorf("zip test directory failed: %w", err))
+			return errors
+		}
+
+		// Push test zip to workspace
+		if err := anyscaleCLI.pushFolderToWorkspace(wtc.workspaceName, testZipDir); err != nil {
+			errors = append(errors, fmt.Errorf("push test zip to workspace failed: %w", err))
+			return errors
+		}
+
+		// Unzip test folder in workspace
+		if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, "unzip -o tests.zip"); err != nil {
+			errors = append(errors, fmt.Errorf("unzip tests in workspace failed: %w", err))
+			return errors
+		}
+	}
+
+	// Run test command from test configuration
+	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, wtc.template.Test.Command); err != nil {
+		errors = append(errors, fmt.Errorf("run test command failed: %w", err))
 		return errors
 	}
 

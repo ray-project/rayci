@@ -246,8 +246,8 @@ echo "ok"
 	if err == nil {
 		t.Fatal("expected error when copy template fails")
 	}
-	if !strings.Contains(err.Error(), "push zip to workspace failed") {
-		t.Errorf("error %q should contain 'push zip to workspace failed'", err.Error())
+	if !strings.Contains(err.Error(), "push template zip to workspace failed") {
+		t.Errorf("error %q should contain 'push template zip to workspace failed'", err.Error())
 	}
 }
 
@@ -289,8 +289,8 @@ echo "ok"
 	if err == nil {
 		t.Fatal("expected error when run command fails")
 	}
-	if !strings.Contains(err.Error(), "run_command failed") {
-		t.Errorf("error %q should contain 'run_command failed'", err.Error())
+	if !strings.Contains(err.Error(), "unzip template in workspace failed") {
+		t.Errorf("error %q should contain 'unzip template in workspace failed'", err.Error())
 	}
 }
 
@@ -552,19 +552,6 @@ func createEmptyBuildFile(t *testing.T) string {
 		t.Fatalf("create empty build file: %v", err)
 	}
 	return f
-}
-
-func TestTestCmd_Constant(t *testing.T) {
-	// Verify the test command constant is set correctly
-	if testCmd == "" {
-		t.Error("testCmd should not be empty")
-	}
-	if !strings.Contains(testCmd, "pytest") {
-		t.Errorf("testCmd %q should contain 'pytest'", testCmd)
-	}
-	if !strings.Contains(testCmd, "nbmake") {
-		t.Errorf("testCmd %q should contain 'nbmake'", testCmd)
-	}
 }
 
 func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {

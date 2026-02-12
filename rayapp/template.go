@@ -25,6 +25,13 @@ type ClusterEnv struct {
 	BYOD *ClusterEnvBYOD `yaml:"byod,omitempty" json:"byod,omitempty"`
 }
 
+// TestConfig defines test configuration for a template.
+type TestConfig struct {
+	TimeoutInSec int    `yaml:"timeout_in_sec,omitempty" json:"timeout_in_sec,omitempty"`
+	TestsPath    string `yaml:"tests_path,omitempty"     json:"tests_path,omitempty"`
+	Command      string `yaml:"command"                  json:"command"`
+}
+
 // Template defines the definition of a workspace template.
 type Template struct {
 	Name string `yaml:"name" json:"name"`
@@ -38,6 +45,9 @@ type Template struct {
 
 	// A map of files for different compute platforms.
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
+
+	// Test configuration for the template (required).
+	Test *TestConfig `yaml:"test" json:"test"`
 }
 
 // Find first version-like digit sequence in build ID remainder (unanchored).
@@ -164,6 +174,20 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, er
 	}
 }
 
+// validateTestConfig returns an error if TestConfig is invalid; otherwise nil.
+func validateTestConfig(test *TestConfig) error {
+	if test == nil {
+		return fmt.Errorf("test configuration is required")
+	}
+	if strings.TrimSpace(test.Command) == "" {
+		return fmt.Errorf("test.command is required")
+	}
+	if test.TimeoutInSec < 0 {
+		return fmt.Errorf("test.timeout_in_sec must be non-negative")
+	}
+	return nil
+}
+
 // validateClusterEnv returns an error if ClusterEnv is invalid (BYOD or build_id/image_uri);
 // otherwise nil.
 func validateClusterEnv(env *ClusterEnv) error {
@@ -207,6 +231,12 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 	for _, tmpl := range tmpls {
 		if err := validateClusterEnv(tmpl.ClusterEnv); err != nil {
 			return nil, fmt.Errorf("validate cluster env for template %q: %w", tmpl.Name, err)
+		}
+		if err := validateTestConfig(tmpl.Test); err != nil {
+			return nil, fmt.Errorf("validate test config for template %q: %w", tmpl.Name, err)
+		}
+		if tmpl.Test.TimeoutInSec == 0 {
+			tmpl.Test.TimeoutInSec = 3600
 		}
 	}
 	return tmpls, nil
