@@ -126,12 +126,17 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	wtc.workspaceName = workspaceName
 
 	// create empty workspace
-	workspaceID, err := anyscaleCLI.createEmptyWorkspace(wtc)
+	err := anyscaleCLI.createEmptyWorkspace(wtc)
 	if err != nil {
 		errors = append(errors, fmt.Errorf("create empty workspace failed: %w", err))
 		return errors
 	}
-	wtc.workspaceID = workspaceID
+
+	wtc.workspaceID, err = anyscaleCLI.getWorkspaceID(wtc.workspaceName)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("get workspace ID failed: %w", err))
+		return errors
+	}
 
 	defer func() {
 		log.Println("Cleaning up workspace...")

@@ -358,6 +358,130 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 }
 
+func TestGetWorkspaceDescription(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		script := `#!/bin/sh
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_abc123", "name": "my-workspace", "state": "RUNNING"}'
+    exit 0
+fi
+exit 1
+`
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+
+		got, err := cli.getWorkspaceDescription("my-workspace")
+		if err != nil {
+			t.Fatalf("getWorkspaceDescription() error = %v", err)
+		}
+		if got["id"] != "expwrk_abc123" {
+			t.Errorf("got[%q] = %v, want expwrk_abc123", "id", got["id"])
+		}
+		if got["name"] != "my-workspace" {
+			t.Errorf("got[%q] = %v, want my-workspace", "name", got["name"])
+		}
+		if got["state"] != "RUNNING" {
+			t.Errorf("got[%q] = %v, want RUNNING", "state", got["state"])
+		}
+	})
+
+	t.Run("CLI failure", func(t *testing.T) {
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
+
+		_, err := cli.getWorkspaceDescription("my-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "get workspace failed") {
+			t.Errorf("error %q should contain 'get workspace failed'", err.Error())
+		}
+	})
+
+	t.Run("invalid JSON output", func(t *testing.T) {
+		cli := &AnyscaleCLI{
+			bin: writeFakeAnyscale(t, "#!/bin/sh\necho 'not valid json'"),
+		}
+
+		_, err := cli.getWorkspaceDescription("my-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "parse workspace get output") {
+			t.Errorf("error %q should contain 'parse workspace get output'", err.Error())
+		}
+	})
+}
+
+func TestGetWorkspaceID(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		script := `#!/bin/sh
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": "expwrk_xyz789", "name": "test-ws"}'
+    exit 0
+fi
+exit 1
+`
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+
+		got, err := cli.getWorkspaceID("test-ws")
+		if err != nil {
+			t.Fatalf("getWorkspaceID() error = %v", err)
+		}
+		if got != "expwrk_xyz789" {
+			t.Errorf("getWorkspaceID() = %q, want expwrk_xyz789", got)
+		}
+	})
+
+	t.Run("getWorkspaceDescription fails", func(t *testing.T) {
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
+
+		_, err := cli.getWorkspaceID("my-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "get workspace description failed") {
+			t.Errorf("error %q should contain 'get workspace description failed'", err.Error())
+		}
+	})
+
+	t.Run("id missing in description", func(t *testing.T) {
+		script := `#!/bin/sh
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"name": "no-id-workspace"}'
+    exit 0
+fi
+exit 1
+`
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+
+		_, err := cli.getWorkspaceID("no-id-workspace")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "workspace ID not found in description") {
+			t.Errorf("error %q should contain 'workspace ID not found in description'", err.Error())
+		}
+	})
+
+	t.Run("id not a string", func(t *testing.T) {
+		script := `#!/bin/sh
+if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
+    echo '{"id": 12345, "name": "bad-id"}'
+    exit 0
+fi
+exit 1
+`
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+
+		_, err := cli.getWorkspaceID("bad-id")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "workspace ID not found in description") {
+			t.Errorf("error %q should contain 'workspace ID not found in description'", err.Error())
+		}
+	})
+}
+
 func TestCreateEmptyWorkspace(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -472,7 +596,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, tt.script)}
 
-			workspaceID, err := cli.createEmptyWorkspace(tt.config)
+			err := cli.createEmptyWorkspace(tt.config)
 
 			if tt.wantErr {
 				if err == nil {
@@ -486,10 +610,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if workspaceID == "" {
-				t.Error("expected workspace ID, got empty string")
 			}
 		})
 	}
