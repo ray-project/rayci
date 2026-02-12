@@ -134,9 +134,9 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			wantErrStr: "anyscale error",
 		},
 		{
-			name:    "exec failed with exit code in output",
-			script:  "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
-			args:    []string{"deploy"},
+			name:       "exec failed with exit code in output",
+			script:     "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
+			args:       []string{"deploy"},
 			wantErrStr: "anyscale error: command failed:",
 		},
 	}
@@ -208,7 +208,10 @@ exit 1
 
 		err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
 		if err != nil {
-			t.Errorf("CreateComputeConfig() error = %v (should skip with no error when config exists)", err)
+			t.Errorf(
+				"CreateComputeConfig() error = %v (should skip with no error when config exists)",
+				err,
+			)
 		}
 	})
 
@@ -238,14 +241,22 @@ exit 1
 			t.Fatal("CreateComputeConfig() error = nil, want create compute config failed")
 		}
 		if !strings.Contains(err.Error(), "create compute config failed") {
-			t.Errorf("CreateComputeConfig() error = %q, want containing 'create compute config failed'", err.Error())
+			t.Errorf(
+				"CreateComputeConfig() error = %q, want containing 'create compute config failed'",
+				err.Error(),
+			)
 		}
 	})
 }
 
 func TestGetComputeConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"")}
+		cli := &AnyscaleCLI{
+			bin: writeFakeAnyscale(
+				t,
+				"#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"",
+			),
+		}
 
 		output, err := cli.GetComputeConfig("my-config")
 		if err != nil {
@@ -318,7 +329,9 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("invalid YAML output", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\"")}
+		cli := &AnyscaleCLI{
+			bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\""),
+		}
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {

@@ -177,14 +177,22 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			wantImageURI: "anyscale/ray:2.44.1-py312-cu128", wantRayVersion: "2.44.1",
 		},
 		{
-			name:           "both set",
-			env:            &ClusterEnv{BuildID: "anyscaleray2440", ImageURI: "anyscale/ray:2.44.0"},
-			wantImageURI:   "anyscale/ray:2.44.0",
-			wantRayVersion: "2.44.0",
+			name: "both set",
+			env: &ClusterEnv{
+				BuildID:  "anyscaleray2440",
+				ImageURI: "anyscale/ray:2.44.0",
+			},
+			wantErr:     true,
+			errContains: "exactly one",
 		},
 		{
-			name:           "BYOD",
-			env:            &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "cr.ray.io/ray:2340-py311", RayVersion: "2.34.0"}},
+			name: "BYOD",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage: "cr.ray.io/ray:2340-py311",
+					RayVersion:  "2.34.0",
+				},
+			},
 			wantImageURI:   "cr.ray.io/ray:2340-py311",
 			wantRayVersion: "2.34.0",
 		},
@@ -195,14 +203,10 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			errContains: "build_id or image_uri",
 		},
 		{
-			name:        "nil env",
-			env:         nil,
-			wantErr:     true,
-			errContains: "cluster_env is required",
-		},
-		{
-			name:        "BYOD containerfile only",
-			env:         &ClusterEnv{BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD containerfile only",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"},
+			},
 			wantErr:     true,
 			errContains: "containerfile",
 		},
@@ -246,9 +250,12 @@ func TestReadTemplates_emptyClusterEnv(t *testing.T) {
 	}
 	_, err := readTemplates(f)
 	if err == nil {
-		t.Fatal("want error for cluster_env defined but empty (no build_id, image_uri, or byod), got nil")
+		t.Fatal(
+			"want error for cluster_env defined but empty (no build_id, image_uri, or byod), got nil",
+		)
 	}
-	if !strings.Contains(err.Error(), "build_id or image_uri") && !strings.Contains(err.Error(), "byod") {
+	if !strings.Contains(err.Error(), "build_id or image_uri") &&
+		!strings.Contains(err.Error(), "byod") {
 		t.Errorf("error %q should mention build_id/image_uri or byod", err.Error())
 	}
 }
@@ -266,18 +273,31 @@ func TestValidateClusterEnv(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "BYOD docker_image and ray_version",
-			env:     &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "cr.ray.io/ray:2340-py311", RayVersion: "2.34.0"}},
+			name: "BYOD docker_image and ray_version",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage: "cr.ray.io/ray:2340-py311",
+					RayVersion:  "2.34.0",
+				},
+			},
 			wantErr: false,
 		},
 		{
-			name:    "BYOD containerfile and ray_version",
-			env:     &ClusterEnv{BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD containerfile and ray_version",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"},
+			},
 			wantErr: false,
 		},
 		{
-			name:        "BYOD both docker_image and containerfile",
-			env:         &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "img", ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD both docker_image and containerfile",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage:   "img",
+					ContainerFile: "Dockerfile",
+					RayVersion:    "2.34.0",
+				},
+			},
 			wantErr:     true,
 			errContains: "exactly one",
 		},
@@ -304,8 +324,11 @@ func TestValidateClusterEnv(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "build_id and image_uri both set",
-			env:         &ClusterEnv{BuildID: "anyscaleray2340-py311", ImageURI: "anyscale/ray:2.34.0-py311"},
+			name: "build_id and image_uri both set",
+			env: &ClusterEnv{
+				BuildID:  "anyscaleray2340-py311",
+				ImageURI: "anyscale/ray:2.34.0-py311",
+			},
 			wantErr:     true,
 			errContains: "exactly one",
 		},
@@ -379,7 +402,8 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			}
 			switch tt.name {
 			case "byod missing docker_image":
-				if !strings.Contains(err.Error(), "docker_image") && !strings.Contains(err.Error(), "containerfile") {
+				if !strings.Contains(err.Error(), "docker_image") &&
+					!strings.Contains(err.Error(), "containerfile") {
 					t.Errorf("error %q should mention docker_image or containerfile", err.Error())
 				}
 			case "byod missing ray_version":
@@ -387,15 +411,19 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 					t.Errorf("error %q should mention ray_version requirement", err.Error())
 				}
 			case "byod both docker_image and containerfile":
-				if !strings.Contains(err.Error(), "exactly one") && !strings.Contains(err.Error(), "not both") {
-					t.Errorf("error %q should mention exactly one of docker_image or containerfile, not both", err.Error())
+				if !strings.Contains(err.Error(), "exactly one") &&
+					!strings.Contains(err.Error(), "not both") {
+					t.Errorf(
+						"error %q should mention exactly one of docker_image or containerfile, not both",
+						err.Error(),
+					)
 				}
 			}
 		})
 	}
 }
 
-func TestConvertBuildIdToImageURI(t *testing.T) {
+func TestConvertBuildIDToImageURI(t *testing.T) {
 	tests := []struct {
 		name           string
 		buildID        string

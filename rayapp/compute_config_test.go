@@ -49,7 +49,12 @@ func TestGenerateComputeConfigName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := generateComputeConfigName(tt.configPath)
 			if got != tt.wantConfigName {
-				t.Errorf("generateComputeConfigName(%q) = %q, want %q", tt.configPath, got, tt.wantConfigName)
+				t.Errorf(
+					"generateComputeConfigName(%q) = %q, want %q",
+					tt.configPath,
+					got,
+					tt.wantConfigName,
+				)
 			}
 		})
 	}

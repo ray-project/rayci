@@ -535,5 +535,6 @@ func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
 	// Mock that fails immediately so we can test without full execution
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
-	_ = Test("reefy-ray", "testdata/BUILD.yaml") // We don't care about the error, just that it uses the token
+	// We don't care about the error, just that it uses the token
+	_ = Test("reefy-ray", "testdata/BUILD.yaml")
 }

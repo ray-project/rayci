@@ -18,7 +18,7 @@ import (
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct {
 	client *http.Client
-	bin string // path to the anyscale binary; defaults to "anyscale"
+	bin    string // path to the anyscale binary; defaults to "anyscale"
 }
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
@@ -268,9 +268,17 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) (string, e
 		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
 			buildDir := filepath.Dir(wtc.buildFile)
 			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
-			args = append(args, "--containerfile", resolvedPath, "--ray-version", env.BYOD.RayVersion)
+			args = append(
+				args,
+				"--containerfile",
+				resolvedPath,
+				"--ray-version",
+				env.BYOD.RayVersion,
+			)
 		} else {
-			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(wtc.template.ClusterEnv)
+			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(
+				wtc.template.ClusterEnv,
+			)
 			if err != nil {
 				return "", fmt.Errorf("cluster env: %w", err)
 			}
@@ -341,7 +349,11 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("delete workspace failed with status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf(
+			"delete workspace failed with status %d: %s",
+			resp.StatusCode,
+			string(body),
+		)
 	}
 
 	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
@@ -349,7 +361,9 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 }
 
 func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
+	_, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath},
+	)
 	if err != nil {
 		return fmt.Errorf("push file to workspace failed: %w", err)
 	}
@@ -357,7 +371,9 @@ func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string
 }
 
 func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", workspaceName, cmd})
+	_, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "run_command", "--name", workspaceName, cmd},
+	)
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
@@ -380,8 +396,13 @@ func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) 
 	return output, nil
 }
 
-func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state WorkspaceState) (string, error) {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()})
+func (ac *AnyscaleCLI) waitForWorkspaceState(
+	workspaceName string,
+	state WorkspaceState,
+) (string, error) {
+	output, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()},
+	)
 	if err != nil {
 		return "", fmt.Errorf("wait for workspace state failed: %w", err)
 	}

@@ -11,14 +11,14 @@ import (
 
 // ClusterEnvBYOD is the cluster environment for BYOD clusters.
 type ClusterEnvBYOD struct {
-	ContainerFile string `yaml:"containerfile" json:"containerfile"`
-	DockerImage   string `yaml:"docker_image" json:"docker_image"`
+	ContainerFile string `yaml:"containerfile"         json:"containerfile"`
+	DockerImage   string `yaml:"docker_image"          json:"docker_image"`
 	RayVersion    string `yaml:"ray_version,omitempty" json:"ray_version,omitempty"`
 }
 
 // ClusterEnv is the cluster environment for Anyscale clusters.
 type ClusterEnv struct {
-	BuildID  string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
+	BuildID  string `yaml:"build_id,omitempty"  json:"build_id,omitempty"`
 	ImageURI string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"`
 
 	// BYOD is the cluster environment for bring-your-own-docker clusters.
@@ -28,10 +28,10 @@ type ClusterEnv struct {
 // Template defines the definition of a workspace template.
 type Template struct {
 	Name string `yaml:"name" json:"name"`
-	Dir  string `yaml:"dir" json:"dir"`
+	Dir  string `yaml:"dir"  json:"dir"`
 
-	Emoji       string `yaml:"emoji" json:"emoji"`
-	Title       string `yaml:"title" json:"title"`
+	Emoji       string `yaml:"emoji"                 json:"emoji"`
+	Title       string `yaml:"title"                 json:"title"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 
 	ClusterEnv *ClusterEnv `yaml:"cluster_env" json:"cluster_env"`
@@ -59,7 +59,11 @@ func convertBuildIDToImageURI(buildID string) (string, string, error) {
 	remainder := strings.TrimPrefix(buildID, prefix)
 	locs := buildIDVersionFindRe.FindStringSubmatchIndex(remainder)
 	if locs == nil {
-		return "", "", fmt.Errorf("version string must match major(1 digit).minor(2 digits).patch(1+ digits) in build ID: %s", buildID)
+		err := fmt.Errorf(
+			"version string must match major(1 digit), minor(2 digits), patch(1+) in build ID: %s",
+			buildID,
+		)
+		return "", "", err
 	}
 	slugifiedImageType := remainder[:locs[0]]
 	suffix := remainder[locs[1]:]
@@ -73,14 +77,16 @@ func convertBuildIDToImageURI(buildID string) (string, string, error) {
 	minor := remainder[locs[4]:locs[5]]
 	patch := remainder[locs[6]:locs[7]]
 
-	return fmt.Sprintf("anyscale/%s:%s.%s.%s%s", imageName, major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+	imageURI := fmt.Sprintf("anyscale/%s:%s.%s.%s%s", imageName, major, minor, patch, suffix)
+	rayVersion := fmt.Sprintf("%s.%s.%s", major, minor, patch)
+	return imageURI, rayVersion, nil
 }
 
 var slugifyRemoveRe = regexp.MustCompile(`[^\w\s-]+`)
 var slugifyCollapseRe = regexp.MustCompile(`[-\s]+`)
 
-// slugify converts a string to a slug (Django-style): normalize to ASCII, keep only
-// alphanumerics/underscores/hyphens/spaces, strip, then collapse spaces and hyphens to single hyphens.
+// slugify converts a string to a slug (Django-style): normalize to ASCII, keep only alphanumerics/
+// underscores/hyphens/spaces, strip, then collapse spaces and hyphens to single hyphens.
 // Code adopted from here https://github.com/django/django/blob/master/django/utils/text.py
 func slugify(value string) string {
 	value = strings.Map(func(r rune) rune {
@@ -105,41 +111,61 @@ var imageURIVersionRe = regexp.MustCompile(`(\d)\.(\d{2})\.(\d+)`)
 func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err error) {
 	matches := imageURIVersionRe.FindStringSubmatch(imageURI)
 	if matches == nil {
-		return "", fmt.Errorf("image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s", imageURI)
+		err := fmt.Errorf(
+			"image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s",
+			imageURI,
+		)
+		return "", err
 	}
 	major, minor, patch := matches[1], matches[2], matches[3]
 	return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
-// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI; when both BuildID and ImageURI are set, ImageURI is used.
-func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
+// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI.
+func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, error) {
 	if env.BYOD != nil {
 		if env.BYOD.ContainerFile != "" {
-			return "", "", fmt.Errorf("cluster_env byod: containerfile is used via --containerfile; image URI not applicable")
+			err := fmt.Errorf(
+				"cluster_env byod: containerfile is used via --containerfile; image URI not applicable",
+			)
+			return "", "", err
 		}
-		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
-			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+		if strings.TrimSpace(env.BYOD.DockerImage) == "" ||
+			strings.TrimSpace(env.BYOD.RayVersion) == "" {
+			err := fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+			return "", "", err
 		}
 		return env.BYOD.DockerImage, env.BYOD.RayVersion, nil
 	}
 	hasBuildID := strings.TrimSpace(env.BuildID) != ""
 	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
 	switch {
+	case hasBuildID && hasImageURI:
+		err := fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri, not both")
+		return "", "", err
 	case !hasBuildID && !hasImageURI:
-		return "", "", fmt.Errorf("cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version")
+		err := fmt.Errorf(
+			"cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version",
+		)
+		return "", "", err
 	case hasImageURI:
 		rayVersion, err := extractRayVersionFromImageURI(env.ImageURI)
 		if err != nil {
-			return "", "", err
+			return "", "", fmt.Errorf("failed to extract ray version from image URI: %w", err)
 		}
 		return env.ImageURI, rayVersion, nil
 	default:
-		return convertBuildIDToImageURI(env.BuildID)
+		imageURI, rayVersion, err := convertBuildIDToImageURI(env.BuildID)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert build ID to image URI: %w", err)
+		}
+		return imageURI, rayVersion, nil
 	}
 }
 
-// validateClusterEnv returns an error if ClusterEnv is invalid (BYOD or build_id/image_uri); otherwise nil.
+// validateClusterEnv returns an error if ClusterEnv is invalid (BYOD or build_id/image_uri);
+// otherwise nil.
 func validateClusterEnv(env *ClusterEnv) error {
 	if env == nil {
 		return nil
@@ -148,7 +174,9 @@ func validateClusterEnv(env *ClusterEnv) error {
 		hasDocker := strings.TrimSpace(env.BYOD.DockerImage) != ""
 		hasContainer := strings.TrimSpace(env.BYOD.ContainerFile) != ""
 		if hasDocker && hasContainer {
-			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or containerfile, not both")
+			return fmt.Errorf(
+				"cluster_env byod: specify exactly one of docker_image or containerfile, not both",
+			)
 		}
 		if !hasDocker && !hasContainer {
 			return fmt.Errorf("cluster_env byod: specify one of docker_image or containerfile")

@@ -35,7 +35,9 @@ func generateComputeConfigName(configPath string) string {
 	return configDir + "-" + filename
 }
 
-// versionLegacyRe matches optional spaces, then "version" = "legacy" (zero or more spaces between each), in a comment line.
+// versionLegacyRe matches optional spaces,
+// then "version" = "legacy" (zero or more spaces between each),
+// in a comment line.
 var versionLegacyRe = regexp.MustCompile(` *version *= *legacy`)
 
 // isLegacyComputeConfigFormat checks if a YAML file uses the legacy compute config format.
