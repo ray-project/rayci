@@ -104,7 +104,7 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
 	}
 
 	// Check if the config file uses the old format
-	isOldFormat, err := isOldComputeConfigFormat(configFilePath)
+	isOldFormat, err := isLegacyComputeConfigFormat(configFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to check config format: %w", err)
 	}

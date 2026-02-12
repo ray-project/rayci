@@ -52,9 +52,9 @@ func parseComputeConfigName(configPath string) string {
 	return configDir + "-" + filename
 }
 
-// isOldComputeConfigFormat checks if a YAML file uses the old compute config format
+// isLegacyComputeConfigFormat checks if a YAML file uses the legacy compute config format
 // by looking for old-style keys like "head_node_type" or "worker_node_types".
-func isOldComputeConfigFormat(configFilePath string) (bool, error) {
+func isLegacyComputeConfigFormat(configFilePath string) (bool, error) {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to read config file: %w", err)

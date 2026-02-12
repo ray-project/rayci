@@ -55,7 +55,7 @@ func TestParseComputeConfigName(t *testing.T) {
 	}
 }
 
-func TestIsOldComputeConfigFormat(t *testing.T) {
+func TestIsLegacyComputeConfigFormat(t *testing.T) {
 	dir := t.TempDir()
 
 	oldFormatWithHead := strings.Join([]string{
@@ -149,13 +149,13 @@ func TestIsOldComputeConfigFormat(t *testing.T) {
 				}
 			}
 
-			got, err := isOldComputeConfigFormat(path)
+			got, err := isLegacyComputeConfigFormat(path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("isOldComputeConfigFormat() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("isLegacyComputeConfigFormat() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("isOldComputeConfigFormat() = %v, want %v", got, tt.want)
+				t.Errorf("isLegacyComputeConfigFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
