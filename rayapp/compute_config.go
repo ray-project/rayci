@@ -9,6 +9,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// ComputeConfigListItem represents one entry from "compute-config list --json" results.
+type ComputeConfigListItem struct {
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	CloudID        string  `json:"cloud_id"`
+	Version        float64 `json:"version"`
+	CreatedAt      string  `json:"created_at"`
+	LastModifiedAt string  `json:"last_modified_at"`
+	URL            string  `json:"url"`
+}
+
 // OldComputeConfig represents the old compute config format
 type OldComputeConfig struct {
 	HeadNodeType    OldHeadNodeType     `yaml:"head_node_type"`
