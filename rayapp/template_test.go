@@ -423,7 +423,7 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 	}
 }
 
-func TestConvertBuildIdToImageURI(t *testing.T) {
+func TestConvertBuildIDToImageURI(t *testing.T) {
 	tests := []struct {
 		name           string
 		buildID        string
