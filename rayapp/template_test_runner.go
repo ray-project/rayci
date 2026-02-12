@@ -3,7 +3,7 @@ package rayapp
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	tmplName      string
-	buildFile     string
+	buildDir      string
 	workspaceName string
 	workspaceID   string
 	configFile    string

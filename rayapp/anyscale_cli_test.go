@@ -523,7 +523,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 			script: "#!/bin/sh\necho \"args: $@\"\necho \"(anyscale +1.0s) Workspace created successfully id: expwrk_testid123\"",
 			config: &WorkspaceTestConfig{
 				workspaceName: "test-workspace",
-				buildFile:     filepath.Join("foo", "bar", "BUILD.yaml"),
+				buildDir:      filepath.Join("foo", "bar"),
 				template: &Template{
 					ClusterEnv: &ClusterEnv{
 						BYOD: &ClusterEnvBYOD{
