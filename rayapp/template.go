@@ -11,14 +11,14 @@ import (
 
 // ClusterEnvBYOD is the cluster environment for BYOD clusters.
 type ClusterEnvBYOD struct {
-	ContainerFile string `yaml:"containerfile" json:"containerfile"`
-	DockerImage   string `yaml:"docker_image" json:"docker_image"`
+	ContainerFile string `yaml:"containerfile"         json:"containerfile"`
+	DockerImage   string `yaml:"docker_image"          json:"docker_image"`
 	RayVersion    string `yaml:"ray_version,omitempty" json:"ray_version,omitempty"`
 }
 
 // ClusterEnv is the cluster environment for Anyscale clusters.
 type ClusterEnv struct {
-	BuildID  string `yaml:"build_id,omitempty" json:"build_id,omitempty"`
+	BuildID  string `yaml:"build_id,omitempty"  json:"build_id,omitempty"`
 	ImageURI string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"`
 
 	// BYOD is the cluster environment for bring-your-own-docker clusters.
@@ -28,10 +28,10 @@ type ClusterEnv struct {
 // Template defines the definition of a workspace template.
 type Template struct {
 	Name string `yaml:"name" json:"name"`
-	Dir  string `yaml:"dir" json:"dir"`
+	Dir  string `yaml:"dir"  json:"dir"`
 
-	Emoji       string `yaml:"emoji" json:"emoji"`
-	Title       string `yaml:"title" json:"title"`
+	Emoji       string `yaml:"emoji"                 json:"emoji"`
+	Title       string `yaml:"title"                 json:"title"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 
 	ClusterEnv *ClusterEnv `yaml:"cluster_env" json:"cluster_env"`
@@ -40,145 +40,157 @@ type Template struct {
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 }
 
-func convertBuildIdToImageURI(buildId string) (string, string, error) {
-	// Convert build ID like "anyscaleray2441-py312-cu128" to "anyscale/ray:2.44.1-py312-cu128"
-	const prefix = "anyscaleray"
-	if !strings.HasPrefix(buildId, prefix) {
-		return "", "", fmt.Errorf("build ID must start with %q: %s", prefix, buildId)
-	}
+// Find first version-like digit sequence in build ID remainder (unanchored).
+var buildIDVersionFindRe = regexp.MustCompile(`(\d)(\d{2})(\d+)`)
 
-	// Remove the prefix to get "2441-py312-cu128"
-	remainder := strings.TrimPrefix(buildId, prefix)
-
-	// Find the first hyphen to separate version from suffix
-	hyphenIdx := strings.Index(remainder, "-")
-	var versionStr, suffix string
-	if hyphenIdx == -1 {
-		versionStr = remainder
-		suffix = ""
-	} else {
-		versionStr = remainder[:hyphenIdx]
-		suffix = remainder[hyphenIdx:] // includes the hyphen
-	}
-
-	// Parse version: "2441" -> "2.44.1"
-	// Format: major (1 digit), minor (2 digits), patch (1+ digits)
-	buildIDVersionRe := regexp.MustCompile(`^(\d)(\d{2})(\d+)$`)
-	matches := buildIDVersionRe.FindStringSubmatch(versionStr)
-	if matches == nil {
-		return "", "", fmt.Errorf("version string must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
-	}
-	major, minor, patch := matches[1], matches[2], matches[3]
-
-	return fmt.Sprintf("anyscale/ray:%s.%s.%s%s", major, minor, patch, suffix), fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+// buildIDToImageName maps build ID slugified image-type (after "anyscale") to image name for URI.
+var buildIDToImageName = map[string]string{
+	"ray":    "ray",
+	"rayllm": "ray-llm",
+	"rayml":  "ray-ml",
 }
 
-// convertImageURIToBuildID converts an image URI like "anyscale/ray:2.44.1-py312-cu128"
-// to a build ID like "anyscaleray2441-py312-cu128" and returns the ray version "2.44.1".
-func convertImageURIToBuildID(imageURI string) (buildID, rayVersion string, err error) {
-	const prefix = "anyscale/ray:"
-	if !strings.HasPrefix(imageURI, prefix) {
-		return "", "", fmt.Errorf("image URI must start with %q: %s", prefix, imageURI)
+func convertBuildIDToImageURI(buildID string) (string, string, error) {
+	const prefix = "anyscale"
+	if !strings.HasPrefix(buildID, prefix) {
+		return "", "", fmt.Errorf("build ID must start with %q: %s", prefix, buildID)
 	}
-	tag := strings.TrimPrefix(imageURI, prefix)
-	hyphenIdx := strings.Index(tag, "-")
-	var versionStr, suffix string
-	if hyphenIdx == -1 {
-		versionStr = tag
-		suffix = ""
-	} else {
-		versionStr = tag[:hyphenIdx]
-		suffix = tag[hyphenIdx:]
+
+	remainder := strings.TrimPrefix(buildID, prefix)
+	locs := buildIDVersionFindRe.FindStringSubmatchIndex(remainder)
+	if locs == nil {
+		err := fmt.Errorf(
+			"version string must match major(1 digit), minor(2 digits), patch(1+) in build ID: %s",
+			buildID,
+		)
+		return "", "", err
 	}
-	// Require exactly 3 parts: major (1 digit).minor (2 digits).patch (1+ digits)
-	imageURIVersionRe := regexp.MustCompile(`^(\d)\.(\d{2})\.(\d+)$`)
-	matches := imageURIVersionRe.FindStringSubmatch(versionStr)
+	slugifiedImageType := remainder[:locs[0]]
+	suffix := remainder[locs[1]:]
+
+	imageName, ok := buildIDToImageName[slugifiedImageType]
+	if !ok {
+		imageName = slugifiedImageType
+	}
+
+	major := remainder[locs[2]:locs[3]]
+	minor := remainder[locs[4]:locs[5]]
+	patch := remainder[locs[6]:locs[7]]
+
+	imageURI := fmt.Sprintf("anyscale/%s:%s.%s.%s%s", imageName, major, minor, patch, suffix)
+	rayVersion := fmt.Sprintf("%s.%s.%s", major, minor, patch)
+	return imageURI, rayVersion, nil
+}
+
+var slugifyRemoveRe = regexp.MustCompile(`[^\w\s-]+`)
+var slugifyCollapseRe = regexp.MustCompile(`[-\s]+`)
+
+// slugify converts a string to a slug (Django-style): normalize to ASCII, keep only alphanumerics/
+// underscores/hyphens/spaces, strip, then collapse spaces and hyphens to single hyphens.
+// Code adopted from here https://github.com/django/django/blob/master/django/utils/text.py
+func slugify(value string) string {
+	value = strings.Map(func(r rune) rune {
+		if r < 128 {
+			return r
+		}
+		return -1
+	}, value)
+	value = slugifyRemoveRe.ReplaceAllString(value, "")
+	value = strings.TrimSpace(value)
+	return slugifyCollapseRe.ReplaceAllString(value, "-")
+}
+
+// convertImageURIToBuildID returns the slugified image URI as the build ID.
+func convertImageURIToBuildID(imageURI string) (buildID string, err error) {
+	return slugify(imageURI), nil
+}
+
+var imageURIVersionRe = regexp.MustCompile(`(\d)\.(\d{2})\.(\d+)`)
+
+// extractRayVersionFromImageURI returns the ray version from the image URI.
+func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err error) {
+	matches := imageURIVersionRe.FindStringSubmatch(imageURI)
 	if matches == nil {
-		return "", "", fmt.Errorf("image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s", versionStr)
+		err := fmt.Errorf(
+			"image URI version must match major(1 digit).minor(2 digits).patch(1+ digits): %s",
+			imageURI,
+		)
+		return "", err
 	}
 	major, minor, patch := matches[1], matches[2], matches[3]
-	versionCompact := major + minor + patch
-	return "anyscaleray" + versionCompact + suffix, versionStr, nil
+	return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
-// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI; when both BuildID and ImageURI are set, ImageURI is used.
-func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (imageURI, rayVersion string, err error) {
-	if env == nil {
-		return "", "", fmt.Errorf("cluster_env is required")
-	}
+// It supports BYOD (docker_image + ray_version) or BuildID/ImageURI.
+func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, error) {
 	if env.BYOD != nil {
 		if env.BYOD.ContainerFile != "" {
-			return "", "", fmt.Errorf("cluster_env byod: containerfile is used via --containerfile; image URI not applicable")
+			err := fmt.Errorf(
+				"cluster_env byod: containerfile is used via --containerfile; image URI not applicable",
+			)
+			return "", "", err
 		}
-		if strings.TrimSpace(env.BYOD.DockerImage) == "" || strings.TrimSpace(env.BYOD.RayVersion) == "" {
-			return "", "", fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+		if strings.TrimSpace(env.BYOD.DockerImage) == "" ||
+			strings.TrimSpace(env.BYOD.RayVersion) == "" {
+			err := fmt.Errorf("cluster_env byod: both docker_image and ray_version are required")
+			return "", "", err
 		}
 		return env.BYOD.DockerImage, env.BYOD.RayVersion, nil
 	}
 	hasBuildID := strings.TrimSpace(env.BuildID) != ""
 	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
 	switch {
+	case hasBuildID && hasImageURI:
+		err := fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri, not both")
+		return "", "", err
 	case !hasBuildID && !hasImageURI:
-		return "", "", fmt.Errorf("cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version")
+		err := fmt.Errorf(
+			"cluster_env: specify build_id or image_uri, or byod with docker_image and ray_version",
+		)
+		return "", "", err
 	case hasImageURI:
-		_, rayVersion, err := convertImageURIToBuildID(env.ImageURI)
+		rayVersion, err := extractRayVersionFromImageURI(env.ImageURI)
 		if err != nil {
-			return "", "", err
+			return "", "", fmt.Errorf("failed to extract ray version from image URI: %w", err)
 		}
 		return env.ImageURI, rayVersion, nil
 	default:
-		return convertBuildIdToImageURI(env.BuildID)
+		imageURI, rayVersion, err := convertBuildIDToImageURI(env.BuildID)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert build ID to image URI: %w", err)
+		}
+		return imageURI, rayVersion, nil
 	}
 }
 
-// validateAndBuildClusterEnv validates ClusterEnv (BYOD or build_id/image_uri) and populates the missing one of BuildID or ImageURI when exactly one is set.
-func validateAndBuildClusterEnv(env *ClusterEnv) error {
+// validateClusterEnv returns an error if ClusterEnv is invalid (BYOD or build_id/image_uri);
+// otherwise nil.
+func validateClusterEnv(env *ClusterEnv) error {
 	if env == nil {
 		return nil
 	}
-	hasBuildID := env.BuildID != ""
-	hasImageURI := env.ImageURI != ""
 	if env.BYOD != nil {
-		hasDocker := env.BYOD.DockerImage != ""
-		hasContainer := env.BYOD.ContainerFile != ""
+		hasDocker := strings.TrimSpace(env.BYOD.DockerImage) != ""
+		hasContainer := strings.TrimSpace(env.BYOD.ContainerFile) != ""
 		if hasDocker && hasContainer {
-			return fmt.Errorf("cluster_env byod: specify exactly one of docker_image or containerfile, not both")
+			return fmt.Errorf(
+				"cluster_env byod: specify exactly one of docker_image or containerfile, not both",
+			)
 		}
 		if !hasDocker && !hasContainer {
 			return fmt.Errorf("cluster_env byod: specify one of docker_image or containerfile")
 		}
-		if env.BYOD.RayVersion == "" {
+		if strings.TrimSpace(env.BYOD.RayVersion) == "" {
 			return fmt.Errorf("cluster_env byod: ray_version is required")
 		}
 		return nil
 	}
-	if !hasBuildID && !hasImageURI {
-		return fmt.Errorf("cluster_env: specify at least one of build_id or image_uri, or use byod with docker_image and ray_version")
+	hasBuildID := strings.TrimSpace(env.BuildID) != ""
+	hasImageURI := strings.TrimSpace(env.ImageURI) != ""
+	if (!hasBuildID && !hasImageURI) || (hasBuildID && hasImageURI) {
+		return fmt.Errorf("cluster_env: specify exactly one of build_id or image_uri, not both")
 	}
-	if hasBuildID && hasImageURI {
-		imageURIFromBuildID, _, err := convertBuildIdToImageURI(env.BuildID)
-		if err != nil {
-			return err
-		}
-		if imageURIFromBuildID != env.ImageURI {
-			return fmt.Errorf("build_id and image_uri do not match: build_id %q implies image_uri %q", env.BuildID, imageURIFromBuildID)
-		}
-		return nil
-	}
-	if hasBuildID {
-		imageURI, _, err := convertBuildIdToImageURI(env.BuildID)
-		if err != nil {
-			return err
-		}
-		env.ImageURI = imageURI
-		return nil
-	}
-	buildID, _, err := convertImageURIToBuildID(env.ImageURI)
-	if err != nil {
-		return err
-	}
-	env.BuildID = buildID
 	return nil
 }
 
@@ -193,8 +205,8 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
 	}
 	for _, tmpl := range tmpls {
-		if err := validateAndBuildClusterEnv(tmpl.ClusterEnv); err != nil {
-			return nil, fmt.Errorf("resolve cluster env for template %q: %w", tmpl.Name, err)
+		if err := validateClusterEnv(tmpl.ClusterEnv); err != nil {
+			return nil, fmt.Errorf("validate cluster env for template %q: %w", tmpl.Name, err)
 		}
 	}
 	return tmpls, nil
