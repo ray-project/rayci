@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,16 +11,21 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
-type AnyscaleCLI struct{}
+type AnyscaleCLI struct {
+	client *http.Client
+	bin    string // path to the anyscale binary; defaults to "anyscale"
+}
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
-	return &AnyscaleCLI{}
+	return &AnyscaleCLI{bin: "anyscale", client: &http.Client{}}
 }
 
 type WorkspaceState int
@@ -40,19 +46,20 @@ func (ws WorkspaceState) String() string {
 	return WorkspaceStateName[ws]
 }
 
+var workspaceIDRe = regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
+
 // extractWorkspaceID extracts the workspace ID from the CLI output.
 // Expected format: "Workspace created successfully id: expwrk_xxx"
 func extractWorkspaceID(output string) (string, error) {
-	re := regexp.MustCompile(`id:\s*(expwrk_[a-zA-Z0-9]+)`)
-	matches := re.FindStringSubmatch(output)
+	matches := workspaceIDRe.FindStringSubmatch(output)
 	if len(matches) < 2 {
 		return "", fmt.Errorf("could not extract workspace ID from output: %s", output)
 	}
 	return matches[1], nil
 }
 
-func isAnyscaleInstalled() bool {
-	_, err := exec.LookPath("anyscale")
+func (ac *AnyscaleCLI) isAnyscaleInstalled() bool {
+	_, err := exec.LookPath(ac.bin)
 	return err == nil
 }
 
@@ -60,12 +67,12 @@ func isAnyscaleInstalled() bool {
 // Returns the combined output and any error that occurred.
 // Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
-	if !isAnyscaleInstalled() {
+	if !ac.isAnyscaleInstalled() {
 		return "", errors.New("anyscale is not installed")
 	}
 
 	fmt.Println("anyscale cli args: ", args)
-	cmd := exec.Command("anyscale", args...)
+	cmd := exec.Command(ac.bin, args...)
 
 	tw := newTailWriter(maxOutputBufferSize)
 	cmd.Stdout = io.MultiWriter(os.Stdout, tw)
@@ -84,59 +91,71 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 
 // CreateComputeConfig creates a new compute config from a YAML file if it doesn't already exist.
 // If the config file uses the old format (head_node_type, worker_node_types), it will be
-// automatically converted to the new format before creation.
+// have the cloud added to it if missing.
 // name: the name for the compute config (without version tag)
-// configFile: path to the YAML config file
-// Returns the output from the CLI and any error.
-func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) (string, error) {
-	// Check if compute config already exists
-	if output, err := ac.GetComputeConfig(name); err == nil {
+// configFilePath: path to the YAML config file
+func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
+	list, err := ac.ListComputeConfigs(&name)
+	if err != nil {
+		return fmt.Errorf("list compute configs: %w", err)
+	}
+	if len(list) > 0 {
 		fmt.Printf("Compute config %q already exists, skipping creation\n", name)
-		return output, nil
+		return nil
 	}
 
 	// Check if the config file uses the old format
-	isOldFormat, err := isOldComputeConfigFormat(configFilePath)
+	isOldFormat, err := isLegacyComputeConfigFormat(configFilePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to check config format: %w", err)
+		return fmt.Errorf("failed to check config format: %w", err)
 	}
 
-	// If old format, convert to new format and use a temp file
+	// If old format, create a temp copy, add cloud key if missing, then use the copy
 	actualConfigPath := configFilePath
 	if isOldFormat {
-		fmt.Printf("Detected old compute config format, converting to new format...\n")
+		fmt.Printf("Detected old compute config format, using temp copy...\n")
 
-		newConfigData, err := ConvertComputeConfig(configFilePath)
+		hasCloud, err := hasCloudKey(actualConfigPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to convert old config: %w", err)
+			return fmt.Errorf("failed to check cloud key: %w", err)
 		}
 
-		// Create a temp file for the converted config
-		tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
-		if err != nil {
-			return "", fmt.Errorf("failed to create temp file: %w", err)
-		}
-		defer os.Remove(tmpFile.Name())
-
-		if _, err := tmpFile.Write(newConfigData); err != nil {
+		if !hasCloud {
+			tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
+			if err != nil {
+				return fmt.Errorf("failed to create temp file: %w", err)
+			}
+			tmpPath := tmpFile.Name()
 			tmpFile.Close()
-			return "", fmt.Errorf("failed to write temp file: %w", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			return "", fmt.Errorf("failed to close temp file: %w", err)
-		}
+			defer os.Remove(tmpPath)
 
-		actualConfigPath = tmpFile.Name()
-		fmt.Printf("Converted config saved to temp file: %s\n", actualConfigPath)
+			if err := CopyFile(actualConfigPath, tmpPath); err != nil {
+				return fmt.Errorf("failed to copy config file: %w", err)
+			}
+			cloudInfo, err := ac.GetDefaultCloud()
+			if err != nil {
+				return fmt.Errorf("failed to get default cloud: %w", err)
+			}
+			if err := addCloudKey(tmpPath, cloudInfo.Name); err != nil {
+				return fmt.Errorf("failed to add cloud key: %w", err)
+			}
+			actualConfigPath = tmpPath
+		}
+		fmt.Printf("Temp copy: %s\n", actualConfigPath)
 	}
 
 	// Create the compute config
-	args := []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
-	output, err := ac.runAnyscaleCLI(args)
-	if err != nil {
-		return output, fmt.Errorf("create compute config failed: %w", err)
+	var args []string
+	if isOldFormat {
+		args = []string{"compute-config", "create", "-n", name, actualConfigPath}
+	} else {
+		args = []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
 	}
-	return output, nil
+	_, err = ac.runAnyscaleCLI(args)
+	if err != nil {
+		return fmt.Errorf("create compute config failed: %w", err)
+	}
+	return nil
 }
 
 // GetComputeConfig retrieves the details of a compute config by name.
@@ -151,6 +170,96 @@ func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
 	return output, nil
 }
 
+// ListComputeConfigs returns compute configs from "compute-config list --json". Returns an empty list when there are no results.
+func (ac *AnyscaleCLI) ListComputeConfigs(name *string) ([]ComputeConfigListItem, error) {
+	args := []string{"compute-config", "list", "--json"}
+	if name != nil {
+		args = append(args, "--name", *name)
+	}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return nil, fmt.Errorf("list compute configs failed: %w", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal([]byte(output), &m); err != nil {
+		return nil, fmt.Errorf("parse list output: %w", err)
+	}
+
+	resultsAny, ok := m["results"]
+	if !ok || resultsAny == nil {
+		return []ComputeConfigListItem{}, nil
+	}
+
+	resultsSlice, ok := resultsAny.([]any)
+	if !ok {
+		return nil, fmt.Errorf("results is not an array")
+	}
+
+	out := make([]ComputeConfigListItem, 0, len(resultsSlice))
+	for i, itemAny := range resultsSlice {
+		item, ok := itemAny.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("results[%d] is not an object", i)
+		}
+		li, err := computeConfigListItemFromMap(item)
+		if err != nil {
+			return nil, fmt.Errorf("results[%d]: %w", i, err)
+		}
+		out = append(out, li)
+	}
+	return out, nil
+}
+
+func computeConfigListItemFromMap(m map[string]any) (ComputeConfigListItem, error) {
+	li := ComputeConfigListItem{}
+	if v, ok := m["id"].(string); ok {
+		li.ID = v
+	}
+	if v, ok := m["name"].(string); ok {
+		li.Name = v
+	}
+	if v, ok := m["cloud_id"].(string); ok {
+		li.CloudID = v
+	}
+	if v, ok := m["version"].(float64); ok {
+		li.Version = v
+	}
+	if v, ok := m["created_at"].(string); ok {
+		li.CreatedAt = v
+	}
+	if v, ok := m["last_modified_at"].(string); ok {
+		li.LastModifiedAt = v
+	}
+	if v, ok := m["url"].(string); ok {
+		li.URL = v
+	}
+	return li, nil
+}
+
+// CloudInfo represents the cloud information returned from the CLI.
+type CloudInfo struct {
+	Name string `yaml:"name"`
+	ID   string `yaml:"id"`
+}
+
+// GetDefaultCloud retrieves the default cloud from the Anyscale CLI.
+// Returns the cloud name and ID from the YAML output.
+func (ac *AnyscaleCLI) GetDefaultCloud() (*CloudInfo, error) {
+	args := []string{"cloud", "get-default"}
+	output, err := ac.runAnyscaleCLI(args)
+	if err != nil {
+		return nil, fmt.Errorf("get default cloud failed: %w", err)
+	}
+
+	var cloudInfo CloudInfo
+	if err := yaml.Unmarshal([]byte(output), &cloudInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse cloud info: %w", err)
+	}
+
+	return &cloudInfo, nil
+}
+
 func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) (string, error) {
 	args := []string{"workspace_v2", "create"}
 	args = append(args, "--name", wtc.workspaceName)
@@ -159,9 +268,17 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) (string, e
 		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
 			buildDir := filepath.Dir(wtc.buildFile)
 			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
-			args = append(args, "--containerfile", resolvedPath, "--ray-version", env.BYOD.RayVersion)
+			args = append(
+				args,
+				"--containerfile",
+				resolvedPath,
+				"--ray-version",
+				env.BYOD.RayVersion,
+			)
 		} else {
-			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(wtc.template.ClusterEnv)
+			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(
+				wtc.template.ClusterEnv,
+			)
 			if err != nil {
 				return "", fmt.Errorf("cluster env: %w", err)
 			}
@@ -220,8 +337,7 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	req.Header.Set("Authorization", "Bearer "+apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := ac.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -233,7 +349,11 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("delete workspace failed with status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf(
+			"delete workspace failed with status %d: %s",
+			resp.StatusCode,
+			string(body),
+		)
 	}
 
 	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
@@ -241,7 +361,9 @@ func (ac *AnyscaleCLI) deleteWorkspaceByID(workspaceID string) error {
 }
 
 func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath})
+	_, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath},
+	)
 	if err != nil {
 		return fmt.Errorf("push file to workspace failed: %w", err)
 	}
@@ -249,7 +371,9 @@ func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string
 }
 
 func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "run_command", "--name", workspaceName, cmd})
+	_, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "run_command", "--name", workspaceName, cmd},
+	)
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
@@ -272,8 +396,13 @@ func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) 
 	return output, nil
 }
 
-func (ac *AnyscaleCLI) waitForWorkspaceState(workspaceName string, state WorkspaceState) (string, error) {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()})
+func (ac *AnyscaleCLI) waitForWorkspaceState(
+	workspaceName string,
+	state WorkspaceState,
+) (string, error) {
+	output, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()},
+	)
 	if err != nil {
 		return "", fmt.Errorf("wait for workspace state failed: %w", err)
 	}

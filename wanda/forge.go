@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	cranename "github.com/google/go-containerregistry/pkg/name"
@@ -59,13 +60,33 @@ func Build(specFile string, config *ForgeConfig) error {
 		order = []string{graph.Root}
 	}
 
+	var targetCacheHit bool
 	for _, name := range order {
 		rs := graph.Specs[name]
 
 		log.Printf("building %s (from %s)", name, rs.Path)
 
+		hitsBefore := forge.cacheHit()
 		if err := forge.Build(rs.Spec); err != nil {
 			return fmt.Errorf("build %s: %w", name, err)
+		}
+		if name == graph.Root {
+			targetCacheHit = forge.cacheHit() > hitsBefore
+		}
+	}
+
+	// Extract artifacts only for the root spec, and only if it was actually
+	// built (not a cache hit). On cache hit, the image exists only in the
+	// remote registry; extracting would require pulling it first.
+	if config.ArtifactsDir != "" {
+		rootSpec := graph.Specs[graph.Root].Spec
+		if len(rootSpec.Artifacts) > 0 && !targetCacheHit {
+			rootTag := forge.workTag(rootSpec.Name)
+			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
+				return fmt.Errorf("extract artifacts: %w", err)
+			}
+		} else if targetCacheHit && len(rootSpec.Artifacts) > 0 {
+			log.Printf("skipping artifact extraction: cache hit")
 		}
 	}
 
@@ -180,6 +201,73 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		m[from] = src
 	}
 	return m, nil
+}
+
+// ExtractArtifacts copies artifacts from a built image to ArtifactsDir.
+// The image must be locally available (this is only called after a successful
+// build, not on cache hits).
+func (f *Forge) ExtractArtifacts(spec *Spec, imageTag string) error {
+	d := f.newDockerCmd()
+	artifactsDir := f.config.ArtifactsDir
+
+	// In RayCI mode, clear the artifacts directory to avoid stale artifacts.
+	if f.config.RayCI {
+		if err := os.RemoveAll(artifactsDir); err != nil {
+			return fmt.Errorf("clear artifacts dir: %w", err)
+		}
+	}
+
+	if err := os.MkdirAll(artifactsDir, 0755); err != nil {
+		return fmt.Errorf("create artifacts dir: %w", err)
+	}
+
+	log.Printf("extracting %d artifact(s) from %s", len(spec.Artifacts), imageTag)
+	extractStart := time.Now()
+
+	containerID, err := d.createContainer(imageTag)
+	if err != nil {
+		return fmt.Errorf("create container: %w", err)
+	}
+	defer func() {
+		if err := d.removeContainer(containerID); err != nil {
+			log.Printf("warning: failed to remove container %s: %v", containerID, err)
+		}
+	}()
+
+	var extracted []string
+
+	for _, a := range spec.Artifacts {
+		if err := a.Validate(); err != nil {
+			return fmt.Errorf("invalid artifact: %w", err)
+		}
+
+		dst, err := a.ResolveDst(artifactsDir)
+		if err != nil {
+			return fmt.Errorf("resolve artifact dst: %w", err)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+			return fmt.Errorf("create dir for artifact %s: %w", a.Dst, err)
+		}
+
+		if err := d.copyFromContainer(containerID, a.Src, dst); err != nil {
+			if a.Optional {
+				log.Printf("warning: optional artifact not found: %s", a.Src)
+				continue
+			}
+			return fmt.Errorf("copy artifact %s: %w", a.Src, err)
+		}
+		if abs, err := filepath.Abs(dst); err == nil {
+			dst = abs
+		}
+		extracted = append(extracted, dst)
+	}
+
+	log.Printf("extracted %d artifact(s) in %v:", len(extracted), time.Since(extractStart).Round(time.Millisecond))
+	for _, f := range extracted {
+		log.Printf("  %s", f)
+	}
+	return nil
 }
 
 // Build builds a container image from the given specification.

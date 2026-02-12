@@ -52,12 +52,12 @@ PLATFORM_MAP = {
     "linux-amd64": {
         "goos": "linux",
         "goarch": "amd64",
-        "platform": "manylinux_2_17_x86_64",
+        "platform": "manylinux2014_x86_64",
     },
     "linux-arm64": {
         "goos": "linux",
         "goarch": "arm64",
-        "platform": "manylinux_2_17_aarch64",
+        "platform": "manylinux2014_aarch64",
     },
 }
 

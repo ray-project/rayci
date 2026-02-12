@@ -9,6 +9,29 @@ import (
 	"time"
 )
 
+// CopyFile copies the file at src to dst. The destination file is created or truncated.
+func CopyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open source file: %w", err)
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create destination file: %w", err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return fmt.Errorf("copy file: %w", err)
+	}
+	if err := out.Sync(); err != nil {
+		return fmt.Errorf("sync destination file: %w", err)
+	}
+	return nil
+}
+
 func checkIsDir(path string) error {
 	stat, err := os.Stat(path)
 	if err != nil {
