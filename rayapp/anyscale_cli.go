@@ -82,11 +82,11 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 // name: the name for the compute config (without version tag)
 // configFilePath: path to the YAML config file
 func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
-	list, err := ac.ListComputeConfigs(&name)
+	foundComputeConfigs, err := ac.ListComputeConfigs(&name)
 	if err != nil {
-		return fmt.Errorf("list compute configs: %w", err)
+		return fmt.Errorf("list compute configs failed: %w", err)
 	}
-	if len(list) > 0 {
+	if len(foundComputeConfigs) > 0 {
 		fmt.Printf("Compute config %q already exists, skipping creation\n", name)
 		return nil
 	}
