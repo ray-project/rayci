@@ -4,30 +4,48 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
-// parseComputeConfigName parses the config path and converts it to a config name.
+// generateComputeConfigName converts a config path to a config name.
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
-func parseComputeConfigName(configPath string) string {
+func generateComputeConfigName(configPath string) string {
 	dir := filepath.Dir(configPath)
 	base := filepath.Base(configPath)
 	ext := filepath.Ext(base)
 	filename := strings.TrimSuffix(base, ext)
 	configDir := filepath.Base(dir)
+	if configDir == "." || configDir == string(filepath.Separator) {
+		return filename
+	}
 	return configDir + "-" + filename
 }
 
-// isOldComputeConfigFormat checks if a YAML file uses the old compute config format
-// by looking for old-style keys like "head_node_type" or "worker_node_types".
-func isOldComputeConfigFormat(configFilePath string) (bool, error) {
+// versionLegacyRe matches optional spaces, then "version" = "legacy" (zero or more spaces between each), in a comment line.
+var versionLegacyRe = regexp.MustCompile(` *version *= *legacy`)
+
+// isLegacyComputeConfigFormat checks if a YAML file uses the legacy compute config format.
+// Primary check: a comment line containing "version=legacy".
+// Secondary check: legacy-style keys "head_node_type" or "worker_node_types" in the YAML.
+func isLegacyComputeConfigFormat(configFilePath string) (bool, error) {
 	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to read config file: %w", err)
 	}
-	var configMap map[string]interface{}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimLeft(line, " \t")
+		if len(trimmed) > 0 && trimmed[0] == '#' {
+			if versionLegacyRe.MatchString(trimmed[1:]) {
+				return true, nil
+			}
+		}
+	}
+
+	var configMap map[string]any
 	if err := yaml.Unmarshal(data, &configMap); err != nil {
 		return false, fmt.Errorf("failed to parse config file: %w", err)
 	}
@@ -36,72 +54,46 @@ func isOldComputeConfigFormat(configFilePath string) (bool, error) {
 	return hasHeadNodeType || hasWorkerNodeTypes, nil
 }
 
-// OldComputeConfig represents the old compute config format
-type OldComputeConfig struct {
-	HeadNodeType    OldHeadNodeType     `yaml:"head_node_type"`
-	WorkerNodeTypes []OldWorkerNodeType `yaml:"worker_node_types"`
-}
-
-// OldHeadNodeType represents the head node configuration in old format
-type OldHeadNodeType struct {
-	Name         string `yaml:"name"`
-	InstanceType string `yaml:"instance_type"`
-}
-
-// OldWorkerNodeType represents a worker node configuration in old format
-type OldWorkerNodeType struct {
-	Name         string `yaml:"name"`
-	InstanceType string `yaml:"instance_type"`
-}
-
-// NewComputeConfig represents the new compute config format
-type NewComputeConfig struct {
-	HeadNode               NewHeadNode `yaml:"head_node"`
-	AutoSelectWorkerConfig bool        `yaml:"auto_select_worker_config"`
-}
-
-// NewHeadNode represents the head node configuration in new format
-type NewHeadNode struct {
-	InstanceType string `yaml:"instance_type"`
-}
-
-// ConvertComputeConfig converts an old format compute config to the new format.
-// It reads the old YAML file, transforms the structure, and returns the new YAML content.
-func ConvertComputeConfig(oldConfigPath string) ([]byte, error) {
-	data, err := os.ReadFile(oldConfigPath)
+// hasCloudKey checks if a YAML config file contains a "cloud" key.
+// Returns true if the cloud key exists, false otherwise.
+func hasCloudKey(configFilePath string) (bool, error) {
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read old config file: %w", err)
+		return false, fmt.Errorf("failed to read config file: %w", err)
 	}
-	var oldConfig OldComputeConfig
-	if err := yaml.Unmarshal(data, &oldConfig); err != nil {
-		return nil, fmt.Errorf("failed to parse old config: %w", err)
+
+	var configMap map[string]any
+	if err := yaml.Unmarshal(data, &configMap); err != nil {
+		return false, fmt.Errorf("failed to parse config file: %w", err)
 	}
-	newConfig := NewComputeConfig{
-		HeadNode: NewHeadNode{
-			InstanceType: oldConfig.HeadNodeType.InstanceType,
-		},
-		AutoSelectWorkerConfig: true,
-	}
-	newData, err := yaml.Marshal(&newConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal new config: %w", err)
-	}
-	return newData, nil
+
+	_, exists := configMap["cloud"]
+	return exists, nil
 }
 
-// ConvertComputeConfigFile converts an old format compute config file to a new format file.
-// If outputPath is empty, the new config is written to stdout.
-func ConvertComputeConfigFile(oldConfigPath, newConfigPath string) error {
-	newData, err := ConvertComputeConfig(oldConfigPath)
+// addCloudKey reads a YAML file and sets the "cloud" key to the given value,
+// then writes the file back.
+func addCloudKey(configFilePath, cloud string) error {
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
-	if newConfigPath == "" {
-		fmt.Print(string(newData))
-		return nil
+
+	var configMap map[string]any
+	if err := yaml.Unmarshal(data, &configMap); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
 	}
-	if err := os.WriteFile(newConfigPath, newData, 0644); err != nil {
-		return fmt.Errorf("failed to write new config file: %w", err)
+
+	configMap["cloud"] = cloud
+
+	updatedData, err := yaml.Marshal(configMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated config: %w", err)
 	}
+
+	if err := os.WriteFile(configFilePath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write updated config file: %w", err)
+	}
+
 	return nil
 }

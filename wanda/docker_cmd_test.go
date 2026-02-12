@@ -1,9 +1,10 @@
 package wanda
 
 import (
-	"testing"
-
+	"os"
+	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
@@ -133,5 +134,117 @@ func TestDockerCmdBuild_withHints(t *testing.T) {
 
 	if messageEnv != "MESSAGE=hint message" {
 		t.Errorf("MESSAGE env got %q, want `MESSAGE=hint message`", messageEnv)
+	}
+}
+
+func TestDockerCmdCopyFromContainer(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	containerID, err := cmd.createContainer(testImage)
+	if err != nil {
+		t.Fatalf("createContainer: %v", err)
+	}
+	defer cmd.removeContainer(containerID)
+
+	tmpDir := t.TempDir()
+
+	// Copy a known file from the container
+	if err := cmd.copyFromContainer(containerID, "/etc/alpine-release", filepath.Join(tmpDir, "alpine-release")); err != nil {
+		t.Fatalf("copyFromContainer: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpDir, "alpine-release")); os.IsNotExist(err) {
+		t.Error("alpine-release was not copied")
+	}
+}
+
+func TestDockerCmdCopyFromContainer_directory(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	containerID, err := cmd.createContainer(testImage)
+	if err != nil {
+		t.Fatalf("createContainer: %v", err)
+	}
+	defer cmd.removeContainer(containerID)
+
+	tmpDir := t.TempDir()
+
+	// Copy a directory from the container
+	if err := cmd.copyFromContainer(containerID, "/etc", filepath.Join(tmpDir, "etc")); err != nil {
+		t.Fatalf("copyFromContainer: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpDir, "etc", "alpine-release")); os.IsNotExist(err) {
+		t.Error("alpine-release was not copied from /etc directory")
+	}
+}
+
+func TestDockerCmdCopyFromContainer_directoryContents(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	containerID, err := cmd.createContainer(testImage)
+	if err != nil {
+		t.Fatalf("createContainer: %v", err)
+	}
+	defer cmd.removeContainer(containerID)
+
+	tmpDir := t.TempDir()
+	dst := filepath.Join(tmpDir, "out")
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Trailing slash on src copies contents, not the directory itself.
+	if err := cmd.copyFromContainer(containerID, "/etc/apk/", dst); err != nil {
+		t.Fatalf("copyFromContainer: %v", err)
+	}
+
+	// keys/ should be directly in dst, not in dst/apk/.
+	if _, err := os.Stat(filepath.Join(dst, "keys")); os.IsNotExist(err) {
+		t.Error("keys/ should be directly in dst when src has trailing slash")
+	}
+	if _, err := os.Stat(filepath.Join(dst, "apk")); !os.IsNotExist(err) {
+		t.Error("apk/ subdirectory should not exist when src has trailing slash")
+	}
+}
+
+func TestDockerCmdCopyFromContainer_notFound(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	containerID, err := cmd.createContainer(testImage)
+	if err != nil {
+		t.Fatalf("createContainer: %v", err)
+	}
+	defer cmd.removeContainer(containerID)
+
+	tmpDir := t.TempDir()
+
+	// Copying a non-existent file should fail
+	if err := cmd.copyFromContainer(containerID, "/nonexistent/file", filepath.Join(tmpDir, "file")); err == nil {
+		t.Error("copyFromContainer should fail for non-existent file")
 	}
 }

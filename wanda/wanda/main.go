@@ -48,6 +48,10 @@ func main() {
 		"env_file", "",
 		"env file for variable expansion; values override OS environment variables",
 	)
+	artifactsDir := flag.String(
+		"artifacts_dir", "",
+		"base directory for artifact extraction",
+	)
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
@@ -62,6 +66,7 @@ func main() {
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
 		*rebuild = os.Getenv("RAYCI_WANDA_ALWAYS_REBUILD") == "true"
 		*envFile = os.Getenv("RAYCI_ENV_FILE")
+		*artifactsDir = os.Getenv("RAYCI_ARTIFACTS_DIR")
 
 		if *epoch == "" {
 			*epoch = wanda.DefaultCacheEpoch()
@@ -89,6 +94,7 @@ func main() {
 		Epoch:          *epoch,
 		WandaSpecsFile: *wandaSpecsFile,
 		EnvFile:        *envFile,
+		ArtifactsDir:   *artifactsDir,
 
 		RayCI:   *rayCI,
 		Rebuild: *rebuild,

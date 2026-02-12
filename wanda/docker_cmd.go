@@ -82,6 +82,16 @@ func (c *dockerCmd) run(args ...string) error {
 	return cmd.Run()
 }
 
+func (c *dockerCmd) output(args ...string) ([]byte, error) {
+	cmd := c.cmd(args...)
+	buf := new(bytes.Buffer)
+	cmd.Stdout = buf
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func (c *dockerCmd) pull(src, asTag string) error {
 	if err := c.run("pull", src); err != nil {
 		return fmt.Errorf("pull %s: %w", src, err)
@@ -124,6 +134,32 @@ func (c *dockerCmd) inspectImage(tag string) (*dockerImageInfo, error) {
 
 func (c *dockerCmd) tag(src, asTag string) error {
 	return c.run("tag", src, asTag)
+}
+
+// createContainer creates a container from an image without starting it.
+// Returns the container ID.
+func (c *dockerCmd) createContainer(image string) (string, error) {
+	// "true" is a no-op command required for images without CMD/ENTRYPOINT.
+	// The container is never started, so the command doesn't actually run.
+	out, err := c.output("create", image, "true")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// copyFromContainer copies a file or directory from a container to the host.
+// If src ends with "/", the contents of the directory are copied (not the
+// directory itself) by appending "." per docker cp convention.
+func (c *dockerCmd) copyFromContainer(containerID, src, dst string) error {
+	if strings.HasSuffix(src, "/") {
+		src += "."
+	}
+	return c.run("cp", containerID+":"+src, dst)
+}
+
+func (c *dockerCmd) removeContainer(containerID string) error {
+	return c.run("rm", containerID)
 }
 
 func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInputHints) error {
