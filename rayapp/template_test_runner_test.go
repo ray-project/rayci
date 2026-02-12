@@ -567,13 +567,6 @@ func TestTestCmd_Constant(t *testing.T) {
 	}
 }
 
-func TestWorkspaceStartWaitTime_Constant(t *testing.T) {
-	// Verify the wait time constant is reasonable
-	if workspaceStartWaitTime <= 0 {
-		t.Error("workspaceStartWaitTime should be positive")
-	}
-}
-
 func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
 	// Set a test token
 	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")

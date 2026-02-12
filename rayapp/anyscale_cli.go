@@ -253,8 +253,7 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) error {
 	if wtc.template.ClusterEnv != nil {
 		env := wtc.template.ClusterEnv
 		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
-			buildDir := filepath.Dir(wtc.buildFile)
-			resolvedPath := filepath.Join(buildDir, env.BYOD.ContainerFile)
+			resolvedPath := filepath.Join(wtc.buildDir, env.BYOD.ContainerFile)
 			args = append(
 				args,
 				"--containerfile",

@@ -11,12 +11,10 @@ import (
 
 const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv"
 
-const workspaceStartWaitTime = 30 * time.Second
-
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	tmplName      string
-	buildFile     string
+	buildDir      string
 	workspaceName string
 	workspaceID   string
 	configFile    string
@@ -63,7 +61,7 @@ func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 
 		runner := NewWorkspaceTestConfig(t.Name)
 		runner.template = t
-		runner.buildFile = buildFile
+		runner.buildDir = buildDir
 		runner.template.Dir = filepath.Join(buildDir, t.Dir)
 		testConfigs = append(testConfigs, runner)
 	}
@@ -105,13 +103,11 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	// init anyscale cli
 	anyscaleCLI := NewAnyscaleCLI()
 
-	buildDir := filepath.Dir(wtc.buildFile)
-
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
 		wtc.computeConfig = generateComputeConfigName(awsConfigPath)
 		// Resolve compute config path relative to build file directory
-		resolvedConfigPath := filepath.Join(buildDir, awsConfigPath)
+		resolvedConfigPath := filepath.Join(wtc.buildDir, awsConfigPath)
 		// Create compute config if it doesn't already exist
 		if err := anyscaleCLI.CreateComputeConfig(
 			wtc.computeConfig,
