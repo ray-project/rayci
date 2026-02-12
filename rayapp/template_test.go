@@ -77,8 +77,7 @@ func TestReadTemplates(t *testing.T) {
 		Dir:         "templates/intro-jobs",
 		Description: "Introduction on how to use Anyscale Jobs",
 		ClusterEnv: &ClusterEnv{
-			BuildID:  "anyscaleray2340-py311",
-			ImageURI: "anyscale/ray:2.34.0-py311", // populated from build_id during read
+			BuildID: "anyscaleray2340-py311",
 		},
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
@@ -92,7 +91,6 @@ func TestReadTemplates(t *testing.T) {
 		Description: "Same as job-intro but cluster_env uses image_uri",
 		ClusterEnv: &ClusterEnv{
 			ImageURI: "anyscale/ray:2.34.0-py311",
-			BuildID:  "anyscaleray2340-py311", // populated from image_uri during read
 		},
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
@@ -179,14 +177,22 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			wantImageURI: "anyscale/ray:2.44.1-py312-cu128", wantRayVersion: "2.44.1",
 		},
 		{
-			name:           "both set",
-			env:            &ClusterEnv{BuildID: "anyscaleray2440", ImageURI: "anyscale/ray:2.44.0"},
-			wantImageURI:   "anyscale/ray:2.44.0",
-			wantRayVersion: "2.44.0",
+			name: "both set",
+			env: &ClusterEnv{
+				BuildID:  "anyscaleray2440",
+				ImageURI: "anyscale/ray:2.44.0",
+			},
+			wantErr:     true,
+			errContains: "exactly one",
 		},
 		{
-			name:           "BYOD",
-			env:            &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "cr.ray.io/ray:2340-py311", RayVersion: "2.34.0"}},
+			name: "BYOD",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage: "cr.ray.io/ray:2340-py311",
+					RayVersion:  "2.34.0",
+				},
+			},
 			wantImageURI:   "cr.ray.io/ray:2340-py311",
 			wantRayVersion: "2.34.0",
 		},
@@ -197,14 +203,10 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 			errContains: "build_id or image_uri",
 		},
 		{
-			name:        "nil env",
-			env:         nil,
-			wantErr:     true,
-			errContains: "cluster_env is required",
-		},
-		{
-			name:        "BYOD containerfile only",
-			env:         &ClusterEnv{BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD containerfile only",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"},
+			},
 			wantErr:     true,
 			errContains: "containerfile",
 		},
@@ -234,29 +236,6 @@ func TestGetImageURIAndRayVersionFromClusterEnv(t *testing.T) {
 	}
 }
 
-func TestReadTemplates_buildIDImageURIMismatch(t *testing.T) {
-	tmp := t.TempDir()
-	f := filepath.Join(tmp, "BUILD.yaml")
-	yaml := strings.Join([]string{
-		"- name: bad",
-		"  dir: x",
-		"  cluster_env:",
-		"    build_id: anyscaleray2340-py311",
-		"    image_uri: anyscale/ray:2.44.1-py312-cu128",
-		"  compute_config: {}",
-	}, "\n")
-	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
-	_, err := readTemplates(f)
-	if err == nil {
-		t.Fatal("want error for mismatched build_id and image_uri, got nil")
-	}
-	if !strings.Contains(err.Error(), "do not match") {
-		t.Errorf("error %q should contain %q", err.Error(), "do not match")
-	}
-}
-
 func TestReadTemplates_emptyClusterEnv(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "BUILD.yaml")
@@ -271,22 +250,22 @@ func TestReadTemplates_emptyClusterEnv(t *testing.T) {
 	}
 	_, err := readTemplates(f)
 	if err == nil {
-		t.Fatal("want error for cluster_env defined but empty (no build_id, image_uri, or byod), got nil")
+		t.Fatal(
+			"want error for cluster_env defined but empty (no build_id, image_uri, or byod), got nil",
+		)
 	}
-	if !strings.Contains(err.Error(), "build_id or image_uri") && !strings.Contains(err.Error(), "byod") {
+	if !strings.Contains(err.Error(), "build_id or image_uri") &&
+		!strings.Contains(err.Error(), "byod") {
 		t.Errorf("error %q should mention build_id/image_uri or byod", err.Error())
 	}
 }
 
-func TestValidateAndBuildClusterEnv(t *testing.T) {
+func TestValidateClusterEnv(t *testing.T) {
 	tests := []struct {
 		name        string
 		env         *ClusterEnv
 		wantErr     bool
 		errContains string
-		// optional: after success, expected populated fields (env may be mutated)
-		wantImageURI string
-		wantBuildID  string
 	}{
 		{
 			name:    "nil env",
@@ -294,18 +273,31 @@ func TestValidateAndBuildClusterEnv(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "BYOD docker_image and ray_version",
-			env:     &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "cr.ray.io/ray:2340-py311", RayVersion: "2.34.0"}},
+			name: "BYOD docker_image and ray_version",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage: "cr.ray.io/ray:2340-py311",
+					RayVersion:  "2.34.0",
+				},
+			},
 			wantErr: false,
 		},
 		{
-			name:    "BYOD containerfile and ray_version",
-			env:     &ClusterEnv{BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD containerfile and ray_version",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{ContainerFile: "Dockerfile", RayVersion: "2.34.0"},
+			},
 			wantErr: false,
 		},
 		{
-			name:        "BYOD both docker_image and containerfile",
-			env:         &ClusterEnv{BYOD: &ClusterEnvBYOD{DockerImage: "img", ContainerFile: "Dockerfile", RayVersion: "2.34.0"}},
+			name: "BYOD both docker_image and containerfile",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage:   "img",
+					ContainerFile: "Dockerfile",
+					RayVersion:    "2.34.0",
+				},
+			},
 			wantErr:     true,
 			errContains: "exactly one",
 		},
@@ -322,27 +314,23 @@ func TestValidateAndBuildClusterEnv(t *testing.T) {
 			errContains: "ray_version",
 		},
 		{
-			name:         "build_id only populates image_uri",
-			env:          &ClusterEnv{BuildID: "anyscaleray2340-py311"},
-			wantErr:      false,
-			wantImageURI: "anyscale/ray:2.34.0-py311",
-		},
-		{
-			name:        "image_uri only populates build_id",
-			env:         &ClusterEnv{ImageURI: "anyscale/ray:2.34.0-py311"},
-			wantErr:     false,
-			wantBuildID: "anyscaleray2340-py311",
-		},
-		{
-			name:    "build_id and image_uri matching",
-			env:     &ClusterEnv{BuildID: "anyscaleray2340-py311", ImageURI: "anyscale/ray:2.34.0-py311"},
+			name:    "build_id only",
+			env:     &ClusterEnv{BuildID: "anyscaleray2340-py311"},
 			wantErr: false,
 		},
 		{
-			name:        "build_id and image_uri mismatching",
-			env:         &ClusterEnv{BuildID: "anyscaleray2340-py311", ImageURI: "anyscale/ray:2.44.1-py312-cu128"},
+			name:    "image_uri only",
+			env:     &ClusterEnv{ImageURI: "anyscale/ray:2.34.0-py311"},
+			wantErr: false,
+		},
+		{
+			name: "build_id and image_uri both set",
+			env: &ClusterEnv{
+				BuildID:  "anyscaleray2340-py311",
+				ImageURI: "anyscale/ray:2.34.0-py311",
+			},
 			wantErr:     true,
-			errContains: "do not match",
+			errContains: "exactly one",
 		},
 		{
 			name:        "neither build_id nor image_uri",
@@ -350,22 +338,10 @@ func TestValidateAndBuildClusterEnv(t *testing.T) {
 			wantErr:     true,
 			errContains: "build_id or image_uri",
 		},
-		{
-			name:        "invalid build_id format",
-			env:         &ClusterEnv{BuildID: "bad-format"},
-			wantErr:     true,
-			errContains: "anyscaleray",
-		},
-		{
-			name:        "invalid image_uri format",
-			env:         &ClusterEnv{ImageURI: "wrong/format:tag"},
-			wantErr:     true,
-			errContains: "image URI",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateAndBuildClusterEnv(tt.env)
+			err := validateClusterEnv(tt.env)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -377,20 +353,6 @@ func TestValidateAndBuildClusterEnv(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if tt.wantImageURI != "" && (tt.env == nil || tt.env.ImageURI != tt.wantImageURI) {
-				got := ""
-				if tt.env != nil {
-					got = tt.env.ImageURI
-				}
-				t.Errorf("ImageURI = %q, want %q", got, tt.wantImageURI)
-			}
-			if tt.wantBuildID != "" && (tt.env == nil || tt.env.BuildID != tt.wantBuildID) {
-				got := ""
-				if tt.env != nil {
-					got = tt.env.BuildID
-				}
-				t.Errorf("BuildID = %q, want %q", got, tt.wantBuildID)
 			}
 		})
 	}
@@ -440,7 +402,8 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			}
 			switch tt.name {
 			case "byod missing docker_image":
-				if !strings.Contains(err.Error(), "docker_image") && !strings.Contains(err.Error(), "containerfile") {
+				if !strings.Contains(err.Error(), "docker_image") &&
+					!strings.Contains(err.Error(), "containerfile") {
 					t.Errorf("error %q should mention docker_image or containerfile", err.Error())
 				}
 			case "byod missing ray_version":
@@ -448,8 +411,12 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 					t.Errorf("error %q should mention ray_version requirement", err.Error())
 				}
 			case "byod both docker_image and containerfile":
-				if !strings.Contains(err.Error(), "exactly one") && !strings.Contains(err.Error(), "not both") {
-					t.Errorf("error %q should mention exactly one of docker_image or containerfile, not both", err.Error())
+				if !strings.Contains(err.Error(), "exactly one") &&
+					!strings.Contains(err.Error(), "not both") {
+					t.Errorf(
+						"error %q should mention exactly one of docker_image or containerfile, not both",
+						err.Error(),
+					)
 				}
 			}
 		})
@@ -459,7 +426,7 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 func TestConvertBuildIdToImageURI(t *testing.T) {
 	tests := []struct {
 		name           string
-		buildId        string
+		buildID        string
 		wantImageURI   string
 		wantRayVersion string
 		wantErr        bool
@@ -467,49 +434,67 @@ func TestConvertBuildIdToImageURI(t *testing.T) {
 	}{
 		{
 			name:           "valid build ID with suffix",
-			buildId:        "anyscaleray2441-py312-cu128",
+			buildID:        "anyscaleray2441-py312-cu128",
 			wantImageURI:   "anyscale/ray:2.44.1-py312-cu128",
 			wantRayVersion: "2.44.1",
 		},
 		{
 			name:           "valid build ID without suffix",
-			buildId:        "anyscaleray2440",
+			buildID:        "anyscaleray2440",
 			wantImageURI:   "anyscale/ray:2.44.0",
 			wantRayVersion: "2.44.0",
 		},
 		{
 			name:           "valid build ID with only python suffix",
-			buildId:        "anyscaleray2350-py311",
+			buildID:        "anyscaleray2350-py311",
 			wantImageURI:   "anyscale/ray:2.35.0-py311",
 			wantRayVersion: "2.35.0",
 		},
 		{
 			name:           "valid build ID version 3",
-			buildId:        "anyscaleray3001-py312",
+			buildID:        "anyscaleray3001-py312",
 			wantImageURI:   "anyscale/ray:3.00.1-py312",
 			wantRayVersion: "3.00.1",
 		},
 		{
+			name:           "valid build ID ray-llm",
+			buildID:        "anyscalerayllm2441-py312-cu128",
+			wantImageURI:   "anyscale/ray-llm:2.44.1-py312-cu128",
+			wantRayVersion: "2.44.1",
+		},
+		{
+			name:           "valid build ID ray-ml",
+			buildID:        "anyscalerayml2440-py311",
+			wantImageURI:   "anyscale/ray-ml:2.44.0-py311",
+			wantRayVersion: "2.44.0",
+		},
+		{
 			name:        "invalid prefix",
-			buildId:     "rayimage2441-py312",
+			buildID:     "rayimage2441-py312",
 			wantErr:     true,
 			errContains: "must start with",
 		},
 		{
+			name:           "unknown image type used as image name",
+			buildID:        "anyscalerayfoo2441-py312",
+			wantImageURI:   "anyscale/rayfoo:2.44.1-py312",
+			wantRayVersion: "2.44.1",
+		},
+		{
 			name:        "version too short",
-			buildId:     "anyscaleray123",
+			buildID:     "anyscaleray123",
 			wantErr:     true,
 			errContains: "major(1 digit)",
 		},
 		{
 			name:        "empty build ID",
-			buildId:     "",
+			buildID:     "",
 			wantErr:     true,
 			errContains: "must start with",
 		},
 		{
 			name:        "only prefix",
-			buildId:     "anyscaleray",
+			buildID:     "anyscaleray",
 			wantErr:     true,
 			errContains: "major(1 digit)",
 		},
@@ -517,7 +502,7 @@ func TestConvertBuildIdToImageURI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imageURI, rayVersion, err := convertBuildIdToImageURI(tt.buildId)
+			imageURI, rayVersion, err := convertBuildIDToImageURI(tt.buildID)
 
 			if tt.wantErr {
 				if err == nil {
@@ -544,64 +529,39 @@ func TestConvertBuildIdToImageURI(t *testing.T) {
 
 func TestConvertImageURIToBuildID(t *testing.T) {
 	tests := []struct {
-		name           string
-		imageURI       string
-		wantBuildID    string
-		wantRayVersion string
-		wantErr        bool
-		errContains    string
+		name        string
+		imageURI    string
+		wantBuildID string
 	}{
 		{
-			name:           "valid image URI with suffix",
-			imageURI:       "anyscale/ray:2.44.1-py312-cu128",
-			wantBuildID:    "anyscaleray2441-py312-cu128",
-			wantRayVersion: "2.44.1",
+			name:        "image URI with suffix",
+			imageURI:    "anyscale/ray:2.44.1-py312-cu128",
+			wantBuildID: "anyscaleray2441-py312-cu128",
 		},
 		{
-			name:           "valid image URI without suffix",
-			imageURI:       "anyscale/ray:2.44.0",
-			wantBuildID:    "anyscaleray2440",
-			wantRayVersion: "2.44.0",
+			name:        "image URI without suffix",
+			imageURI:    "anyscale/ray:2.44.0",
+			wantBuildID: "anyscaleray2440",
 		},
 		{
-			name:           "valid image URI with python suffix",
-			imageURI:       "anyscale/ray:2.35.0-py311",
-			wantBuildID:    "anyscaleray2350-py311",
-			wantRayVersion: "2.35.0",
+			name:        "image URI ray-llm",
+			imageURI:    "anyscale/ray-llm:2.44.1-py312-cu128",
+			wantBuildID: "anyscaleray-llm2441-py312-cu128",
 		},
 		{
-			name:        "invalid prefix",
+			name:        "any URI is slugified",
 			imageURI:    "other/ray:2.44.1-py312",
-			wantErr:     true,
-			errContains: "must start with",
-		},
-		{
-			name:        "invalid version format",
-			imageURI:    "anyscale/ray:2.4.1",
-			wantErr:     true,
-			errContains: "major(1 digit)",
+			wantBuildID: "otherray2441-py312",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buildID, rayVersion, err := convertImageURIToBuildID(tt.imageURI)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("error %q should contain %q", err.Error(), tt.errContains)
-				}
-				return
-			}
+			buildID, err := convertImageURIToBuildID(tt.imageURI)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if buildID != tt.wantBuildID {
 				t.Errorf("buildID = %q, want %q", buildID, tt.wantBuildID)
-			}
-			if rayVersion != tt.wantRayVersion {
-				t.Errorf("rayVersion = %q, want %q", rayVersion, tt.wantRayVersion)
 			}
 		})
 	}
