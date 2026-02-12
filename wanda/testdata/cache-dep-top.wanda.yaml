@@ -1,0 +1,10 @@
+name: cache-dep-top
+dockerfile: Dockerfile.cache-dep-top
+froms:
+  - cr.ray.io/rayproject/cache-dep-base
+build_args:
+  - BASE=cr.ray.io/rayproject/cache-dep-base
+  - BUILD_VALUE=$BUILD_VALUE
+artifacts:
+  - src: /output.txt
+    dst: output.txt
