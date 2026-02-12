@@ -1017,6 +1017,7 @@ func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
 		WandaSpecsFile: wandaSpecs,
 		ArtifactsDir:   artifactsDir1,
 		EnvFile:        envFile,
+		Rebuild:        true, // force build so prior cached images don't interfere
 	}
 
 	// First build: both dep and root are fresh, artifacts extracted.
@@ -1037,6 +1038,7 @@ func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
 
 	artifactsDir2 := filepath.Join(tmpDir, "artifacts2")
 	config.ArtifactsDir = artifactsDir2
+	config.Rebuild = false // allow cache checking for second build
 
 	// Second build: dep cache hit, root cache miss.
 	// Artifacts SHOULD be extracted because the root was rebuilt.

@@ -191,6 +191,41 @@ func TestDockerCmdCopyFromContainer_directory(t *testing.T) {
 	}
 }
 
+func TestDockerCmdCopyFromContainer_directoryContents(t *testing.T) {
+	cmd := newDockerCmd(&dockerCmdConfig{})
+
+	const testImage = "alpine:latest"
+
+	if err := cmd.run("pull", testImage); err != nil {
+		t.Fatalf("pull image: %v", err)
+	}
+
+	containerID, err := cmd.createContainer(testImage)
+	if err != nil {
+		t.Fatalf("createContainer: %v", err)
+	}
+	defer cmd.removeContainer(containerID)
+
+	tmpDir := t.TempDir()
+	dst := filepath.Join(tmpDir, "out")
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Trailing slash on src copies contents, not the directory itself.
+	if err := cmd.copyFromContainer(containerID, "/etc/apk/", dst); err != nil {
+		t.Fatalf("copyFromContainer: %v", err)
+	}
+
+	// keys/ should be directly in dst, not in dst/apk/.
+	if _, err := os.Stat(filepath.Join(dst, "keys")); os.IsNotExist(err) {
+		t.Error("keys/ should be directly in dst when src has trailing slash")
+	}
+	if _, err := os.Stat(filepath.Join(dst, "apk")); !os.IsNotExist(err) {
+		t.Error("apk/ subdirectory should not exist when src has trailing slash")
+	}
+}
+
 func TestDockerCmdCopyFromContainer_notFound(t *testing.T) {
 	cmd := newDockerCmd(&dockerCmdConfig{})
 

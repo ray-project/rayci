@@ -18,13 +18,14 @@ import (
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct {
 	client *http.Client
+	bin string // path to the anyscale binary; defaults to "anyscale"
 }
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
-	return &AnyscaleCLI{client: &http.Client{}}
+	return &AnyscaleCLI{bin: "anyscale", client: &http.Client{}}
 }
 
 type WorkspaceState int
@@ -57,8 +58,8 @@ func extractWorkspaceID(output string) (string, error) {
 	return matches[1], nil
 }
 
-func isAnyscaleInstalled() bool {
-	_, err := exec.LookPath("anyscale")
+func (ac *AnyscaleCLI) isAnyscaleInstalled() bool {
+	_, err := exec.LookPath(ac.bin)
 	return err == nil
 }
 
@@ -66,12 +67,12 @@ func isAnyscaleInstalled() bool {
 // Returns the combined output and any error that occurred.
 // Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
-	if !isAnyscaleInstalled() {
+	if !ac.isAnyscaleInstalled() {
 		return "", errors.New("anyscale is not installed")
 	}
 
 	fmt.Println("anyscale cli args: ", args)
-	cmd := exec.Command("anyscale", args...)
+	cmd := exec.Command(ac.bin, args...)
 
 	tw := newTailWriter(maxOutputBufferSize)
 	cmd.Stdout = io.MultiWriter(os.Stdout, tw)

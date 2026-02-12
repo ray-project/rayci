@@ -4,9 +4,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// setupMockAnyscale installs a fake anyscale script and prepends its directory to PATH
+// so NewAnyscaleCLI() and exec.LookPath("anyscale") use it.
+func setupMockAnyscale(t *testing.T, script string) {
+	t.Helper()
+	binPath := writeFakeAnyscale(t, script)
+	dir := filepath.Dir(binPath)
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", dir+string(os.PathListSeparator)+origPath)
+	t.Cleanup(func() { os.Setenv("PATH", origPath) })
+}
 
 // setupMockDeleteWorkspaceAPI starts an httptest.Server that accepts DELETE workspace
 // and sets ANYSCALE_HOST/ANYSCALE_CLI_TOKEN so deleteWorkspaceByID succeeds.

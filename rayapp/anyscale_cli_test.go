@@ -1,7 +1,6 @@
 package rayapp
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,21 +9,21 @@ import (
 	"testing"
 )
 
-// setupMockAnyscale creates a mock anyscale script and returns a cleanup function.
-func setupMockAnyscale(t *testing.T, script string) {
+// writeFakeAnyscale writes a fake anyscale script to a temp directory
+// and returns its path. If script is empty, returns a path that does not exist.
+func writeFakeAnyscale(t *testing.T, script string) string {
 	t.Helper()
 	tmp := t.TempDir()
+	bin := filepath.Join(tmp, "anyscale")
 
-	if script != "" {
-		mockScript := tmp + "/anyscale"
-		if err := os.WriteFile(mockScript, []byte(script), 0755); err != nil {
-			t.Fatalf("failed to create mock script: %v", err)
-		}
+	if script == "" {
+		return bin // non-existent path
 	}
 
-	origPath := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", origPath) })
-	os.Setenv("PATH", tmp)
+	if err := os.WriteFile(bin, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to create fake script: %v", err)
+	}
+	return bin
 }
 
 func TestNewAnyscaleCLI(t *testing.T) {
@@ -36,16 +35,16 @@ func TestNewAnyscaleCLI(t *testing.T) {
 
 func TestIsAnyscaleInstalled(t *testing.T) {
 	t.Run("not installed", func(t *testing.T) {
-		setupMockAnyscale(t, "")
-		if isAnyscaleInstalled() {
-			t.Error("should return false when not in PATH")
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "")}
+		if cli.isAnyscaleInstalled() {
+			t.Error("should return false when binary does not exist")
 		}
 	})
 
 	t.Run("installed", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho mock")
-		if !isAnyscaleInstalled() {
-			t.Error("should return true when in PATH")
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho mock")}
+		if !cli.isAnyscaleInstalled() {
+			t.Error("should return true when binary exists")
 		}
 	})
 }
@@ -60,8 +59,7 @@ for ((i=1; i<=12000; i++)); do
     printf "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"
 done
 `
-	setupMockAnyscale(t, script)
-	cli := NewAnyscaleCLI()
+	cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 	output, err := cli.runAnyscaleCLI([]string{})
 	if err != nil {
@@ -107,14 +105,14 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		name       string
 		script     string
 		args       []string
-		wantErr    error
+		wantErrStr string
 		wantSubstr string
 	}{
 		{
-			name:    "anyscale not installed",
-			script:  "", // empty PATH, no script
-			args:    []string{"--version"},
-			wantErr: errors.New("anyscale is not installed"),
+			name:       "anyscale not installed",
+			script:     "", // non-existent binary
+			args:       []string{"--version"},
+			wantErrStr: "anyscale is not installed",
 		},
 		{
 			name:       "success",
@@ -133,29 +131,28 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
 			wantSubstr: "error msg",
-			wantErr:    errors.New("anyscale error"),
+			wantErrStr: "anyscale error",
 		},
 		{
 			name:    "exec failed with exit code in output",
 			script:  "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
 			args:    []string{"deploy"},
-			wantErr: errors.New("anyscale error: command failed:"),
+			wantErrStr: "anyscale error: command failed:",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setupMockAnyscale(t, tt.script)
-			cli := NewAnyscaleCLI()
+			cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, tt.script)}
 
 			output, err := cli.runAnyscaleCLI(tt.args)
 
-			if tt.wantErr != nil {
+			if tt.wantErrStr != "" {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if !strings.Contains(err.Error(), tt.wantErr.Error()) {
-					t.Errorf("error %q should contain %q", err.Error(), tt.wantErr.Error())
+				if !strings.Contains(err.Error(), tt.wantErrStr) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.wantErrStr)
 				}
 				return
 			}
@@ -183,8 +180,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
 fi
 exit 1
 `
-		setupMockAnyscale(t, script)
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -208,8 +204,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then
 fi
 exit 1
 `
-		setupMockAnyscale(t, script)
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 		err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
 		if err != nil {
@@ -228,8 +223,7 @@ if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
 fi
 exit 1
 `
-		setupMockAnyscale(t, script)
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -251,8 +245,7 @@ exit 1
 
 func TestGetComputeConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"")}
 
 		output, err := cli.GetComputeConfig("my-config")
 		if err != nil {
@@ -264,8 +257,7 @@ func TestGetComputeConfig(t *testing.T) {
 	})
 
 	t.Run("success with version", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"args: $@\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"args: $@\"")}
 
 		output, err := cli.GetComputeConfig("my-config:2")
 		if err != nil {
@@ -277,8 +269,7 @@ func TestGetComputeConfig(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		_, err := cli.GetComputeConfig("nonexistent-config")
 		if err == nil {
@@ -297,8 +288,7 @@ func TestGetDefaultCloud(t *testing.T) {
 			"echo \"name: my-default-cloud\"",
 			"echo \"id: cld_abc123\"",
 		}, "\n")
-		setupMockAnyscale(t, script)
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {
@@ -316,8 +306,7 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("CLI failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -329,8 +318,7 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("invalid YAML output", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\"")}
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -342,8 +330,7 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("empty output", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"\"")}
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {
@@ -484,8 +471,7 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setupMockAnyscale(t, tt.script)
-			cli := NewAnyscaleCLI()
+			cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, tt.script)}
 
 			workspaceID, err := cli.createEmptyWorkspace(tt.config)
 
@@ -615,8 +601,7 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 
 func TestPushFolderToWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"push $@\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"push $@\"")}
 
 		err := cli.pushFolderToWorkspace("my-workspace", "/local/path")
 		if err != nil {
@@ -625,8 +610,7 @@ func TestPushFolderToWorkspace(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		err := cli.pushFolderToWorkspace("my-workspace", "/local/path")
 		if err == nil {
@@ -640,8 +624,7 @@ func TestPushFolderToWorkspace(t *testing.T) {
 
 func TestTerminateWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"terminating $@\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"terminating $@\"")}
 
 		err := cli.terminateWorkspace("my-workspace")
 		if err != nil {
@@ -650,8 +633,7 @@ func TestTerminateWorkspace(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		err := cli.terminateWorkspace("my-workspace")
 		if err == nil {
@@ -665,8 +647,7 @@ func TestTerminateWorkspace(t *testing.T) {
 
 func TestRunCmdInWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"running: $@\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"running: $@\"")}
 
 		err := cli.runCmdInWorkspace("test-workspace", "echo hello")
 		if err != nil {
@@ -675,8 +656,7 @@ func TestRunCmdInWorkspace(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		err := cli.runCmdInWorkspace("test-workspace", "failing-command")
 		if err == nil {
@@ -690,8 +670,7 @@ func TestRunCmdInWorkspace(t *testing.T) {
 
 func TestStartWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"starting $@\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"starting $@\"")}
 
 		err := cli.startWorkspace("test-workspace")
 		if err != nil {
@@ -700,8 +679,7 @@ func TestStartWorkspace(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		err := cli.startWorkspace("test-workspace")
 		if err == nil {
@@ -715,8 +693,7 @@ func TestStartWorkspace(t *testing.T) {
 
 func TestGetWorkspaceStatus(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"RUNNING\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"RUNNING\"")}
 
 		output, err := cli.getWorkspaceStatus("test-workspace")
 		if err != nil {
@@ -728,8 +705,7 @@ func TestGetWorkspaceStatus(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		_, err := cli.getWorkspaceStatus("test-workspace")
 		if err == nil {
@@ -743,8 +719,7 @@ func TestGetWorkspaceStatus(t *testing.T) {
 
 func TestWaitForWorkspaceState(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"state reached\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"state reached\"")}
 
 		output, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
 		if err != nil {
@@ -756,8 +731,7 @@ func TestWaitForWorkspaceState(t *testing.T) {
 	})
 
 	t.Run("wait for terminated", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\necho \"terminated\"")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"terminated\"")}
 
 		output, err := cli.waitForWorkspaceState("test-workspace", StateTerminated)
 		if err != nil {
@@ -769,8 +743,7 @@ func TestWaitForWorkspaceState(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-		cli := NewAnyscaleCLI()
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
 
 		_, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
 		if err == nil {
