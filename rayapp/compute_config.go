@@ -21,24 +21,6 @@ type ComputeConfigListItem struct {
 	URL            string  `json:"url"`
 }
 
-// OldComputeConfig represents the old compute config format
-type OldComputeConfig struct {
-	HeadNodeType    OldHeadNodeType     `yaml:"head_node_type"`
-	WorkerNodeTypes []OldWorkerNodeType `yaml:"worker_node_types"`
-}
-
-// OldHeadNodeType represents the head node configuration in old format
-type OldHeadNodeType struct {
-	Name         string `yaml:"name"`
-	InstanceType string `yaml:"instance_type"`
-}
-
-// OldWorkerNodeType represents a worker node configuration in old format
-type OldWorkerNodeType struct {
-	Name         string `yaml:"name"`
-	InstanceType string `yaml:"instance_type"`
-}
-
 // generateComputeConfigName converts a config path to a config name.
 // e.g., "configs/basic-single-node/aws.yaml" -> "basic-single-node-aws"
 func generateComputeConfigName(configPath string) string {
