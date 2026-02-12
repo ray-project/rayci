@@ -1,0 +1,4 @@
+ARG BASE
+FROM ${BASE}
+ARG BUILD_VALUE=default
+RUN echo "${BUILD_VALUE}" > /output.txt

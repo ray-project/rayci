@@ -28,6 +28,9 @@ type Spec struct {
 
 	// DisableCaching disables use of caching.
 	DisableCaching bool `yaml:"disable_caching,omitempty"`
+
+	// Artifacts defines files and directories to extract from the built image.
+	Artifacts []*Artifact `yaml:"artifacts,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
@@ -116,6 +119,21 @@ func stringsExpandVar(slice []string, lookup lookupFunc) []string {
 	return result
 }
 
+func artifactsExpandVar(artifacts []*Artifact, lookup lookupFunc) []*Artifact {
+	if len(artifacts) == 0 {
+		return nil
+	}
+	result := make([]*Artifact, len(artifacts))
+	for i, a := range artifacts {
+		result[i] = &Artifact{
+			Src:      expandVar(a.Src, lookup),
+			Dst:      expandVar(a.Dst, lookup),
+			Optional: a.Optional,
+		}
+	}
+	return result
+}
+
 func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result := new(Spec)
 
@@ -127,6 +145,7 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result.BuildArgs = stringsExpandVar(s.BuildArgs, lookup)
 	result.BuildHintArgs = stringsExpandVar(s.BuildHintArgs, lookup)
 	result.DisableCaching = s.DisableCaching
+	result.Artifacts = artifactsExpandVar(s.Artifacts, lookup)
 
 	return result
 }

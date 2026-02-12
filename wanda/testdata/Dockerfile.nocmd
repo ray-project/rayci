@@ -1,0 +1,5 @@
+FROM alpine:latest AS builder
+RUN echo "test-content" > /output.txt
+
+FROM scratch
+COPY --from=builder /output.txt /output.txt

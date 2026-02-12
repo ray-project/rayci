@@ -1,0 +1,9 @@
+name: artifact-dep-top
+dockerfile: Dockerfile.artifact-top
+froms:
+  - cr.ray.io/rayproject/artifact-dep-base
+build_args:
+  - BASE=cr.ray.io/rayproject/artifact-dep-base
+artifacts:
+  - src: /top-layer.txt
+    dst: top.txt
