@@ -219,14 +219,20 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		}
 
 		// Unzip test folder in workspace
-		if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, "unzip -o tests.zip"); err != nil {
+		if err := anyscaleCLI.runCmdInWorkspace(
+			wtc.workspaceName,
+			"unzip -o tests.zip",
+		); err != nil {
 			errors = append(errors, fmt.Errorf("unzip tests in workspace failed: %w", err))
 			return errors
 		}
 	}
 
 	// Run test command from test configuration
-	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, wtc.template.Test.Command); err != nil {
+	testCommand := fmt.Sprintf(
+		"timeout %d bash -c '%s'", wtc.template.Test.TimeoutInSec, wtc.template.Test.Command,
+	)
+	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, testCommand); err != nil {
 		errors = append(errors, fmt.Errorf("run test command failed: %w", err))
 		return errors
 	}

@@ -19,7 +19,7 @@ Each template in `BUILD.yaml` must now include a `test` configuration that defin
   emoji: 🚀
   title: My Template
   description: A sample template
-  dir: my-template
+  dir: templates/my-template
   cluster_env:
     build_id: anyscaleray2370-py311
   compute_config:
@@ -35,7 +35,7 @@ Each template in `BUILD.yaml` must now include a `test` configuration that defin
   emoji: ⏱️
   title: Long Running Template
   description: Template with extended test time
-  dir: long-running-template
+  dir: templates/long-running-template
   cluster_env:
     build_id: anyscaleray2370-py311
   compute_config:
@@ -52,14 +52,15 @@ Each template in `BUILD.yaml` must now include a `test` configuration that defin
   emoji: 🧪
   title: Template with Test Suite
   description: Template with a separate test directory
-  dir: template-with-tests
+  dir: templates/template-with-tests
   cluster_env:
     build_id: anyscaleray2370-py311
   compute_config:
     AWS: configs/aws.yaml
   test:
     command: pip install -r tests/requirements.txt && pytest tests/ -v
-    tests_path: template-with-tests/tests
+    # If the test scripts and artifacts are located at tests/template-with-tests/ci/tests
+    tests_path: tests/template-with-tests/ci/  # Everything inside ci/ is copied to workspace
     timeout_in_sec: 1800  # 30 minutes
 ```
 
@@ -72,9 +73,11 @@ When running tests, the following steps occur:
 3. Push the template zip to the workspace
 4. Unzip the template contents in the workspace
 5. If `tests_path` is specified:
-   - Zip the test folder
+   - Zip the contents of the folder at `tests_path`
    - Push the test zip to the workspace
-   - Unzip the test folder in the workspace
+   - Unzip the contents in the workspace
+   - **Note**: The folder at `tests_path` will not be copied to workspace. The workspace will only
+   contain the contents of the `tests_path` folder.
 6. Execute the test `command`
 7. Clean up the workspace (terminate and delete)
 
@@ -91,7 +94,7 @@ When running tests, the following steps occur:
 ./rayapp test my-template --build BUILD.yaml
 
 # Test all templates in a custom build file
-./rayapp test my-template --build BUILD.yaml
+./rayapp test all --build BUILD.yaml
 ```
 
 ## Migration Guide
