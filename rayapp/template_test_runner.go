@@ -108,11 +108,14 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
-		wtc.computeConfig = parseComputeConfigName(awsConfigPath)
+		wtc.computeConfig = generateComputeConfigName(awsConfigPath)
 		// Resolve compute config path relative to build file directory
 		resolvedConfigPath := filepath.Join(buildDir, awsConfigPath)
 		// Create compute config if it doesn't already exist
-		if _, err := anyscaleCLI.CreateComputeConfig(wtc.computeConfig, resolvedConfigPath); err != nil {
+		if err := anyscaleCLI.CreateComputeConfig(
+			wtc.computeConfig,
+			resolvedConfigPath,
+		); err != nil {
 			errors = append(errors, fmt.Errorf("create compute config failed: %w", err))
 			return errors
 		}
@@ -136,8 +139,14 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 			errors = append(errors, fmt.Errorf("terminate workspace failed: %w", err))
 			return
 		}
-		if _, err := anyscaleCLI.waitForWorkspaceState(wtc.workspaceName, StateTerminated); err != nil {
-			errors = append(errors, fmt.Errorf("wait for workspace terminated state failed: %w", err))
+		if _, err := anyscaleCLI.waitForWorkspaceState(
+			wtc.workspaceName,
+			StateTerminated,
+		); err != nil {
+			errors = append(
+				errors,
+				fmt.Errorf("wait for workspace terminated state failed: %w", err),
+			)
 			return
 		}
 
@@ -177,7 +186,10 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 		return errors
 	}
 
-	if err := anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, "unzip -o "+wtc.tmplName+".zip"); err != nil {
+	if err := anyscaleCLI.runCmdInWorkspace(
+		wtc.workspaceName,
+		"unzip -o "+wtc.tmplName+".zip",
+	); err != nil {
 		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
 		return errors
 	}
