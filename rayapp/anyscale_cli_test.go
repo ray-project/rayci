@@ -107,7 +107,7 @@ func TestRunAnyscaleCLI(t *testing.T) {
 		},
 		{
 			name:       "command fails with stderr",
-			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
+			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1                                                        ",
 			args:       []string{"deploy"},
 			wantSubstr: "error msg",
 			wantErrStr: "anyscale error",
