@@ -5,6 +5,14 @@ default_install_hook_types: [pre-commit, pre-push]
 
 repos:
   # Pre-commit hooks (fast checks, run on every commit)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
   - repo: local
     hooks:
       - id: go-fmt
