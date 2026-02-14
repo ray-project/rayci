@@ -55,6 +55,10 @@ func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 		if filter != nil && !filter(t) {
 			continue
 		}
+		if t.Test == nil {
+			log.Printf("Template %s has no test configuration, skipping", t.Name)
+			continue
+		}
 		log.Println("Testing template:", t.Name)
 
 		runner := NewWorkspaceTestConfig(t.Name)

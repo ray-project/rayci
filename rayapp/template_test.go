@@ -464,10 +464,9 @@ func TestValidateTestConfig(t *testing.T) {
 		errContains string
 	}{
 		{
-			name:        "nil test config",
-			test:        nil,
-			wantErr:     true,
-			errContains: "test configuration is required",
+			name:    "nil test config is valid",
+			test:    nil,
+			wantErr: false,
 		},
 		{
 			name: "valid test config with all fields",
@@ -551,12 +550,15 @@ func TestReadTemplates_missingTestConfig(t *testing.T) {
 	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
-	_, err := readTemplates(f)
-	if err == nil {
-		t.Fatal("want error for missing test config, got nil")
+	tmpls, err := readTemplates(f)
+	if err != nil {
+		t.Fatalf("readTemplates() = %v, want nil error", err)
 	}
-	if !strings.Contains(err.Error(), "test configuration is required") {
-		t.Errorf("error %q should mention test configuration is required", err.Error())
+	if len(tmpls) != 1 {
+		t.Fatalf("len(tmpls) = %d, want 1", len(tmpls))
+	}
+	if tmpls[0].Test != nil {
+		t.Errorf("template without test key should have Test == nil, got %v", tmpls[0].Test)
 	}
 }
 

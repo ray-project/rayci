@@ -46,8 +46,8 @@ type Template struct {
 	// A map of files for different compute platforms.
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
 
-	// Test configuration for the template (required).
-	Test *TestConfig `yaml:"test" json:"test"`
+	// Test configuration for the template (optional).
+	Test *TestConfig `yaml:"test,omitempty" json:"test,omitempty"`
 }
 
 // Find first version-like digit sequence in build ID remainder (unanchored).
@@ -175,9 +175,10 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, er
 }
 
 // validateTestConfig returns an error if TestConfig is invalid; otherwise nil.
+// Nil test config is valid (test configuration is optional).
 func validateTestConfig(test *TestConfig) error {
 	if test == nil {
-		return fmt.Errorf("test configuration is required")
+		return nil
 	}
 	if strings.TrimSpace(test.Command) == "" {
 		return fmt.Errorf("test.command is required")
@@ -235,7 +236,7 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		if err := validateTestConfig(tmpl.Test); err != nil {
 			return nil, fmt.Errorf("validate test config for template %q: %w", tmpl.Name, err)
 		}
-		if tmpl.Test.TimeoutInSec == 0 {
+		if tmpl.Test != nil && tmpl.Test.TimeoutInSec == 0 {
 			tmpl.Test.TimeoutInSec = 3600
 		}
 	}
