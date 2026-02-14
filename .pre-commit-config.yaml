@@ -16,8 +16,10 @@ repos:
 
       - id: golines
         name: golines (max 100 chars)
-        entry: golines -w --max-len=100
-        language: system
+        entry: golines
+        language: golang
+        additional_dependencies: [github.com/segmentio/golines@latest]
+        args: [-w, --max-len=100]
         types: [go]
         stages: [pre-commit]
 

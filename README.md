@@ -21,15 +21,12 @@ pip install pre-commit
 brew install pre-commit
 ```
 
-**Install golines (required for line-length enforcement):**
-```bash
-go install github.com/segmentio/golines@latest
-```
-
 **Install the git hooks:**
 ```bash
 pre-commit install --install-hooks
 ```
+
+This will automatically install all required tools (including `golines` for line-length enforcement) in pre-commit's isolated environment.
 
 The hooks will run automatically on:
 - **Commit** (fast checks): `go fmt`, `golines` (100-char line limit)
