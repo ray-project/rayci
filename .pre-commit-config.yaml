@@ -9,18 +9,16 @@ repos:
     hooks:
       - id: go-fmt
         name: go fmt
-        entry: bash -c 'go fmt ./... && git diff --exit-code'
+        entry: go fmt
         language: system
         types: [go]
-        pass_filenames: false
         stages: [pre-commit]
 
       - id: golines
         name: golines (max 100 chars)
-        entry: golines --list-files --max-len=100 .
+        entry: golines -w --max-len=100
         language: system
         types: [go]
-        pass_filenames: false
         stages: [pre-commit]
 
   # Pre-push hooks (comprehensive checks, run before push)
@@ -36,7 +34,7 @@ repos:
 
       - id: goqualgate
         name: goqualgate all
-        entry: bash -c 'go build -o /tmp/goqualgate-hook ./goqualgate/goqualgate && /tmp/goqualgate-hook all'
+        entry: go run ./goqualgate/goqualgate all
         language: system
         types: [go]
         pass_filenames: false
