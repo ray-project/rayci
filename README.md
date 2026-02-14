@@ -7,3 +7,36 @@ This repository contains scripts and progresm for Ray CI/CD on buildkite.
 
 This repository also contains scripts that are used on legacy CI/CD pipelines
 and KubeRay pipelines, in the `ray_ci` directory and `ecosystem_ci` directory.
+
+## Development Setup
+
+### Pre-commit Hooks
+
+This project uses pre-commit hooks for automated code quality enforcement.
+
+**Install pre-commit:**
+```bash
+pip install pre-commit
+# or
+brew install pre-commit
+```
+
+**Install golines (required for line-length enforcement):**
+```bash
+go install github.com/segmentio/golines@latest
+```
+
+**Install the git hooks:**
+```bash
+pre-commit install --install-hooks
+```
+
+The hooks will run automatically on:
+- **Commit** (fast checks): `go fmt`, `golines` (100-char line limit)
+- **Push** (comprehensive checks): `go vet ./...`, `goqualgate all`
+
+**To bypass hooks in emergencies:**
+```bash
+git commit --no-verify
+git push --no-verify
+```

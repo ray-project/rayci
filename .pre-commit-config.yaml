@@ -26,10 +26,10 @@ repos:
     hooks:
       - id: go-vet
         name: go vet
-        entry: go vet ./...
+        entry: go vet
         language: system
         types: [go]
-        pass_filenames: false
+        pass_filenames: true
         stages: [pre-push]
 
       - id: goqualgate
