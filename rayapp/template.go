@@ -164,11 +164,11 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, er
 	}
 }
 
-// validateClusterEnv returns an error if ClusterEnv is invalid (BYOD or build_id/image_uri);
+// validateClusterEnv returns an error if ClusterEnv is nil or invalid (BYOD or build_id/image_uri);
 // otherwise nil.
 func validateClusterEnv(env *ClusterEnv) error {
 	if env == nil {
-		return nil
+		return fmt.Errorf("cluster_env is required")
 	}
 	if env.BYOD != nil {
 		hasDocker := strings.TrimSpace(env.BYOD.DockerImage) != ""
