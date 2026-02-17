@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,15 +11,14 @@ import (
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct {
-	client *http.Client
-	bin    string // path to the anyscale binary; defaults to "anyscale"
+	bin string // path to the anyscale binary; defaults to "anyscale"
 }
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
 
 // NewAnyscaleCLI creates a new AnyscaleCLI instance.
 func NewAnyscaleCLI() *AnyscaleCLI {
-	return &AnyscaleCLI{bin: "anyscale", client: &http.Client{}}
+	return &AnyscaleCLI{bin: "anyscale"}
 }
 
 type WorkspaceState int
