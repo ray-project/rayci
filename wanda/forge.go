@@ -110,6 +110,10 @@ type Forge struct {
 
 // NewForge creates a new forge with the given configuration.
 func NewForge(config *ForgeConfig) (*Forge, error) {
+	if err := checkPlatformSupport(); err != nil {
+		return nil, err
+	}
+
 	absWorkDir, err := filepath.Abs(filepath.FromSlash(config.WorkDir))
 	if err != nil {
 		return nil, fmt.Errorf("abs path for work dir: %w", err)

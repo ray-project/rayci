@@ -3,8 +3,38 @@ package wanda
 import (
 	"fmt"
 	"runtime"
+	"sort"
 	"strings"
 )
+
+var supportedPlatforms = map[string]map[string]struct{}{
+	"linux":   {"amd64": {}, "arm64": {}},
+	"darwin":  {"arm64": {}},
+	"windows": {"amd64": {}},
+}
+
+func checkPlatformSupport() error {
+	archs, ok := supportedPlatforms[runtime.GOOS]
+	if !ok {
+		return fmt.Errorf("unsupported host OS: %s", runtime.GOOS)
+	}
+	if _, ok := archs[runtime.GOARCH]; !ok {
+		return fmt.Errorf("unsupported host architecture: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	return nil
+}
+
+// SupportedPlatformsList returns a formatted list of supported platforms.
+func SupportedPlatformsList() string {
+	var platforms []string
+	for os, archs := range supportedPlatforms {
+		for arch := range archs {
+			platforms = append(platforms, os+"/"+arch)
+		}
+	}
+	sort.Strings(platforms)
+	return strings.Join(platforms, ", ")
+}
 
 // targetOS returns the OS to use for container image resolution.
 // On macOS, containers are always linux; otherwise use the host OS.
