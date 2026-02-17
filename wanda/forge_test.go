@@ -1078,3 +1078,16 @@ func TestBuild_WithArtifacts_noCmdImage(t *testing.T) {
 		t.Errorf("extracted content = %q, want %q", got, want)
 	}
 }
+
+func TestTargetOS(t *testing.T) {
+	got := targetOS()
+	if runtime.GOOS == "darwin" {
+		if got != "linux" {
+			t.Errorf("targetOS() = %q on darwin, want \"linux\"", got)
+		}
+	} else {
+		if got != runtime.GOOS {
+			t.Errorf("targetOS() = %q, want %q", got, runtime.GOOS)
+		}
+	}
+}
