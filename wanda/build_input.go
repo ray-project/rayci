@@ -100,7 +100,7 @@ func (i *buildInput) makeCore(dockerfile string, lookup lookupFunc) (*buildInput
 		platform = ""
 	}
 
-	os := runtime.GOOS
+	os := targetOS()
 	if os == "linux" {
 		os = ""
 	}
