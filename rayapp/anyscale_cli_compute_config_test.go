@@ -260,28 +260,48 @@ func TestGetComputeConfig(t *testing.T) {
 		cli := &AnyscaleCLI{
 			bin: writeFakeAnyscale(
 				t,
-				"#!/bin/sh\necho \"name: my-config\nhead_node:\n  instance_type: m5.xlarge\"",
+				`#!/bin/sh
+if [ "$4" = "my-config:2" ]; then
+	echo "name: my-config-versioned"
+elif [ "$4" = "my-config" ]; then
+	echo "name: my-config"
+	echo "head_node:"
+	echo "  instance_type: m5.xlarge"
+else
+	exit 1
+fi
+`,
 			),
 		}
 
-		output, err := cli.GetComputeConfig("my-config")
+		// Test without version
+		config, err := cli.GetComputeConfig("my-config")
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if !strings.Contains(output, "name: my-config") {
-			t.Errorf("output %q should contain 'name: my-config'", output)
+		if name, _ := config["name"].(string); name != "my-config" {
+			t.Errorf(`config["name"] = %q, want %q`, name, "my-config")
+		}
+
+		// Test with version
+		config, err = cli.GetComputeConfig("my-config:2")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if name, _ := config["name"].(string); name != "my-config-versioned" {
+			t.Errorf(`config["name"] = %q, want %q`, name, "my-config-versioned")
 		}
 	})
 
-	t.Run("success with version", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"args: $@\"")}
+	t.Run("invalid yaml", func(t *testing.T) {
+		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid-yaml\"")}
 
-		output, err := cli.GetComputeConfig("my-config:2")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		_, err := cli.GetComputeConfig("my-config")
+		if err == nil {
+			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(output, "-n my-config:2") {
-			t.Errorf("output %q should contain '-n my-config:2'", output)
+		if !strings.Contains(err.Error(), "failed to parse compute config yaml") {
+			t.Errorf("error %q should contain 'failed to parse compute config yaml'", err.Error())
 		}
 	})
 
