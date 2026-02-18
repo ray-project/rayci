@@ -1078,3 +1078,51 @@ func TestBuild_WithArtifacts_noCmdImage(t *testing.T) {
 		t.Errorf("extracted content = %q, want %q", got, want)
 	}
 }
+
+func TestTargetOS(t *testing.T) {
+	got := targetOS()
+	if runtime.GOOS == "darwin" {
+		if got != "linux" {
+			t.Errorf("targetOS() = %q on darwin, want \"linux\"", got)
+		}
+	} else {
+		if got != runtime.GOOS {
+			t.Errorf("targetOS() = %q, want %q", got, runtime.GOOS)
+		}
+	}
+}
+
+func TestCheckPlatformSupport(t *testing.T) {
+	if err := checkPlatformSupport(); err != nil {
+		t.Errorf("checkPlatformSupport() on %s/%s = %v, want nil", runtime.GOOS, runtime.GOARCH, err)
+	}
+}
+
+func TestSupportedPlatforms(t *testing.T) {
+	for _, p := range []struct{ os, arch string }{
+		{"linux", "amd64"},
+		{"linux", "arm64"},
+		{"darwin", "arm64"},
+		{"windows", "amd64"},
+	} {
+		if _, ok := supportedPlatforms[p.os]; !ok {
+			t.Errorf("OS %q missing from supportedPlatforms", p.os)
+		} else if _, ok := supportedPlatforms[p.os][p.arch]; !ok {
+			t.Errorf("%s/%s missing from supportedPlatforms", p.os, p.arch)
+		}
+	}
+
+	for _, p := range []struct{ os, arch string }{
+		{"freebsd", "amd64"},
+		{"darwin", "amd64"},
+		{"windows", "arm64"},
+	} {
+		archs, osOK := supportedPlatforms[p.os]
+		if !osOK {
+			continue
+		}
+		if _, ok := archs[p.arch]; ok {
+			t.Errorf("%s/%s should not be in supportedPlatforms", p.os, p.arch)
+		}
+	}
+}

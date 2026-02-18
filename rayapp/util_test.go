@@ -27,6 +27,30 @@ func TestCopyFile(t *testing.T) {
 	if !bytes.Equal(got, content) {
 		t.Errorf("CopyFile() destination = %q, want %q", got, content)
 	}
+	dstInfo, err := os.Stat(dst)
+	if err != nil {
+		t.Fatalf("stat destination: %v", err)
+	}
+	if got, want := dstInfo.Mode().Perm(), os.FileMode(0644); got != want {
+		t.Errorf("CopyFile() destination mode = %o, want %o", got, want)
+	}
+
+	execSrc := filepath.Join(tmp, "script.sh")
+	execDst := filepath.Join(tmp, "script-copy.sh")
+	if err := os.WriteFile(execSrc, content, 0755); err != nil {
+		t.Fatalf("write executable source: %v", err)
+	}
+	if err := CopyFile(execSrc, execDst); err != nil {
+		t.Fatalf("CopyFile(executable) error = %v", err)
+	}
+	execDstInfo, err := os.Stat(execDst)
+	if err != nil {
+		t.Fatalf("stat executable destination: %v", err)
+	}
+	if got, want := execDstInfo.Mode().Perm(), os.FileMode(0755); got != want {
+		t.Errorf("CopyFile() executable destination mode = %o, want %o", got, want)
+	}
+
 	if err := CopyFile(filepath.Join(tmp, "nonexistent"), dst); err == nil {
 		t.Error("CopyFile(nonexistent) want error, got nil")
 	}

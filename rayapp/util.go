@@ -17,7 +17,13 @@ func CopyFile(src, dst string) error {
 	}
 	defer in.Close()
 
-	out, err := os.Create(dst)
+	info, err := in.Stat()
+	if err != nil {
+		return fmt.Errorf("stat source file: %w", err)
+	}
+	mode := info.Mode().Perm()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return fmt.Errorf("create destination file: %w", err)
 	}
@@ -157,13 +163,12 @@ func zipDirectory(srcDir, outPath string) (err error) {
 		return nil
 	})
 
+	closeErr := z.Close()
 	if err != nil {
-		z.Close()
 		return fmt.Errorf("walk directory: %w", err)
 	}
-
-	if err := z.Close(); err != nil {
-		return fmt.Errorf("close zip writer: %w", err)
+	if closeErr != nil {
+		return fmt.Errorf("close zip writer: %w", closeErr)
 	}
 
 	if err := outFile.Sync(); err != nil {
