@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"gopkg.in/yaml.v2"
 )
 
 // ComputeConfigListItem represents one entry from "compute-config list --json" results.
@@ -90,14 +91,19 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
 
 // GetComputeConfig retrieves the details of a compute config by name.
 // name: the name of the compute config (optionally with version tag, e.g., "name:1")
-// Returns the output from the CLI and any error.
-func (ac *AnyscaleCLI) GetComputeConfig(name string) (string, error) {
+// Returns the parsed YAML from the CLI and any error.
+func (ac *AnyscaleCLI) GetComputeConfig(name string) (map[string]any, error) {
 	args := []string{"compute-config", "get", "-n", name}
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
-		return output, fmt.Errorf("get compute config failed: %w", err)
+		return nil, fmt.Errorf("get compute config failed: %w", err)
 	}
-	return output, nil
+
+	var config map[string]any
+	if err := yaml.Unmarshal([]byte(output), &config); err != nil {
+		return nil, fmt.Errorf("failed to parse compute config yaml: %w", err)
+	}
+	return config, nil
 }
 
 // ListComputeConfigs returns compute configs from "compute-config list --json". Returns an empty list when there are no results.
