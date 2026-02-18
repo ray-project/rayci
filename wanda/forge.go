@@ -121,7 +121,7 @@ func NewForge(config *ForgeConfig) (*Forge, error) {
 		remoteOpts: []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
 			remote.WithPlatform(crane.Platform{
-				OS:           runtime.GOOS,
+				OS:           targetOS(),
 				Architecture: runtime.GOARCH,
 			}),
 		},

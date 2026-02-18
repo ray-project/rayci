@@ -2,8 +2,18 @@ package wanda
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 )
+
+// targetOS returns the OS to use for container image resolution.
+// On macOS, containers are always linux; otherwise use the host OS.
+func targetOS() string {
+	if runtime.GOOS == "darwin" {
+		return "linux"
+	}
+	return runtime.GOOS
+}
 
 // ForgeConfig is a configuration for a forge to build container images.
 type ForgeConfig struct {
