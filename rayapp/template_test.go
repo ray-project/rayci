@@ -46,15 +46,6 @@ const testBuildDotYaml = `
   compute_config:
     GCP: configs/basic-single-node/gce.yaml
     AWS: configs/basic-single-node/aws.yaml
-
-- name: no-cluster-env
-  emoji: 📋
-  title: No cluster env
-  description: Template with no cluster_env (legal)
-  dir: templates/no-env
-  compute_config:
-    GCP: configs/basic-single-node/gce.yaml
-    AWS: configs/basic-single-node/aws.yaml
 `
 
 func TestReadTemplates(t *testing.T) {
@@ -108,17 +99,6 @@ func TestReadTemplates(t *testing.T) {
 				RayVersion:  "2.34.0",
 			},
 		},
-		ComputeConfig: map[string]string{
-			"GCP": "configs/basic-single-node/gce.yaml",
-			"AWS": "configs/basic-single-node/aws.yaml",
-		},
-	}, {
-		Name:        "no-cluster-env",
-		Emoji:       "📋",
-		Title:       "No cluster env",
-		Dir:         "templates/no-env",
-		Description: "Template with no cluster_env (legal)",
-		ClusterEnv:  nil,
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
@@ -260,6 +240,28 @@ func TestReadTemplates_emptyClusterEnv(t *testing.T) {
 	}
 }
 
+func TestReadTemplates_missingClusterEnv(t *testing.T) {
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "BUILD.yaml")
+	yaml := strings.Join([]string{
+		"- name: no-cluster-env",
+		"  dir: x",
+		"  emoji: 📋",
+		"  title: No cluster env",
+		"  compute_config: {}",
+	}, "\n")
+	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	_, err := readTemplates(f)
+	if err == nil {
+		t.Fatal("want error when cluster_env is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "cluster_env is required") {
+		t.Errorf("error %q should contain %q", err.Error(), "cluster_env is required")
+	}
+}
+
 func TestValidateClusterEnv(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -268,9 +270,10 @@ func TestValidateClusterEnv(t *testing.T) {
 		errContains string
 	}{
 		{
-			name:    "nil env",
-			env:     nil,
-			wantErr: false,
+			name:        "nil env",
+			env:         nil,
+			wantErr:     true,
+			errContains: "cluster_env is required",
 		},
 		{
 			name: "BYOD docker_image and ray_version",
