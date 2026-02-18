@@ -79,25 +79,6 @@ done
 	}
 }
 
-func TestWorkspaceStateString(t *testing.T) {
-	tests := []struct {
-		state WorkspaceState
-		want  string
-	}{
-		{StateTerminated, "TERMINATED"},
-		{StateStarting, "STARTING"},
-		{StateRunning, "RUNNING"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			if got := tt.state.String(); got != tt.want {
-				t.Errorf("WorkspaceState.String() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestRunAnyscaleCLI(t *testing.T) {
 	tests := []struct {
 		name       string

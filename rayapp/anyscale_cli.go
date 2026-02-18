@@ -21,24 +21,6 @@ func NewAnyscaleCLI() *AnyscaleCLI {
 	return &AnyscaleCLI{bin: "anyscale"}
 }
 
-type WorkspaceState int
-
-const (
-	StateTerminated WorkspaceState = iota
-	StateStarting
-	StateRunning
-)
-
-var WorkspaceStateName = map[WorkspaceState]string{
-	StateTerminated: "TERMINATED",
-	StateStarting:   "STARTING",
-	StateRunning:    "RUNNING",
-}
-
-func (ws WorkspaceState) String() string {
-	return WorkspaceStateName[ws]
-}
-
 func (ac *AnyscaleCLI) isAnyscaleInstalled() bool {
 	_, err := exec.LookPath(ac.bin)
 	return err == nil
@@ -67,9 +49,6 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if strings.Contains(output, "exec failed with exit code") {
 		return output, fmt.Errorf("anyscale error: command failed: %s", output)
 	}
-	if strings.Contains(tw.String(), "exec failed with exit code") {
-		return "", fmt.Errorf("anyscale error: command failed: %s", tw.String())
-	}
 
-	return tw.String(), nil
+	return output, nil
 }
