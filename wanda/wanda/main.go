@@ -1,15 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"text/template"
 
 	"github.com/ray-project/rayci/wanda"
 )
 
-const usage = `
+var usageTmpl = template.Must(template.New("usage").Parse(`
 wanda - container image builder for RayCI using a container registry as a
 content-addressed build cache.
 
@@ -21,8 +23,19 @@ Runs in either remote mode or local mode.
    Takes exactly one argument for the spec file and builds the image for local
    use only.
 
+Supported platforms:
+  {{.Platforms}}
+
 Flags:
-`
+`))
+
+func usageText() string {
+	var buf bytes.Buffer
+	usageTmpl.Execute(&buf, struct{ Platforms string }{
+		Platforms: wanda.SupportedPlatformsList(),
+	})
+	return buf.String()
+}
 
 func main() {
 	workDir := flag.String("work_dir", ".", "root directory for the build")
@@ -54,7 +67,7 @@ func main() {
 	)
 
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, usage)
+		fmt.Fprint(os.Stderr, usageText())
 		flag.PrintDefaults()
 	}
 	flag.Parse()
