@@ -1,18 +1,17 @@
 package rayapp
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestGetDefaultCloud(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		script := strings.Join([]string{
-			"#!/bin/sh",
-			"echo \"name: my-default-cloud\"",
-			"echo \"id: cld_abc123\"",
-		}, "\n")
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "name: my-default-cloud\nid: cld_abc123\n", nil
+		})
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {
@@ -30,7 +29,10 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("CLI failure", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "", fmt.Errorf("exit status 1")
+		})
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -42,9 +44,10 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("invalid YAML output", func(t *testing.T) {
-		cli := &AnyscaleCLI{
-			bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\""),
-		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "invalid: yaml: output: [", nil
+		})
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -56,7 +59,10 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("empty output", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"\"")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "", nil
+		})
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {
