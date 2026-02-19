@@ -9,6 +9,53 @@ import (
 	"testing"
 )
 
+func TestCopyFile(t *testing.T) {
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "src.txt")
+	dst := filepath.Join(tmp, "dst.txt")
+	content := []byte("hello")
+	if err := os.WriteFile(src, content, 0644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := CopyFile(src, dst); err != nil {
+		t.Fatalf("CopyFile() error = %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("CopyFile() destination = %q, want %q", got, content)
+	}
+	dstInfo, err := os.Stat(dst)
+	if err != nil {
+		t.Fatalf("stat destination: %v", err)
+	}
+	if got, want := dstInfo.Mode().Perm(), os.FileMode(0644); got != want {
+		t.Errorf("CopyFile() destination mode = %o, want %o", got, want)
+	}
+
+	execSrc := filepath.Join(tmp, "script.sh")
+	execDst := filepath.Join(tmp, "script-copy.sh")
+	if err := os.WriteFile(execSrc, content, 0755); err != nil {
+		t.Fatalf("write executable source: %v", err)
+	}
+	if err := CopyFile(execSrc, execDst); err != nil {
+		t.Fatalf("CopyFile(executable) error = %v", err)
+	}
+	execDstInfo, err := os.Stat(execDst)
+	if err != nil {
+		t.Fatalf("stat executable destination: %v", err)
+	}
+	if got, want := execDstInfo.Mode().Perm(), os.FileMode(0755); got != want {
+		t.Errorf("CopyFile() executable destination mode = %o, want %o", got, want)
+	}
+
+	if err := CopyFile(filepath.Join(tmp, "nonexistent"), dst); err == nil {
+		t.Error("CopyFile(nonexistent) want error, got nil")
+	}
+}
+
 func TestCheckIsDir(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -180,6 +227,73 @@ func TestBuildZip(t *testing.T) {
 		}
 		if !bytes.Equal(content, want[f]) {
 			t.Errorf("content of %q: want %q, got %q", f, want[f], content)
+		}
+	}
+}
+
+func TestZipDirectory(t *testing.T) {
+	tmp := t.TempDir()
+
+	srcDir := filepath.Join(tmp, "src")
+	if err := os.MkdirAll(srcDir, 0o700); err != nil {
+		t.Fatalf("create src dir: %v", err)
+	}
+
+	files := map[string][]byte{
+		"root.txt":   []byte("root content"),
+		"sub/a.txt":  []byte("sub a"),
+		"sub/b.txt":  []byte("sub b"),
+		"deep/x/y.z": []byte("nested"),
+	}
+	for path, content := range files {
+		full := filepath.Join(srcDir, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
+			t.Fatalf("create dir for %q: %v", path, err)
+		}
+		if err := os.WriteFile(full, content, 0o600); err != nil {
+			t.Fatalf("write %q: %v", path, err)
+		}
+	}
+
+	outPath := filepath.Join(tmp, "out.zip")
+	if err := zipDirectory(srcDir, outPath); err != nil {
+		t.Fatalf("zipDirectory: %v", err)
+	}
+
+	r, err := zip.OpenReader(outPath)
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	defer r.Close()
+
+	if got, want := len(r.File), len(files); got != want {
+		t.Errorf("zip file count: got %d, want %d", got, want)
+	}
+
+	for _, zf := range r.File {
+		if zf.FileInfo().IsDir() {
+			t.Errorf("zip should not contain directory entries, got %q", zf.Name)
+			continue
+		}
+		wantContent, ok := files[zf.Name]
+		if !ok {
+			t.Errorf("unexpected file in zip: %q", zf.Name)
+			continue
+		}
+		if zf.Modified.Unix() != frozenTime.Unix() {
+			t.Errorf("file %q timestamp: got %s, want %s", zf.Name, zf.Modified, frozenTime)
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			t.Fatalf("open %q in zip: %v", zf.Name, err)
+		}
+		got, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatalf("read %q in zip: %v", zf.Name, err)
+		}
+		if !bytes.Equal(got, wantContent) {
+			t.Errorf("content of %q: got %q, want %q", zf.Name, got, wantContent)
 		}
 	}
 }

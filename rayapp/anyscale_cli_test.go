@@ -112,6 +112,12 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			wantSubstr: "error msg",
 			wantErrStr: "anyscale error",
 		},
+		{
+			name:       "exec failed with exit code in output",
+			script:     "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
+			args:       []string{"deploy"},
+			wantErrStr: "anyscale error: command failed:",
+		},
 	}
 
 	for _, tt := range tests {
