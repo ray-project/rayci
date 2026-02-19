@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
@@ -41,8 +42,13 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	cmd.Stderr = io.MultiWriter(os.Stderr, tw)
 
 	err := cmd.Run()
+	output := tw.String()
 	if err != nil {
-		return tw.String(), fmt.Errorf("anyscale error: %w", err)
+		return output, fmt.Errorf("anyscale error: %w", err)
 	}
-	return tw.String(), nil
+	if strings.Contains(output, "exec failed with exit code") {
+		return output, fmt.Errorf("anyscale error: command failed: %s", output)
+	}
+
+	return output, nil
 }
