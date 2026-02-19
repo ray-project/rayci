@@ -8,8 +8,6 @@
   compute_config:
     GCP: configs/gcp.yaml
     AWS: configs/aws.yaml
-  test:
-    command: pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv
 
 - name: fishy-ray
   emoji: 🐠
