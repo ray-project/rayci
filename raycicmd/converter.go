@@ -94,6 +94,9 @@ func (c *converter) convertGroup(n *stepNode) (
 		if err != nil {
 			return nil, fmt.Errorf("convert pipeline step: %w", err)
 		}
+		if len(step.resolvedDependsOn) > 0 {
+			bkStep["depends_on"] = step.resolvedDependsOn
+		}
 		bkGroup.Steps = append(bkGroup.Steps, bkStep)
 	}
 
@@ -118,6 +121,10 @@ func stepTags(step map[string]any) []string {
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
+	if err := expandArraySteps(gs); err != nil {
+		return nil, fmt.Errorf("expand array: %w", err)
+	}
+
 	set := newStepNodeSet()
 	var groupNodes []*stepNode
 
@@ -129,15 +136,16 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			tags:     g.Tags,
 		}
 
-		for j, step := range g.Steps {
-			stepNode := &stepNode{
-				id:   fmt.Sprintf("g%d_s%d", i, j),
-				key:  stepKey(step),
-				tags: stepTags(step),
-				src:  step,
+		for j, rs := range g.resolvedSteps {
+			sn := &stepNode{
+				id:                fmt.Sprintf("g%d_s%d", i, j),
+				key:               stepKey(rs.src),
+				tags:              stepTags(rs.src),
+				src:               rs.src,
+				resolvedDependsOn: rs.resolvedDependsOn,
 			}
-			set.add(stepNode)
-			groupNode.subSteps = append(groupNode.subSteps, stepNode)
+			set.add(sn)
+			groupNode.subSteps = append(groupNode.subSteps, sn)
 		}
 
 		set.add(groupNode)
@@ -167,10 +175,8 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 
 		var lastBlockOrWait *stepNode
 		for _, step := range groupNode.subSteps {
-			// Track step dependencies.
-			if dependsOn, ok := step.src["depends_on"]; ok {
-				deps := toStringList(dependsOn)
-				for _, dep := range deps {
+			if len(step.resolvedDependsOn) > 0 {
+				for _, dep := range step.resolvedDependsOn {
 					if depNode, ok := set.byKey(dep); ok {
 						set.addDep(step.id, depNode.id)
 					}

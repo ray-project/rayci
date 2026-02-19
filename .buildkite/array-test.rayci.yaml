@@ -1,0 +1,38 @@
+group: array expansion test
+tags:
+  - array-test
+steps:
+  # Array step with 6 values - only "linux-1" and "macos-1" should be run
+  # when filtered (others are skipped)
+  - label: "Array {{array.os}}-{{array.variant}}"
+    key: array-step
+    command: |
+      echo "Running os={{array.os}} variant={{array.variant}}"
+      if [ "{{array.os}}" != "linux" ] && [ "{{array.os}}" != "macos" ]; then
+        echo "ERROR: unexpected os={{array.os}}"
+        exit 1
+      fi
+      if [ "{{array.variant}}" != "1" ]; then
+        echo "ERROR: unexpected variant={{array.variant}}"
+        exit 1
+      fi
+    depends_on: forge
+    array:
+      os: ["linux", "windows", "macos"]
+      variant: ["1", "2"]
+
+  # Depends on only the linux-1 and macos-1 variants
+  - label: "Depends check only"
+    key: depends-on-variants
+    command: echo "This step depends on only the variants we want."
+    depends_on:
+      - array-step:
+          os: ["linux", "macos"]
+          variant: "1"
+      - forge
+
+  - label: "Final validation"
+    tags: always
+    key: final-validation
+    command: echo "Trigger check"
+    depends_on: depends-on-variants
