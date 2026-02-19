@@ -83,7 +83,7 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
 	} else {
 		args = []string{"compute-config", "create", "-n", name, "-f", actualConfigPath}
 	}
-	
+
 	if _, err := ac.runAnyscaleCLI(args); err != nil {
 		return fmt.Errorf("create compute config failed: %w", err)
 	}

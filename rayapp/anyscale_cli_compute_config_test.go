@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -8,18 +9,16 @@ import (
 
 func TestCreateComputeConfig(t *testing.T) {
 	t.Run("creates when config does not exist", func(t *testing.T) {
-		script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then
-    echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'
-    exit 0
-fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
-    echo "created compute config: $@"
-    exit 0
-fi
-exit 1
-`
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
+				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
+			}
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+				return "created compute config: " + strings.Join(args, " "), nil
+			}
+			return "", fmt.Errorf("unexpected args: %v", args)
+		})
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -36,14 +35,13 @@ exit 1
 	})
 
 	t.Run("skips creation when config exists", func(t *testing.T) {
-		script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then
-    echo '{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "", "last_modified_at": "", "url": ""}], "metadata": {"count": 1, "next_token": null}}'
-    exit 0
-fi
-exit 1
-`
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
+				return `{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "", "last_modified_at": "", "url": ""}], "metadata": {"count": 1, "next_token": null}}`, nil
+			}
+			return "", fmt.Errorf("unexpected args: %v", args)
+		})
 
 		err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
 		if err != nil {
@@ -55,20 +53,16 @@ exit 1
 	})
 
 	t.Run("old format with existing cloud key skips temp file", func(t *testing.T) {
-		// Script has no handler for "cloud get-default", so if GetDefaultCloud
-		// were called the script would exit 1, failing the test.
-		script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then
-    echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'
-    exit 0
-fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
-    echo "created compute config: $@"
-    exit 0
-fi
-exit 1
-`
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
+				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
+			}
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+				return "created compute config: " + strings.Join(args, " "), nil
+			}
+			return "", fmt.Errorf("unexpected command: %v", args)
+		})
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -76,7 +70,9 @@ exit 1
 		}
 		defer os.Remove(tmpFile.Name())
 		// Legacy format (head_node_type) with cloud key already set.
-		tmpFile.WriteString("cloud: my-cloud\nhead_node_type:\n  name: head\n  instance_type: m5.large\n")
+		tmpFile.WriteString(
+			"cloud: my-cloud\nhead_node_type:\n  name: head\n  instance_type: m5.large\n",
+		)
 		tmpFile.Close()
 
 		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
@@ -86,17 +82,16 @@ exit 1
 	})
 
 	t.Run("failure when create fails", func(t *testing.T) {
-		script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then
-    echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'
-    exit 0
-fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
-    exit 1
-fi
-exit 1
-`
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
+				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
+			}
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+				return "", fmt.Errorf("anyscale error: exit status 1")
+			}
+			return "", fmt.Errorf("unexpected args: %v", args)
+		})
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -124,7 +119,7 @@ func TestListComputeConfigs(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		script     string
+		runFunc    func(args []string) (string, error)
 		filterName *string
 		wantLen    int
 		wantErrStr string
@@ -133,20 +128,18 @@ func TestListComputeConfigs(t *testing.T) {
 	}{
 		{
 			name: "success with items",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "2024-01-01", "last_modified_at": "2024-01-02", "url": "https://example.com"}]}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "2024-01-01", "last_modified_at": "2024-01-02", "url": "https://example.com"}]}`, nil
+			},
 			wantLen:  1,
 			wantID:   "cpt_1",
 			wantName: "my-config",
 		},
 		{
 			name: "success with name filter",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": [{"id": "cpt_2", "name": "filtered-config"}]}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": [{"id": "cpt_2", "name": "filtered-config"}]}`, nil
+			},
 			filterName: strPtr("filtered-config"),
 			wantLen:    1,
 			wantID:     "cpt_2",
@@ -154,78 +147,73 @@ func TestListComputeConfigs(t *testing.T) {
 		},
 		{
 			name: "empty results array",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": []}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": []}`, nil
+			},
 			wantLen: 0,
 		},
 		{
 			name: "null results",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": null}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": null}`, nil
+			},
 			wantLen: 0,
 		},
 		{
 			name: "missing results key",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{}`, nil
+			},
 			wantLen: 0,
 		},
 		{
 			name: "non-array results",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": "not-an-array"}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": "not-an-array"}`, nil
+			},
 			wantErrStr: "results is not an array",
 		},
 		{
 			name: "non-object element in results",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": ["not-an-object"]}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": ["not-an-object"]}`, nil
+			},
 			wantErrStr: "results[0] is not an object",
 		},
 		{
 			name: "item missing id",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": [{"name": "no-id"}]}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": [{"name": "no-id"}]}`, nil
+			},
 			wantErrStr: `missing or non-string field "id"`,
 		},
 		{
 			name: "item missing name",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				`echo '{"results": [{"id": "cpt_1"}]}'`,
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return `{"results": [{"id": "cpt_1"}]}`, nil
+			},
 			wantErrStr: `missing or non-string field "name"`,
 		},
 		{
-			name:       "CLI failure",
-			script:     "#!/bin/sh\nexit 1",
+			name: "CLI failure",
+			runFunc: func(args []string) (string, error) {
+				return "", fmt.Errorf("exit status 1")
+			},
 			wantErrStr: "list compute configs failed",
 		},
 		{
 			name: "invalid JSON output",
-			script: strings.Join([]string{
-				"#!/bin/sh",
-				"echo 'not valid json'",
-			}, "\n"),
+			runFunc: func(args []string) (string, error) {
+				return "not valid json", nil
+			},
 			wantErrStr: "parse list output",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, tt.script)}
+			cli := NewAnyscaleCLI()
+			cli.setRunFunc(tt.runFunc)
 
 			got, err := cli.ListComputeConfigs(tt.filterName)
 
@@ -234,7 +222,11 @@ func TestListComputeConfigs(t *testing.T) {
 					t.Fatal("expected error, got nil")
 				}
 				if !strings.Contains(err.Error(), tt.wantErrStr) {
-					t.Errorf("ListComputeConfigs() error = %q, want containing %q", err.Error(), tt.wantErrStr)
+					t.Errorf(
+						"ListComputeConfigs() error = %q, want containing %q",
+						err.Error(),
+						tt.wantErrStr,
+					)
 				}
 				return
 			}
@@ -257,22 +249,16 @@ func TestListComputeConfigs(t *testing.T) {
 
 func TestGetComputeConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		cli := &AnyscaleCLI{
-			bin: writeFakeAnyscale(
-				t,
-				`#!/bin/sh
-if [ "$4" = "my-config:2" ]; then
-	echo "name: my-config-versioned"
-elif [ "$4" = "my-config" ]; then
-	echo "name: my-config"
-	echo "head_node:"
-	echo "  instance_type: m5.xlarge"
-else
-	exit 1
-fi
-`,
-			),
-		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 4 && args[3] == "my-config:2" {
+				return "name: my-config-versioned\n", nil
+			}
+			if len(args) >= 4 && args[3] == "my-config" {
+				return "name: my-config\nhead_node:\n  instance_type: m5.xlarge\n", nil
+			}
+			return "", fmt.Errorf("unexpected args: %v", args)
+		})
 
 		// Test without version
 		config, err := cli.GetComputeConfig("my-config")
@@ -294,7 +280,10 @@ fi
 	})
 
 	t.Run("invalid yaml", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid-yaml\"")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "invalid-yaml", nil
+		})
 
 		_, err := cli.GetComputeConfig("my-config")
 		if err == nil {
@@ -306,7 +295,10 @@ fi
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "", fmt.Errorf("exit status 1")
+		})
 
 		_, err := cli.GetComputeConfig("nonexistent-config")
 		if err == nil {

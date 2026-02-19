@@ -11,8 +11,8 @@ import (
 
 // AnyscaleCLI provides methods for interacting with the Anyscale CLI.
 type AnyscaleCLI struct {
-	bin string // path to the anyscale binary; defaults to "anyscale"
-	runFunc func(args []string) (string, error)  // function to run the CLI.
+	bin     string                              // path to the anyscale binary; defaults to "anyscale"
+	runFunc func(args []string) (string, error) // function to run the CLI.
 }
 
 const maxOutputBufferSize = 1024 * 1024 // 1 MB
