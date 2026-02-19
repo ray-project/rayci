@@ -147,12 +147,11 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		runFunc       func(args []string) (string, error)
-		config        *WorkspaceTestConfig
-		wantErr       bool
-		errContains   string
-		wantArgSubstr string
+		name        string
+		runFunc     func(args []string) (string, error)
+		config      *WorkspaceTestConfig
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:    "success without compute config",
@@ -165,7 +164,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
-			wantArgSubstr: "workspace_v2 create",
 		},
 		{
 			name:    "success with compute config name",
@@ -179,7 +177,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
-			wantArgSubstr: "--compute-config",
 		},
 		{
 			name:    "success with BYOD containerfile",
@@ -196,7 +193,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
-			wantArgSubstr: "--containerfile",
 		},
 		{
 			name:    "success with ImageURI",
@@ -209,7 +205,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
-			wantArgSubstr: "--image-uri anyscale/ray:2.44.1-py312-cu128",
 		},
 		{
 			name:    "success with ImageURI and compute config",
@@ -223,7 +218,6 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
-			wantArgSubstr: "--image-uri anyscale/ray:2.35.0-py311",
 		},
 		{
 			name:    "invalid build ID",

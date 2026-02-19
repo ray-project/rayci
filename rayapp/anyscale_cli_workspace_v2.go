@@ -23,7 +23,10 @@ var workspaceStateName = map[WorkspaceState]string{
 
 // String returns the Anyscale API name of the state (e.g., "RUNNING").
 func (ws WorkspaceState) String() string {
-	return workspaceStateName[ws]
+	if name, ok := workspaceStateName[ws]; ok {
+		return name
+	}
+	return fmt.Sprintf("UNKNOWN(%d)", int(ws))
 }
 
 func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) error {
@@ -78,7 +81,9 @@ func (ac *AnyscaleCLI) getWorkspaceID(workspaceName string) (string, error) {
 }
 
 func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceName string) (map[string]any, error) {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "get", "--name", workspaceName, "--json"})
+	output, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "get", "--name", workspaceName, "--json"},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get workspace failed: %w", err)
 	}

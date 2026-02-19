@@ -81,6 +81,49 @@ func TestCreateComputeConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("old format without cloud key fetches default cloud", func(t *testing.T) {
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
+				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
+			}
+			if len(args) >= 2 && args[0] == "cloud" && args[1] == "get-default" {
+				return "name: test-cloud\nid: cld_test123\n", nil
+			}
+			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+				// Old format uses positional path: create -n <name> <path>
+				configPath := args[4]
+				data, err := os.ReadFile(configPath)
+				if err != nil {
+					return "", fmt.Errorf("mock: read config: %w", err)
+				}
+				if !strings.Contains(string(data), "cloud: test-cloud") {
+					return "", fmt.Errorf(
+						"mock: expected cloud key in config, got:\n%s", data,
+					)
+				}
+				return "created compute config", nil
+			}
+			return "", fmt.Errorf("unexpected command: %v", args)
+		})
+
+		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		// Legacy format (head_node_type) without cloud key.
+		tmpFile.WriteString(
+			"head_node_type:\n  name: head\n  instance_type: m5.large\n",
+		)
+		tmpFile.Close()
+
+		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		if err != nil {
+			t.Errorf("CreateComputeConfig() error = %v", err)
+		}
+	})
+
 	t.Run("failure when create fails", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
@@ -279,7 +322,7 @@ func TestGetComputeConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid yaml", func(t *testing.T) {
+	t.Run("yaml type mismatch", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
 			return "invalid-yaml", nil
