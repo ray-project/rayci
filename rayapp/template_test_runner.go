@@ -104,6 +104,11 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 
 	// init anyscale cli
 	anyscaleCLI := NewAnyscaleCLI()
+	anyscaleAPI, err := newAnyscaleAPI()
+	if err != nil {
+		errors = append(errors, fmt.Errorf("new anyscale api failed: %w", err))
+		return errors
+	}
 
 	// Parse compute config name from template's AWS config path and create if needed
 	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
@@ -125,7 +130,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	wtc.workspaceName = workspaceName
 
 	// create empty workspace
-	err := anyscaleCLI.createEmptyWorkspace(wtc)
+	err = anyscaleCLI.createEmptyWorkspace(wtc)
 	if err != nil {
 		errors = append(errors, fmt.Errorf("create empty workspace failed: %w", err))
 		return errors
@@ -154,7 +159,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 			return
 		}
 
-		if err := anyscaleCLI.deleteWorkspaceByID(wtc.workspaceID); err != nil {
+		if err := anyscaleAPI.DeleteWorkspaceByID(wtc.workspaceID); err != nil {
 			errors = append(errors, fmt.Errorf("delete workspace failed: %w", err))
 			return
 		}
