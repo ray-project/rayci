@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 type fakeCloud struct {
@@ -21,15 +19,11 @@ type fakeComputeConfig struct {
 	CreatedAt      string
 	LastModifiedAt string
 	URL            string
-
-	// Config is the YAML body returned by "compute-config get".
-	// If nil, a minimal YAML with just "name: <Name>" is returned.
-	Config map[string]any
 }
 
 // fakeAnyscale simulates the Anyscale CLI for tests. It dispatches
-// "cloud get-default", "compute-config list", "compute-config get",
-// and "compute-config create" based on its fake data fields.
+// "cloud get-default", "compute-config list", and "compute-config create"
+// based on its fake data fields.
 type fakeAnyscale struct {
 	defaultCloud   *fakeCloud
 	computeConfigs []*fakeComputeConfig
@@ -48,8 +42,6 @@ func (f *fakeAnyscale) run(args []string) (string, error) {
 		return f.cloudGetDefault()
 	case "compute-config list":
 		return f.computeConfigList(args[2:])
-	case "compute-config get":
-		return f.computeConfigGet(args[2:])
 	case "compute-config create":
 		if f.onCreateComputeConfig != nil {
 			return f.onCreateComputeConfig(args)
@@ -111,28 +103,4 @@ func (f *fakeAnyscale) computeConfigList(opts []string) (string, error) {
 		return "", fmt.Errorf("fake: marshal: %w", err)
 	}
 	return string(bs), nil
-}
-
-func (f *fakeAnyscale) computeConfigGet(opts []string) (string, error) {
-	var name string
-	for i := 0; i < len(opts)-1; i++ {
-		if opts[i] == "-n" || opts[i] == "--name" {
-			name = opts[i+1]
-			break
-		}
-	}
-
-	for _, cc := range f.computeConfigs {
-		if cc.Name == name {
-			if cc.Config != nil {
-				bs, err := yaml.Marshal(cc.Config)
-				if err != nil {
-					return "", fmt.Errorf("fake: marshal: %w", err)
-				}
-				return string(bs), nil
-			}
-			return strings.Join([]string{"name: " + cc.Name, ""}, "\n"), nil
-		}
-	}
-	return "", fmt.Errorf("compute config %q not found", name)
 }
