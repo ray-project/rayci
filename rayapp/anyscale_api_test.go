@@ -170,7 +170,7 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"id":"expwrk_789","name":"my-template-20260220"}`))
+			w.Write([]byte(`{"result":{"id":"expwrk_789","name":"my-template-20260220"}}`))
 		}))
 		defer server.Close()
 
@@ -221,6 +221,23 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "failed to parse response") {
 			t.Errorf("error %q should contain 'failed to parse response'", err.Error())
+		}
+	})
+
+	t.Run("missing result key", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id":"expwrk_789","name":"my-template-20260220"}`))
+		}))
+		defer server.Close()
+
+		api := newTestAPI(t, server)
+		_, err := api.LaunchTemplateInWorkspace("cld_123", "prj_456", "my-template")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "missing 'result' key") {
+			t.Errorf("error %q should contain \"missing 'result' key\"", err.Error())
 		}
 	})
 

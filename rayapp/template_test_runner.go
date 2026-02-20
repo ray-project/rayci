@@ -74,8 +74,7 @@ func Probe(tmplName string, buildFile string) error {
 	if _, err := anyscaleCLI.waitForWorkspaceState(workspaceName, StateRunning); err != nil {
 		return fmt.Errorf("wait for workspace running state failed: %w", err)
 	}
-
-	fmt.Println("Workspace launched successfully:", workspaceName)
+	log.Println("Workspace launched successfully:", workspaceName)
 	return nil
 }
 

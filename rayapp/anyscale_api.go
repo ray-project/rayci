@@ -86,6 +86,9 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
+
+	fmt.Println("resp: ", resp)
+	fmt.Println("err: ", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -104,9 +107,14 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 		)
 	}
 
-	var result map[string]any
-	if err := json.Unmarshal(body, &result); err != nil {
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	result, ok := response["result"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response format: missing 'result' key")
 	}
 
 	return result, nil
