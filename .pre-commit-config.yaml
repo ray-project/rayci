@@ -1,0 +1,51 @@
+# .pre-commit-config.yaml
+# See https://pre-commit.com for more information
+
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  # Pre-commit hooks (fast checks, run on every commit)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: go fmt
+        language: system
+        types: [go]
+        stages: [pre-commit]
+
+      - id: golines
+        name: golines (max 100 chars)
+        entry: golines
+        language: golang
+        additional_dependencies: [github.com/segmentio/golines@latest]
+        args: [-w, --max-len=100]
+        types: [go]
+        stages: [pre-commit]
+
+  # Pre-push hooks (comprehensive checks, run before push)
+  - repo: local
+    hooks:
+      - id: go-vet
+        name: go vet
+        entry: go vet
+        language: system
+        types: [go]
+        pass_filenames: true
+        stages: [pre-push]
+
+      - id: goqualgate
+        name: goqualgate all
+        entry: go run ./goqualgate/goqualgate all
+        language: system
+        types: [go]
+        pass_filenames: false
+        stages: [pre-push]
