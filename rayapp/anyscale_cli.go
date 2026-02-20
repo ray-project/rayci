@@ -39,6 +39,7 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 
 	tw := newTailWriter(maxOutputBufferSize)
 	cmd.Stdout = io.MultiWriter(os.Stdout, tw)
+
 	cmd.Stderr = io.MultiWriter(os.Stderr, tw)
 
 	err := cmd.Run()

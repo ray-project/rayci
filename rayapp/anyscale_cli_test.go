@@ -19,7 +19,10 @@ func writeFakeAnyscale(t *testing.T, script string) string {
 	}
 
 	if err := os.WriteFile(bin, []byte(script), 0755); err != nil {
-		t.Fatalf("failed to create fake script: %v", err)
+		t.Fatalf(
+			"failed to create fake script: %v",
+			err,
+		)
 	}
 	return bin
 }

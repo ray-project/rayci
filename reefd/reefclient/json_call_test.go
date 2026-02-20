@@ -23,6 +23,7 @@ func TestJSONCaller(t *testing.T) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+
 		if r.Header.Get("Accept") != JSONContentType {
 			http.Error(w, "wrong accept", http.StatusUnsupportedMediaType)
 			return
