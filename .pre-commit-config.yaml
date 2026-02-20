@@ -36,7 +36,7 @@ repos:
     hooks:
       - id: go-vet
         name: go vet
-        entry: go vet
+        entry: bash -c 'pkgs=$(for f in "$@"; do echo "./$(dirname "$f")"; done | sort -u); go vet $pkgs' --
         language: system
         types: [go]
         pass_filenames: true
