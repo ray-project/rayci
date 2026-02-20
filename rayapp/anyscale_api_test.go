@@ -9,28 +9,22 @@ import (
 
 func TestNewAnyscaleAPI(t *testing.T) {
 	t.Run("missing host", func(t *testing.T) {
-		t.Setenv("ANYSCALE_HOST", "")
-		t.Setenv("ANYSCALE_CLI_TOKEN", "tok")
-
-		_, err := NewAnyscaleAPI()
+		_, err := NewAnyscaleAPI("", "tok")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "ANYSCALE_HOST") {
-			t.Errorf("error = %q, want mention of ANYSCALE_HOST", err)
+		if !strings.Contains(err.Error(), "host") {
+			t.Errorf("error = %q, want mention of host", err)
 		}
 	})
 
 	t.Run("missing token", func(t *testing.T) {
-		t.Setenv("ANYSCALE_HOST", "http://localhost")
-		t.Setenv("ANYSCALE_CLI_TOKEN", "")
-
-		_, err := NewAnyscaleAPI()
+		_, err := NewAnyscaleAPI("http://localhost", "")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "ANYSCALE_CLI_TOKEN") {
-			t.Errorf("error = %q, want mention of ANYSCALE_CLI_TOKEN", err)
+		if !strings.Contains(err.Error(), "token") {
+			t.Errorf("error = %q, want mention of token", err)
 		}
 	})
 }
@@ -52,10 +46,7 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 		}))
 		defer server.Close()
 
-		t.Setenv("ANYSCALE_HOST", server.URL)
-		t.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
-
-		api, err := NewAnyscaleAPI()
+		api, err := NewAnyscaleAPI(server.URL, "test-token")
 		if err != nil {
 			t.Fatalf("NewAnyscaleAPI: %v", err)
 		}
@@ -71,10 +62,7 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 		}))
 		defer server.Close()
 
-		t.Setenv("ANYSCALE_HOST", server.URL)
-		t.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
-
-		api, err := NewAnyscaleAPI()
+		api, err := NewAnyscaleAPI(server.URL, "test-token")
 		if err != nil {
 			t.Fatalf("NewAnyscaleAPI: %v", err)
 		}
@@ -91,10 +79,7 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 	})
 
 	t.Run("empty workspace ID", func(t *testing.T) {
-		t.Setenv("ANYSCALE_HOST", "http://localhost")
-		t.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
-
-		api, err := NewAnyscaleAPI()
+		api, err := NewAnyscaleAPI("http://localhost", "test-token")
 		if err != nil {
 			t.Fatalf("NewAnyscaleAPI: %v", err)
 		}

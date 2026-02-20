@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 )
 
@@ -17,15 +16,13 @@ type AnyscaleAPI struct {
 	client *http.Client
 }
 
-// NewAnyscaleAPI creates an AnyscaleAPI from environment variables.
-func NewAnyscaleAPI() (*AnyscaleAPI, error) {
-	host := os.Getenv("ANYSCALE_HOST")
+// NewAnyscaleAPI creates an AnyscaleAPI with the given host and token.
+func NewAnyscaleAPI(host, token string) (*AnyscaleAPI, error) {
 	if host == "" {
-		return nil, errors.New("ANYSCALE_HOST environment variable is not set")
+		return nil, errors.New("host is empty")
 	}
-	token := os.Getenv("ANYSCALE_CLI_TOKEN")
 	if token == "" {
-		return nil, errors.New("ANYSCALE_CLI_TOKEN environment variable is not set")
+		return nil, errors.New("token is empty")
 	}
 	return &AnyscaleAPI{
 		host:   host,
