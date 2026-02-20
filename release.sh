@@ -22,6 +22,7 @@ build_wheels() {
 }
 
 build_goqualgate() { build_go goqualgate ./goqualgate/goqualgate "$1" "$2"; }
+build_prcheck()    { build_go prcheck    ./prcheck/prcheck       "$1" "$2"; }
 build_rayapp()     { build_go rayapp     ./rayapp/rayapp         "$1" "$2"; }
 build_rayci()      { build_go rayci      .                       "$1" "$2"; }
 build_wanda()      { build_go wanda      ./wanda/wanda           "$1" "$2"; }
@@ -29,6 +30,8 @@ build_wanda()      { build_go wanda      ./wanda/wanda           "$1" "$2"; }
 build_goqualgate darwin arm64
 build_goqualgate linux  amd64
 build_goqualgate linux  arm64
+
+build_prcheck linux  amd64
 
 build_rayapp linux   amd64
 
