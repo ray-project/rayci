@@ -39,10 +39,12 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 	if workspaceID == "" {
 		return errors.New("workspace ID is empty")
 	}
-	reqURL := fmt.Sprintf(
-		"%s/api/v2/experimental_workspaces/%s",
-		a.host, url.PathEscape(workspaceID),
+	reqURL, err := url.JoinPath(
+		a.host, "/api/v2/experimental_workspaces", url.PathEscape(workspaceID),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to construct workspace URL: %w", err)
+	}
 
 	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
 	if err != nil {
@@ -58,12 +60,11 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
 		return fmt.Errorf(
 			"delete workspace failed with status %d: %s",
 			resp.StatusCode,
@@ -71,6 +72,6 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 		)
 	}
 
-	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
+	fmt.Printf("delete workspace %s succeeded\n", workspaceID)
 	return nil
 }
