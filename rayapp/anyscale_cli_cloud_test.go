@@ -8,10 +8,11 @@ import (
 
 func TestGetDefaultCloud(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			defaultCloud: &fakeCloud{Name: "my-default-cloud", ID: "cld_abc123"},
+		}
 		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			return "name: my-default-cloud\nid: cld_abc123\n", nil
-		})
+		cli.setRunFunc(fake.run)
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {

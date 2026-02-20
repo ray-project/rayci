@@ -9,23 +9,18 @@ import (
 
 func TestCreateComputeConfig(t *testing.T) {
 	t.Run("creates when config does not exist", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
-				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
-			}
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
-				return "created compute config: " + strings.Join(args, " "), nil
-			}
-			return "", fmt.Errorf("unexpected args: %v", args)
-		})
+		cli.setRunFunc(fake.run)
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 		defer os.Remove(tmpFile.Name())
-		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.WriteString(
+			strings.Join([]string{"head_node:", "  instance_type: m5.xlarge", ""}, "\n"),
+		)
 		tmpFile.Close()
 
 		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
@@ -35,13 +30,13 @@ func TestCreateComputeConfig(t *testing.T) {
 	})
 
 	t.Run("skips creation when config exists", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			computeConfigs: []*fakeComputeConfig{
+				{ID: "cpt_1", Name: "my-config", CloudID: "cld_1", Version: 1},
+			},
+		}
 		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
-				return `{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "", "last_modified_at": "", "url": ""}], "metadata": {"count": 1, "next_token": null}}`, nil
-			}
-			return "", fmt.Errorf("unexpected args: %v", args)
-		})
+		cli.setRunFunc(fake.run)
 
 		err := cli.CreateComputeConfig("my-config", "/path/to/config.yaml")
 		if err != nil {
@@ -53,16 +48,9 @@ func TestCreateComputeConfig(t *testing.T) {
 	})
 
 	t.Run("old format with existing cloud key skips temp file", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
-				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
-			}
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
-				return "created compute config: " + strings.Join(args, " "), nil
-			}
-			return "", fmt.Errorf("unexpected command: %v", args)
-		})
+		cli.setRunFunc(fake.run)
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -70,9 +58,9 @@ func TestCreateComputeConfig(t *testing.T) {
 		}
 		defer os.Remove(tmpFile.Name())
 		// Legacy format (head_node_type) with cloud key already set.
-		tmpFile.WriteString(
-			"cloud: my-cloud\nhead_node_type:\n  name: head\n  instance_type: m5.large\n",
-		)
+		tmpFile.WriteString(strings.Join([]string{
+			"cloud: my-cloud", "head_node_type:", "  name: head", "  instance_type: m5.large", "",
+		}, "\n"))
 		tmpFile.Close()
 
 		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
@@ -82,30 +70,25 @@ func TestCreateComputeConfig(t *testing.T) {
 	})
 
 	t.Run("old format without cloud key fetches default cloud", func(t *testing.T) {
-		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
-				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
-			}
-			if len(args) >= 2 && args[0] == "cloud" && args[1] == "get-default" {
-				return "name: test-cloud\nid: cld_test123\n", nil
-			}
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+		fake := &fakeAnyscale{
+			defaultCloud: &fakeCloud{Name: "test-cloud", ID: "cld_test123"},
+			onCreateComputeConfig: func(args []string) (string, error) {
 				// Old format uses positional path: create -n <name> <path>
 				configPath := args[4]
 				data, err := os.ReadFile(configPath)
 				if err != nil {
-					return "", fmt.Errorf("mock: read config: %w", err)
+					return "", fmt.Errorf("fake: read config: %w", err)
 				}
 				if !strings.Contains(string(data), "cloud: test-cloud") {
 					return "", fmt.Errorf(
-						"mock: expected cloud key in config, got:\n%s", data,
+						"fake: expected cloud key in config, got:\n%s", data,
 					)
 				}
 				return "created compute config", nil
-			}
-			return "", fmt.Errorf("unexpected command: %v", args)
-		})
+			},
+		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(fake.run)
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
@@ -113,9 +96,9 @@ func TestCreateComputeConfig(t *testing.T) {
 		}
 		defer os.Remove(tmpFile.Name())
 		// Legacy format (head_node_type) without cloud key.
-		tmpFile.WriteString(
-			"head_node_type:\n  name: head\n  instance_type: m5.large\n",
-		)
+		tmpFile.WriteString(strings.Join([]string{
+			"head_node_type:", "  name: head", "  instance_type: m5.large", "",
+		}, "\n"))
 		tmpFile.Close()
 
 		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
@@ -125,23 +108,22 @@ func TestCreateComputeConfig(t *testing.T) {
 	})
 
 	t.Run("failure when create fails", func(t *testing.T) {
-		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "list" {
-				return `{"results": [], "metadata": {"count": 0, "next_token": null}}`, nil
-			}
-			if len(args) >= 2 && args[0] == "compute-config" && args[1] == "create" {
+		fake := &fakeAnyscale{
+			onCreateComputeConfig: func(args []string) (string, error) {
 				return "", fmt.Errorf("anyscale error: exit status 1")
-			}
-			return "", fmt.Errorf("unexpected args: %v", args)
-		})
+			},
+		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(fake.run)
 
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 		defer os.Remove(tmpFile.Name())
-		tmpFile.WriteString("head_node:\n  instance_type: m5.xlarge\n")
+		tmpFile.WriteString(
+			strings.Join([]string{"head_node:", "  instance_type: m5.xlarge", ""}, "\n"),
+		)
 		tmpFile.Close()
 
 		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
@@ -171,28 +153,33 @@ func TestListComputeConfigs(t *testing.T) {
 	}{
 		{
 			name: "success with items",
-			runFunc: func(args []string) (string, error) {
-				return `{"results": [{"id": "cpt_1", "name": "my-config", "cloud_id": "cld_1", "version": 1, "created_at": "2024-01-01", "last_modified_at": "2024-01-02", "url": "https://example.com"}]}`, nil
-			},
+			runFunc: (&fakeAnyscale{
+				computeConfigs: []*fakeComputeConfig{{
+					ID: "cpt_1", Name: "my-config", CloudID: "cld_1", Version: 1,
+					CreatedAt: "2024-01-01", LastModifiedAt: "2024-01-02",
+					URL: "https://example.com",
+				}},
+			}).run,
 			wantLen:  1,
 			wantID:   "cpt_1",
 			wantName: "my-config",
 		},
 		{
 			name: "success with name filter",
-			runFunc: func(args []string) (string, error) {
-				return `{"results": [{"id": "cpt_2", "name": "filtered-config"}]}`, nil
-			},
+			runFunc: (&fakeAnyscale{
+				computeConfigs: []*fakeComputeConfig{
+					{ID: "cpt_1", Name: "other-config"},
+					{ID: "cpt_2", Name: "filtered-config"},
+				},
+			}).run,
 			filterName: strPtr("filtered-config"),
 			wantLen:    1,
 			wantID:     "cpt_2",
 			wantName:   "filtered-config",
 		},
 		{
-			name: "empty results array",
-			runFunc: func(args []string) (string, error) {
-				return `{"results": []}`, nil
-			},
+			name:    "empty results",
+			runFunc: (&fakeAnyscale{}).run,
 			wantLen: 0,
 		},
 		{
@@ -292,16 +279,23 @@ func TestListComputeConfigs(t *testing.T) {
 
 func TestGetComputeConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			computeConfigs: []*fakeComputeConfig{
+				{
+					Name: "my-config",
+					Config: map[string]any{
+						"name":      "my-config",
+						"head_node": map[string]any{"instance_type": "m5.xlarge"},
+					},
+				},
+				{
+					Name:   "my-config:2",
+					Config: map[string]any{"name": "my-config-versioned"},
+				},
+			},
+		}
 		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
-			if len(args) >= 4 && args[3] == "my-config:2" {
-				return "name: my-config-versioned\n", nil
-			}
-			if len(args) >= 4 && args[3] == "my-config" {
-				return "name: my-config\nhead_node:\n  instance_type: m5.xlarge\n", nil
-			}
-			return "", fmt.Errorf("unexpected args: %v", args)
-		})
+		cli.setRunFunc(fake.run)
 
 		// Test without version
 		config, err := cli.GetComputeConfig("my-config")
