@@ -129,16 +129,23 @@ func makePipeline(ctx *pipelineContext) (
 
 	c := newConverter(ctx.config, ctx.info)
 
-	// Build steps for CI.
 	bkDirs := ctx.config.buildkiteDirs()
+	fullBkDirs := make([]string, len(bkDirs))
+	for i, d := range bkDirs {
+		fullBkDirs[i] = filepath.Join(ctx.repoDir, d)
+	}
+
+	defaultRunnerQueue, ok := ctx.config.RunnerQueues["default"]
+	if !ok {
+		defaultRunnerQueue = ""
+	}
 
 	testRulesFiles := ctx.config.TestRulesFiles
 	if len(testRulesFiles) == 0 {
-		for _, bkDir := range bkDirs {
-			fullDir := filepath.Join(ctx.repoDir, bkDir)
-			files, err := listRulesFiles(fullDir)
+		for _, dir := range fullBkDirs {
+			files, err := listRulesFiles(dir)
 			if err != nil {
-				return nil, fmt.Errorf("list rules files in %s: %w", bkDir, err)
+				return nil, fmt.Errorf("list rules files in %s: %w", dir, err)
 			}
 			testRulesFiles = append(testRulesFiles, files...)
 		}
@@ -159,16 +166,14 @@ func makePipeline(ctx *pipelineContext) (
 	filter.noTagMeansAlways = ctx.config.NoTagMeansAlways
 
 	var groups []*pipelineGroup
-	for _, bkDir := range bkDirs {
-		bkDir = filepath.Join(ctx.repoDir, bkDir) // extend to full path
-
-		names, err := listCIYamlFiles(bkDir)
+	for _, dir := range fullBkDirs {
+		names, err := listCIYamlFiles(dir)
 		if err != nil {
 			return nil, fmt.Errorf("list pipeline files: %w", err)
 		}
 
 		for _, name := range names {
-			file := filepath.Join(bkDir, name)
+			file := filepath.Join(dir, name)
 			g, err := parsePipelineFile(file)
 			if err != nil {
 				return nil, fmt.Errorf("parse pipeline file %s: %w", file, err)
@@ -179,7 +184,6 @@ func makePipeline(ctx *pipelineContext) (
 	}
 	sortPipelineGroups(groups)
 
-	// map each file into a group.
 	steps, err := c.convertGroups(groups, filter)
 	if err != nil {
 		return nil, fmt.Errorf("convert pipeline groups: %w", err)
@@ -187,16 +191,28 @@ func makePipeline(ctx *pipelineContext) (
 	pl.Steps = steps
 
 	if pl.totalSteps() == 0 {
-		q, ok := ctx.config.RunnerQueues["default"]
-		if !ok {
-			q = ""
-		}
-		return makeNoopBkPipeline(q), nil
+		return makeNoopBkPipeline(defaultRunnerQueue), nil
 	}
 
 	if ctx.config.NotifyOwnerOnFailure {
 		if email := ctx.info.buildAuthorEmail; email != "" {
 			pl.Notify = append(pl.Notify, makeBuildFailureBkNotify(email))
+		}
+	}
+
+	if isPullRequest(ctx.envs) {
+		for _, dir := range fullBkDirs {
+			policy, err := loadReviewPolicy(dir)
+			if err != nil {
+				return nil, fmt.Errorf("load review policy: %w", err)
+			}
+			if policy == nil {
+				continue
+			}
+			if g := makePolicyGroup(policy, ctx.changeLister, defaultRunnerQueue); g != nil {
+				pl.Steps = append([]*bkPipelineGroup{g}, pl.Steps...)
+			}
+			break
 		}
 	}
 

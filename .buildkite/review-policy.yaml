@@ -1,0 +1,3 @@
+review:
+  max_additions: 500
+  max_deletions: 1000

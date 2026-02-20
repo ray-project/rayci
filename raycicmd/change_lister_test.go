@@ -91,6 +91,13 @@ func (h *gitTestHelper) commitFiles(msg string, files ...string) string {
 	return h.head()
 }
 
+func (h *gitTestHelper) commitAll(msg string) string {
+	h.t.Helper()
+	h.git("add", ".")
+	h.git("commit", "-m", msg)
+	return h.head()
+}
+
 func (h *gitTestHelper) initialCommit() {
 	h.t.Helper()
 	h.writeFile("README.md", "# README\n")
@@ -469,5 +476,101 @@ func TestListChangedFiles_DeepDirectoryStructure(t *testing.T) {
 		if !slices.Contains(files, want) {
 			t.Errorf("got %v, want %s in result", files, want)
 		}
+	}
+}
+
+func TestCountChangedLines(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	h.writeFile("src/main.go", strings.Join([]string{
+		"package main",
+		"func main() {}",
+		"// end",
+	}, "\n")+"\n")
+	commit := h.commitAll("add main.go")
+
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	stats, err := lister.CountChangedLines(nil)
+	if err != nil {
+		t.Fatalf("CountChangedLines: %v", err)
+	}
+
+	if stats.Added != 3 {
+		t.Errorf("Added = %d, want 3", stats.Added)
+	}
+	if stats.Deleted != 0 {
+		t.Errorf("Deleted = %d, want 0", stats.Deleted)
+	}
+}
+
+func TestCountChangedLines_NoChanges(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	commit := h.head()
+
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	stats, err := lister.CountChangedLines(nil)
+	if err != nil {
+		t.Fatalf("CountChangedLines: %v", err)
+	}
+
+	if stats.Added != 0 {
+		t.Errorf("Added = %d, want 0", stats.Added)
+	}
+	if stats.Deleted != 0 {
+		t.Errorf("Deleted = %d, want 0", stats.Deleted)
+	}
+}
+
+func TestCountChangedLines_Ignore(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	h.writeFile("src/main.go", "line1\nline2\n")
+	h.writeFile("vendor/lib.go", "vendored1\nvendored2\nvendored3\n")
+	h.writeFile("docs/readme.md", "doc line\n")
+	commit := h.commitAll("add files")
+
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	stats, err := lister.CountChangedLines([]string{"vendor/", "docs/"})
+	if err != nil {
+		t.Fatalf("CountChangedLines: %v", err)
+	}
+
+	if stats.Added != 2 {
+		t.Errorf("Added = %d, want 2", stats.Added)
+	}
+	if stats.Deleted != 0 {
+		t.Errorf("Deleted = %d, want 0", stats.Deleted)
+	}
+}
+
+func TestCountChangedLines_Deletions(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.writeFile("existing.go", "line1\nline2\nline3\nline4\nline5\n")
+	h.git("add", ".")
+	h.git("commit", "-m", "initial with existing.go")
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	h.writeFile("existing.go", "line1\nline5\n")
+	commit := h.commitAll("shrink file")
+
+	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	stats, err := lister.CountChangedLines(nil)
+	if err != nil {
+		t.Fatalf("CountChangedLines: %v", err)
+	}
+
+	if stats.Deleted == 0 {
+		t.Errorf("Deleted = %d, want > 0", stats.Deleted)
 	}
 }

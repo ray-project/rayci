@@ -46,6 +46,9 @@ func loadTagRuleConfigs(configPaths []string) ([]*TagRuleSet, error) {
 // Buildkite sets BUILDKITE_PULL_REQUEST to "false" for non-PR builds,
 // or to the PR number for PR builds.
 func isPullRequest(env Envs) bool {
+	if env == nil {
+		return false
+	}
 	pr := getEnv(env, "BUILDKITE_PULL_REQUEST")
 	return pr != "false" && pr != ""
 }

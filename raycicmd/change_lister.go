@@ -3,12 +3,14 @@ package raycicmd
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
-// ChangeLister lists changed files between two directory states.
+// ChangeLister lists changed files and computes diff stats.
 type ChangeLister interface {
 	ListChangedFiles() ([]string, error)
+	CountChangedLines(ignore []string) (*diffStats, error)
 }
 
 // GitChangeLister lists files changed by finding the merge-base (common ancestor)
@@ -121,4 +123,68 @@ func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
 	}
 
 	return files, nil
+}
+
+type diffStats struct {
+	Added   int
+	Deleted int
+}
+
+// CountChangedLines returns the number of added and deleted lines between
+// BaseBranch and Commit, excluding files under any of the given directory
+// prefixes.
+func (g *GitChangeLister) CountChangedLines(ignore []string) (*diffStats, error) {
+	dr, err := g.diffRange()
+	if err != nil {
+		return nil, err
+	}
+
+	diffOut, err := g.run("diff", "--numstat", dr, "--")
+	if err != nil {
+		return nil, fmt.Errorf("git diff --numstat %s: %w", dr, err)
+	}
+
+	stats := new(diffStats)
+	for _, line := range strings.Split(string(diffOut), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
+			continue
+		}
+
+		// Binary files show as "-\t-\tfilename".
+		if parts[0] == "-" || parts[1] == "-" {
+			continue
+		}
+
+		filename := parts[2]
+		skip := false
+		for _, prefix := range ignore {
+			if strings.HasPrefix(filename, prefix) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		added, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+		deleted, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+
+		stats.Added += added
+		stats.Deleted += deleted
+	}
+
+	return stats, nil
 }
