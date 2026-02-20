@@ -1,11 +1,14 @@
 package rayapp
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
 
 // AnyscaleAPI handles HTTP client calls to the Anyscale API host.
@@ -60,4 +63,51 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 
 	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
 	return nil
+}
+
+func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string, templateName string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/from_template", a.host)
+	payload := map[string]any{
+		"template_id": templateName,
+		"name":        slugify(templateName) + "-" + time.Now().Format("20060102150405"),
+		"cloud_id":    cloudID,
+		"project_id":  projectID,
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf(
+			"launch template in workspace failed with status %d: %s",
+			resp.StatusCode,
+			string(body),
+		)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return result, nil
 }

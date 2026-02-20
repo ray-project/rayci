@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -97,6 +98,7 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 }
 
 func TestWorkspaceTestConfigRun_CreateWorkspaceFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -120,6 +122,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_GetWorkspaceIDFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -147,6 +150,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_StartWorkspaceFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -178,6 +182,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_WaitForStateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -213,6 +218,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_CopyTemplateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -252,6 +258,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_RunCommandFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -295,6 +302,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_TerminateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -584,4 +592,176 @@ func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
 
 	// We don't care about the error, just that it uses the token
 	_ = Test("reefy-ray", "testdata/BUILD.yaml")
+}
+
+// setupMockProbeAPI starts an httptest.Server that handles both
+// POST /from_template (launch) and DELETE /workspaces/{id} (cleanup).
+func setupMockProbeAPI(t *testing.T, launchStatus int, launchBody string) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/from_template"):
+			w.WriteHeader(launchStatus)
+			fmt.Fprint(w, launchBody)
+		case r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{}`)
+		default:
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	origHost := os.Getenv("ANYSCALE_HOST")
+	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
+	t.Cleanup(func() {
+		if origHost == "" {
+			os.Unsetenv("ANYSCALE_HOST")
+		} else {
+			os.Setenv("ANYSCALE_HOST", origHost)
+		}
+		if origToken == "" {
+			os.Unsetenv("ANYSCALE_CLI_TOKEN")
+		} else {
+			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
+		}
+	})
+	os.Setenv("ANYSCALE_HOST", server.URL)
+	os.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
+}
+
+// probeScript builds a mock anyscale CLI script for Probe tests.
+// Each step can be set to succeed or fail via the flags.
+func probeScript(cloudOK, projectOK, waitOK, terminateOK bool) string {
+	lines := []string{"#!/bin/sh"}
+
+	cloudExit := "0"
+	if !cloudOK {
+		cloudExit = "1"
+	}
+	lines = append(lines, fmt.Sprintf(
+		`if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit %s; fi`,
+		cloudExit,
+	))
+
+	projectExit := "0"
+	if !projectOK {
+		projectExit = "1"
+	}
+	lines = append(lines, fmt.Sprintf(
+		`if [ "$1" = "project" ] && [ "$2" = "get-default" ]; then echo "name: test-project"; echo "id: prj_test"; exit %s; fi`,
+		projectExit,
+	))
+
+	waitExit := "0"
+	if !waitOK {
+		waitExit = "1"
+	}
+	lines = append(lines, fmt.Sprintf(
+		`if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then echo "running"; exit %s; fi`,
+		waitExit,
+	))
+
+	terminateExit := "0"
+	if !terminateOK {
+		terminateExit = "1"
+	}
+	lines = append(lines, fmt.Sprintf(
+		`if [ "$1" = "workspace_v2" ] && [ "$2" = "terminate" ]; then echo "terminated"; exit %s; fi`,
+		terminateExit,
+	))
+
+	lines = append(lines, `echo "ok"`)
+	return strings.Join(lines, "\n")
+}
+
+func TestProbe_Success(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
+	setupMockAnyscale(t, probeScript(true, true, true, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProbe_APIInitFails(t *testing.T) {
+	// Don't set ANYSCALE_HOST/ANYSCALE_CLI_TOKEN so newAnyscaleAPI fails.
+	origHost := os.Getenv("ANYSCALE_HOST")
+	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
+	t.Cleanup(func() {
+		if origHost == "" {
+			os.Unsetenv("ANYSCALE_HOST")
+		} else {
+			os.Setenv("ANYSCALE_HOST", origHost)
+		}
+		if origToken == "" {
+			os.Unsetenv("ANYSCALE_CLI_TOKEN")
+		} else {
+			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
+		}
+	})
+	os.Unsetenv("ANYSCALE_HOST")
+	os.Unsetenv("ANYSCALE_CLI_TOKEN")
+	setupMockAnyscale(t, probeScript(true, true, true, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "new anyscale api failed") {
+		t.Errorf("error %q should contain 'new anyscale api failed'", err.Error())
+	}
+}
+
+func TestProbe_GetDefaultCloudFails(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
+	setupMockAnyscale(t, probeScript(false, true, true, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "get default cloud failed") {
+		t.Errorf("error %q should contain 'get default cloud failed'", err.Error())
+	}
+}
+
+func TestProbe_GetDefaultProjectFails(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
+	setupMockAnyscale(t, probeScript(true, false, true, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "get default project failed") {
+		t.Errorf("error %q should contain 'get default project failed'", err.Error())
+	}
+}
+
+func TestProbe_LaunchFails(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusBadRequest, `{"error":"bad request"}`)
+	setupMockAnyscale(t, probeScript(true, true, true, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "launch template in workspace failed") {
+		t.Errorf("error %q should contain 'launch template in workspace failed'", err.Error())
+	}
+}
+
+func TestProbe_WaitForRunningFails(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
+	setupMockAnyscale(t, probeScript(true, true, false, true))
+
+	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "wait for workspace running state failed") {
+		t.Errorf("error %q should contain 'wait for workspace running state failed'", err.Error())
+	}
 }

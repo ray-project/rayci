@@ -23,6 +23,9 @@ func main() {
 	testFlags := flag.NewFlagSet("test", flag.ExitOnError)
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
 
+	probeFlags := flag.NewFlagSet("probe", flag.ExitOnError)
+	probeBuildFile := probeFlags.String("build", "BUILD.yaml", "build file")
+
 	switch os.Args[1] {
 	case "build":
 		buildFlags.Parse(os.Args[2:])
@@ -53,6 +56,15 @@ func main() {
 			if err := rayapp.Test(args[0], *testBuildFile); err != nil {
 				log.Fatal(err)
 			}
+		}
+	case "probe":
+		probeFlags.Parse(os.Args[2:])
+		args := probeFlags.Args()
+		if len(args) < 1 {
+			log.Fatal("probe requires <template-name>")
+		}
+		if err := rayapp.Probe(args[0], *probeBuildFile); err != nil {
+			log.Fatal(err)
 		}
 	case "help":
 		printUsage()

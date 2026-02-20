@@ -41,6 +41,44 @@ func Test(tmplName, buildFile string) error {
 	})
 }
 
+func Probe(tmplName string, buildFile string) error {
+	anyscaleCLI := NewAnyscaleCLI()
+	anyscaleAPI, err := newAnyscaleAPI()
+	if err != nil {
+		return fmt.Errorf("new anyscale api failed: %w", err)
+	}
+
+	cloudInfo, err := anyscaleCLI.GetDefaultCloud()
+	if err != nil {
+		return fmt.Errorf("get default cloud failed: %w", err)
+	}
+
+	projectInfo, err := anyscaleCLI.GetDefaultProject(cloudInfo.ID)
+	if err != nil {
+		return fmt.Errorf("get default project failed: %w", err)
+	}
+
+	result, err := anyscaleAPI.LaunchTemplateInWorkspace(cloudInfo.ID, projectInfo.ID, tmplName)
+	if err != nil {
+		return fmt.Errorf("launch template in workspace failed: %w", err)
+	}
+	workspaceName := result["name"].(string)
+	workspaceID := result["id"].(string)
+
+	defer func() {
+		if err := cleanupWorkspace(anyscaleCLI, anyscaleAPI, workspaceName, workspaceID); err != nil {
+			log.Printf("cleanup failed: %v", err)
+		}
+	}()
+
+	if _, err := anyscaleCLI.waitForWorkspaceState(workspaceName, StateRunning); err != nil {
+		return fmt.Errorf("wait for workspace running state failed: %w", err)
+	}
+
+	fmt.Println("Workspace launched successfully:", workspaceName)
+	return nil
+}
+
 func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 	// read build file and get template details
 	tmpls, err := readTemplates(buildFile)
@@ -141,25 +179,8 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	}
 
 	defer func() {
-		log.Println("Cleaning up workspace...")
-		if err := anyscaleCLI.terminateWorkspace(wtc.workspaceName); err != nil {
-			errors = append(errors, fmt.Errorf("terminate workspace failed: %w", err))
-			return
-		}
-		if _, err := anyscaleCLI.waitForWorkspaceState(
-			wtc.workspaceName,
-			StateTerminated,
-		); err != nil {
-			errors = append(
-				errors,
-				fmt.Errorf("wait for workspace terminated state failed: %w", err),
-			)
-			return
-		}
-
-		if err := anyscaleAPI.DeleteWorkspaceByID(wtc.workspaceID); err != nil {
-			errors = append(errors, fmt.Errorf("delete workspace failed: %w", err))
-			return
+		if err := cleanupWorkspace(anyscaleCLI, anyscaleAPI, wtc.workspaceName, wtc.workspaceID); err != nil {
+			errors = append(errors, err)
 		}
 	}()
 
@@ -208,4 +229,21 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	}
 
 	return errors
+}
+
+func cleanupWorkspace(anyscaleCLI *AnyscaleCLI, anyscaleAPI *AnyscaleAPI, workspaceName, workspaceID string) error {
+	log.Println("Cleaning up workspace...")
+	if err := anyscaleCLI.terminateWorkspace(workspaceName); err != nil {
+		return fmt.Errorf("terminate workspace failed: %w", err)
+	}
+	if _, err := anyscaleCLI.waitForWorkspaceState(
+		workspaceName,
+		StateTerminated,
+	); err != nil {
+		return fmt.Errorf("wait for workspace terminated state failed: %w", err)
+	}
+	if err := anyscaleAPI.DeleteWorkspaceByID(workspaceID); err != nil {
+		return fmt.Errorf("delete workspace failed: %w", err)
+	}
+	return nil
 }
