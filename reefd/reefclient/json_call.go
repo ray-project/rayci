@@ -33,7 +33,6 @@ func NewJSONCaller(server string) (*JSONCaller, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse server URL: %w", err)
 	}
-
 	if u.Path == "" {
 		u.Path = "/"
 	}
