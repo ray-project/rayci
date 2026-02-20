@@ -28,6 +28,8 @@ type GitChangeLister struct {
 
 	// Commit is the commit to diff from the base branch.
 	Commit string
+
+	fetched bool
 }
 
 func (g *GitChangeLister) remote() string {
@@ -53,22 +55,29 @@ func (g *GitChangeLister) runNoOutput(args ...string) error {
 	return cmd.Run()
 }
 
-// ListChangedFiles returns files changed between BaseBranch and Commit.
-//
-// It uses the merge-base of (remote/BaseBranch, Commit) so it only includes
-// changes introduced on the feature branch, matching GitHub PR diffs and
-// excluding new commits on the base branch.
-func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
+// fetch ensures the base branch refs are up to date. It only runs once
+// per lister instance.
+func (g *GitChangeLister) fetch() error {
+	if g.fetched {
+		return nil
+	}
 	remote := g.remote()
-
-	// Ensure we have the latest base branch refs.
 	if err := g.runNoOutput("fetch", "-q", remote, g.BaseBranch); err != nil {
-		return nil, fmt.Errorf("git fetch %s %s: %w", remote, g.BaseBranch, err)
+		return fmt.Errorf("git fetch %s %s: %w", remote, g.BaseBranch, err)
+	}
+	g.fetched = true
+	return nil
+}
+
+// diffRange returns the merge-base..Commit range string used for diffs.
+func (g *GitChangeLister) diffRange() (string, error) {
+	if err := g.fetch(); err != nil {
+		return "", err
 	}
 
-	// Find the merge-base (common ancestor) between the base branch and the commit.
-	// This is the correct way to compute PR diffs - it shows only the changes
-	// introduced by the PR, not changes that happened on the base branch.
+	// Find the merge-base (common ancestor) between the base branch and the
+	// commit. This is the correct way to compute PR diffs — it shows only
+	// changes introduced by the PR, not changes on the base branch.
 	//
 	//   feature-branch:              [A] --------> [B]  (Commit)
 	//                                 |            + feature.go
@@ -79,18 +88,28 @@ func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
 	//   merge-base(remote/base, B) = A
 	//   diff(A, B) = [feature.go]           <-- correct
 	//   diff(C, B) = [feature.go, other.go] <-- wrong
-	remoteBranch := remote + "/" + g.BaseBranch
+	remoteBranch := g.remote() + "/" + g.BaseBranch
 	mergeBaseOut, err := g.run("merge-base", remoteBranch, g.Commit)
 	if err != nil {
-		return nil, fmt.Errorf("git merge-base %s %s: %w", remoteBranch, g.Commit, err)
+		return "", fmt.Errorf("git merge-base %s %s: %w", remoteBranch, g.Commit, err)
 	}
-	mergeBase := strings.TrimSpace(string(mergeBaseOut))
+	return strings.TrimSpace(string(mergeBaseOut)) + ".." + g.Commit, nil
+}
 
-	// Diff only the PR changes: merge-base..Commit.
-	diffRange := mergeBase + ".." + g.Commit
-	diffOut, err := g.run("diff", "--name-only", diffRange, "--")
+// ListChangedFiles returns files changed between BaseBranch and Commit.
+//
+// It uses the merge-base of (remote/BaseBranch, Commit) so it only includes
+// changes introduced on the feature branch, matching GitHub PR diffs and
+// excluding new commits on the base branch.
+func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
+	dr, err := g.diffRange()
 	if err != nil {
-		return nil, fmt.Errorf("git diff %s: %w", diffRange, err)
+		return nil, err
+	}
+
+	diffOut, err := g.run("diff", "--name-only", dr, "--")
+	if err != nil {
+		return nil, fmt.Errorf("git diff %s: %w", dr, err)
 	}
 
 	var files []string
