@@ -17,9 +17,10 @@ repos:
     hooks:
       - id: go-fmt
         name: go fmt
-        entry: go fmt
+        entry: bash -c 'for d in $(for f in "$@"; do dirname "$f"; done | sort -u); do go fmt ./"$d" || exit 1; done' --
         language: system
         types: [go]
+        pass_filenames: true
         stages: [pre-commit]
 
       - id: golines
@@ -36,7 +37,7 @@ repos:
     hooks:
       - id: go-vet
         name: go vet
-        entry: go vet
+        entry: bash -c 'pkgs=$(for f in "$@"; do echo "./$(dirname "$f")"; done | sort -u); go vet $pkgs' --
         language: system
         types: [go]
         pass_filenames: true
