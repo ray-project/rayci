@@ -52,17 +52,13 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"delete workspace failed with status %d: %s",
 			resp.StatusCode,
 			string(body),
@@ -115,14 +111,14 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 		)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var response map[string]any
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse response body: %w", err)
 	}
 
 	result, ok := response["result"].(map[string]any)
