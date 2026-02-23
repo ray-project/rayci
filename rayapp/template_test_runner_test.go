@@ -109,7 +109,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when create workspace fails")
@@ -136,7 +136,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when get workspace ID fails")
@@ -167,7 +167,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when start workspace fails")
@@ -202,7 +202,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when wait for state fails")
@@ -241,7 +241,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when copy template fails")
@@ -284,7 +284,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when run command fails")
@@ -331,7 +331,7 @@ echo "ok"
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when terminate fails")
@@ -383,7 +383,7 @@ exit 1
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -416,7 +416,7 @@ exit 1
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -426,7 +426,7 @@ exit 1
 func TestTest_Failure(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error")
@@ -442,7 +442,7 @@ func TestTest_Failure(t *testing.T) {
 func TestTest_NoTemplatesToTest(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\necho ok")
 
-	err := Test("nonexistent-template", "testdata/BUILD.yaml")
+	err := RunTemplateTest("nonexistent-template", "testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when no templates match filter")
@@ -455,7 +455,7 @@ func TestTest_NoTemplatesToTest(t *testing.T) {
 func TestTest_ReadTemplatesFailed(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\necho ok")
 
-	err := Test("reefy-ray", "nonexistent/BUILD.yaml")
+	err := RunTemplateTest("reefy-ray", "nonexistent/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
@@ -478,7 +478,7 @@ echo "unknown"; exit 1
 `
 	setupMockAnyscale(t, script)
 
-	err := Test("fishy-ray", "testdata/BUILD.yaml")
+	err := RunTemplateTest("fishy-ray", "testdata/BUILD.yaml")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -498,7 +498,7 @@ echo "unknown"; exit 1
 `
 	setupMockAnyscale(t, script)
 
-	err := TestAll("testdata/BUILD.yaml")
+	err := RunAllTemplateTests("testdata/BUILD.yaml")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -508,7 +508,7 @@ echo "unknown"; exit 1
 func TestTestAll_ReadTemplatesFailed(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\necho ok")
 
-	err := TestAll("nonexistent/BUILD.yaml")
+	err := RunAllTemplateTests("nonexistent/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
@@ -522,7 +522,7 @@ func TestTestAll_NoTemplatesToTest(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\necho ok")
 	f := createEmptyBuildFile(t)
 
-	err := TestAll(f)
+	err := RunAllTemplateTests(f)
 
 	if err == nil {
 		t.Fatal("expected error when build file has no templates")
@@ -535,7 +535,7 @@ func TestTestAll_NoTemplatesToTest(t *testing.T) {
 func TestTestAll_PartialFailure(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
-	err := TestAll("testdata/BUILD.yaml")
+	err := RunAllTemplateTests("testdata/BUILD.yaml")
 
 	if err == nil {
 		t.Fatal("expected error when some templates fail")
@@ -583,5 +583,5 @@ func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
 	// We don't care about the error, just that it uses the token
-	_ = Test("reefy-ray", "testdata/BUILD.yaml")
+	_ = RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
 }

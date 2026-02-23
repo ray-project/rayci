@@ -46,11 +46,11 @@ func main() {
 			log.Fatal("test requires <template-name> or 'all'")
 		}
 		if args[0] == "all" {
-			if err := rayapp.TestAll(*testBuildFile); err != nil {
+			if err := rayapp.RunAllTemplateTests(*testBuildFile); err != nil {
 				log.Fatal(err)
 			}
 		} else {
-			if err := rayapp.Test(args[0], *testBuildFile); err != nil {
+			if err := rayapp.RunTemplateTest(args[0], *testBuildFile); err != nil {
 				log.Fatal(err)
 			}
 		}

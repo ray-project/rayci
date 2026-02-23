@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -33,17 +34,17 @@ func NewWorkspaceTestConfig(tmplName string) *WorkspaceTestConfig {
 	return &WorkspaceTestConfig{tmplName: tmplName, success: false, errs: nil}
 }
 
-func TestAll(buildFile string) error {
-	return testWithFilter(buildFile, nil)
+func RunAllTemplateTests(buildFile string) error {
+	return runTemplateTestsWithFilter(buildFile, nil)
 }
 
-func Test(tmplName, buildFile string) error {
-	return testWithFilter(buildFile, func(tmpl *Template) bool {
+func RunTemplateTest(tmplName, buildFile string) error {
+	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
 	})
 }
 
-func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
+func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 	// read build file and get template details
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
@@ -60,42 +61,42 @@ func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
 
-	for _, t := range tmpls {
-		if filter != nil && !filter(t) {
-			continue
+	filteredTmpls := slices.Collect(func(yield func(*Template) bool) {
+		for _, t := range tmpls {
+			if filter != nil && !filter(t) {
+				continue
+			}
+			if !yield(t) {
+				return
+			}
 		}
-		log.Println("Testing template:", t.Name)
-
-		runner := NewWorkspaceTestConfig(t.Name)
-		runner.anyscaleCLI = anyscaleCLI
-		runner.anyscaleAPI = anyscaleAPI
-		runner.template = t
-		runner.buildDir = buildDir
-		runner.template.Dir = filepath.Join(buildDir, t.Dir)
-		testConfigs = append(testConfigs, runner)
-	}
-
-	if len(testConfigs) == 0 {
+	})
+	if len(filteredTmpls) == 0 {
 		return fmt.Errorf("no templates to test")
 	}
 
-	for _, wtc := range testConfigs {
-		if errs := wtc.Run(); len(errs) > 0 {
-			wtc.errs = errs
-			wtc.success = false
-		} else {
-			wtc.errs = nil
-			wtc.success = true
-		}
+	for _, t := range filteredTmpls {
+		c := NewWorkspaceTestConfig(t.Name)
+		c.anyscaleCLI = anyscaleCLI
+		c.anyscaleAPI = anyscaleAPI
+		c.template = t
+		c.buildDir = buildDir
+		c.template.Dir = filepath.Join(buildDir, t.Dir)
+		testConfigs = append(testConfigs, c)
+	}
+
+	for _, c := range testConfigs {
+		log.Println("Testing template:", c.template.Name)
+		c.Run()
 	}
 
 	var failed []string
-	for _, wtc := range testConfigs {
-		log.Println("Template:", wtc.template.Name)
-		log.Println("Success:", wtc.success)
-		if !wtc.success {
-			log.Println("Error:", wtc.errs)
-			failed = append(failed, fmt.Sprintf("%s: %v", wtc.template.Name, wtc.errs))
+	for _, c := range testConfigs {
+		log.Println("Template:", c.template.Name)
+		log.Println("Success:", c.success)
+		if !c.success {
+			log.Println("Error:", c.errs)
+			failed = append(failed, fmt.Sprintf("%s: %v", c.template.Name, c.errs))
 		}
 	}
 
@@ -106,108 +107,112 @@ func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
 	return nil
 }
 
-// Run creates an empty workspace and copies the template to it.
-func (wtc *WorkspaceTestConfig) Run() (errors []error) {
-	// Parse compute config name from template's AWS config path and create if needed
-	if awsConfigPath, ok := wtc.template.ComputeConfig["AWS"]; ok {
-		wtc.computeConfig = generateComputeConfigName(awsConfigPath)
-		// Resolve compute config path relative to build file directory
-		resolvedConfigPath := filepath.Join(wtc.buildDir, awsConfigPath)
-		// Create compute config if it doesn't already exist
-		if err := wtc.anyscaleCLI.CreateComputeConfig(
-			wtc.computeConfig,
+// Run creates an empty workspace, copies the template to it, and runs tests.
+// It sets c.errs and c.success based on the outcome.
+func (c *WorkspaceTestConfig) Run() {
+	c.errs = nil
+	c.success = false
+
+	defer func() {
+		log.Println("Test completed successfully")
+		c.success = len(c.errs) == 0
+	}()
+
+	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
+		c.computeConfig = generateComputeConfigName(awsConfigPath)
+		resolvedConfigPath := filepath.Join(c.buildDir, awsConfigPath)
+		if err := c.anyscaleCLI.CreateComputeConfig(
+			c.computeConfig,
 			resolvedConfigPath,
 		); err != nil {
-			errors = append(errors, fmt.Errorf("create compute config failed: %w", err))
-			return errors
+			c.errs = append(c.errs, fmt.Errorf("create compute config failed: %w", err))
+			return
 		}
 	}
 
-	// generate workspace name
-	workspaceName := wtc.tmplName + "-" + time.Now().Format("20060102150405")
-	wtc.workspaceName = workspaceName
+	workspaceName := c.tmplName + "-" + time.Now().Format("20060102150405")
+	c.workspaceName = workspaceName
 
-	// create empty workspace
-	if err := wtc.anyscaleCLI.createEmptyWorkspace(wtc); err != nil {
-		errors = append(errors, fmt.Errorf("create empty workspace failed: %w", err))
-		return errors
+	if err := c.anyscaleCLI.createEmptyWorkspace(c); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("create empty workspace failed: %w", err))
+		return
 	}
-	workspaceID, err := wtc.anyscaleCLI.getWorkspaceID(wtc.workspaceName)
+	workspaceID, err := c.anyscaleCLI.getWorkspaceID(c.workspaceName)
 	if err != nil {
-		errors = append(errors, fmt.Errorf("get workspace ID failed: %w", err))
-		return errors
+		c.errs = append(c.errs, fmt.Errorf("get workspace ID failed: %w", err))
+		return
 	}
-	wtc.workspaceID = workspaceID
+	c.workspaceID = workspaceID
 
 	defer func() {
 		log.Println("Cleaning up workspace...")
-		if err := wtc.anyscaleCLI.terminateWorkspace(wtc.workspaceName); err != nil {
-			errors = append(errors, fmt.Errorf("terminate workspace failed: %w", err))
+		if err := c.anyscaleCLI.terminateWorkspace(c.workspaceName); err != nil {
+			c.errs = append(c.errs, fmt.Errorf("terminate workspace failed: %w", err))
 			return
 		}
-		if _, err := wtc.anyscaleCLI.waitForWorkspaceState(
-			wtc.workspaceName,
+		if _, err := c.anyscaleCLI.waitForWorkspaceState(
+			c.workspaceName,
 			StateTerminated,
 		); err != nil {
-			errors = append(
-				errors, fmt.Errorf("wait for workspace terminated state failed: %w", err),
+			c.errs = append(
+				c.errs,
+				fmt.Errorf("wait for workspace terminated state failed: %w", err),
 			)
 			return
 		}
-		log.Println("Terminated workspace:", wtc.workspaceID)
+		log.Println("Terminated workspace:", c.workspaceID)
 
-		if err := wtc.anyscaleAPI.deleteWorkspaceByID(wtc.workspaceID); err != nil {
-			errors = append(errors, fmt.Errorf("delete workspace failed: %w", err))
+		if err := c.anyscaleAPI.deleteWorkspaceByID(c.workspaceID); err != nil {
+			c.errs = append(c.errs, fmt.Errorf("delete workspace failed: %w", err))
 			return
 		}
-		log.Println("Deleted workspace:", wtc.workspaceID)
+		log.Println("Deleted workspace:", c.workspaceID)
 	}()
 
-	if err := wtc.anyscaleCLI.startWorkspace(wtc.workspaceName); err != nil {
-		errors = append(errors, fmt.Errorf("start workspace failed: %w", err))
-		return errors
+	if err := c.anyscaleCLI.startWorkspace(c.workspaceName); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("start workspace failed: %w", err))
+		return
 	}
 
-	if _, err := wtc.anyscaleCLI.waitForWorkspaceState(wtc.workspaceName, StateRunning); err != nil {
-		errors = append(errors, fmt.Errorf("wait for workspace running state failed: %w", err))
-		return errors
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(
+		c.workspaceName, StateRunning,
+	); err != nil {
+		c.errs = append(
+			c.errs, fmt.Errorf("wait for workspace running state failed: %w", err),
+		)
+		return
 	}
 
-	// Create temp directory for the zip file
 	templateZipDir, err := os.MkdirTemp("", "template_zip")
 	if err != nil {
-		errors = append(errors, fmt.Errorf("create temp directory failed: %w", err))
-		return errors
+		c.errs = append(c.errs, fmt.Errorf("create temp directory failed: %w", err))
+		return
 	}
-	defer os.RemoveAll(templateZipDir) // clean up temp directory after push
+	defer os.RemoveAll(templateZipDir)
 
-	// Zip template directory to the temp directory
-	zipFileName := filepath.Join(templateZipDir, wtc.tmplName+".zip")
-	if err := zipDirectory(wtc.template.Dir, zipFileName); err != nil {
-		errors = append(errors, fmt.Errorf("zip template directory failed: %w", err))
-		return errors
-	}
-
-	if err := wtc.anyscaleCLI.pushFolderToWorkspace(wtc.workspaceName, templateZipDir); err != nil {
-		errors = append(errors, fmt.Errorf("push zip to workspace failed: %w", err))
-		return errors
+	zipFileName := filepath.Join(templateZipDir, c.tmplName+".zip")
+	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("zip template directory failed: %w", err))
+		return
 	}
 
-	if err := wtc.anyscaleCLI.runCmdInWorkspace(
-		wtc.workspaceName,
-		fmt.Sprintf("unzip -o %s.zip", wtc.tmplName),
+	if err := c.anyscaleCLI.pushFolderToWorkspace(
+		c.workspaceName, templateZipDir,
 	); err != nil {
-		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
-		return errors
+		c.errs = append(c.errs, fmt.Errorf("push zip to workspace failed: %w", err))
+		return
 	}
 
-	// run test in workspace
-	if err := wtc.anyscaleCLI.runCmdInWorkspace(wtc.workspaceName, testCmd); err != nil {
-		errors = append(errors, fmt.Errorf("run_command failed: %w", err))
-		return errors
+	if err := c.anyscaleCLI.runCmdInWorkspace(
+		c.workspaceName,
+		fmt.Sprintf("unzip -o %s.zip", c.tmplName),
+	); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("run_command failed: %w", err))
+		return
 	}
 
-	log.Println("Test completed successfully")
-
-	return errors
+	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCmd); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("run_command failed: %w", err))
+		return
+	}
 }
