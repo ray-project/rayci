@@ -23,16 +23,22 @@ var workspaceStateName = map[WorkspaceState]string{
 
 // String returns the Anyscale API name of the state (e.g., "RUNNING").
 func (ws WorkspaceState) String() string {
-	return workspaceStateName[ws]
+	if name, ok := workspaceStateName[ws]; ok {
+		return name
+	}
+	return fmt.Sprintf("UNKNOWN(%d)", int(ws))
 }
 
-func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) error {
+func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
+	if c.template == nil {
+		return fmt.Errorf("template is required")
+	}
 	args := []string{"workspace_v2", "create"}
-	args = append(args, "--name", wtc.workspaceName)
-	if wtc.template.ClusterEnv != nil {
-		env := wtc.template.ClusterEnv
+	args = append(args, "--name", c.workspaceName)
+	if c.template.ClusterEnv != nil {
+		env := c.template.ClusterEnv
 		if env.BYOD != nil && env.BYOD.ContainerFile != "" {
-			resolvedPath := filepath.Join(wtc.buildDir, env.BYOD.ContainerFile)
+			resolvedPath := filepath.Join(c.buildDir, env.BYOD.ContainerFile)
 			args = append(
 				args,
 				"--containerfile",
@@ -42,7 +48,7 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) error {
 			)
 		} else {
 			imageURI, rayVersion, err := getImageURIAndRayVersionFromClusterEnv(
-				wtc.template.ClusterEnv,
+				c.template.ClusterEnv,
 			)
 			if err != nil {
 				return fmt.Errorf("cluster env: %w", err)
@@ -52,9 +58,8 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(wtc *WorkspaceTestConfig) error {
 		}
 	}
 
-	// Use compute config name if set
-	if wtc.computeConfig != "" {
-		args = append(args, "--compute-config", wtc.computeConfig)
+	if c.computeConfig != "" {
+		args = append(args, "--compute-config", c.computeConfig)
 	}
 
 	_, err := ac.runAnyscaleCLI(args)
@@ -78,7 +83,9 @@ func (ac *AnyscaleCLI) getWorkspaceID(workspaceName string) (string, error) {
 }
 
 func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceName string) (map[string]any, error) {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "get", "--name", workspaceName, "--json"})
+	output, err := ac.runAnyscaleCLI(
+		[]string{"workspace_v2", "get", "--name", workspaceName, "--json"},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get workspace failed: %w", err)
 	}
