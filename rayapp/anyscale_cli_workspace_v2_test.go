@@ -3,6 +3,7 @@ package rayapp
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,7 @@ func TestWorkspaceStateString(t *testing.T) {
 		{StateTerminated, "TERMINATED"},
 		{StateStarting, "STARTING"},
 		{StateRunning, "RUNNING"},
+		{WorkspaceState(99), "UNKNOWN(99)"},
 	}
 
 	for _, tt := range tests {
@@ -28,9 +30,26 @@ func TestWorkspaceStateString(t *testing.T) {
 
 func TestGetWorkspaceDescription(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			workspaces: []*fakeWorkspace{
+				{
+					ID: "expwrk_abc123", Name: "my-workspace",
+					State: "RUNNING",
+				},
+				{
+					ID: "expwrk_xyz789", Name: "my-workspace-2",
+					State: "STARTING",
+				},
+			},
+		}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return `{"id": "expwrk_abc123", "name": "my-workspace", "state": "RUNNING"}`, nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "my-workspace"}},
+			)
+			return fake.run(args)
 		})
 
 		got, err := cli.getWorkspaceDescription("my-workspace")
@@ -51,6 +70,11 @@ func TestGetWorkspaceDescription(t *testing.T) {
 	t.Run("CLI failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "my-workspace"}},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -66,6 +90,11 @@ func TestGetWorkspaceDescription(t *testing.T) {
 	t.Run("invalid JSON output", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "my-workspace"}},
+			)
 			return "not valid json", nil
 		})
 
@@ -81,9 +110,19 @@ func TestGetWorkspaceDescription(t *testing.T) {
 
 func TestGetWorkspaceID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			workspaces: []*fakeWorkspace{{
+				ID: "expwrk_xyz789", Name: "test-ws",
+			}},
+		}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return `{"id": "expwrk_xyz789", "name": "test-ws"}`, nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "test-ws"}},
+			)
+			return fake.run(args)
 		})
 
 		got, err := cli.getWorkspaceID("test-ws")
@@ -96,9 +135,21 @@ func TestGetWorkspaceID(t *testing.T) {
 	})
 
 	t.Run("getWorkspaceDescription fails", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			workspaces: []*fakeWorkspace{
+				{
+					ID: "expwrk_xyz789", Name: "my-workspace-2", State: "RUNNING",
+				},
+			},
+		}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "", fmt.Errorf("exit status 1")
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "my-workspace"}},
+			)
+			return fake.run(args)
 		})
 
 		_, err := cli.getWorkspaceID("my-workspace")
@@ -113,6 +164,11 @@ func TestGetWorkspaceID(t *testing.T) {
 	t.Run("id missing in description", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "no-id-workspace"}},
+			)
 			return `{"name": "no-id-workspace"}`, nil
 		})
 
@@ -128,6 +184,11 @@ func TestGetWorkspaceID(t *testing.T) {
 	t.Run("id not a string", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "get"},
+				[]string{"--json"},
+				[][2]string{{"--name", "bad-id"}},
+			)
 			return `{"id": 12345, "name": "bad-id"}`, nil
 		})
 
@@ -142,14 +203,13 @@ func TestGetWorkspaceID(t *testing.T) {
 }
 
 func TestCreateEmptyWorkspace(t *testing.T) {
-	successRunFunc := func(args []string) (string, error) {
-		return "Workspace created successfully", nil
-	}
+	successRunFunc := (&fakeAnyscale{}).run
 
 	tests := []struct {
 		name        string
 		runFunc     func(args []string) (string, error)
 		config      *WorkspaceTestConfig
+		wantPairs   [][2]string
 		wantErr     bool
 		errContains string
 	}{
@@ -164,6 +224,11 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "anyscale/ray:2.44.1-py312-cu128"},
+				{"--ray-version", "2.44.1"},
+			},
 		},
 		{
 			name:    "success with compute config name",
@@ -176,6 +241,12 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 						BuildID: "anyscaleray2441-py312-cu128",
 					},
 				},
+			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "anyscale/ray:2.44.1-py312-cu128"},
+				{"--ray-version", "2.44.1"},
+				{"--compute-config", "basic-single-node-aws"},
 			},
 		},
 		{
@@ -193,6 +264,31 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--containerfile", filepath.Join("foo", "bar", "Dockerfile")},
+				{"--ray-version", "2.34.0"},
+			},
+		},
+		{
+			name:    "success with BYOD docker image",
+			runFunc: successRunFunc,
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+				template: &Template{
+					ClusterEnv: &ClusterEnv{
+						BYOD: &ClusterEnvBYOD{
+							DockerImage: "my-custom-image:latest",
+							RayVersion:  "2.34.0",
+						},
+					},
+				},
+			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "my-custom-image:latest"},
+				{"--ray-version", "2.34.0"},
+			},
 		},
 		{
 			name:    "success with ImageURI",
@@ -200,10 +296,13 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 			config: &WorkspaceTestConfig{
 				workspaceName: "test-workspace",
 				template: &Template{
-					ClusterEnv: &ClusterEnv{
-						ImageURI: "anyscale/ray:2.44.1-py312-cu128",
-					},
+					ClusterEnv: &ClusterEnv{ImageURI: "anyscale/ray:2.44.1-py312-cu128"},
 				},
+			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "anyscale/ray:2.44.1-py312-cu128"},
+				{"--ray-version", "2.44.1"},
 			},
 		},
 		{
@@ -218,6 +317,21 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "anyscale/ray:2.35.0-py311"},
+				{"--ray-version", "2.35.0"},
+				{"--compute-config", "basic-single-node-aws"},
+			},
+		},
+		{
+			name:    "nil template",
+			runFunc: successRunFunc,
+			config: &WorkspaceTestConfig{
+				workspaceName: "test-workspace",
+			},
+			wantErr:     true,
+			errContains: "template is required",
 		},
 		{
 			name:    "invalid build ID",
@@ -246,6 +360,11 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 					},
 				},
 			},
+			wantPairs: [][2]string{
+				{"--name", "test-workspace"},
+				{"--image-uri", "anyscale/ray:2.44.1-py312-cu128"},
+				{"--ray-version", "2.44.1"},
+			},
 			wantErr:     true,
 			errContains: "create empty workspace failed",
 		},
@@ -254,7 +373,10 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cli := NewAnyscaleCLI()
-			cli.setRunFunc(tt.runFunc)
+			cli.setRunFunc(func(args []string) (string, error) {
+				checkArgs(t, args, []string{"workspace_v2", "create"}, nil, tt.wantPairs)
+				return tt.runFunc(args)
+			})
 
 			err := cli.createEmptyWorkspace(tt.config)
 
@@ -277,9 +399,18 @@ func TestCreateEmptyWorkspace(t *testing.T) {
 
 func TestPushFolderToWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "push ok", nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "push"},
+				nil,
+				[][2]string{
+					{"--name", "my-workspace"},
+					{"--local-dir", "/local/path"},
+				},
+			)
+			return fake.run(args)
 		})
 
 		err := cli.pushFolderToWorkspace("my-workspace", "/local/path")
@@ -291,6 +422,14 @@ func TestPushFolderToWorkspace(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "push"},
+				nil,
+				[][2]string{
+					{"--name", "my-workspace"},
+					{"--local-dir", "/local/path"},
+				},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -306,9 +445,15 @@ func TestPushFolderToWorkspace(t *testing.T) {
 
 func TestTerminateWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "terminating ok", nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "terminate"},
+				nil,
+				[][2]string{{"--name", "my-workspace"}},
+			)
+			return fake.run(args)
 		})
 
 		err := cli.terminateWorkspace("my-workspace")
@@ -320,6 +465,11 @@ func TestTerminateWorkspace(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "terminate"},
+				nil,
+				[][2]string{{"--name", "my-workspace"}},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -327,17 +477,31 @@ func TestTerminateWorkspace(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "terminate workspace failed") {
-			t.Errorf("error %q should contain 'terminate workspace failed'", err.Error())
+		if !strings.Contains(
+			err.Error(), "terminate workspace failed",
+		) {
+			t.Errorf(
+				"error %q should contain"+
+					" 'terminate workspace failed'",
+				err.Error(),
+			)
 		}
 	})
 }
 
 func TestRunCmdInWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{}
+		pairs := [][2]string{{"--name", "test-workspace"}}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "running ok", nil
+			checkArgs(t, args, []string{"workspace_v2", "run_command"}, nil, pairs)
+			positional := findPositionalArgs(args[2:], nil, pairs)
+			want := []string{"echo hello"}
+			if !slices.Equal(positional, want) {
+				t.Errorf("positional args = %v, want %v", positional, want)
+			}
+			return fake.run(args)
 		})
 
 		err := cli.runCmdInWorkspace("test-workspace", "echo hello")
@@ -347,8 +511,15 @@ func TestRunCmdInWorkspace(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
+		pairs := [][2]string{{"--name", "test-workspace"}}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args, []string{"workspace_v2", "run_command"}, nil, pairs)
+			positional := findPositionalArgs(args[2:], nil, pairs)
+			want := []string{"failing-command"}
+			if !slices.Equal(positional, want) {
+				t.Errorf("positional args = %v, want %v", positional, want)
+			}
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -364,9 +535,17 @@ func TestRunCmdInWorkspace(t *testing.T) {
 
 func TestStartWorkspace(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "starting ok", nil
+			checkArgs(
+				t,
+				args,
+				[]string{"workspace_v2", "start"},
+				nil,
+				[][2]string{{"--name", "test-workspace"}},
+			)
+			return fake.run(args)
 		})
 
 		err := cli.startWorkspace("test-workspace")
@@ -378,6 +557,11 @@ func TestStartWorkspace(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "start"},
+				nil,
+				[][2]string{{"--name", "test-workspace"}},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -393,9 +577,21 @@ func TestStartWorkspace(t *testing.T) {
 
 func TestGetWorkspaceStatus(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			workspaces: []*fakeWorkspace{{
+				Name: "test-workspace", State: "RUNNING",
+			}},
+		}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "RUNNING", nil
+			checkArgs(
+				t,
+				args,
+				[]string{"workspace_v2", "status"},
+				nil,
+				[][2]string{{"--name", "test-workspace"}},
+			)
+			return fake.run(args)
 		})
 
 		output, err := cli.getWorkspaceStatus("test-workspace")
@@ -410,6 +606,11 @@ func TestGetWorkspaceStatus(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "status"},
+				nil,
+				[][2]string{{"--name", "test-workspace"}},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -425,47 +626,106 @@ func TestGetWorkspaceStatus(t *testing.T) {
 
 func TestWaitForWorkspaceState(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "state reached", nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "wait"},
+				nil,
+				[][2]string{
+					{"--name", "test-workspace"},
+					{"--state", "RUNNING"},
+				},
+			)
+			return fake.run(args)
 		})
 
-		output, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
+		output, err := cli.waitForWorkspaceState(
+			"test-workspace", StateRunning,
+		)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !strings.Contains(output, "state reached") {
-			t.Errorf("output %q should contain 'state reached'", output)
+		if !strings.Contains(output, "reached target state") {
+			t.Errorf(
+				"output %q should contain"+
+					" 'reached target state'",
+				output,
+			)
+		}
+		if !strings.Contains(output, "RUNNING") {
+			t.Errorf(
+				"output %q should contain 'RUNNING'",
+				output,
+			)
 		}
 	})
 
 	t.Run("wait for terminated", func(t *testing.T) {
+		fake := &fakeAnyscale{}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "terminated", nil
+			checkArgs(t, args,
+				[]string{"workspace_v2", "wait"},
+				nil,
+				[][2]string{
+					{"--name", "test-workspace"},
+					{"--state", "TERMINATED"},
+				},
+			)
+			return fake.run(args)
 		})
 
-		output, err := cli.waitForWorkspaceState("test-workspace", StateTerminated)
+		output, err := cli.waitForWorkspaceState(
+			"test-workspace", StateTerminated,
+		)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !strings.Contains(output, "terminated") {
-			t.Errorf("output %q should contain 'terminated'", output)
+		if !strings.Contains(output, "reached target state") {
+			t.Errorf(
+				"output %q should contain"+
+					" 'reached target state'",
+				output,
+			)
+		}
+		if !strings.Contains(output, "TERMINATED") {
+			t.Errorf(
+				"output %q should contain 'TERMINATED'",
+				output,
+			)
 		}
 	})
 
 	t.Run("failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"workspace_v2", "wait"},
+				nil,
+				[][2]string{
+					{"--name", "test-workspace"},
+					{"--state", "RUNNING"},
+				},
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
-		_, err := cli.waitForWorkspaceState("test-workspace", StateRunning)
+		_, err := cli.waitForWorkspaceState(
+			"test-workspace", StateRunning,
+		)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "wait for workspace state failed") {
-			t.Errorf("error %q should contain 'wait for workspace state failed'", err.Error())
+		if !strings.Contains(
+			err.Error(),
+			"wait for workspace state failed",
+		) {
+			t.Errorf(
+				"error %q should contain"+
+					" 'wait for workspace state failed'",
+				err.Error(),
+			)
 		}
 	})
 }
