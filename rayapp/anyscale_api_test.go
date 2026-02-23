@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,8 +9,18 @@ import (
 )
 
 func TestNewAnyscaleAPI(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		api, err := newAnyscaleAPI("http://localhost", "tok")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if api == nil {
+			t.Fatal("got nil, want non-nil anyscaleAPI")
+		}
+	})
+
 	t.Run("missing host", func(t *testing.T) {
-		_, err := NewAnyscaleAPI("", "tok")
+		_, err := newAnyscaleAPI("", "tok")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -19,7 +30,7 @@ func TestNewAnyscaleAPI(t *testing.T) {
 	})
 
 	t.Run("missing token", func(t *testing.T) {
-		_, err := NewAnyscaleAPI("http://localhost", "")
+		_, err := newAnyscaleAPI("http://localhost", "")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -46,11 +57,11 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 		}))
 		defer server.Close()
 
-		api, err := NewAnyscaleAPI(server.URL, "test-token")
+		api, err := newAnyscaleAPI(server.URL, "test-token")
 		if err != nil {
-			t.Fatalf("NewAnyscaleAPI: %v", err)
+			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		if err := api.DeleteWorkspaceByID("expwrk_abc"); err != nil {
+		if err := api.deleteWorkspaceByID("expwrk_abc"); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
@@ -62,33 +73,46 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 		}))
 		defer server.Close()
 
-		api, err := NewAnyscaleAPI(server.URL, "test-token")
+		api, err := newAnyscaleAPI(server.URL, "test-token")
 		if err != nil {
-			t.Fatalf("NewAnyscaleAPI: %v", err)
+			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		err = api.DeleteWorkspaceByID("expwrk_missing")
+		err = api.deleteWorkspaceByID("expwrk_missing")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "404") {
-			t.Errorf("error %q should contain 404", err.Error())
+		var ae *apiError
+		if !errors.As(err, &ae) {
+			t.Fatalf("error type = %T, want *apiError", err)
 		}
-		if !strings.Contains(err.Error(), "not found") {
-			t.Errorf("error %q should contain response body", err.Error())
+		if ae.StatusCode != http.StatusNotFound {
+			t.Errorf(
+				"StatusCode = %d, want %d",
+				ae.StatusCode, http.StatusNotFound,
+			)
+		}
+		if !strings.Contains(ae.Body, "not found") {
+			t.Errorf("Body = %q, want mention of not found", ae.Body)
 		}
 	})
 
-	t.Run("empty workspace ID", func(t *testing.T) {
-		api, err := NewAnyscaleAPI("http://localhost", "test-token")
+	t.Run("invalid workspace ID", func(t *testing.T) {
+		api, err := newAnyscaleAPI("http://localhost", "test-token")
 		if err != nil {
-			t.Fatalf("NewAnyscaleAPI: %v", err)
+			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		err = api.DeleteWorkspaceByID("")
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "empty") {
-			t.Errorf("error = %q, want mention of empty", err.Error())
+		for _, id := range []string{"", "../../admin", "id with spaces", "a/b"} {
+			err = api.deleteWorkspaceByID(id)
+			if err == nil {
+				t.Errorf("deleteWorkspaceByID(%q): expected error, got nil", id)
+				continue
+			}
+			if !strings.Contains(err.Error(), "invalid workspace ID") {
+				t.Errorf(
+					"deleteWorkspaceByID(%q) error = %q, want invalid workspace ID",
+					id, err,
+				)
+			}
 		}
 	})
 }
