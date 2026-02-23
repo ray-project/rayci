@@ -54,30 +54,32 @@ func setupMockDeleteWorkspaceAPI(t *testing.T) {
 
 func TestNewWorkspaceTestConfig(t *testing.T) {
 	tests := []struct {
-		name      string
-		tmplName  string
-		buildFile string
+		name     string
+		tmplName string
+		buildDir string
 	}{
 		{
-			name:      "basic config",
-			tmplName:  "my-template",
-			buildFile: "path/to/build.yaml",
+			name:     "basic config",
+			tmplName: "my-template",
+			buildDir: "path/to",
 		},
 		{
-			name:      "empty values",
-			tmplName:  "",
-			buildFile: "",
+			name:     "empty values",
+			tmplName: "",
+			buildDir: "",
 		},
 		{
-			name:      "special characters",
-			tmplName:  "template-with-dashes_and_underscores",
-			buildFile: "/path/with spaces/build.yaml",
+			name:     "special characters",
+			tmplName: "template-with-dashes_and_underscores",
+			buildDir: "/path/with spaces",
 		},
 	}
 
+	cli := NewAnyscaleCLI()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewWorkspaceTestConfig(tt.tmplName)
+			tmpl := &Template{Name: tt.tmplName}
+			config := NewWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
@@ -85,12 +87,17 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 			if config.tmplName != tt.tmplName {
 				t.Errorf("tmplName = %q, want %q", config.tmplName, tt.tmplName)
 			}
-			// Other fields should be zero values
-			if config.workspaceName != "" {
-				t.Errorf("workspaceName should be empty, got %q", config.workspaceName)
+			if config.template != tmpl {
+				t.Error("template should match passed template")
 			}
-			if config.template != nil {
-				t.Error("template should be nil")
+			if config.buildDir != tt.buildDir {
+				t.Errorf("buildDir = %q, want %q", config.buildDir, tt.buildDir)
+			}
+			if !strings.HasPrefix(config.workspaceName, tt.tmplName) {
+				t.Errorf(
+					"workspaceName %q should start with %q",
+					config.workspaceName, tt.tmplName,
+				)
 			}
 		})
 	}

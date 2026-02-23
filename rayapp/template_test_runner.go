@@ -30,8 +30,24 @@ type WorkspaceTestConfig struct {
 }
 
 // NewWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
-func NewWorkspaceTestConfig(tmplName string) *WorkspaceTestConfig {
-	return &WorkspaceTestConfig{tmplName: tmplName, success: false, errs: nil}
+func NewWorkspaceTestConfig(
+	t *Template,
+	anyscaleCLI *AnyscaleCLI,
+	anyscaleAPI *anyscaleAPI,
+	buildDir string,
+) *WorkspaceTestConfig {
+	newConfig := &WorkspaceTestConfig{
+		tmplName:      t.Name,
+		anyscaleCLI:   anyscaleCLI,
+		anyscaleAPI:   anyscaleAPI,
+		success:       false,
+		errs:          nil,
+		template:      t,
+		buildDir:      buildDir,
+		workspaceName: fmt.Sprintf("%s-%s", t.Name, time.Now().Format("20060102150405")),
+	}
+	newConfig.template.Dir = filepath.Join(buildDir, t.Dir)
+	return newConfig
 }
 
 func RunAllTemplateTests(buildFile string) error {
@@ -76,29 +92,17 @@ func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bo
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
 
-	var testConfigs []*WorkspaceTestConfig
-	for _, t := range filteredTmpls {
-		c := NewWorkspaceTestConfig(t.Name)
-		c.anyscaleCLI = anyscaleCLI
-		c.anyscaleAPI = anyscaleAPI
-		c.template = t
-		c.buildDir = buildDir
-		c.template.Dir = filepath.Join(buildDir, t.Dir)
-		testConfigs = append(testConfigs, c)
-	}
-
-	for _, c := range testConfigs {
-		log.Println("Testing template:", c.template.Name)
-		c.Run()
-	}
-
 	var failed []string
-	for _, c := range testConfigs {
-		log.Println("Template:", c.template.Name)
+	for _, t := range filteredTmpls {
+		c := NewWorkspaceTestConfig(t, anyscaleCLI, anyscaleAPI, buildDir)
+
+		log.Println("Testing template:", c.tmplName)
+		c.Run()
+
 		log.Println("Success:", c.success)
 		if !c.success {
 			log.Println("Error:", c.errs)
-			failed = append(failed, fmt.Sprintf("%s: %v", c.template.Name, c.errs))
+			failed = append(failed, fmt.Sprintf("%s: %v", c.tmplName, c.errs))
 		}
 	}
 
@@ -131,9 +135,6 @@ func (c *WorkspaceTestConfig) Run() {
 			return
 		}
 	}
-
-	workspaceName := c.tmplName + "-" + time.Now().Format("20060102150405")
-	c.workspaceName = workspaceName
 
 	if err := c.anyscaleCLI.createEmptyWorkspace(c); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("create empty workspace failed: %w", err))
