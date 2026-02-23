@@ -679,7 +679,7 @@ func TestProbe_Success(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -705,7 +705,7 @@ func TestProbe_APIInitFails(t *testing.T) {
 	os.Unsetenv("ANYSCALE_CLI_TOKEN")
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -718,7 +718,7 @@ func TestProbe_GetDefaultCloudFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
 	setupMockAnyscale(t, probeScript(false, true, true, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -731,7 +731,7 @@ func TestProbe_GetDefaultProjectFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
 	setupMockAnyscale(t, probeScript(true, false, true, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -744,7 +744,7 @@ func TestProbe_LaunchFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusBadRequest, `{"error":"bad request"}`)
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -757,7 +757,7 @@ func TestProbe_WaitForRunningFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
 	setupMockAnyscale(t, probeScript(true, true, false, true))
 
-	err := Probe("my-tmpl", "testdata/BUILD.yaml")
+	err := Probe("my-tmpl")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -41,7 +41,7 @@ func Test(tmplName, buildFile string) error {
 	})
 }
 
-func Probe(tmplName string, buildFile string) error {
+func Probe(tmplName string) error {
 	anyscaleCLI := NewAnyscaleCLI()
 	anyscaleAPI, err := newAnyscaleAPI()
 	if err != nil {
@@ -62,12 +62,16 @@ func Probe(tmplName string, buildFile string) error {
 	if err != nil {
 		return fmt.Errorf("launch template in workspace failed: %w", err)
 	}
-	workspaceName := result["name"].(string)
-	workspaceID := result["id"].(string)
+
+	workspaceName, okName := result["name"].(string)
+	workspaceID, okID := result["id"].(string)
+	if !okName || !okID {
+		return fmt.Errorf("unexpected response format: missing name or id")
+	}
 
 	defer func() {
 		if err := cleanupWorkspace(anyscaleCLI, anyscaleAPI, workspaceName, workspaceID); err != nil {
-			log.Printf("cleanup failed: %v", err)
+			log.Println("cleanup failed: %v", err)
 		}
 	}()
 

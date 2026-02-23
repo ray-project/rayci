@@ -32,7 +32,10 @@ func newAnyscaleAPI() (*AnyscaleAPI, error) {
 
 // DeleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
 func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
-	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/%s", a.host, workspaceID)
+	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces", workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to parse URL: %w", err)
+	}
 
 	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
@@ -66,7 +69,10 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 }
 
 func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string, templateName string) (map[string]any, error) {
-	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/from_template", a.host)
+	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces/from_template")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
 	payload := map[string]any{
 		"template_id": templateName,
 		"name":        slugify(templateName) + "-" + time.Now().Format("20060102150405"),
@@ -87,8 +93,6 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 
 	resp, err := a.client.Do(req)
 
-	fmt.Println("resp: ", resp)
-	fmt.Println("err: ", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -100,7 +104,11 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf(
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+		return fmt.Errorf(
 			"launch template in workspace failed with status %d: %s",
 			resp.StatusCode,
 			string(body),
