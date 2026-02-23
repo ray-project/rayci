@@ -676,7 +676,7 @@ func probeScript(cloudOK, projectOK, waitOK, terminateOK bool) string {
 }
 
 func TestProbe_Success(t *testing.T) {
-	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
 	err := Probe("my-tmpl")
@@ -715,7 +715,7 @@ func TestProbe_APIInitFails(t *testing.T) {
 }
 
 func TestProbe_GetDefaultCloudFails(t *testing.T) {
-	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"ws"}}`)
 	setupMockAnyscale(t, probeScript(false, true, true, true))
 
 	err := Probe("my-tmpl")
@@ -728,7 +728,7 @@ func TestProbe_GetDefaultCloudFails(t *testing.T) {
 }
 
 func TestProbe_GetDefaultProjectFails(t *testing.T) {
-	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"ws"}`)
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"ws"}}`)
 	setupMockAnyscale(t, probeScript(true, false, true, true))
 
 	err := Probe("my-tmpl")
@@ -754,7 +754,7 @@ func TestProbe_LaunchFails(t *testing.T) {
 }
 
 func TestProbe_WaitForRunningFails(t *testing.T) {
-	setupMockProbeAPI(t, http.StatusOK, `{"id":"expwrk_123","name":"my-tmpl-ws"}`)
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
 	setupMockAnyscale(t, probeScript(true, true, false, true))
 
 	err := Probe("my-tmpl")

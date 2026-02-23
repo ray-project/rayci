@@ -71,7 +71,7 @@ func Probe(tmplName string) error {
 
 	defer func() {
 		if err := cleanupWorkspace(anyscaleCLI, anyscaleAPI, workspaceName, workspaceID); err != nil {
-			log.Println("cleanup failed: %v", err)
+			log.Printf("cleanup failed: %v", err)
 		}
 	}()
 

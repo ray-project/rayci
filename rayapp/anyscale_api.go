@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -37,7 +38,7 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 		return fmt.Errorf("failed to parse URL: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -83,7 +84,7 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -98,21 +99,21 @@ func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		if err != nil {
-			return fmt.Errorf("failed to read response body: %w", err)
+			return nil, fmt.Errorf("failed to read response body: %w", err)
 		}
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"launch template in workspace failed with status %d: %s",
 			resp.StatusCode,
 			string(body),
 		)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var response map[string]any
