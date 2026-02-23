@@ -8,9 +8,17 @@ import (
 
 func TestGetDefaultCloud(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		fake := &fakeAnyscale{
+			defaultCloud: &fakeCloud{
+				Name: "my-default-cloud", ID: "cld_abc123",
+			},
+		}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
-			return "name: my-default-cloud\nid: cld_abc123\n", nil
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
+			return fake.run(args)
 		})
 
 		cloudInfo, err := cli.GetDefaultCloud()
@@ -31,6 +39,9 @@ func TestGetDefaultCloud(t *testing.T) {
 	t.Run("CLI failure", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
 			return "", fmt.Errorf("exit status 1")
 		})
 
@@ -46,6 +57,9 @@ func TestGetDefaultCloud(t *testing.T) {
 	t.Run("invalid YAML output", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
 			return "invalid: yaml: output: [", nil
 		})
 
@@ -61,6 +75,9 @@ func TestGetDefaultCloud(t *testing.T) {
 	t.Run("empty output", func(t *testing.T) {
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
 			return "", nil
 		})
 

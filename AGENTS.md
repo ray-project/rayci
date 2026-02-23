@@ -122,6 +122,12 @@ Buildkite steps are represented as `map[string]any` to handle dynamic YAML struc
 
 ## Code Style
 
+### Line Length
+
+- Maximum line length: **100 characters**
+- Enforced by `golines` in pre-commit hooks
+- Long lines will be automatically wrapped on commit
+
 ### Comments
 
 - Avoid obvious comments that describe what the code literally does
