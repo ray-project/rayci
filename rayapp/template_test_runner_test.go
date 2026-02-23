@@ -97,6 +97,7 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 }
 
 func TestWorkspaceTestConfigRun_CreateWorkspaceFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -120,6 +121,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_GetWorkspaceIDFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -147,6 +149,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_StartWorkspaceFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -178,6 +181,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_WaitForStateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -213,6 +217,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_CopyTemplateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -252,6 +257,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_RunCommandFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -295,6 +301,7 @@ echo "ok"
 }
 
 func TestWorkspaceTestConfigRun_TerminateFails(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	script := `#!/bin/sh
 if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
 if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
@@ -424,6 +431,7 @@ exit 1
 }
 
 func TestTest_Failure(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
 	err := RunTemplateTest("reefy-ray", "testdata/BUILD.yaml")
@@ -533,6 +541,7 @@ func TestTestAll_NoTemplatesToTest(t *testing.T) {
 }
 
 func TestTestAll_PartialFailure(t *testing.T) {
+	setupMockDeleteWorkspaceAPI(t)
 	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
 
 	err := RunAllTemplateTests("testdata/BUILD.yaml")
@@ -568,15 +577,7 @@ func TestTestCmd_Constant(t *testing.T) {
 }
 
 func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
-	// Set a test token
-	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
-	t.Cleanup(func() {
-		if origToken == "" {
-			os.Unsetenv("ANYSCALE_CLI_TOKEN")
-		} else {
-			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
-		}
-	})
+	setupMockDeleteWorkspaceAPI(t)
 	os.Setenv("ANYSCALE_CLI_TOKEN", "test-token-123")
 
 	// Mock that fails immediately so we can test without full execution

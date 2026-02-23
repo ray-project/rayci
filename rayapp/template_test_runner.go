@@ -54,13 +54,6 @@ func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bo
 	// Get the directory containing the build file to resolve relative paths
 	buildDir := filepath.Dir(buildFile)
 
-	var testConfigs []*WorkspaceTestConfig
-	anyscaleCLI := NewAnyscaleCLI()
-	anyscaleAPI, err := newAnyscaleAPI(os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"))
-	if err != nil {
-		return fmt.Errorf("new anyscale api failed: %w", err)
-	}
-
 	filteredTmpls := slices.Collect(func(yield func(*Template) bool) {
 		for _, t := range tmpls {
 			if filter != nil && !filter(t) {
@@ -75,6 +68,15 @@ func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bo
 		return fmt.Errorf("no templates to test")
 	}
 
+	anyscaleCLI := NewAnyscaleCLI()
+	anyscaleAPI, err := newAnyscaleAPI(
+		os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"),
+	)
+	if err != nil {
+		return fmt.Errorf("new anyscale api failed: %w", err)
+	}
+
+	var testConfigs []*WorkspaceTestConfig
 	for _, t := range filteredTmpls {
 		c := NewWorkspaceTestConfig(t.Name)
 		c.anyscaleCLI = anyscaleCLI
