@@ -58,7 +58,11 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf(
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response body: %w", err)
+		}
+		return nil, fmt.Errorf(
 			"delete workspace failed with status %d: %s",
 			resp.StatusCode,
 			string(body),
