@@ -1,4 +1,4 @@
-package goqualgate
+package raycilint
 
 import (
 	"bufio"
@@ -71,8 +71,8 @@ func getTestPackages() ([]string, error) {
 	var pkgs []string
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		line = strings.TrimSpace(line)
-		// Exclude goqualgate to avoid recursive test invocation
-		if line != "" && !strings.Contains(line, "/goqualgate") {
+		// Exclude raycilint to avoid recursive test invocation
+		if line != "" && !strings.Contains(line, "/raycilint") {
 			pkgs = append(pkgs, line)
 		}
 	}
