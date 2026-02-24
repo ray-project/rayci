@@ -51,23 +51,38 @@ func NewWorkspaceTestConfig(
 }
 
 func RunAllTemplateTests(buildFile string) error {
-	return runTemplateTestsWithFilter(buildFile, nil)
+	cli := NewAnyscaleCLI()
+	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
+	api, err := newAnyscaleAPI(host, token)
+	if err != nil {
+		return fmt.Errorf("new anyscale api failed: %w", err)
+	}
+	return runTemplateTestsWithFilter(buildFile, nil, cli, api)
 }
 
 func RunTemplateTest(tmplName, buildFile string) error {
+	cli := NewAnyscaleCLI()
+	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
+	api, err := newAnyscaleAPI(host, token)
+	if err != nil {
+		return fmt.Errorf("new anyscale api failed: %w", err)
+	}
 	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
-	})
+	}, cli, api)
 }
 
-func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bool) error {
-	// read build file and get template details
+func runTemplateTestsWithFilter(
+	buildFile string,
+	filter func(tmpl *Template) bool,
+	cli *AnyscaleCLI,
+	api *anyscaleAPI,
+) error {
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
 		return fmt.Errorf("read templates failed: %w", err)
 	}
 
-	// Get the directory containing the build file to resolve relative paths
 	buildDir := filepath.Dir(buildFile)
 
 	filteredTmpls := slices.Collect(func(yield func(*Template) bool) {
@@ -84,17 +99,9 @@ func runTemplateTestsWithFilter(buildFile string, filter func(tmpl *Template) bo
 		return fmt.Errorf("no templates to test")
 	}
 
-	anyscaleCLI := NewAnyscaleCLI()
-	anyscaleAPI, err := newAnyscaleAPI(
-		os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"),
-	)
-	if err != nil {
-		return fmt.Errorf("new anyscale api failed: %w", err)
-	}
-
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := NewWorkspaceTestConfig(t, anyscaleCLI, anyscaleAPI, buildDir)
+		c := NewWorkspaceTestConfig(t, cli, api, buildDir)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()

@@ -34,6 +34,10 @@ type fakeAnyscale struct {
 	computeConfigs []*fakeComputeConfig
 	workspaces     []*fakeWorkspace
 
+	// commandErrors, if set, maps "group subcommand" keys (e.g.
+	// "workspace_v2 create") to errors returned before normal dispatch.
+	commandErrors map[string]error
+
 	// onCreateComputeConfig, if set, is called for "compute-config create"
 	// with the full args slice. If nil, create succeeds with a generic message.
 	onCreateComputeConfig func(args []string) (string, error)
@@ -47,7 +51,13 @@ func (f *fakeAnyscale) run(args []string) (string, error) {
 	if len(args) < 2 {
 		return "", fmt.Errorf("fake: insufficient args: %v", args)
 	}
-	switch args[0] + " " + args[1] {
+	cmd := fmt.Sprintf("%s %s", args[0], args[1])
+	if f.commandErrors != nil {
+		if err, ok := f.commandErrors[cmd]; ok {
+			return "", err
+		}
+	}
+	switch cmd {
 	case "cloud get-default":
 		return f.cloudGetDefault()
 	case "compute-config list":
@@ -113,9 +123,11 @@ func (f *fakeAnyscale) workspaceCreate(
 	opts []string,
 ) (string, error) {
 	name := parseName(opts)
-	return fmt.Sprintf(
-		"Workspace created successfully id: %s", name,
-	), nil
+	id := fmt.Sprintf("expwrk_%s", name)
+	f.workspaces = append(f.workspaces, &fakeWorkspace{
+		ID: id, Name: name, State: "TERMINATED",
+	})
+	return fmt.Sprintf("Workspace created successfully id: %s", id), nil
 }
 
 func (f *fakeAnyscale) workspaceGet(
@@ -195,15 +207,10 @@ func (f *fakeAnyscale) workspaceWait(
 	state := parseFlag(opts, "--state")
 	return strings.Join([]string{
 		fmt.Sprintf(
-			"Waiting for workspace '%s' to reach"+
-				" target state %s,"+
-				" currently in state: %s",
+			"Waiting for workspace '%s' to reach target state %s, currently in state: %s",
 			name, state, state,
 		),
-		fmt.Sprintf(
-			"Workspace '%s' reached target state, exiting",
-			name,
-		),
+		fmt.Sprintf("Workspace '%s' reached target state, exiting", name),
 	}, "\n"), nil
 }
 
