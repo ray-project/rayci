@@ -166,7 +166,7 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
-				func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+				func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 				cli, api,
 			)
 
@@ -205,7 +205,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
@@ -226,7 +226,7 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
@@ -235,8 +235,22 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 	if !strings.Contains(err.Error(), "test failed") {
 		t.Errorf("error %q should contain 'test failed'", err.Error())
 	}
-	if !strings.Contains(err.Error(), "reefy-ray") {
-		t.Errorf("error %q should contain template name 'reefy-ray'", err.Error())
+	if !strings.Contains(err.Error(), "fishy-ray") {
+		t.Errorf("error %q should contain template name 'fishy-ray'", err.Error())
+	}
+}
+
+func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		nil, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error when matched template has no test config")
+	}
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 
