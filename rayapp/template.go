@@ -3,6 +3,7 @@ package rayapp
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -188,6 +189,18 @@ func validateTestConfig(test *TestConfig) error {
 	if test.TimeoutInSec < 0 {
 		return fmt.Errorf("test.timeout_in_sec must be non-negative")
 	}
+	if test.TestsPath != "" {
+		if filepath.IsAbs(test.TestsPath) {
+			return fmt.Errorf("test.tests_path must be a relative path")
+		}
+		if strings.Contains(filepath.Clean(test.TestsPath), "..") {
+			return fmt.Errorf("test.tests_path must not contain '..'")
+		}
+	}
+	// Default timeout to 1 hour if not specified.
+	if test.TimeoutInSec == 0 {
+		test.TimeoutInSec = 3600
+	}
 	return nil
 }
 
@@ -240,9 +253,6 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		}
 		if err := validateTestConfig(tmpl.Test); err != nil {
 			return nil, fmt.Errorf("validate test config for template %q: %w", tmpl.Name, err)
-		}
-		if tmpl.Test != nil && tmpl.Test.TimeoutInSec == 0 {
-			tmpl.Test.TimeoutInSec = 3600
 		}
 	}
 	return tmpls, nil

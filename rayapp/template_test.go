@@ -507,10 +507,36 @@ func TestValidateTestConfig(t *testing.T) {
 			errContains: "timeout_in_sec must be non-negative",
 		},
 		{
-			name: "zero timeout is valid",
+			name: "zero timeout defaults to 3600",
 			test: &TestConfig{
 				TimeoutInSec: 0,
 				Command:      "pytest",
+			},
+			wantErr: false,
+		},
+		{
+			name: "absolute tests_path rejected",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "/etc/passwd",
+			},
+			wantErr:     true,
+			errContains: "tests_path must be a relative path",
+		},
+		{
+			name: "parent traversal tests_path rejected",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "../secret",
+			},
+			wantErr:     true,
+			errContains: "tests_path must not contain '..'",
+		},
+		{
+			name: "valid relative tests_path",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "tests/",
 			},
 			wantErr: false,
 		},
@@ -529,6 +555,14 @@ func TestValidateTestConfig(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.name == "zero timeout defaults to 3600" {
+				if tt.test.TimeoutInSec != 3600 {
+					t.Errorf(
+						"TimeoutInSec = %d, want 3600",
+						tt.test.TimeoutInSec,
+					)
+				}
 			}
 		})
 	}

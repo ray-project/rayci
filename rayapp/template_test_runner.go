@@ -26,8 +26,8 @@ type WorkspaceTestConfig struct {
 	errs          []error
 }
 
-// NewWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
-func NewWorkspaceTestConfig(
+// newWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
+func newWorkspaceTestConfig(
 	t *Template,
 	anyscaleCLI *AnyscaleCLI,
 	anyscaleAPI *anyscaleAPI,
@@ -83,23 +83,28 @@ func runTemplateTestsWithFilter(
 	buildDir := filepath.Dir(buildFile)
 
 	var filteredTmpls []*Template
+	var skippedNoTest int
 	for _, t := range tmpls {
 		if filter != nil && !filter(t) {
 			continue
 		}
 		if t.Test == nil {
 			log.Printf("Template %s has no test configuration, skipping", t.Name)
+			skippedNoTest++
 			continue
 		}
 		filteredTmpls = append(filteredTmpls, t)
 	}
 	if len(filteredTmpls) == 0 {
+		if skippedNoTest > 0 {
+			return fmt.Errorf("no templates with test configuration to run")
+		}
 		return fmt.Errorf("no templates to test")
 	}
 
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := NewWorkspaceTestConfig(t, cli, api, buildDir)
+		c := newWorkspaceTestConfig(t, cli, api, buildDir)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()
@@ -247,10 +252,10 @@ func (c *WorkspaceTestConfig) Run() {
 		}
 	}
 
-	// Run test command from test configuration
-	testCommand := fmt.Sprintf(
-		"timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, c.template.Test.Command,
-	)
+	// Run test command from test configuration.
+	// Escape single quotes to prevent command injection via bash -c '...'.
+	escapedCmd := strings.ReplaceAll(c.template.Test.Command, "'", "'\\''")
+	testCommand := fmt.Sprintf("timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, escapedCmd)
 	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCommand); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("run test command failed: %w", err))
 		return

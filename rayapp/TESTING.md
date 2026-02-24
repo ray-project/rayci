@@ -99,7 +99,9 @@ When running tests, the following steps occur:
 
 ## Migration Guide
 
-If you have existing templates without the `test` configuration, you need to add it. For templates that were previously using the default pytest command, add:
+If you have existing templates without the `test` configuration, they will be skipped during tests.
+To add tests, add tests as shown in the command below, or through a test.sh script that invokes the
+required test scripts.
 
 ```yaml
 test:
