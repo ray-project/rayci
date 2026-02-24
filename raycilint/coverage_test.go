@@ -1,4 +1,4 @@
-package goqualgate
+package raycilint
 
 import (
 	"strings"

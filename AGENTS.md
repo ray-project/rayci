@@ -11,7 +11,7 @@ CI/CD tooling for the Ray project on Buildkite:
 - **rayapp**: Builds Ray application templates (zip artifacts)
 - **raycirun**: Library for triggering Buildkite builds programmatically
 - **reefd**: EC2/database service with reaper functionality
-- **goqualgate**: Go quality gates for CI (test coverage checks)
+- **raycilint**: Quality gates for CI (test coverage, file length checks)
 
 If you are unsure where logic lives:
 - pipeline generation + rules + selection: `raycicmd/`
@@ -19,7 +19,7 @@ If you are unsure where logic lives:
 - container build + registry/cache: `wanda/`
 - template zips: `rayapp/`
 - build triggering: `raycirun/`
-- Go quality gates: `goqualgate/`
+- Quality gates: `raycilint/`
 
 ---
 
@@ -44,8 +44,8 @@ go build ./wanda/wanda
 # Build rayapp
 go build ./rayapp/rayapp
 
-# Build goqualgate
-go build ./goqualgate/goqualgate
+# Build rayci-lint
+go build -o /tmp/rayci-lint ./raycilint/raycilint
 
 # Run all tests
 go test ./...
@@ -78,16 +78,16 @@ bash release.sh
 # wanda: build in RayCI mode (uses RAYCI_* env vars)
 ./wanda -rayci
 
-# goqualgate: run all quality gates with defaults
-./goqualgate all
+# rayci-lint: run all quality gates with defaults
+./rayci-lint all
 
-# goqualgate: run coverage checks (default minimum 80%)
-./goqualgate coverage
-./goqualgate coverage -min-coverage-pct=90
+# rayci-lint: run coverage checks (default minimum 80%)
+./rayci-lint go-coverage
+./rayci-lint go-coverage -min-coverage-pct=90
 
-# goqualgate: check file lengths (default max 500 lines)
-./goqualgate filelength
-./goqualgate filelength -max-lines=400
+# rayci-lint: check file lengths (default max 500 lines)
+./rayci-lint go-filelength
+./rayci-lint go-filelength -max-lines=400
 ```
 
 ## Architecture

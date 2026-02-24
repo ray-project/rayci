@@ -4,8 +4,8 @@ steps:
     tags:
       - always
     command:
-      - go build -o /tmp/goqualgate ./goqualgate/goqualgate
-      - WANDA_TEST_CR_PORT=5555 /tmp/goqualgate coverage
+      - go build -o /tmp/rayci-lint ./raycilint/raycilint
+      - WANDA_TEST_CR_PORT=5555 /tmp/rayci-lint go-coverage
     queue: small
     docker_publish_tcp_ports: "5555"
     depends_on: forge
@@ -14,7 +14,7 @@ steps:
     tags:
       - always
     command:
-      - go build -o /tmp/goqualgate ./goqualgate/goqualgate
-      - /tmp/goqualgate filelength
+      - go build -o /tmp/rayci-lint ./raycilint/raycilint
+      - /tmp/rayci-lint go-filelength
     queue: small
     depends_on: forge

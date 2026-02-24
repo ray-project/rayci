@@ -43,9 +43,9 @@ repos:
         pass_filenames: true
         stages: [pre-push]
 
-      - id: goqualgate
-        name: goqualgate all
-        entry: go run ./goqualgate/goqualgate all
+      - id: rayci-lint
+        name: rayci-lint all
+        entry: go run ./raycilint/raycilint all
         language: system
         types: [go]
         pass_filenames: false

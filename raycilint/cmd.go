@@ -1,4 +1,4 @@
-package goqualgate
+package raycilint
 
 import (
 	"flag"
@@ -9,24 +9,24 @@ import (
 const runAll = "all"
 const defaultMinCoveragePct = 80.0
 const defaultMaxLines = 500
-const usage = `goqualgate - Go quality gates for CI
+const usage = `rayci-lint - Quality gates for CI
 
 Usage:
-  goqualgate <command> [flags]
+  rayci-lint <command> [flags]
 
 Commands:
-	all         Run all quality gates with default settings
-	coverage    Run test coverage and check minimum thresholds
-	filelength  Check that Go files don't exceed line limit
+	all            Run all quality gates with default settings
+	go-coverage    Run test coverage and check minimum thresholds
+	go-filelength  Check that Go files don't exceed line limit
 `
 
-var coverageUsage = fmt.Sprintf(`goqualgate coverage - Run test coverage checks
+var coverageUsage = fmt.Sprintf(`rayci-lint go-coverage - Run test coverage checks
 
 Runs 'go test -cover' on all packages and reports coverage.
 Fails if any package is below -min-coverage-pct.
 
 Usage:
-  goqualgate coverage [flags]
+  rayci-lint go-coverage [flags]
 
 Flags:
 	-min-coverage-pct float
@@ -35,7 +35,7 @@ Flags:
 Improving Coverage (for AI agents):
 
   1. Run coverage check to identify failing packages:
-       ./goqualgate coverage -min-coverage-pct <target-coverage-pct>
+       ./rayci-lint go-coverage -min-coverage-pct <target-coverage-pct>
 
   2. For each failing package, get detailed function-level coverage:
        go test -coverprofile=cover.out ./<package>/...
@@ -55,14 +55,14 @@ Improving Coverage (for AI agents):
      mocking infrastructure exists. Focus on testable code paths.
 `
 
-var filelengthUsage = fmt.Sprintf(`goqualgate filelength - Check Go file lengths against limits
+var filelengthUsage = fmt.Sprintf(`rayci-lint go-filelength - Check Go file lengths against limits
 
 Finds all .go files in the current directory (recursive) and checks their
 line counts against -max-lines. Test files, generated files,
 vendor/, and symlinks are excluded.
 
 Usage:
-  goqualgate filelength [flags]
+  rayci-lint go-filelength [flags]
 
 Flags:
 	-max-lines int
@@ -70,7 +70,7 @@ Flags:
 `, defaultMaxLines)
 
 const installHint = `
-To install and run goqualgate locally, download 'goqualgate' from the latest release:
+To install and run rayci-lint locally, download 'rayci-lint' from the latest release:
   https://github.com/ray-project/rayci/releases/latest
 `
 
@@ -80,12 +80,11 @@ type subcommand struct {
 }
 
 var subcommands = []*subcommand{
-	{"coverage", cmdCoverage},
-	{"filelength", cmdFilelength},
+	{"go-coverage", cmdCoverage},
+	{"go-filelength", cmdFilelength},
 }
 
-// Main is the entry point for the goqualgate CLI, dispatching to the appropriate subcommand
-// based on the first argument.
+// Main is the entry point for the rayci-lint CLI, dispatching to the appropriate subcommand.
 func Main(args []string) (int, error) {
 	if len(args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
@@ -105,7 +104,6 @@ func Main(args []string) (int, error) {
 	for i, sub := range subcommands {
 		if sub.name == cmd || cmd == runAll {
 			if cmd == runAll && i > 0 {
-				// Print a separator between commands
 				fmt.Println()
 			}
 			if err := sub.run(subArgs); err != nil {
@@ -124,7 +122,7 @@ func Main(args []string) (int, error) {
 }
 
 func parseCoverageConfig(args []string) (*CoverageConfig, error) {
-	set := flag.NewFlagSet("goqualgate coverage", flag.ExitOnError)
+	set := flag.NewFlagSet("rayci-lint go-coverage", flag.ExitOnError)
 	set.Usage = func() {
 		fmt.Fprint(os.Stderr, coverageUsage)
 		set.PrintDefaults()
@@ -152,7 +150,7 @@ func cmdCoverage(args []string) error {
 }
 
 func parseFileLengthConfig(args []string) (*FileLengthConfig, error) {
-	set := flag.NewFlagSet("goqualgate filelength", flag.ExitOnError)
+	set := flag.NewFlagSet("rayci-lint go-filelength", flag.ExitOnError)
 	set.Usage = func() {
 		fmt.Fprint(os.Stderr, filelengthUsage)
 		set.PrintDefaults()
