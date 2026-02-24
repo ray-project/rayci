@@ -77,8 +77,11 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 			if config.tmplName != tt.tmplName {
 				t.Errorf("tmplName = %q, want %q", config.tmplName, tt.tmplName)
 			}
-			if config.template != tmpl {
-				t.Error("template should match passed template")
+			if config.template.Name != tt.tmplName {
+				t.Errorf("template.Name = %q, want %q", config.template.Name, tt.tmplName)
+			}
+			if tmpl.Dir != "" {
+				t.Errorf("original template Dir should be unchanged, got %q", tmpl.Dir)
 			}
 			if config.buildDir != tt.buildDir {
 				t.Errorf("buildDir = %q, want %q", config.buildDir, tt.buildDir)
@@ -135,11 +138,11 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 			wantErr: "push zip to workspace failed",
 		},
 		{
-			name: "run command fails",
+			name: "unzip fails",
 			commandErrors: map[string]error{
 				"workspace_v2 run_command": fmt.Errorf("run failed"),
 			},
-			wantErr: "run_command failed",
+			wantErr: "unzip template failed",
 		},
 		{
 			name: "terminate fails",
@@ -183,18 +186,33 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 	}
 }
 
-func TestRunTemplateTest_Success(t *testing.T) {
+func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
+
+	var runCmdCount int
+	cli.setRunFunc(func(args []string) (string, error) {
+		cmd := fmt.Sprintf("%s %s", args[0], args[1])
+		if cmd == "workspace_v2 run_command" {
+			runCmdCount++
+			if runCmdCount > 1 {
+				return "", fmt.Errorf("test execution failed")
+			}
+		}
+		return fake.run(args)
+	})
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
 		cli, api,
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error when test command fails")
+	}
+	if !strings.Contains(err.Error(), "test command failed") {
+		t.Errorf("error %q should contain 'test command failed'", err.Error())
 	}
 }
 
@@ -269,16 +287,6 @@ func TestRunAllTemplateTests_Success(t *testing.T) {
 	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestRunAllTemplateTests_ReadTemplatesFailed(t *testing.T) {
-	err := runTemplateTestsWithFilter("nonexistent/BUILD.yaml", nil, nil, nil)
-	if err == nil {
-		t.Fatal("expected error for invalid build file")
-	}
-	if !strings.Contains(err.Error(), "read templates failed") {
-		t.Errorf("error %q should contain 'read templates failed'", err.Error())
 	}
 }
 

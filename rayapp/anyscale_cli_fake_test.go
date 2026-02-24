@@ -96,8 +96,8 @@ func (f *fakeAnyscale) cloudGetDefault() (string, error) {
 		return "", fmt.Errorf("no default cloud configured")
 	}
 	return strings.Join([]string{
-		"name: " + f.defaultCloud.Name,
-		"id: " + f.defaultCloud.ID,
+		fmt.Sprintf("name: %s", f.defaultCloud.Name),
+		fmt.Sprintf("id: %s", f.defaultCloud.ID),
 		"",
 	}, "\n"), nil
 }
@@ -119,9 +119,7 @@ func parseName(opts []string) string {
 	return parseFlag(opts, "--name", "-n")
 }
 
-func (f *fakeAnyscale) workspaceCreate(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceCreate(opts []string) (string, error) {
 	name := parseName(opts)
 	id := fmt.Sprintf("expwrk_%s", name)
 	f.workspaces = append(f.workspaces, &fakeWorkspace{
@@ -130,9 +128,7 @@ func (f *fakeAnyscale) workspaceCreate(
 	return fmt.Sprintf("Workspace created successfully id: %s", id), nil
 }
 
-func (f *fakeAnyscale) workspaceGet(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceGet(opts []string) (string, error) {
 	name := parseName(opts)
 	for _, ws := range f.workspaces {
 		if ws.Name == name {
@@ -151,46 +147,28 @@ func (f *fakeAnyscale) workspaceGet(
 	return "", fmt.Errorf("fake: workspace not found: %s", name)
 }
 
-func (f *fakeAnyscale) workspaceTerminate(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceTerminate(opts []string) (string, error) {
 	name := parseName(opts)
-	return fmt.Sprintf(
-		"Terminating workspace '%s'", name,
-	), nil
+	return fmt.Sprintf("Terminating workspace '%s'", name), nil
 }
 
-func (f *fakeAnyscale) workspacePush(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspacePush(opts []string) (string, error) {
 	name := parseName(opts)
 	localDir := parseFlag(opts, "--local-dir")
-	return fmt.Sprintf(
-		"Sending %s to workspace '%s'", localDir, name,
-	), nil
+	return fmt.Sprintf("Sending %s to workspace '%s'", localDir, name), nil
 }
 
-func (f *fakeAnyscale) workspaceRunCommand(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceRunCommand(opts []string) (string, error) {
 	name := parseName(opts)
-	return fmt.Sprintf(
-		"Running command in workspace '%s'", name,
-	), nil
+	return fmt.Sprintf("Running command in workspace '%s'", name), nil
 }
 
-func (f *fakeAnyscale) workspaceStart(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceStart(opts []string) (string, error) {
 	name := parseName(opts)
-	return fmt.Sprintf(
-		"Starting workspace '%s'", name,
-	), nil
+	return fmt.Sprintf("Starting workspace '%s'", name), nil
 }
 
-func (f *fakeAnyscale) workspaceStatus(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceStatus(opts []string) (string, error) {
 	name := parseName(opts)
 	for _, ws := range f.workspaces {
 		if ws.Name == name {
@@ -200,9 +178,7 @@ func (f *fakeAnyscale) workspaceStatus(
 	return "", fmt.Errorf("fake: workspace not found: %s", name)
 }
 
-func (f *fakeAnyscale) workspaceWait(
-	opts []string,
-) (string, error) {
+func (f *fakeAnyscale) workspaceWait(opts []string) (string, error) {
 	name := parseName(opts)
 	state := parseFlag(opts, "--state")
 	return strings.Join([]string{
@@ -215,13 +191,7 @@ func (f *fakeAnyscale) workspaceWait(
 }
 
 func (f *fakeAnyscale) computeConfigList(opts []string) (string, error) {
-	var nameFilter string
-	for i := 0; i < len(opts)-1; i++ {
-		if opts[i] == "--name" || opts[i] == "-n" {
-			nameFilter = opts[i+1]
-			break
-		}
-	}
+	nameFilter := parseName(opts)
 
 	var results []map[string]any
 	for _, cc := range f.computeConfigs {

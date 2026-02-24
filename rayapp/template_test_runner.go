@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 )
@@ -36,18 +35,18 @@ func NewWorkspaceTestConfig(
 	anyscaleAPI *anyscaleAPI,
 	buildDir string,
 ) *WorkspaceTestConfig {
-	newConfig := &WorkspaceTestConfig{
+	tmplCopy := *t
+	tmplCopy.Dir = filepath.Join(buildDir, t.Dir)
+	return &WorkspaceTestConfig{
 		tmplName:      t.Name,
 		anyscaleCLI:   anyscaleCLI,
 		anyscaleAPI:   anyscaleAPI,
 		success:       false,
 		errs:          nil,
-		template:      t,
+		template:      &tmplCopy,
 		buildDir:      buildDir,
 		workspaceName: fmt.Sprintf("%s-%s", t.Name, time.Now().Format("20060102150405")),
 	}
-	newConfig.template.Dir = filepath.Join(buildDir, t.Dir)
-	return newConfig
 }
 
 func RunAllTemplateTests(buildFile string) error {
@@ -85,16 +84,12 @@ func runTemplateTestsWithFilter(
 
 	buildDir := filepath.Dir(buildFile)
 
-	filteredTmpls := slices.Collect(func(yield func(*Template) bool) {
-		for _, t := range tmpls {
-			if filter != nil && !filter(t) {
-				continue
-			}
-			if !yield(t) {
-				return
-			}
+	var filteredTmpls []*Template
+	for _, t := range tmpls {
+		if filter == nil || filter(t) {
+			filteredTmpls = append(filteredTmpls, t)
 		}
-	})
+	}
 	if len(filteredTmpls) == 0 {
 		return fmt.Errorf("no templates to test")
 	}
@@ -127,10 +122,15 @@ func (c *WorkspaceTestConfig) Run() {
 	c.success = false
 
 	defer func() {
-		log.Println("Test completed successfully")
 		c.success = len(c.errs) == 0
+		if c.success {
+			log.Println("Test completed successfully")
+		} else {
+			log.Println("Test completed with errors")
+		}
 	}()
 
+	// Currently only AWS compute configs are supported for workspace testing.
 	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
 		c.computeConfig = generateComputeConfigName(awsConfigPath)
 		resolvedConfigPath := filepath.Join(c.buildDir, awsConfigPath)
@@ -200,7 +200,7 @@ func (c *WorkspaceTestConfig) Run() {
 	}
 	defer os.RemoveAll(templateZipDir)
 
-	zipFileName := filepath.Join(templateZipDir, c.tmplName+".zip")
+	zipFileName := filepath.Join(templateZipDir, fmt.Sprintf("%s.zip", c.tmplName))
 	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("zip template directory failed: %w", err))
 		return
@@ -217,12 +217,12 @@ func (c *WorkspaceTestConfig) Run() {
 		c.workspaceName,
 		fmt.Sprintf("unzip -o %s.zip", c.tmplName),
 	); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("run_command failed: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("unzip template failed: %w", err))
 		return
 	}
 
 	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCmd); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("run_command failed: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("test command failed: %w", err))
 		return
 	}
 }
