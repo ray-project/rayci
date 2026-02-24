@@ -1,18 +1,25 @@
 package rayapp
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestGetDefaultCloud(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		script := strings.Join([]string{
-			"#!/bin/sh",
-			"echo \"name: my-default-cloud\"",
-			"echo \"id: cld_abc123\"",
-		}, "\n")
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+		fake := &fakeAnyscale{
+			defaultCloud: &fakeCloud{
+				Name: "my-default-cloud", ID: "cld_abc123",
+			},
+		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
+			return fake.run(args)
+		})
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {
@@ -30,7 +37,13 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("CLI failure", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\nexit 1")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
+			return "", fmt.Errorf("exit status 1")
+		})
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -42,9 +55,13 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("invalid YAML output", func(t *testing.T) {
-		cli := &AnyscaleCLI{
-			bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"invalid: yaml: output: [\""),
-		}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
+			return "invalid: yaml: output: [", nil
+		})
 
 		_, err := cli.GetDefaultCloud()
 		if err == nil {
@@ -56,7 +73,13 @@ func TestGetDefaultCloud(t *testing.T) {
 	})
 
 	t.Run("empty output", func(t *testing.T) {
-		cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, "#!/bin/sh\necho \"\"")}
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			checkArgs(t, args,
+				[]string{"cloud", "get-default"}, nil, nil,
+			)
+			return "", nil
+		})
 
 		cloudInfo, err := cli.GetDefaultCloud()
 		if err != nil {

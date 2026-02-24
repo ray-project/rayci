@@ -1,83 +1,75 @@
 package rayapp
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// setupMockAnyscale installs a fake anyscale script and prepends its directory to PATH
-// so NewAnyscaleCLI() and exec.LookPath("anyscale") use it.
-func setupMockAnyscale(t *testing.T, script string) {
-	t.Helper()
-	binPath := writeFakeAnyscale(t, script)
-	dir := filepath.Dir(binPath)
-	origPath := os.Getenv("PATH")
-	os.Setenv("PATH", dir+string(os.PathListSeparator)+origPath)
-	t.Cleanup(func() { os.Setenv("PATH", origPath) })
+func newDefaultFake() *fakeAnyscale {
+	return &fakeAnyscale{
+		defaultCloud: &fakeCloud{Name: "test-cloud", ID: "cld_test"},
+	}
 }
 
-// setupMockDeleteWorkspaceAPI starts an httptest.Server that accepts DELETE workspace
-// and sets ANYSCALE_HOST/ANYSCALE_CLI_TOKEN so deleteWorkspaceByID succeeds.
-func setupMockDeleteWorkspaceAPI(t *testing.T) {
+func newTestCLI(fake *fakeAnyscale) *AnyscaleCLI {
+	cli := NewAnyscaleCLI()
+	cli.setRunFunc(fake.run)
+	return cli
+}
+
+func newFakeAnyscaleAPI(t *testing.T) *anyscaleAPI {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{}"))
-	}))
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodDelete {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("{}"))
+		},
+	))
 	t.Cleanup(server.Close)
 
-	origHost := os.Getenv("ANYSCALE_HOST")
-	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
-	t.Cleanup(func() {
-		if origHost == "" {
-			os.Unsetenv("ANYSCALE_HOST")
-		} else {
-			os.Setenv("ANYSCALE_HOST", origHost)
-		}
-		if origToken == "" {
-			os.Unsetenv("ANYSCALE_CLI_TOKEN")
-		} else {
-			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
-		}
-	})
-	os.Setenv("ANYSCALE_HOST", server.URL)
-	os.Setenv("ANYSCALE_CLI_TOKEN", "test-token")
+	api, err := newAnyscaleAPI(server.URL, "test-token")
+	if err != nil {
+		t.Fatalf("newFakeAnyscaleAPI: %v", err)
+	}
+	return api
 }
 
 func TestNewWorkspaceTestConfig(t *testing.T) {
 	tests := []struct {
-		name      string
-		tmplName  string
-		buildFile string
+		name     string
+		tmplName string
+		buildDir string
 	}{
 		{
-			name:      "basic config",
-			tmplName:  "my-template",
-			buildFile: "path/to/build.yaml",
+			name:     "basic config",
+			tmplName: "my-template",
+			buildDir: "path/to",
 		},
 		{
-			name:      "empty values",
-			tmplName:  "",
-			buildFile: "",
+			name:     "empty values",
+			tmplName: "",
+			buildDir: "",
 		},
 		{
-			name:      "special characters",
-			tmplName:  "template-with-dashes_and_underscores",
-			buildFile: "/path/with spaces/build.yaml",
+			name:     "special characters",
+			tmplName: "template-with-dashes_and_underscores",
+			buildDir: "/path/with spaces",
 		},
 	}
 
+	cli := NewAnyscaleCLI()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewWorkspaceTestConfig(tt.tmplName)
+			tmpl := &Template{Name: tt.tmplName}
+			config := NewWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
@@ -85,349 +77,158 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 			if config.tmplName != tt.tmplName {
 				t.Errorf("tmplName = %q, want %q", config.tmplName, tt.tmplName)
 			}
-			// Other fields should be zero values
-			if config.workspaceName != "" {
-				t.Errorf("workspaceName should be empty, got %q", config.workspaceName)
+			if config.template.Name != tt.tmplName {
+				t.Errorf("template.Name = %q, want %q", config.template.Name, tt.tmplName)
 			}
-			if config.template != nil {
-				t.Error("template should be nil")
+			if tmpl.Dir != "" {
+				t.Errorf("original template Dir should be unchanged, got %q", tmpl.Dir)
+			}
+			if config.buildDir != tt.buildDir {
+				t.Errorf("buildDir = %q, want %q", config.buildDir, tt.buildDir)
+			}
+			if !strings.HasPrefix(config.workspaceName, tt.tmplName) {
+				t.Errorf(
+					"workspaceName %q should start with %q",
+					config.workspaceName, tt.tmplName,
+				)
 			}
 		})
 	}
 }
 
-func TestWorkspaceTestConfigRun_CreateWorkspaceFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "create failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
+func TestWorkspaceTestConfigRun(t *testing.T) {
+	tests := []struct {
+		name          string
+		commandErrors map[string]error
+		wantErr       string
+	}{
+		{
+			name: "create workspace fails",
+			commandErrors: map[string]error{
+				"workspace_v2 create": fmt.Errorf("create failed"),
+			},
+			wantErr: "create empty workspace failed",
+		},
+		{
+			name: "get workspace ID fails",
+			commandErrors: map[string]error{
+				"workspace_v2 get": fmt.Errorf("get failed"),
+			},
+			wantErr: "get workspace ID failed",
+		},
+		{
+			name: "start workspace fails",
+			commandErrors: map[string]error{
+				"workspace_v2 start": fmt.Errorf("start failed"),
+			},
+			wantErr: "start workspace failed",
+		},
+		{
+			name: "wait for state fails",
+			commandErrors: map[string]error{
+				"workspace_v2 wait": fmt.Errorf("wait failed"),
+			},
+			wantErr: "wait for workspace running state failed",
+		},
+		{
+			name: "push zip fails",
+			commandErrors: map[string]error{
+				"workspace_v2 push": fmt.Errorf("push failed"),
+			},
+			wantErr: "push template zip to workspace failed",
+		},
+		{
+			name: "unzip fails",
+			commandErrors: map[string]error{
+				"workspace_v2 run_command": fmt.Errorf("run failed"),
+			},
+			wantErr: "unzip template failed",
+		},
+		{
+			name: "terminate fails",
+			commandErrors: map[string]error{
+				"workspace_v2 terminate": fmt.Errorf("terminate failed"),
+			},
+			wantErr: "terminate workspace failed",
+		},
+		{
+			name:    "success",
+			wantErr: "",
+		},
+	}
 
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := newDefaultFake()
+			fake.commandErrors = tt.commandErrors
+			cli := newTestCLI(fake)
+			api := newFakeAnyscaleAPI(t)
 
+			err := runTemplateTestsWithFilter(
+				"testdata/BUILD.yaml",
+				func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+				cli, api,
+			)
+
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	var runCmdCount int
+	cli.setRunFunc(func(args []string) (string, error) {
+		cmd := fmt.Sprintf("%s %s", args[0], args[1])
+		if cmd == "workspace_v2 run_command" {
+			runCmdCount++
+			if runCmdCount > 1 {
+				return "", fmt.Errorf("test execution failed")
+			}
+		}
+		return fake.run(args)
+	})
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		cli, api,
+	)
 	if err == nil {
-		t.Fatal("expected error when create workspace fails")
+		t.Fatal("expected error when test command fails")
 	}
-	if !strings.Contains(err.Error(), "create empty workspace failed") {
-		t.Errorf("error %q should contain 'create empty workspace failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_GetWorkspaceIDFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo "get failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when get workspace ID fails")
-	}
-	if !strings.Contains(err.Error(), "get workspace ID failed") {
-		t.Errorf("error %q should contain 'get workspace ID failed'", err.Error())
+	if !strings.Contains(err.Error(), "test command failed") {
+		t.Errorf("error %q should contain 'test command failed'", err.Error())
 	}
 }
 
-func TestWorkspaceTestConfigRun_StartWorkspaceFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "start failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when start workspace fails")
+func TestRunTemplateTest_Failure(t *testing.T) {
+	fake := newDefaultFake()
+	fake.commandErrors = map[string]error{
+		"compute-config list": fmt.Errorf("forced failure"),
 	}
-	if !strings.Contains(err.Error(), "start workspace failed") {
-		t.Errorf("error %q should contain 'start workspace failed'", err.Error())
-	}
-}
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
 
-func TestWorkspaceTestConfigRun_WaitForStateFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "started"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
-    echo "wait failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when wait for state fails")
-	}
-	if !strings.Contains(err.Error(), "wait for workspace running state failed") {
-		t.Errorf("error %q should contain 'wait for workspace running state failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_CopyTemplateFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "started"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
-    echo "running"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
-    echo "push failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when copy template fails")
-	}
-	if !strings.Contains(err.Error(), "push template zip to workspace failed") {
-		t.Errorf("error %q should contain 'push template zip to workspace failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_RunCommandFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "started"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
-    echo "running"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
-    echo "pushed"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
-    echo "run_command failed: forced failure" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when run command fails")
-	}
-	if !strings.Contains(err.Error(), "unzip template in workspace failed") {
-		t.Errorf("error %q should contain 'unzip template in workspace failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_TerminateFails(t *testing.T) {
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "started"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
-    echo "running"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
-    echo "pushed"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
-    echo "tests passed"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "terminate" ]; then
-    echo "terminate failed" >&2
-    exit 1
-fi
-echo "ok"
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error when terminate fails")
-	}
-	if !strings.Contains(err.Error(), "terminate workspace failed") {
-		t.Errorf("error %q should contain 'terminate workspace failed'", err.Error())
-	}
-}
-
-func TestWorkspaceTestConfigRun_Success(t *testing.T) {
-	setupMockDeleteWorkspaceAPI(t)
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
-    echo "created compute config"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "start" ]; then
-    echo "started"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "wait" ]; then
-    echo "running"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "push" ]; then
-    echo "pushed"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "run_command" ]; then
-    echo "tests passed"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "terminate" ]; then
-    echo "terminated"
-    exit 0
-fi
-echo "unknown command: $@"
-exit 1
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestTest_Success(t *testing.T) {
-	setupMockDeleteWorkspaceAPI(t)
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then
-    echo "created"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then
-    echo "Workspace created successfully id: expwrk_testid123"
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then
-    echo '{"id": "expwrk_testid123", "name": "test"}'
-    exit 0
-fi
-if [ "$1" = "workspace_v2" ]; then
-    echo "success"
-    exit 0
-fi
-echo "unknown"
-exit 1
-`
-	setupMockAnyscale(t, script)
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestTest_Failure(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-
-	err := Test("reefy-ray", "testdata/BUILD.yaml")
-
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		cli, api,
+	)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -435,15 +236,16 @@ func TestTest_Failure(t *testing.T) {
 		t.Errorf("error %q should contain 'test failed'", err.Error())
 	}
 	if !strings.Contains(err.Error(), "reefy-ray") {
-		t.Errorf("error %q should contain failed template name 'reefy-ray'", err.Error())
+		t.Errorf("error %q should contain template name 'reefy-ray'", err.Error())
 	}
 }
 
-func TestTest_NoTemplatesToTest(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho ok")
-
-	err := Test("nonexistent-template", "testdata/BUILD.yaml")
-
+func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "nonexistent-template" },
+		nil, nil,
+	)
 	if err == nil {
 		t.Fatal("expected error when no templates match filter")
 	}
@@ -452,11 +254,8 @@ func TestTest_NoTemplatesToTest(t *testing.T) {
 	}
 }
 
-func TestTest_ReadTemplatesFailed(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho ok")
-
-	err := Test("reefy-ray", "nonexistent/BUILD.yaml")
-
+func TestRunTemplateTest_ReadTemplatesFailed(t *testing.T) {
+	err := runTemplateTestsWithFilter("nonexistent/BUILD.yaml", nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
 	}
@@ -465,65 +264,36 @@ func TestTest_ReadTemplatesFailed(t *testing.T) {
 	}
 }
 
-func TestTest_FilterSelectsSingleTemplate(t *testing.T) {
-	setupMockDeleteWorkspaceAPI(t)
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then echo '{"id": "expwrk_testid123", "name": "test"}'; exit 0; fi
-if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
-echo "unknown"; exit 1
-`
-	setupMockAnyscale(t, script)
+func TestRunTemplateTest_FilterSelectsSingleTemplate(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
 
-	err := Test("fishy-ray", "testdata/BUILD.yaml")
-
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		cli, api,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestTestAll_Success(t *testing.T) {
-	setupMockDeleteWorkspaceAPI(t)
-	script := `#!/bin/sh
-if [ "$1" = "compute-config" ] && [ "$2" = "list" ]; then echo '{"results": [], "metadata": {"count": 0, "next_token": null}}'; exit 0; fi
-if [ "$1" = "cloud" ] && [ "$2" = "get-default" ]; then echo "name: test-cloud"; echo "id: cld_test"; exit 0; fi
-if [ "$1" = "compute-config" ] && [ "$2" = "create" ]; then echo "created"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "create" ]; then echo "Workspace created successfully id: expwrk_testid123"; exit 0; fi
-if [ "$1" = "workspace_v2" ] && [ "$2" = "get" ]; then echo '{"id": "expwrk_testid123", "name": "test"}'; exit 0; fi
-if [ "$1" = "workspace_v2" ]; then echo "success"; exit 0; fi
-echo "unknown"; exit 1
-`
-	setupMockAnyscale(t, script)
+func TestRunAllTemplateTests_Success(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
 
-	err := TestAll("testdata/BUILD.yaml")
-
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestTestAll_ReadTemplatesFailed(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho ok")
-
-	err := TestAll("nonexistent/BUILD.yaml")
-
-	if err == nil {
-		t.Fatal("expected error for invalid build file")
-	}
-	if !strings.Contains(err.Error(), "read templates failed") {
-		t.Errorf("error %q should contain 'read templates failed'", err.Error())
-	}
-}
-
-func TestTestAll_NoTemplatesToTest(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\necho ok")
+func TestRunAllTemplateTests_NoTemplatesToTest(t *testing.T) {
 	f := createEmptyBuildFile(t)
 
-	err := TestAll(f)
-
+	err := runTemplateTestsWithFilter(f, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error when build file has no templates")
 	}
@@ -532,11 +302,15 @@ func TestTestAll_NoTemplatesToTest(t *testing.T) {
 	}
 }
 
-func TestTestAll_PartialFailure(t *testing.T) {
-	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
+func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
+	fake := newDefaultFake()
+	fake.commandErrors = map[string]error{
+		"compute-config list": fmt.Errorf("forced failure"),
+	}
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
 
-	err := TestAll("testdata/BUILD.yaml")
-
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, cli, api)
 	if err == nil {
 		t.Fatal("expected error when some templates fail")
 	}
@@ -547,28 +321,9 @@ func TestTestAll_PartialFailure(t *testing.T) {
 
 func createEmptyBuildFile(t *testing.T) string {
 	t.Helper()
-	f := t.TempDir() + "/BUILD.yaml"
+	f := fmt.Sprintf("%s/BUILD.yaml", t.TempDir())
 	if err := os.WriteFile(f, []byte("[]"), 0644); err != nil {
 		t.Fatalf("create empty build file: %v", err)
 	}
 	return f
-}
-
-func TestWorkspaceTestConfigRun_UsesAnyscaleToken(t *testing.T) {
-	// Set a test token
-	origToken := os.Getenv("ANYSCALE_CLI_TOKEN")
-	t.Cleanup(func() {
-		if origToken == "" {
-			os.Unsetenv("ANYSCALE_CLI_TOKEN")
-		} else {
-			os.Setenv("ANYSCALE_CLI_TOKEN", origToken)
-		}
-	})
-	os.Setenv("ANYSCALE_CLI_TOKEN", "test-token-123")
-
-	// Mock that fails immediately so we can test without full execution
-	setupMockAnyscale(t, "#!/bin/sh\nexit 1")
-
-	// We don't care about the error, just that it uses the token
-	_ = Test("reefy-ray", "testdata/BUILD.yaml")
 }

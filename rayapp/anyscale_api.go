@@ -5,59 +5,82 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"net/url"
+	"regexp"
+	"time"
 )
 
-// AnyscaleAPI handles HTTP client calls to the Anyscale API host.
-type AnyscaleAPI struct {
+// apiError represents a non-2xx HTTP response from the Anyscale API.
+type apiError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *apiError) Error() string {
+	return fmt.Sprintf(
+		"request failed with status %d: %s",
+		e.StatusCode, e.Body,
+	)
+}
+
+var validWorkspaceID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// anyscaleAPI handles HTTP client calls to the Anyscale API host.
+type anyscaleAPI struct {
 	host   string
 	token  string
 	client *http.Client
 }
 
-func newAnyscaleAPI() (*AnyscaleAPI, error) {
-	host := os.Getenv("ANYSCALE_HOST")
+func newAnyscaleAPI(host, token string) (*anyscaleAPI, error) {
 	if host == "" {
-		return nil, errors.New("ANYSCALE_HOST environment variable is not set")
+		return nil, errors.New("host is empty")
 	}
-	token := os.Getenv("ANYSCALE_CLI_TOKEN")
 	if token == "" {
-		return nil, errors.New("ANYSCALE_CLI_TOKEN environment variable is not set")
+		return nil, errors.New("token is empty")
 	}
-	return &AnyscaleAPI{host: host, token: token, client: &http.Client{}}, nil
+	return &anyscaleAPI{
+		host:   host,
+		token:  token,
+		client: &http.Client{Timeout: 30 * time.Second},
+	}, nil
 }
 
-// DeleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
-func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
-	url := fmt.Sprintf("%s/api/v2/experimental_workspaces/%s", a.host, workspaceID)
-
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
+	if !validWorkspaceID.MatchString(workspaceID) {
+		return fmt.Errorf("invalid workspace ID: %q", workspaceID)
+	}
+	reqURL, err := url.JoinPath(
+		a.host, "/api/v2/experimental_workspaces", workspaceID,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("construct workspace URL: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+a.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)
+		return fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf(
-			"delete workspace failed with status %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if err != nil {
+			return fmt.Errorf("read response body: %w", err)
+		}
+		return &apiError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
 	}
 
-	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
+	io.Copy(io.Discard, resp.Body)
 	return nil
 }

@@ -51,6 +51,8 @@ type Template struct {
 }
 
 // Find first version-like digit sequence in build ID remainder (unanchored).
+var validTemplateName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+
 var buildIDVersionFindRe = regexp.MustCompile(`(\d)(\d{2})(\d+)`)
 
 // buildIDToImageName maps build ID slugified image-type (after "anyscale") to image name for URI.
@@ -230,6 +232,9 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
 	}
 	for _, tmpl := range tmpls {
+		if !validTemplateName.MatchString(tmpl.Name) {
+			return nil, fmt.Errorf("invalid template name %q", tmpl.Name)
+		}
 		if err := validateClusterEnv(tmpl.ClusterEnv); err != nil {
 			return nil, fmt.Errorf("validate cluster env for template %q: %w", tmpl.Name, err)
 		}
