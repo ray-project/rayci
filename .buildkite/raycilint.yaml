@@ -2,3 +2,6 @@ go_filelength:
   max_lines: 500
 go_coverage:
   min_coverage_pct: 80
+prsize:
+  max_additions: 500
+  max_deletions: 2000

@@ -1,0 +1,83 @@
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+
+env:
+  CONFIG_PATH: ".buildkite/raycilint.yaml"
+  SKIP_LABEL: "skip-prcheck" # If updating this label, also update harcoded ref below.
+
+jobs:
+  check:
+    name: PR size check
+    # Skip all label-related events unless the skip-prcheck label was toggled.
+    # env context is unavailable in job-level if, so the label name must be hardcoded.
+    if: >-
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+      || github.event.label.name == 'skip-prcheck'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for skip label
+        id: check
+        if: ${{ !contains(github.event.pull_request.labels.*.name, env.SKIP_LABEL) }}
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.run
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        if: steps.check.outputs.run
+        with:
+          go-version-file: go.mod
+
+      # To use a pre-built binary instead of building from source,
+      # enable this step and disable the setup-go + "Run prcheck" steps.
+      # Requires a .rayciversion file containing the release tag.
+      - name: Download prcheck
+        if: ${{ false }}
+        run: |
+          set -euo pipefail
+          version="$(cat .rayciversion)"
+          url="https://github.com/ray-project/rayci/releases/download/v${version}/prcheck-linux-amd64"
+          curl -fsSL "$url" -o /usr/local/bin/prcheck && chmod +x /usr/local/bin/prcheck
+
+      - name: Run prcheck
+        id: prcheck
+        if: steps.check.outputs.run
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if command -v prcheck &>/dev/null; then
+            prcheck -config-file "$CONFIG_PATH" prsize -base-ref "$BASE_REF" -head-ref "$HEAD_REF"
+          else
+            go run ./raycilint/raycilint -config-file "$CONFIG_PATH" prsize -base-ref "$BASE_REF" -head-ref "$HEAD_REF"
+          fi
+
+      - name: Update size warning comment
+        if: failure()
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        with:
+          header: prcheck
+          message: |
+            ## ⚠️ PR Size Warning
+            This PR exceeds the size limits defined in `${{ env.CONFIG_PATH }}`.
+            ${{ steps.prcheck.outputs.additions && format('- additions: `{0}`', steps.prcheck.outputs.additions) || '' }}
+            ${{ steps.prcheck.outputs.deletions && format('- deletions: `{0}`', steps.prcheck.outputs.deletions) || '' }}
+
+            Break this into smaller PRs, or apply the `${{ env.SKIP_LABEL }}` label to bypass.
+
+      - name: Delete size warning comment
+        if: success() || !steps.check.outputs.run
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        with:
+          header: prcheck
+          delete: true
