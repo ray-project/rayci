@@ -43,7 +43,7 @@ func Test(tmplName, buildFile string) error {
 
 func Probe(tmplName string) error {
 	anyscaleCLI := NewAnyscaleCLI()
-	anyscaleAPI, err := newAnyscaleAPI()
+	anyscaleAPI, err := newAnyscaleAPI(os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"))
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
@@ -58,7 +58,7 @@ func Probe(tmplName string) error {
 		return fmt.Errorf("get default project failed: %w", err)
 	}
 
-	result, err := anyscaleAPI.LaunchTemplateInWorkspace(cloudInfo.ID, projectInfo.ID, tmplName)
+	result, err := anyscaleAPI.launchTemplateInWorkspace(cloudInfo.ID, projectInfo.ID, tmplName)
 	if err != nil {
 		return fmt.Errorf("launch template in workspace failed: %w", err)
 	}
@@ -143,7 +143,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 
 	// init anyscale cli
 	anyscaleCLI := NewAnyscaleCLI()
-	anyscaleAPI, err := newAnyscaleAPI()
+	anyscaleAPI, err := newAnyscaleAPI(os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"))
 	if err != nil {
 		errors = append(errors, fmt.Errorf("new anyscale api failed: %w", err))
 		return errors
@@ -234,7 +234,7 @@ func (wtc *WorkspaceTestConfig) Run() (errors []error) {
 	return errors
 }
 
-func cleanupWorkspace(anyscaleCLI *AnyscaleCLI, anyscaleAPI *AnyscaleAPI, workspaceName, workspaceID string) error {
+func cleanupWorkspace(anyscaleCLI *AnyscaleCLI, anyscaleAPI *anyscaleAPI, workspaceName, workspaceID string) error {
 	log.Println("Cleaning up workspace...")
 	if err := anyscaleCLI.terminateWorkspace(workspaceName); err != nil {
 		return fmt.Errorf("terminate workspace failed: %w", err)
@@ -245,7 +245,7 @@ func cleanupWorkspace(anyscaleCLI *AnyscaleCLI, anyscaleAPI *AnyscaleAPI, worksp
 	); err != nil {
 		return fmt.Errorf("wait for workspace terminated state failed: %w", err)
 	}
-	if err := anyscaleAPI.DeleteWorkspaceByID(workspaceID); err != nil {
+	if err := anyscaleAPI.deleteWorkspaceByID(workspaceID); err != nil {
 		return fmt.Errorf("delete workspace failed: %w", err)
 	}
 	return nil

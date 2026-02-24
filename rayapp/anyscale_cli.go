@@ -44,7 +44,7 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 		return "", errors.New("anyscale is not installed")
 	}
 
-	fmt.Println("anyscale cli args: ", args)
+	fmt.Fprintf(os.Stdout, ">>> anyscale %s\n", strings.Join(args, " "))
 	cmd := exec.Command(ac.bin, args...)
 
 	tw := newTailWriter(maxOutputBufferSize)

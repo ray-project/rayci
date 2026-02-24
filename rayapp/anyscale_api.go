@@ -8,32 +8,50 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
+	"regexp"
 	"time"
 )
 
-// AnyscaleAPI handles HTTP client calls to the Anyscale API host.
-type AnyscaleAPI struct {
+// apiError represents a non-2xx HTTP response from the Anyscale API.
+type apiError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *apiError) Error() string {
+	return fmt.Sprintf(
+		"request failed with status %d: %s",
+		e.StatusCode, e.Body,
+	)
+}
+
+var validWorkspaceID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// anyscaleAPI handles HTTP client calls to the Anyscale API host.
+type anyscaleAPI struct {
 	host   string
 	token  string
 	client *http.Client
 }
 
-func newAnyscaleAPI() (*AnyscaleAPI, error) {
-	host := os.Getenv("ANYSCALE_HOST")
+func newAnyscaleAPI(host, token string) (*anyscaleAPI, error) {
 	if host == "" {
-		return nil, errors.New("ANYSCALE_HOST environment variable is not set")
+		return nil, errors.New("host must not be empty")
 	}
-	token := os.Getenv("ANYSCALE_CLI_TOKEN")
 	if token == "" {
-		return nil, errors.New("ANYSCALE_CLI_TOKEN environment variable is not set")
+		return nil, errors.New("token must not be empty")
 	}
-	return &AnyscaleAPI{host: host, token: token, client: &http.Client{}}, nil
+	return &anyscaleAPI{host: host, token: token, client: &http.Client{}}, nil
 }
 
-// DeleteWorkspaceByID deletes a workspace by its ID using the Anyscale REST API.
-func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
-	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces", workspaceID)
+func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
+	if !validWorkspaceID.MatchString(workspaceID) {
+		return fmt.Errorf("invalid workspace ID: %q", workspaceID)
+	}
+
+	reqURL, err := url.JoinPath(
+		a.host, "api/v2/experimental_workspaces", workspaceID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %w", err)
 	}
@@ -58,18 +76,19 @@ func (a *AnyscaleAPI) DeleteWorkspaceByID(workspaceID string) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf(
-			"delete workspace failed with status %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
+		return &apiError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
 	}
 
-	fmt.Printf("delete workspace %s succeeded: %s\n", workspaceID, string(body))
+	fmt.Printf(
+		"delete workspace %s succeeded: %s\n", workspaceID, string(body),
+	)
 	return nil
 }
 
-func (a *AnyscaleAPI) LaunchTemplateInWorkspace(cloudID string, projectID string, templateName string) (map[string]any, error) {
+func (a *anyscaleAPI) launchTemplateInWorkspace(cloudID, projectID, templateName string) (map[string]any, error) {
 	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces/from_template")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
