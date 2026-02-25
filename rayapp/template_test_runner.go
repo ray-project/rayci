@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv"
-
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	anyscaleAPI   *anyscaleAPI
@@ -28,8 +26,8 @@ type WorkspaceTestConfig struct {
 	errs          []error
 }
 
-// NewWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
-func NewWorkspaceTestConfig(
+// newWorkspaceTestConfig creates a new WorkspaceTestConfig for a template.
+func newWorkspaceTestConfig(
 	t *Template,
 	anyscaleCLI *AnyscaleCLI,
 	anyscaleAPI *anyscaleAPI,
@@ -85,18 +83,28 @@ func runTemplateTestsWithFilter(
 	buildDir := filepath.Dir(buildFile)
 
 	var filteredTmpls []*Template
+	var skippedNoTest int
 	for _, t := range tmpls {
-		if filter == nil || filter(t) {
-			filteredTmpls = append(filteredTmpls, t)
+		if filter != nil && !filter(t) {
+			continue
 		}
+		if t.Test == nil {
+			log.Printf("Template %s has no test configuration, skipping", t.Name)
+			skippedNoTest++
+			continue
+		}
+		filteredTmpls = append(filteredTmpls, t)
 	}
 	if len(filteredTmpls) == 0 {
+		if skippedNoTest > 0 {
+			return fmt.Errorf("no templates with test configuration to run")
+		}
 		return fmt.Errorf("no templates to test")
 	}
 
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := NewWorkspaceTestConfig(t, cli, api, buildDir)
+		c := newWorkspaceTestConfig(t, cli, api, buildDir)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()
@@ -161,8 +169,7 @@ func (c *WorkspaceTestConfig) Run() {
 			return
 		}
 		if _, err := c.anyscaleCLI.waitForWorkspaceState(
-			c.workspaceName,
-			StateTerminated,
+			c.workspaceName, StateTerminated,
 		); err != nil {
 			c.errs = append(
 				c.errs,
@@ -184,12 +191,8 @@ func (c *WorkspaceTestConfig) Run() {
 		return
 	}
 
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(
-		c.workspaceName, StateRunning,
-	); err != nil {
-		c.errs = append(
-			c.errs, fmt.Errorf("wait for workspace running state failed: %w", err),
-		)
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceName, StateRunning); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("wait for workspace running state failed: %w", err))
 		return
 	}
 
@@ -200,29 +203,61 @@ func (c *WorkspaceTestConfig) Run() {
 	}
 	defer os.RemoveAll(templateZipDir)
 
-	zipFileName := filepath.Join(templateZipDir, fmt.Sprintf("%s.zip", c.tmplName))
-	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
+	templateZipFileName := filepath.Join(templateZipDir, fmt.Sprintf("%s.zip", c.tmplName))
+	if err := zipDirectory(c.template.Dir, templateZipFileName); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("zip template directory failed: %w", err))
 		return
 	}
 
-	if err := c.anyscaleCLI.pushFolderToWorkspace(
-		c.workspaceName, templateZipDir,
-	); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("push zip to workspace failed: %w", err))
+	if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, templateZipDir); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("push template zip to workspace failed: %w", err))
 		return
 	}
 
 	if err := c.anyscaleCLI.runCmdInWorkspace(
-		c.workspaceName,
-		fmt.Sprintf("unzip -o %s.zip", c.tmplName),
+		c.workspaceName, fmt.Sprintf("unzip -o %s.zip", c.tmplName),
 	); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("unzip template failed: %w", err))
 		return
 	}
 
-	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCmd); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("test command failed: %w", err))
+	// If tests_path is provided, zip and push test folder
+	if c.template.Test.TestsPath != "" {
+		testsPath := filepath.Join(c.buildDir, c.template.Test.TestsPath)
+		testZipDir, err := os.MkdirTemp("", "test_zip")
+		if err != nil {
+			c.errs = append(c.errs, fmt.Errorf("create test temp directory failed: %w", err))
+			return
+		}
+		defer os.RemoveAll(testZipDir)
+
+		testZipFileName := filepath.Join(testZipDir, "tests.zip")
+		if err := zipDirectory(testsPath, testZipFileName); err != nil {
+			c.errs = append(c.errs, fmt.Errorf("zip test directory failed: %w", err))
+			return
+		}
+
+		// Push test zip to workspace
+		if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, testZipDir); err != nil {
+			c.errs = append(c.errs, fmt.Errorf("push test zip to workspace failed: %w", err))
+			return
+		}
+
+		// Unzip test folder in workspace
+		if err := c.anyscaleCLI.runCmdInWorkspace(
+			c.workspaceName, "unzip -o tests.zip",
+		); err != nil {
+			c.errs = append(c.errs, fmt.Errorf("unzip tests in workspace failed: %w", err))
+			return
+		}
+	}
+
+	// Run test command from test configuration.
+	// Escape single quotes to prevent command injection via bash -c '...'.
+	escapedCmd := strings.ReplaceAll(c.template.Test.Command, "'", "'\\''")
+	testCommand := fmt.Sprintf("timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, escapedCmd)
+	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCommand); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("run test command failed: %w", err))
 		return
 	}
 }

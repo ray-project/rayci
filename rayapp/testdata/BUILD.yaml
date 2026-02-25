@@ -1,3 +1,5 @@
+# reefy-ray intentionally has no test config — used by
+# TestRunTemplateTest_SkipsTemplateWithNoTestConfig
 - name: reefy-ray
   emoji: 🪸
   title: Reefy Ray
@@ -19,6 +21,8 @@
   compute_config:
     GCP: configs/gcp.yaml
     AWS: configs/aws.yaml
+  test:
+    command: pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv
 
 - name: nully-ray
   emoji: 🪱
@@ -30,3 +34,19 @@
   compute_config:
     GCP: configs/gcp.yaml
     AWS: configs/aws.yaml
+  test:
+    command: pip install nbmake==1.5.5 pytest==9.0.2 && pytest --nbmake . -s -vv
+
+- name: testy-ray
+  emoji: 🧪
+  title: Testy Ray
+  description: Ray with a separate tests directory.
+  dir: testy-ray
+  cluster_env:
+    build_id: anyscaleray2370-py311
+  compute_config:
+    GCP: configs/gcp.yaml
+    AWS: configs/aws.yaml
+  test:
+    command: pytest tests/ -s -vv
+    tests_path: tests/

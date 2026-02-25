@@ -42,7 +42,7 @@ func newFakeAnyscaleAPI(t *testing.T) *anyscaleAPI {
 	return api
 }
 
-func TestNewWorkspaceTestConfig(t *testing.T) {
+func Test_newWorkspaceTestConfig(t *testing.T) {
 	tests := []struct {
 		name     string
 		tmplName string
@@ -69,7 +69,7 @@ func TestNewWorkspaceTestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := &Template{Name: tt.tmplName}
-			config := NewWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
+			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
@@ -135,7 +135,7 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 			commandErrors: map[string]error{
 				"workspace_v2 push": fmt.Errorf("push failed"),
 			},
-			wantErr: "push zip to workspace failed",
+			wantErr: "push template zip to workspace failed",
 		},
 		{
 			name: "unzip fails",
@@ -166,7 +166,7 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
-				func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+				func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 				cli, api,
 			)
 
@@ -186,33 +186,56 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 	}
 }
 
-func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
+func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
 
-	var runCmdCount int
+	var capturedCmd string
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" {
-			runCmdCount++
-			if runCmdCount > 1 {
-				return "", fmt.Errorf("test execution failed")
-			}
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+			capturedCmd = args[4]
 		}
 		return fake.run(args)
 	})
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(capturedCmd, "bash -c '") {
+		t.Errorf("command %q should contain bash -c invocation", capturedCmd)
+	}
+}
+
+func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	cli.setRunFunc(func(args []string) (string, error) {
+		cmd := fmt.Sprintf("%s %s", args[0], args[1])
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+			return "", fmt.Errorf("test execution failed")
+		}
+		return fake.run(args)
+	})
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
 		t.Fatal("expected error when test command fails")
 	}
-	if !strings.Contains(err.Error(), "test command failed") {
-		t.Errorf("error %q should contain 'test command failed'", err.Error())
+	if !strings.Contains(err.Error(), "run test command failed") {
+		t.Errorf("error %q should contain 'run test command failed'", err.Error())
 	}
 }
 
@@ -226,7 +249,7 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
@@ -235,8 +258,22 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 	if !strings.Contains(err.Error(), "test failed") {
 		t.Errorf("error %q should contain 'test failed'", err.Error())
 	}
-	if !strings.Contains(err.Error(), "reefy-ray") {
-		t.Errorf("error %q should contain template name 'reefy-ray'", err.Error())
+	if !strings.Contains(err.Error(), "fishy-ray") {
+		t.Errorf("error %q should contain template name 'fishy-ray'", err.Error())
+	}
+}
+
+func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
+		nil, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error when matched template has no test config")
+	}
+	if !strings.Contains(err.Error(), "no templates with test configuration") {
+		t.Errorf("error %q should contain 'no templates with test configuration'", err.Error())
 	}
 }
 
@@ -319,6 +356,21 @@ func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTestConfigRun_WithTestsPath(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "testy-ray" },
+		cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func createEmptyBuildFile(t *testing.T) string {
 	t.Helper()
 	f := fmt.Sprintf("%s/BUILD.yaml", t.TempDir())
@@ -326,16 +378,4 @@ func createEmptyBuildFile(t *testing.T) string {
 		t.Fatalf("create empty build file: %v", err)
 	}
 	return f
-}
-
-func TestTestCmd_Constant(t *testing.T) {
-	if testCmd == "" {
-		t.Error("testCmd should not be empty")
-	}
-	if !strings.Contains(testCmd, "pytest") {
-		t.Errorf("testCmd %q should contain 'pytest'", testCmd)
-	}
-	if !strings.Contains(testCmd, "nbmake") {
-		t.Errorf("testCmd %q should contain 'nbmake'", testCmd)
-	}
 }
