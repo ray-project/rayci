@@ -36,10 +36,10 @@ type anyscaleAPI struct {
 
 func newAnyscaleAPI(host, token string) (*anyscaleAPI, error) {
 	if host == "" {
-		return nil, errors.New("host must not be empty")
+		return nil, errors.New("host is empty")
 	}
 	if token == "" {
-		return nil, errors.New("token must not be empty")
+		return nil, errors.New("token is empty")
 	}
 	return &anyscaleAPI{host: host, token: token, client: &http.Client{}}, nil
 }
@@ -48,12 +48,11 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 	if !validWorkspaceID.MatchString(workspaceID) {
 		return fmt.Errorf("invalid workspace ID: %q", workspaceID)
 	}
-
 	reqURL, err := url.JoinPath(
 		a.host, "api/v2/experimental_workspaces", workspaceID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to parse URL: %w", err)
+		return fmt.Errorf("construct workspace URL: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
@@ -82,9 +81,6 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 		}
 	}
 
-	fmt.Printf(
-		"delete workspace %s succeeded: %s\n", workspaceID, string(body),
-	)
 	return nil
 }
 
@@ -105,16 +101,15 @@ func (a *anyscaleAPI) launchTemplateInWorkspace(cloudID, projectID, templateName
 	}
 	req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+a.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
+		return nil, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
