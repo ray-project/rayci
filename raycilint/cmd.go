@@ -6,7 +6,6 @@ import (
 	"os"
 )
 
-const runAll = "all"
 const defaultMinCoveragePct = 80.0
 const defaultMaxLines = 500
 const usage = `rayci-lint - Quality gates for CI
@@ -15,7 +14,6 @@ Usage:
   rayci-lint <command> [flags]
 
 Commands:
-	all            Run all quality gates with default settings
 	go-coverage    Run test coverage and check minimum thresholds
 	go-filelength  Check that Go files don't exceed line limit
 `
@@ -74,17 +72,8 @@ To install and run rayci-lint locally, download 'rayci-lint' from the latest rel
   https://github.com/ray-project/rayci/releases/latest
 `
 
-type subcommand struct {
-	name string
-	run  func([]string) error
-}
-
-var subcommands = []*subcommand{
-	{"go-coverage", cmdCoverage},
-	{"go-filelength", cmdFilelength},
-}
-
-// Main is the entry point for the rayci-lint CLI, dispatching to the appropriate subcommand.
+// Main is the entry point for the rayci-lint CLI, dispatching
+// to the appropriate subcommand.
 func Main(args []string) (int, error) {
 	if len(args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
@@ -94,31 +83,26 @@ func Main(args []string) (int, error) {
 	cmd := args[1]
 	subArgs := args[2:]
 
+	var err error
 	switch cmd {
 	case "-h", "-help", "--help", "help":
 		fmt.Print(usage)
 		return 0, nil
+	case "go-coverage":
+		err = cmdCoverage(subArgs)
+	case "go-filelength":
+		err = cmdFilelength(subArgs)
+	default:
+		fmt.Fprintf(
+			os.Stderr, "unknown command: %s\n\n%s", cmd, usage,
+		)
+		return 1, nil
 	}
-
-	matched := false
-	for i, sub := range subcommands {
-		if sub.name == cmd || cmd == runAll {
-			if cmd == runAll && i > 0 {
-				fmt.Println()
-			}
-			if err := sub.run(subArgs); err != nil {
-				fmt.Fprint(os.Stderr, installHint)
-				return 1, err
-			}
-			matched = true
-		}
+	if err != nil {
+		fmt.Fprint(os.Stderr, installHint)
+		return 1, err
 	}
-	if matched {
-		return 0, nil
-	}
-
-	fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", cmd, usage)
-	return 1, nil
+	return 0, nil
 }
 
 func parseCoverageConfig(args []string) (*CoverageConfig, error) {

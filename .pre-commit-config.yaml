@@ -43,9 +43,17 @@ repos:
         pass_filenames: true
         stages: [pre-push]
 
-      - id: rayci-lint
-        name: rayci-lint all
-        entry: go run ./raycilint/raycilint all
+      - id: rayci-lint-coverage
+        name: rayci-lint go-coverage
+        entry: go run ./raycilint/raycilint go-coverage
+        language: system
+        types: [go]
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: rayci-lint-filelength
+        name: rayci-lint go-filelength
+        entry: go run ./raycilint/raycilint go-filelength
         language: system
         types: [go]
         pass_filenames: false
