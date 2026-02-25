@@ -62,8 +62,8 @@ func main() {
 		if len(args) < 1 {
 			log.Fatal("probe requires <template-name>")
 		}
-		if err := rayapp.Probe(args[0]); err != nil {
-			log.Fatal(err)
+		if errs := rayapp.Probe(args[0]); len(errs) > 0 {
+			log.Fatal(errs)
 		}
 	case "help":
 		printUsage()

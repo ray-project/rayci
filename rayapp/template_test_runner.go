@@ -41,45 +41,53 @@ func Test(tmplName, buildFile string) error {
 	})
 }
 
-func Probe(tmplName string) error {
+func Probe(tmplName string) (errors []error) {
 	anyscaleCLI := NewAnyscaleCLI()
 	anyscaleAPI, err := newAnyscaleAPI(os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"))
 	if err != nil {
-		return fmt.Errorf("new anyscale api failed: %w", err)
+		errors = append(errors, fmt.Errorf("new anyscale api failed: %w", err))
+		return errors
 	}
 
 	cloudInfo, err := anyscaleCLI.GetDefaultCloud()
 	if err != nil {
-		return fmt.Errorf("get default cloud failed: %w", err)
+		errors = append(errors, fmt.Errorf("get default cloud failed: %w", err))
+		return errors
 	}
 
 	projectInfo, err := anyscaleCLI.GetDefaultProject(cloudInfo.ID)
 	if err != nil {
-		return fmt.Errorf("get default project failed: %w", err)
+		errors = append(errors, fmt.Errorf("get default project failed: %w", err))
+		return errors
 	}
 
 	result, err := anyscaleAPI.launchTemplateInWorkspace(cloudInfo.ID, projectInfo.ID, tmplName)
 	if err != nil {
-		return fmt.Errorf("launch template in workspace failed: %w", err)
+		errors = append(errors, fmt.Errorf("launch template in workspace failed: %w", err))
+		return errors
 	}
 
 	workspaceName, okName := result["name"].(string)
 	workspaceID, okID := result["id"].(string)
 	if !okName || !okID {
-		return fmt.Errorf("unexpected response format: missing name or id")
+		errors = append(errors, fmt.Errorf("unexpected response format: missing name or id"))
+		return errors
 	}
 
 	defer func() {
-		if err := cleanupWorkspace(anyscaleCLI, anyscaleAPI, workspaceName, workspaceID); err != nil {
-			log.Printf("cleanup failed: %v", err)
+		if err := cleanupWorkspace(
+			anyscaleCLI, anyscaleAPI, workspaceName, workspaceID,
+		); err != nil {
+			errors = append(errors, err)
 		}
 	}()
 
 	if _, err := anyscaleCLI.waitForWorkspaceState(workspaceName, StateRunning); err != nil {
-		return fmt.Errorf("wait for workspace running state failed: %w", err)
+		errors = append(errors, fmt.Errorf("wait for workspace running state failed: %w", err))
+		return errors
 	}
 	log.Println("Workspace launched successfully:", workspaceName)
-	return nil
+	return errors
 }
 
 func testWithFilter(buildFile string, filter func(tmpl *Template) bool) error {

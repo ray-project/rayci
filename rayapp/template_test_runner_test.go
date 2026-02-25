@@ -679,9 +679,9 @@ func TestProbe_Success(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	errs := Probe("my-tmpl")
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
 	}
 }
 
@@ -705,12 +705,12 @@ func TestProbe_APIInitFails(t *testing.T) {
 	os.Unsetenv("ANYSCALE_CLI_TOKEN")
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
 	}
-	if !strings.Contains(err.Error(), "new anyscale api failed") {
-		t.Errorf("error %q should contain 'new anyscale api failed'", err.Error())
+	if !strings.Contains(errs[0].Error(), "new anyscale api failed") {
+		t.Errorf("error %q should contain 'new anyscale api failed'", errs[0])
 	}
 }
 
@@ -718,12 +718,12 @@ func TestProbe_GetDefaultCloudFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"ws"}}`)
 	setupMockAnyscale(t, probeScript(false, true, true, true))
 
-	err := Probe("my-tmpl")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
 	}
-	if !strings.Contains(err.Error(), "get default cloud failed") {
-		t.Errorf("error %q should contain 'get default cloud failed'", err.Error())
+	if !strings.Contains(errs[0].Error(), "get default cloud failed") {
+		t.Errorf("error %q should contain 'get default cloud failed'", errs[0])
 	}
 }
 
@@ -731,12 +731,12 @@ func TestProbe_GetDefaultProjectFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"ws"}}`)
 	setupMockAnyscale(t, probeScript(true, false, true, true))
 
-	err := Probe("my-tmpl")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
 	}
-	if !strings.Contains(err.Error(), "get default project failed") {
-		t.Errorf("error %q should contain 'get default project failed'", err.Error())
+	if !strings.Contains(errs[0].Error(), "get default project failed") {
+		t.Errorf("error %q should contain 'get default project failed'", errs[0])
 	}
 }
 
@@ -744,12 +744,12 @@ func TestProbe_LaunchFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusBadRequest, `{"error":"bad request"}`)
 	setupMockAnyscale(t, probeScript(true, true, true, true))
 
-	err := Probe("my-tmpl")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
 	}
-	if !strings.Contains(err.Error(), "launch template in workspace failed") {
-		t.Errorf("error %q should contain 'launch template in workspace failed'", err.Error())
+	if !strings.Contains(errs[0].Error(), "launch template in workspace failed") {
+		t.Errorf("error %q should contain 'launch template in workspace failed'", errs[0])
 	}
 }
 
@@ -757,11 +757,40 @@ func TestProbe_WaitForRunningFails(t *testing.T) {
 	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
 	setupMockAnyscale(t, probeScript(true, true, false, true))
 
-	err := Probe("my-tmpl")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
 	}
-	if !strings.Contains(err.Error(), "wait for workspace running state failed") {
-		t.Errorf("error %q should contain 'wait for workspace running state failed'", err.Error())
+	if !strings.Contains(errs[0].Error(), "wait for workspace running state failed") {
+		t.Errorf("error %q should contain 'wait for workspace running state failed'", errs[0])
+	}
+}
+
+func TestProbe_CleanupFails(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
+	setupMockAnyscale(t, probeScript(true, true, true, false))
+
+	errs := Probe("my-tmpl")
+	if len(errs) == 0 {
+		t.Fatal("expected errors, got none")
+	}
+	if !strings.Contains(errs[0].Error(), "terminate workspace failed") {
+		t.Errorf("error %q should contain 'terminate workspace failed'", errs[0])
+	}
+}
+
+func TestProbe_WaitAndCleanupBothFail(t *testing.T) {
+	setupMockProbeAPI(t, http.StatusOK, `{"result":{"id":"expwrk_123","name":"my-tmpl-ws"}}`)
+	setupMockAnyscale(t, probeScript(true, true, false, false))
+
+	errs := Probe("my-tmpl")
+	if len(errs) < 2 {
+		t.Fatalf("expected at least 2 errors, got %d: %v", len(errs), errs)
+	}
+	if !strings.Contains(errs[0].Error(), "wait for workspace running state failed") {
+		t.Errorf("errs[0] %q should contain 'wait for workspace running state failed'", errs[0])
+	}
+	if !strings.Contains(errs[1].Error(), "terminate workspace failed") {
+		t.Errorf("errs[1] %q should contain 'terminate workspace failed'", errs[1])
 	}
 }
