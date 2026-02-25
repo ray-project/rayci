@@ -48,11 +48,11 @@ func main() {
 			log.Fatal("test requires <template-name> or 'all'")
 		}
 		if args[0] == "all" {
-			if err := rayapp.TestAll(*testBuildFile); err != nil {
+			if err := rayapp.RunAllTemplateTests(*testBuildFile); err != nil {
 				log.Fatal(err)
 			}
 		} else {
-			if err := rayapp.Test(args[0], *testBuildFile); err != nil {
+			if err := rayapp.RunTemplateTest(args[0], *testBuildFile); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -62,8 +62,8 @@ func main() {
 		if len(args) < 1 {
 			log.Fatal("probe requires <template-name>")
 		}
-		if errs := rayapp.Probe(args[0]); len(errs) > 0 {
-			log.Fatal(errs)
+		if err := rayapp.Probe(args[0]); err != nil {
+			log.Fatal(err)
 		}
 	case "help":
 		printUsage()
@@ -83,5 +83,8 @@ func printUsage() {
 	fmt.Println("Build flags (build):")
 	fmt.Println("  --base string      Base directory (default \".\")")
 	fmt.Println("  --output string    Output directory (default \"_build\")")
+	fmt.Println("  --build string     Build file (default \"BUILD.yaml\")")
+	fmt.Println()
+	fmt.Println("Test flags (test):")
 	fmt.Println("  --build string     Build file (default \"BUILD.yaml\")")
 }

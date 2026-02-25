@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ray-project/rayci/goqualgate"
+	"github.com/ray-project/rayci/raycilint"
 )
 
 func main() {
-	code, err := goqualgate.Main(os.Args)
+	code, err := raycilint.Main(os.Args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
