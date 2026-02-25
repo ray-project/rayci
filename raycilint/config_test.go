@@ -120,7 +120,12 @@ func TestApplyOverrides_Prsize(t *testing.T) {
 	cfg := newConfig()
 	err := applyOverrides(
 		cfg.Prsize,
-		[]string{"max_additions=200", "max_deletions=300"},
+		[]string{
+			"max_additions=200",
+			"max_deletions=300",
+			"github_step_summary=/tmp/summary.md",
+			"github_output=/tmp/output.txt",
+		},
 	)
 	if err != nil {
 		t.Fatalf("applyOverrides() error: %v", err)
@@ -130,6 +135,12 @@ func TestApplyOverrides_Prsize(t *testing.T) {
 	}
 	if got, want := cfg.Prsize.MaxDeletions, 300; got != want {
 		t.Errorf("MaxDeletions = %d, want %d", got, want)
+	}
+	if got, want := cfg.Prsize.GithubStepSummary, "/tmp/summary.md"; got != want {
+		t.Errorf("GithubStepSummary = %q, want %q", got, want)
+	}
+	if got, want := cfg.Prsize.GithubOutput, "/tmp/output.txt"; got != want {
+		t.Errorf("GithubOutput = %q, want %q", got, want)
 	}
 }
 
