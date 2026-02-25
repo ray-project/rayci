@@ -78,9 +78,6 @@ bash release.sh
 # wanda: build in RayCI mode (uses RAYCI_* env vars)
 ./wanda -rayci
 
-# rayci-lint: run all quality gates with defaults
-./rayci-lint all
-
 # rayci-lint: run coverage checks (default minimum 80%)
 ./rayci-lint go-coverage
 ./rayci-lint go-coverage -min-coverage-pct=90
