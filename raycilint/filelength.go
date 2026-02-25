@@ -9,13 +9,8 @@ import (
 	"strings"
 )
 
-// FileLengthConfig holds settings for file length checking.
-type FileLengthConfig struct {
-	MaxLines int
-}
-
-// Run executes the file length check.
-func (cfg FileLengthConfig) Run() error {
+func runFilelength(cfg *config) error {
+	fl := cfg.Filelength
 	files, err := findGoFiles()
 	if err != nil {
 		return fmt.Errorf("find go files: %w", err)
@@ -28,7 +23,7 @@ func (cfg FileLengthConfig) Run() error {
 
 	sort.Strings(files)
 
-	fmt.Printf("=== File Length Results (max %d) ===\n", cfg.MaxLines)
+	fmt.Printf("=== File Length Results (max %d) ===\n", fl.MaxLines)
 
 	var failures []string
 	for _, file := range files {
@@ -37,8 +32,8 @@ func (cfg FileLengthConfig) Run() error {
 			return fmt.Errorf("count lines %s: %w", file, err)
 		}
 
-		if lines > cfg.MaxLines {
-			over := lines - cfg.MaxLines
+		if lines > fl.MaxLines {
+			over := lines - fl.MaxLines
 			fmt.Printf("FAIL  %s: %d lines (%d over)\n", file, lines, over)
 			failures = append(failures, file)
 		}

@@ -12,25 +12,20 @@ import (
 	"strings"
 )
 
-// CoverageConfig holds settings for coverage checks.
-type CoverageConfig struct {
-	MinCoveragePct float64
-}
-
 // PackageCoverage maps package paths to coverage percentages.
 type PackageCoverage map[string]float64
 
-// Run executes coverage checks on the repository.
-func (cfg CoverageConfig) Run() error {
+func runCoverage(cfg *config) error {
 	coverage, err := execGoTestCover()
 	if err != nil {
 		return fmt.Errorf("running coverage: %w", err)
 	}
 
-	return cfg.checkCoverage(coverage)
+	return checkCoverage(cfg, coverage)
 }
 
-func (cfg CoverageConfig) checkCoverage(coverage PackageCoverage) error {
+func checkCoverage(cfg *config, coverage PackageCoverage) error {
+	cc := cfg.Coverage
 	var pkgs []string
 	for pkg := range coverage {
 		pkgs = append(pkgs, pkg)
@@ -42,8 +37,8 @@ func (cfg CoverageConfig) checkCoverage(coverage PackageCoverage) error {
 	fmt.Printf("=== Coverage Results ===\n")
 	for _, pkg := range pkgs {
 		cov := coverage[pkg]
-		if cfg.MinCoveragePct > 0 && cov < cfg.MinCoveragePct {
-			fmt.Printf("FAIL  %s: %.2f%% (need %.2f%%)\n", pkg, cov, cfg.MinCoveragePct)
+		if cc.MinCoveragePct > 0 && cov < cc.MinCoveragePct {
+			fmt.Printf("FAIL  %s: %.2f%% (need %.2f%%)\n", pkg, cov, cc.MinCoveragePct)
 			failures = append(failures, fmt.Sprintf("%s: %.2f%%", pkg, cov))
 		} else {
 			fmt.Printf("pass  %s: %.2f%%\n", pkg, cov)
