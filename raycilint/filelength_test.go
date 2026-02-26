@@ -71,7 +71,7 @@ func TestCountLinesNonExistent(t *testing.T) {
 	}
 }
 
-func TestFileLengthConfigRun(t *testing.T) {
+func TestRunFilelength(t *testing.T) {
 	tests := []struct {
 		name     string
 		files    map[string]int // filename -> line count
@@ -121,13 +121,12 @@ func TestFileLengthConfigRun(t *testing.T) {
 			}
 			defer os.Chdir(oldWd)
 
-			cfg := FileLengthConfig{
-				MaxLines: tt.maxLines,
-			}
+			cfg := newConfig()
+			cfg.Filelength.MaxLines = tt.maxLines
 
-			err = cfg.Run()
+			err = runFilelength(cfg)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("FileLengthConfig.Run() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("runFilelength() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
