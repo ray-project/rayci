@@ -13,6 +13,7 @@ import (
 type config struct {
 	Filelength *filelengthConfig `yaml:"go_filelength"`
 	Coverage   *coverageConfig   `yaml:"go_coverage"`
+	Prsize     *prsizeConfig     `yaml:"prsize"`
 }
 
 type filelengthConfig struct {
@@ -21,6 +22,12 @@ type filelengthConfig struct {
 
 type coverageConfig struct {
 	MinCoveragePct float64 `yaml:"min_coverage_pct"`
+}
+
+type prsizeConfig struct {
+	MaxAdditions int      `yaml:"max_additions"`
+	MaxDeletions int      `yaml:"max_deletions"`
+	Ignore       []string `yaml:"ignore"`
 }
 
 const defaultConfigPath = ".buildkite/raycilint.yaml"
@@ -89,6 +96,7 @@ func newConfig() *config {
 	return &config{
 		Filelength: &filelengthConfig{},
 		Coverage:   &coverageConfig{},
+		Prsize:     &prsizeConfig{},
 	}
 }
 

@@ -116,6 +116,23 @@ func TestApplyOverrides_Errors(t *testing.T) {
 	}
 }
 
+func TestApplyOverrides_Prsize(t *testing.T) {
+	cfg := newConfig()
+	err := applyOverrides(
+		cfg.Prsize,
+		[]string{"max_additions=200", "max_deletions=300"},
+	)
+	if err != nil {
+		t.Fatalf("applyOverrides() error: %v", err)
+	}
+	if got, want := cfg.Prsize.MaxAdditions, 200; got != want {
+		t.Errorf("MaxAdditions = %d, want %d", got, want)
+	}
+	if got, want := cfg.Prsize.MaxDeletions, 300; got != want {
+		t.Errorf("MaxDeletions = %d, want %d", got, want)
+	}
+}
+
 func TestApplyOverrides_Coverage(t *testing.T) {
 	cfg := newConfig()
 	err := applyOverrides(
