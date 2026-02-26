@@ -1,6 +1,7 @@
 package rayapp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,8 @@ import (
 
 func newDefaultFake() *fakeAnyscale {
 	return &fakeAnyscale{
-		defaultCloud: &fakeCloud{Name: "test-cloud", ID: "cld_test"},
+		defaultCloud:   &fakeCloud{Name: "test-cloud", ID: "cld_test"},
+		defaultProject: &fakeProject{Name: "test-project", ID: "prj_test"},
 	}
 }
 
@@ -337,5 +339,147 @@ func TestTestCmd_Constant(t *testing.T) {
 	}
 	if !strings.Contains(testCmd, "nbmake") {
 		t.Errorf("testCmd %q should contain 'nbmake'", testCmd)
+	}
+}
+
+// newProbeTestAPI creates a fake Anyscale API server that handles both
+// POST /from_template (for launchTemplateInWorkspace) and DELETE (for cleanup).
+// launchResult is returned as the "result" field of the POST response.
+// If launchStatus is non-zero, the POST returns that status code as an error.
+func newProbeTestAPI(
+	t *testing.T,
+	launchResult map[string]any,
+	launchStatus int,
+) *anyscaleAPI {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPost &&
+				strings.HasSuffix(r.URL.Path, "/from_template"):
+				if launchStatus != 0 {
+					w.WriteHeader(launchStatus)
+					w.Write([]byte(`{"error":"launch failed"}`))
+					return
+				}
+				resp := map[string]any{"result": launchResult}
+				bs, _ := json.Marshal(resp)
+				w.WriteHeader(http.StatusOK)
+				w.Write(bs)
+			case r.Method == http.MethodDelete:
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("{}"))
+			default:
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		},
+	))
+	t.Cleanup(server.Close)
+
+	api, err := newAnyscaleAPI(server.URL, "test-token")
+	if err != nil {
+		t.Fatalf("newProbeTestAPI: %v", err)
+	}
+	return api
+}
+
+func TestProbe(t *testing.T) {
+	tests := []struct {
+		name          string
+		commandErrors map[string]error
+		launchResult  map[string]any
+		launchStatus  int
+		wantErr       string
+	}{
+		{
+			name: "get default cloud fails",
+			commandErrors: map[string]error{
+				"cloud get-default": fmt.Errorf("cloud error"),
+			},
+			wantErr: "get default cloud failed",
+		},
+		{
+			name: "get default project fails",
+			commandErrors: map[string]error{
+				"project get-default": fmt.Errorf("project error"),
+			},
+			wantErr: "get default project failed",
+		},
+		{
+			name:         "launch template API fails",
+			launchStatus: http.StatusInternalServerError,
+			wantErr:      "launch template in workspace failed",
+		},
+		{
+			name:         "unexpected response format",
+			launchResult: map[string]any{"other": "data"},
+			wantErr:      "unexpected response format: missing name or id",
+		},
+		{
+			name: "wait for running state fails",
+			launchResult: map[string]any{
+				"name": "ws-test",
+				"id":   "expwrk_test",
+			},
+			commandErrors: map[string]error{
+				"workspace_v2 wait": fmt.Errorf("wait failed"),
+			},
+			wantErr: "wait for workspace running state failed",
+		},
+		{
+			name: "success",
+			launchResult: map[string]any{
+				"name": "ws-test",
+				"id":   "expwrk_test",
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := newDefaultFake()
+			fake.commandErrors = tt.commandErrors
+			cli := newTestCLI(fake)
+			api := newProbeTestAPI(t, tt.launchResult, tt.launchStatus)
+
+			err := probe("my-template", cli, api)
+
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestProbe_CleanupFails(t *testing.T) {
+	fake := newDefaultFake()
+	fake.commandErrors = map[string]error{
+		"workspace_v2 terminate": fmt.Errorf("terminate failed"),
+	}
+	cli := newTestCLI(fake)
+	api := newProbeTestAPI(t, map[string]any{
+		"name": "ws-test",
+		"id":   "expwrk_test",
+	}, 0)
+
+	err := probe("my-template", cli, api)
+	if err == nil {
+		t.Fatal("expected error when cleanup fails")
+	}
+	if !strings.Contains(err.Error(), "terminate workspace failed") {
+		t.Errorf(
+			"error %q should contain 'terminate workspace failed'",
+			err.Error(),
+		)
 	}
 }
