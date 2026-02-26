@@ -25,9 +25,11 @@ type coverageConfig struct {
 }
 
 type prsizeConfig struct {
-	MaxAdditions int      `yaml:"max_additions"`
-	MaxDeletions int      `yaml:"max_deletions"`
-	Ignore       []string `yaml:"ignore"`
+	MaxAdditions      int      `yaml:"max_additions"`
+	MaxDeletions      int      `yaml:"max_deletions"`
+	Ignore            []string `yaml:"ignore"`
+	GithubStepSummary string   `yaml:"github_step_summary"`
+	GithubOutput      string   `yaml:"github_output"`
 }
 
 const defaultConfigPath = ".buildkite/raycilint.yaml"
