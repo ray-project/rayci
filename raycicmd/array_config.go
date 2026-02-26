@@ -12,8 +12,8 @@ type arrayConfig struct {
 	dims map[string][]string // dimension name -> values
 }
 
-// arrayInstance is one combination from expand().
-type arrayInstance struct {
+// arrayElement is one combination from expand().
+type arrayElement struct {
 	values map[string]string // dimension name -> selected value
 }
 
@@ -73,19 +73,19 @@ func (cfg *arrayConfig) sortedDimensions() []string {
 }
 
 // expand returns the cartesian product of all dimensions.
-func (cfg *arrayConfig) expand() []*arrayInstance {
+func (cfg *arrayConfig) expand() []*arrayElement {
 	if len(cfg.dims) == 0 {
 		return nil
 	}
 
-	result := []*arrayInstance{{values: make(map[string]string)}}
+	result := []*arrayElement{{values: make(map[string]string)}}
 	for _, dim := range cfg.sortedDimensions() {
-		var expanded []*arrayInstance
-		for _, inst := range result {
+		var expanded []*arrayElement
+		for _, elem := range result {
 			for _, val := range cfg.dims[dim] {
-				newInst := &arrayInstance{values: maps.Clone(inst.values)}
-				newInst.values[dim] = val
-				expanded = append(expanded, newInst)
+				newElem := &arrayElement{values: maps.Clone(elem.values)}
+				newElem.values[dim] = val
+				expanded = append(expanded, newElem)
 			}
 		}
 		result = expanded
@@ -95,16 +95,16 @@ func (cfg *arrayConfig) expand() []*arrayInstance {
 
 // generateKey returns {base}--{dim1}{val1}-{dim2}{val2} (dims sorted).
 // Double-dash separates base key from array dimensions.
-func (inst *arrayInstance) generateKey(baseKey string) string {
-	dims := make([]string, 0, len(inst.values))
-	for dim := range inst.values {
+func (elem *arrayElement) generateKey(baseKey string) string {
+	dims := make([]string, 0, len(elem.values))
+	for dim := range elem.values {
 		dims = append(dims, dim)
 	}
 	sort.Strings(dims)
 
 	var parts []string
 	for _, dim := range dims {
-		parts = append(parts, sanitizeKeyPart(dim+inst.values[dim]))
+		parts = append(parts, sanitizeKeyPart(dim+elem.values[dim]))
 	}
 	return baseKey + "--" + strings.Join(parts, "-")
 }
@@ -122,20 +122,20 @@ func sanitizeKeyPart(s string) string {
 }
 
 // substituteValues deep-copies v, replacing {{array.X}} placeholders.
-func (inst *arrayInstance) substituteValues(v any) any {
+func (elem *arrayElement) substituteValues(v any) any {
 	switch val := v.(type) {
 	case string: // label: "Build {{array.python}}"
-		return inst.substituteString(val)
+		return elem.substituteString(val)
 	case map[string]any: // env: {PYTHON: "{{array.python}}"}
 		result := make(map[string]any, len(val))
 		for k, v := range val {
-			result[k] = inst.substituteValues(v)
+			result[k] = elem.substituteValues(v)
 		}
 		return result
 	case []any: // commands: ["echo {{array.python}}"]
 		result := make([]any, len(val))
 		for i, v := range val {
-			result[i] = inst.substituteValues(v)
+			result[i] = elem.substituteValues(v)
 		}
 		return result
 	default:
@@ -143,11 +143,11 @@ func (inst *arrayInstance) substituteValues(v any) any {
 	}
 }
 
-func (inst *arrayInstance) substituteString(s string) string {
+func (elem *arrayElement) substituteString(s string) string {
 	if !hasArrayPlaceholder(s) {
 		return s
 	}
-	for dim, val := range inst.values {
+	for dim, val := range elem.values {
 		s = strings.ReplaceAll(s, "{{array."+dim+"}}", val)
 	}
 	return s
