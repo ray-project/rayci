@@ -8,43 +8,43 @@ import (
 func TestCheckCoverage(t *testing.T) {
 	tests := []struct {
 		name     string
-		cfg      CoverageConfig
+		pct      float64
 		coverage PackageCoverage
 		wantErr  bool
 	}{
 		{
 			name:     "no threshold all pass",
-			cfg:      CoverageConfig{MinCoveragePct: 0},
+			pct:      0,
 			coverage: PackageCoverage{"pkg": 80.0},
 			wantErr:  false,
 		},
 		{
 			name:     "above threshold",
-			cfg:      CoverageConfig{MinCoveragePct: 50.0},
+			pct:      50.0,
 			coverage: PackageCoverage{"pkg": 80.0},
 			wantErr:  false,
 		},
 		{
 			name:     "exactly at threshold",
-			cfg:      CoverageConfig{MinCoveragePct: 80.0},
+			pct:      80.0,
 			coverage: PackageCoverage{"pkg": 80.0},
 			wantErr:  false,
 		},
 		{
 			name:     "below threshold",
-			cfg:      CoverageConfig{MinCoveragePct: 90.0},
+			pct:      90.0,
 			coverage: PackageCoverage{"pkg": 80.0},
 			wantErr:  true,
 		},
 		{
 			name:     "multiple packages one fails",
-			cfg:      CoverageConfig{MinCoveragePct: 50.0},
+			pct:      50.0,
 			coverage: PackageCoverage{"pkg1": 80.0, "pkg2": 30.0},
 			wantErr:  true,
 		},
 		{
 			name:     "multiple packages all pass",
-			cfg:      CoverageConfig{MinCoveragePct: 50.0},
+			pct:      50.0,
 			coverage: PackageCoverage{"pkg1": 80.0, "pkg2": 60.0},
 			wantErr:  false,
 		},
@@ -52,7 +52,9 @@ func TestCheckCoverage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.checkCoverage(tt.coverage)
+			cfg := newConfig()
+			cfg.Coverage.MinCoveragePct = tt.pct
+			err := checkCoverage(cfg, tt.coverage)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkCoverage() error = %v, wantErr %v", err, tt.wantErr)
 			}

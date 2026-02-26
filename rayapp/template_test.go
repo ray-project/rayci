@@ -22,6 +22,8 @@ const testBuildDotYaml = `
   compute_config:
     GCP: configs/basic-single-node/gce.yaml
     AWS: configs/basic-single-node/aws.yaml
+  test:
+    command: pytest --nbmake . -s -vv
 
 - name: job-intro-image-uri
   emoji: 📦
@@ -33,6 +35,8 @@ const testBuildDotYaml = `
   compute_config:
     GCP: configs/basic-single-node/gce.yaml
     AWS: configs/basic-single-node/aws.yaml
+  test:
+    command: pytest --nbmake . -s -vv
 
 - name: workspace-intro
   emoji: 🔰
@@ -46,6 +50,9 @@ const testBuildDotYaml = `
   compute_config:
     GCP: configs/basic-single-node/gce.yaml
     AWS: configs/basic-single-node/aws.yaml
+  test:
+    command: pytest --nbmake . -s -vv
+    timeout_in_sec: 7200
 `
 
 func TestReadTemplates(t *testing.T) {
@@ -74,6 +81,10 @@ func TestReadTemplates(t *testing.T) {
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
 		},
+		Test: &TestConfig{
+			TimeoutInSec: 3600,
+			Command:      "pytest --nbmake . -s -vv",
+		},
 	}, {
 		Name:        "job-intro-image-uri",
 		Emoji:       "📦",
@@ -86,6 +97,10 @@ func TestReadTemplates(t *testing.T) {
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
+		},
+		Test: &TestConfig{
+			TimeoutInSec: 3600,
+			Command:      "pytest --nbmake . -s -vv",
 		},
 	}, {
 		Name:        "workspace-intro",
@@ -102,6 +117,10 @@ func TestReadTemplates(t *testing.T) {
 		ComputeConfig: map[string]string{
 			"GCP": "configs/basic-single-node/gce.yaml",
 			"AWS": "configs/basic-single-node/aws.yaml",
+		},
+		Test: &TestConfig{
+			TimeoutInSec: 7200,
+			Command:      "pytest --nbmake . -s -vv",
 		},
 	}}
 
@@ -224,6 +243,8 @@ func TestReadTemplates_emptyClusterEnv(t *testing.T) {
 		"  dir: x",
 		"  cluster_env: {}",
 		"  compute_config: {}",
+		"  test:",
+		"    command: pytest",
 	}, "\n")
 	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
@@ -373,6 +394,8 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			"    byod:",
 			"      ray_version: 2.34.0",
 			"  compute_config: {}",
+			"  test:",
+			"    command: pytest",
 		}, "\n")},
 		{"byod missing ray_version", strings.Join([]string{
 			"- name: x",
@@ -381,6 +404,8 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			"    byod:",
 			"      docker_image: cr.ray.io/ray:2340",
 			"  compute_config: {}",
+			"  test:",
+			"    command: pytest",
 		}, "\n")},
 		{"byod both docker_image and containerfile", strings.Join([]string{
 			"- name: x",
@@ -391,6 +416,8 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 			"      containerfile: Dockerfile",
 			"      ray_version: 2.34.0",
 			"  compute_config: {}",
+			"  test:",
+			"    command: pytest",
 		}, "\n")},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -423,6 +450,170 @@ func TestReadTemplates_byodIncomplete(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestValidateTestConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		test        *TestConfig
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "nil test config is valid",
+			test:    nil,
+			wantErr: false,
+		},
+		{
+			name: "valid test config with all fields",
+			test: &TestConfig{
+				TimeoutInSec: 1800,
+				TestsPath:    "tests/",
+				Command:      "pytest",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid test config with only command",
+			test: &TestConfig{
+				Command: "pytest",
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty command",
+			test: &TestConfig{
+				Command: "",
+			},
+			wantErr:     true,
+			errContains: "test.command is required",
+		},
+		{
+			name: "whitespace command",
+			test: &TestConfig{
+				Command: "   ",
+			},
+			wantErr:     true,
+			errContains: "test.command is required",
+		},
+		{
+			name: "negative timeout",
+			test: &TestConfig{
+				TimeoutInSec: -100,
+				Command:      "pytest",
+			},
+			wantErr:     true,
+			errContains: "timeout_in_sec must be non-negative",
+		},
+		{
+			name: "zero timeout defaults to 3600",
+			test: &TestConfig{
+				TimeoutInSec: 0,
+				Command:      "pytest",
+			},
+			wantErr: false,
+		},
+		{
+			name: "absolute tests_path rejected",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "/etc/passwd",
+			},
+			wantErr:     true,
+			errContains: "tests_path must be a relative path",
+		},
+		{
+			name: "parent traversal tests_path rejected",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "../secret",
+			},
+			wantErr:     true,
+			errContains: "tests_path must not contain '..'",
+		},
+		{
+			name: "valid relative tests_path",
+			test: &TestConfig{
+				Command:   "pytest",
+				TestsPath: "tests/",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTestConfig(tt.test)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.errContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.name == "zero timeout defaults to 3600" {
+				if tt.test.TimeoutInSec != 3600 {
+					t.Errorf(
+						"TimeoutInSec = %d, want 3600",
+						tt.test.TimeoutInSec,
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestReadTemplates_missingTestConfig(t *testing.T) {
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "BUILD.yaml")
+	yaml := strings.Join([]string{
+		"- name: no-test",
+		"  dir: x",
+		"  cluster_env:",
+		"    build_id: anyscaleray2340-py311",
+		"  compute_config: {}",
+	}, "\n")
+	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	tmpls, err := readTemplates(f)
+	if err != nil {
+		t.Fatalf("readTemplates() = %v, want nil error", err)
+	}
+	if len(tmpls) != 1 {
+		t.Fatalf("len(tmpls) = %d, want 1", len(tmpls))
+	}
+	if tmpls[0].Test != nil {
+		t.Errorf("template without test key should have Test == nil, got %v", tmpls[0].Test)
+	}
+}
+
+func TestReadTemplates_emptyTestCommand(t *testing.T) {
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "BUILD.yaml")
+	yaml := strings.Join([]string{
+		"- name: empty-cmd",
+		"  dir: x",
+		"  cluster_env:",
+		"    build_id: anyscaleray2340-py311",
+		"  compute_config: {}",
+		"  test:",
+		"    command: ''",
+	}, "\n")
+	if err := os.WriteFile(f, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	_, err := readTemplates(f)
+	if err == nil {
+		t.Fatal("want error for empty test command, got nil")
+	}
+	if !strings.Contains(err.Error(), "test.command is required") {
+		t.Errorf("error %q should mention test.command is required", err.Error())
 	}
 }
 

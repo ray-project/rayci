@@ -3,6 +3,7 @@ package rayapp
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -25,6 +26,13 @@ type ClusterEnv struct {
 	BYOD *ClusterEnvBYOD `yaml:"byod,omitempty" json:"byod,omitempty"`
 }
 
+// TestConfig defines test configuration for a template.
+type TestConfig struct {
+	TimeoutInSec int    `yaml:"timeout_in_sec,omitempty" json:"timeout_in_sec,omitempty"`
+	TestsPath    string `yaml:"tests_path,omitempty"     json:"tests_path,omitempty"`
+	Command      string `yaml:"command"                  json:"command"`
+}
+
 // Template defines the definition of a workspace template.
 type Template struct {
 	Name string `yaml:"name" json:"name"`
@@ -38,6 +46,9 @@ type Template struct {
 
 	// A map of files for different compute platforms.
 	ComputeConfig map[string]string `yaml:"compute_config" json:"compute_config"`
+
+	// Test configuration for the template (optional).
+	Test *TestConfig `yaml:"test,omitempty" json:"test,omitempty"`
 }
 
 // Find first version-like digit sequence in build ID remainder (unanchored).
@@ -166,6 +177,33 @@ func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, er
 	}
 }
 
+// validateTestConfig returns an error if TestConfig is invalid; otherwise nil.
+// Nil test config is valid (test configuration is optional).
+func validateTestConfig(test *TestConfig) error {
+	if test == nil {
+		return nil
+	}
+	if strings.TrimSpace(test.Command) == "" {
+		return fmt.Errorf("test.command is required")
+	}
+	if test.TimeoutInSec < 0 {
+		return fmt.Errorf("test.timeout_in_sec must be non-negative")
+	}
+	if test.TestsPath != "" {
+		if filepath.IsAbs(test.TestsPath) {
+			return fmt.Errorf("test.tests_path must be a relative path")
+		}
+		if strings.Contains(filepath.Clean(test.TestsPath), "..") {
+			return fmt.Errorf("test.tests_path must not contain '..'")
+		}
+	}
+	// Default timeout to 1 hour if not specified.
+	if test.TimeoutInSec == 0 {
+		test.TimeoutInSec = 3600
+	}
+	return nil
+}
+
 // validateClusterEnv returns an error if ClusterEnv is nil or invalid (BYOD or build_id/image_uri);
 // otherwise nil.
 func validateClusterEnv(env *ClusterEnv) error {
@@ -212,6 +250,9 @@ func readTemplates(yamlFile string) ([]*Template, error) {
 		}
 		if err := validateClusterEnv(tmpl.ClusterEnv); err != nil {
 			return nil, fmt.Errorf("validate cluster env for template %q: %w", tmpl.Name, err)
+		}
+		if err := validateTestConfig(tmpl.Test); err != nil {
+			return nil, fmt.Errorf("validate test config for template %q: %w", tmpl.Name, err)
 		}
 	}
 	return tmpls, nil

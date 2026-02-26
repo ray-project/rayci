@@ -8,22 +8,23 @@ import (
 
 const defaultMinCoveragePct = 80.0
 
-var coverageUsage = fmt.Sprintf(`rayci-lint go-coverage - Run test coverage checks
+var coverageUsage = `rayci-lint go-coverage - Run test coverage checks
 
 Runs 'go test -cover' on all packages and reports coverage.
-Fails if any package is below -min-coverage-pct.
+Fails if any package is below the configured min_coverage_pct.
 
 Usage:
-  rayci-lint go-coverage [flags]
+  rayci-lint go-coverage [-config-value key=value]
 
 Flags:
-	-min-coverage-pct float
-		Minimum coverage percentage required to pass (default %.f).`, defaultMinCoveragePct) + `
+  -config-value key=value
+    Override a config value. Supported keys:
+` + overrideKeysHelp(coverageConfig{}) + `
 
 Improving Coverage (for AI agents):
 
   1. Run coverage check to identify failing packages:
-       ./rayci-lint go-coverage -min-coverage-pct <target-coverage-pct>
+       ./rayci-lint go-coverage
 
   2. For each failing package, get detailed function-level coverage:
        go test -coverprofile=cover.out ./<package>/...
@@ -43,36 +44,29 @@ Improving Coverage (for AI agents):
      mocking infrastructure exists. Focus on testable code paths.
 `
 
-func parseCoverageConfig(args []string) (*CoverageConfig, error) {
-	set := flag.NewFlagSet("rayci-lint go-coverage", flag.ExitOnError)
-	set.Usage = func() {
-		fmt.Fprint(os.Stderr, coverageUsage)
-		set.PrintDefaults()
-	}
-
-	cfg := new(CoverageConfig)
-	set.Float64Var(
-		&cfg.MinCoveragePct, "min-coverage-pct",
-		defaultMinCoveragePct,
-		fmt.Sprintf(
-			"Minimum coverage percentage required to pass (default %.f).",
-			defaultMinCoveragePct,
-		),
+func cmdCoverage(cfg *config, args []string) error {
+	set := flag.NewFlagSet(
+		"rayci-lint go-coverage", flag.ContinueOnError,
 	)
+	set.Usage = func() { fmt.Fprint(os.Stderr, coverageUsage) }
 
-	set.Parse(args)
+	var configOverrides multiFlag
+	set.Var(&configOverrides, "config-value", "override a config value")
 
-	if set.NArg() > 0 {
-		return nil, fmt.Errorf("unexpected arguments: %v", set.Args())
-	}
-
-	return cfg, nil
-}
-
-func cmdCoverage(args []string) error {
-	cfg, err := parseCoverageConfig(args)
-	if err != nil {
+	if err := set.Parse(args); err != nil {
 		return err
 	}
-	return cfg.Run()
+	if set.NArg() > 0 {
+		return fmt.Errorf("unexpected arguments: %v", set.Args())
+	}
+
+	if err := applyOverrides(cfg.Coverage, configOverrides); err != nil {
+		return err
+	}
+
+	if cfg.Coverage.MinCoveragePct <= 0 {
+		cfg.Coverage.MinCoveragePct = defaultMinCoveragePct
+	}
+
+	return runCoverage(cfg)
 }

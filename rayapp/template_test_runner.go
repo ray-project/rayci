@@ -175,8 +175,8 @@ type WorkspaceTestConfig struct {
 	errs          []error
 }
 
-// Probe launches a template into a workspace, runs tests, and
-// cleans up.
+// Probe launches a template into a workspace, waits for it to
+// start, and cleans up.
 func Probe(tmplName string) error {
 	cli := NewAnyscaleCLI()
 	api, err := newAnyscaleAPI(
@@ -205,9 +205,9 @@ func probe(
 	return nil
 }
 
-// NewWorkspaceTestConfig creates a new WorkspaceTestConfig that
+// newWorkspaceTestConfig creates a new WorkspaceTestConfig that
 // uses an empty workspace to test a template.
-func NewWorkspaceTestConfig(
+func newWorkspaceTestConfig(
 	t *Template,
 	anyscaleCLI *AnyscaleCLI,
 	anyscaleAPI *anyscaleAPI,
@@ -272,18 +272,33 @@ func runTemplateTestsWithFilter(
 	buildDir := filepath.Dir(buildFile)
 
 	var filteredTmpls []*Template
+	var skippedNoTest int
 	for _, t := range tmpls {
-		if filter == nil || filter(t) {
-			filteredTmpls = append(filteredTmpls, t)
+		if filter != nil && !filter(t) {
+			continue
 		}
+		if t.Test == nil {
+			log.Printf(
+				"Template %s has no test configuration, skipping",
+				t.Name,
+			)
+			skippedNoTest++
+			continue
+		}
+		filteredTmpls = append(filteredTmpls, t)
 	}
 	if len(filteredTmpls) == 0 {
+		if skippedNoTest > 0 {
+			return fmt.Errorf(
+				"no templates with test configuration to run",
+			)
+		}
 		return fmt.Errorf("no templates to test")
 	}
 
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := NewWorkspaceTestConfig(t, cli, api, buildDir)
+		c := newWorkspaceTestConfig(t, cli, api, buildDir)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()
@@ -372,12 +387,72 @@ func (c *WorkspaceTestConfig) Run() {
 		return
 	}
 
+	// If tests_path is provided, zip and push test folder.
+	if c.template != nil && c.template.Test != nil &&
+		c.template.Test.TestsPath != "" {
+		testsPath := filepath.Join(
+			c.buildDir, c.template.Test.TestsPath,
+		)
+		testZipDir, err := os.MkdirTemp("", "test_zip")
+		if err != nil {
+			c.errs = append(c.errs, fmt.Errorf(
+				"create test temp directory failed: %w", err,
+			))
+			return
+		}
+		defer os.RemoveAll(testZipDir)
+
+		testZipFileName := filepath.Join(
+			testZipDir, "tests.zip",
+		)
+		if err := zipDirectory(
+			testsPath, testZipFileName,
+		); err != nil {
+			c.errs = append(c.errs, fmt.Errorf(
+				"zip test directory failed: %w", err,
+			))
+			return
+		}
+
+		if err := c.anyscaleCLI.pushFolderToWorkspace(
+			c.workspaceName, testZipDir,
+		); err != nil {
+			c.errs = append(c.errs, fmt.Errorf(
+				"push test zip to workspace failed: %w", err,
+			))
+			return
+		}
+
+		if err := c.anyscaleCLI.runCmdInWorkspace(
+			c.workspaceName, "unzip -o tests.zip",
+		); err != nil {
+			c.errs = append(c.errs, fmt.Errorf(
+				"unzip tests in workspace failed: %w", err,
+			))
+			return
+		}
+	}
+
+	// Run test command from template config, or fallback to
+	// default testCmd for probe-style runs.
+	var cmd string
+	if c.template != nil && c.template.Test != nil {
+		escaped := strings.ReplaceAll(
+			c.template.Test.Command, "'", "'\\''",
+		)
+		cmd = fmt.Sprintf(
+			"timeout %d bash -c '%s'",
+			c.template.Test.TimeoutInSec, escaped,
+		)
+	} else {
+		cmd = testCmd
+	}
 	if err := c.anyscaleCLI.runCmdInWorkspace(
-		c.workspaceName, testCmd,
+		c.workspaceName, cmd,
 	); err != nil {
 		c.errs = append(
 			c.errs,
-			fmt.Errorf("test command failed: %w", err),
+			fmt.Errorf("run test command failed: %w", err),
 		)
 	}
 }
