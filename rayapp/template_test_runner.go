@@ -151,13 +151,14 @@ type WorkspaceTestConfig struct {
 	imageURI      string
 	rayVersion    string
 	template      *Template
+	probe         bool
 	success       bool
 	errs          []error
 }
 
-// RunProbe launches a template into a workspace, waits for it to
-// start, and cleans up.
-func RunProbe(tmplName string) error {
+// RunProbe launches a template into a workspace, runs tests if
+// configured, and cleans up.
+func RunProbe(tmplName, buildFile string) error {
 	cli := NewAnyscaleCLI()
 	api, err := newAnyscaleAPI(
 		os.Getenv("ANYSCALE_HOST"),
@@ -166,16 +167,42 @@ func RunProbe(tmplName string) error {
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runProbe(tmplName, cli, api)
+	return runProbe(tmplName, buildFile, cli, api)
 }
 
 func runProbe(
-	tmplName string, cli *AnyscaleCLI, api *anyscaleAPI,
+	tmplName, buildFile string,
+	cli *AnyscaleCLI, api *anyscaleAPI,
 ) error {
+	tmpls, err := readTemplates(buildFile)
+	if err != nil {
+		return fmt.Errorf("read templates failed: %w", err)
+	}
+
+	var tmpl *Template
+	for _, t := range tmpls {
+		if t.Name == tmplName {
+			tmpl = t
+			break
+		}
+	}
+	if tmpl == nil {
+		return fmt.Errorf(
+			"template %q not found in %s", tmplName, buildFile,
+		)
+	}
+
+	buildDir := filepath.Dir(buildFile)
+	tmplCopy := *tmpl
+	tmplCopy.Dir = filepath.Join(buildDir, tmpl.Dir)
+
 	c := &WorkspaceTestConfig{
 		tmplName:    tmplName,
 		anyscaleCLI: cli,
 		anyscaleAPI: api,
+		probe:       true,
+		template:    &tmplCopy,
+		buildDir:    buildDir,
 	}
 	c.Run()
 	if !c.success {
@@ -354,10 +381,10 @@ func (c *WorkspaceTestConfig) Run() {
 	}()
 
 	var err error
-	if c.template != nil {
-		err = c.setupEmptyWorkspace()
-	} else {
+	if c.probe {
 		err = c.setupTemplateWorkspace()
+	} else {
+		err = c.setupEmptyWorkspace()
 	}
 	if err != nil {
 		c.errs = append(c.errs, err)
@@ -417,8 +444,7 @@ func (c *WorkspaceTestConfig) Run() {
 		}
 	}
 
-	// Run test command from template config. Probe-style runs
-	// (no template) skip the test command entirely.
+	// Run test command from template config.
 	if c.template != nil && c.template.Test != nil {
 		escaped := strings.ReplaceAll(
 			c.template.Test.Command, "'", "'\\''",

@@ -596,7 +596,10 @@ func TestRunProbe(t *testing.T) {
 				t, tt.launchResult, tt.launchStatus,
 			)
 
-			err := runProbe("my-template", cli, api)
+			err := runProbe(
+				"fishy-ray", "testdata/BUILD.yaml",
+				cli, api,
+			)
 
 			if tt.wantErr == "" {
 				if err != nil {
@@ -633,7 +636,9 @@ func TestRunProbe_CleanupFails(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := runProbe("my-template", cli, api)
+	err := runProbe(
+		"fishy-ray", "testdata/BUILD.yaml", cli, api,
+	)
 	if err == nil {
 		t.Fatal("expected error when cleanup fails")
 	}
@@ -642,6 +647,122 @@ func TestRunProbe_CleanupFails(t *testing.T) {
 	) {
 		t.Errorf(
 			"error %q should contain 'terminate workspace failed'",
+			err.Error(),
+		)
+	}
+}
+
+func TestRunProbe_RunsTestCommand(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newProbeTestAPI(t, map[string]any{
+		"name": "ws-test",
+		"id":   "expwrk_test",
+	}, 0)
+
+	var capturedCmd string
+	cli.setRunFunc(func(args []string) (string, error) {
+		cmd := fmt.Sprintf("%s %s", args[0], args[1])
+		if cmd == "workspace_v2 run_command" &&
+			strings.HasPrefix(args[4], "timeout") {
+			capturedCmd = args[4]
+		}
+		return fake.run(args)
+	})
+
+	err := runProbe(
+		"fishy-ray", "testdata/BUILD.yaml", cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedCmd == "" {
+		t.Fatal("expected test command to be executed")
+	}
+	if !strings.Contains(capturedCmd, "bash -c '") {
+		t.Errorf(
+			"command %q should contain bash -c invocation",
+			capturedCmd,
+		)
+	}
+}
+
+func TestRunProbe_TestCommandFails(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newProbeTestAPI(t, map[string]any{
+		"name": "ws-test",
+		"id":   "expwrk_test",
+	}, 0)
+
+	cli.setRunFunc(func(args []string) (string, error) {
+		cmd := fmt.Sprintf("%s %s", args[0], args[1])
+		if cmd == "workspace_v2 run_command" &&
+			strings.HasPrefix(args[4], "timeout") {
+			return "", fmt.Errorf("test execution failed")
+		}
+		return fake.run(args)
+	})
+
+	err := runProbe(
+		"fishy-ray", "testdata/BUILD.yaml", cli, api,
+	)
+	if err == nil {
+		t.Fatal("expected error when test command fails")
+	}
+	if !strings.Contains(
+		err.Error(), "run test command failed",
+	) {
+		t.Errorf(
+			"error %q should contain 'run test command failed'",
+			err.Error(),
+		)
+	}
+}
+
+func TestRunProbe_WithTestsPath(t *testing.T) {
+	fake := newDefaultFake()
+	cli := newTestCLI(fake)
+	api := newProbeTestAPI(t, map[string]any{
+		"name": "ws-test",
+		"id":   "expwrk_test",
+	}, 0)
+
+	err := runProbe(
+		"testy-ray", "testdata/BUILD.yaml", cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunProbe_TemplateNotFound(t *testing.T) {
+	err := runProbe(
+		"nonexistent", "testdata/BUILD.yaml", nil, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error when template not found")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf(
+			"error %q should contain 'not found'",
+			err.Error(),
+		)
+	}
+}
+
+func TestRunProbe_ReadTemplatesFails(t *testing.T) {
+	err := runProbe(
+		"any", "nonexistent/BUILD.yaml", nil, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error for invalid build file")
+	}
+	if !strings.Contains(
+		err.Error(), "read templates failed",
+	) {
+		t.Errorf(
+			"error %q should contain 'read templates failed'",
 			err.Error(),
 		)
 	}
