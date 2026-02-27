@@ -86,7 +86,9 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 	return nil
 }
 
-func (a *anyscaleAPI) launchTemplateInWorkspace(cloudID, projectID, templateName string) (map[string]any, error) {
+func (a *anyscaleAPI) launchTemplateInWorkspace(
+	cloudID, projectID, templateName string,
+) (map[string]any, error) {
 	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces/from_template")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
