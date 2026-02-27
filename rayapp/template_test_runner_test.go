@@ -480,22 +480,6 @@ func createEmptyBuildFile(t *testing.T) string {
 	return f
 }
 
-func TestTestCmd_Constant(t *testing.T) {
-	if testCmd == "" {
-		t.Error("testCmd should not be empty")
-	}
-	if !strings.Contains(testCmd, "pytest") {
-		t.Errorf(
-			"testCmd %q should contain 'pytest'", testCmd,
-		)
-	}
-	if !strings.Contains(testCmd, "nbmake") {
-		t.Errorf(
-			"testCmd %q should contain 'nbmake'", testCmd,
-		)
-	}
-}
-
 // newProbeTestAPI creates a fake Anyscale API server that handles
 // both POST /from_template and DELETE requests.
 func newProbeTestAPI(
@@ -544,7 +528,7 @@ func newProbeTestAPI(
 	return api
 }
 
-func TestProbe(t *testing.T) {
+func TestRunProbe(t *testing.T) {
 	tests := []struct {
 		name          string
 		commandErrors map[string]error
@@ -612,7 +596,7 @@ func TestProbe(t *testing.T) {
 				t, tt.launchResult, tt.launchStatus,
 			)
 
-			err := probe("my-template", cli, api)
+			err := runProbe("my-template", cli, api)
 
 			if tt.wantErr == "" {
 				if err != nil {
@@ -636,7 +620,7 @@ func TestProbe(t *testing.T) {
 	}
 }
 
-func TestProbe_CleanupFails(t *testing.T) {
+func TestRunProbe_CleanupFails(t *testing.T) {
 	fake := newDefaultFake()
 	fake.commandErrors = map[string]error{
 		"workspace_v2 terminate": fmt.Errorf(
@@ -649,7 +633,7 @@ func TestProbe_CleanupFails(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := probe("my-template", cli, api)
+	err := runProbe("my-template", cli, api)
 	if err == nil {
 		t.Fatal("expected error when cleanup fails")
 	}

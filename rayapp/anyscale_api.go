@@ -61,7 +61,6 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+a.token)
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
 	if err != nil {
@@ -69,12 +68,15 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, err := io.ReadAll(
+			io.LimitReader(resp.Body, 1024),
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to read response body: %w", err,
+			)
+		}
 		return &apiError{
 			StatusCode: resp.StatusCode,
 			Body:       string(body),
@@ -105,29 +107,29 @@ func (a *anyscaleAPI) launchTemplateInWorkspace(cloudID, projectID, templateName
 	}
 
 	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
-
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
+	body, err := io.ReadAll(
+		io.LimitReader(resp.Body, 1024*1024),
+	)
+	if err != nil {
 		return nil, fmt.Errorf(
-			"launch template in workspace failed with status %d: %s",
-			resp.StatusCode,
-			string(body),
+			"failed to read response body: %w", err,
 		)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf(
+			"launch template in workspace failed "+
+				"with status %d: %s",
+			resp.StatusCode, string(body),
+		)
 	}
 
 	var response map[string]any

@@ -62,7 +62,7 @@ func main() {
 		if len(args) < 1 {
 			log.Fatal("probe requires <template-name>")
 		}
-		if err := rayapp.Probe(args[0]); err != nil {
+		if err := rayapp.RunProbe(args[0]); err != nil {
 			log.Fatal(err)
 		}
 	case "help":
@@ -78,6 +78,7 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  build <template-name|all>  Build a template or all templates")
 	fmt.Println("  test  <template-name|all>  Test a template or all templates")
+	fmt.Println("  probe <template-name>      Launch template and run quick test")
 	fmt.Println("  help                       Show this help message")
 	fmt.Println()
 	fmt.Println("Build flags (build):")

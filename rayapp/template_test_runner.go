@@ -10,24 +10,9 @@ import (
 	"time"
 )
 
-const testCmd = "pip install nbmake==1.5.5 pytest==9.0.2 && " +
-	"pytest --nbmake . -s -vv"
-
-// workspaceLauncher sets up a workspace for testing.
-type workspaceLauncher interface {
-	// setup creates and prepares a workspace for test execution.
-	// It sets c.workspaceName and c.workspaceID, and leaves
-	// the workspace in a running state ready for tests.
-	setup(c *WorkspaceTestConfig) error
-}
-
-// emptyWorkspaceLauncher creates an empty workspace, starts it,
+// setupEmptyWorkspace creates an empty workspace, starts it,
 // and pushes template files into it.
-type emptyWorkspaceLauncher struct{}
-
-func (l *emptyWorkspaceLauncher) setup(
-	c *WorkspaceTestConfig,
-) error {
+func (c *WorkspaceTestConfig) setupEmptyWorkspace() error {
 	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
 		c.computeConfig = generateComputeConfigName(awsConfigPath)
 		resolvedPath := filepath.Join(c.buildDir, awsConfigPath)
@@ -103,13 +88,9 @@ func (l *emptyWorkspaceLauncher) setup(
 	return nil
 }
 
-// templateWorkspaceLauncher launches a workspace from a template
+// setupTemplateWorkspace launches a workspace from a template
 // via the Anyscale API.
-type templateWorkspaceLauncher struct{}
-
-func (l *templateWorkspaceLauncher) setup(
-	c *WorkspaceTestConfig,
-) error {
+func (c *WorkspaceTestConfig) setupTemplateWorkspace() error {
 	cloudInfo, err := c.anyscaleCLI.GetDefaultCloud()
 	if err != nil {
 		return fmt.Errorf(
@@ -170,14 +151,13 @@ type WorkspaceTestConfig struct {
 	imageURI      string
 	rayVersion    string
 	template      *Template
-	launcher      workspaceLauncher
 	success       bool
 	errs          []error
 }
 
-// Probe launches a template into a workspace, waits for it to
+// RunProbe launches a template into a workspace, waits for it to
 // start, and cleans up.
-func Probe(tmplName string) error {
+func RunProbe(tmplName string) error {
 	cli := NewAnyscaleCLI()
 	api, err := newAnyscaleAPI(
 		os.Getenv("ANYSCALE_HOST"),
@@ -186,17 +166,16 @@ func Probe(tmplName string) error {
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return probe(tmplName, cli, api)
+	return runProbe(tmplName, cli, api)
 }
 
-func probe(
+func runProbe(
 	tmplName string, cli *AnyscaleCLI, api *anyscaleAPI,
 ) error {
 	c := &WorkspaceTestConfig{
 		tmplName:    tmplName,
 		anyscaleCLI: cli,
 		anyscaleAPI: api,
-		launcher:    &templateWorkspaceLauncher{},
 	}
 	c.Run()
 	if !c.success {
@@ -223,7 +202,6 @@ func newWorkspaceTestConfig(
 		errs:        nil,
 		template:    &tmplCopy,
 		buildDir:    buildDir,
-		launcher:    &emptyWorkspaceLauncher{},
 		workspaceName: fmt.Sprintf(
 			"%s-%s", t.Name, time.Now().Format("20060102150405"),
 		),
@@ -375,7 +353,13 @@ func (c *WorkspaceTestConfig) Run() {
 		}
 	}()
 
-	if err := c.launcher.setup(c); err != nil {
+	var err error
+	if c.template != nil {
+		err = c.setupEmptyWorkspace()
+	} else {
+		err = c.setupTemplateWorkspace()
+	}
+	if err != nil {
 		c.errs = append(c.errs, err)
 	}
 
@@ -433,26 +417,23 @@ func (c *WorkspaceTestConfig) Run() {
 		}
 	}
 
-	// Run test command from template config, or fallback to
-	// default testCmd for probe-style runs.
-	var cmd string
+	// Run test command from template config. Probe-style runs
+	// (no template) skip the test command entirely.
 	if c.template != nil && c.template.Test != nil {
 		escaped := strings.ReplaceAll(
 			c.template.Test.Command, "'", "'\\''",
 		)
-		cmd = fmt.Sprintf(
+		cmd := fmt.Sprintf(
 			"timeout %d bash -c '%s'",
 			c.template.Test.TimeoutInSec, escaped,
 		)
-	} else {
-		cmd = testCmd
-	}
-	if err := c.anyscaleCLI.runCmdInWorkspace(
-		c.workspaceName, cmd,
-	); err != nil {
-		c.errs = append(
-			c.errs,
-			fmt.Errorf("run test command failed: %w", err),
-		)
+		if err := c.anyscaleCLI.runCmdInWorkspace(
+			c.workspaceName, cmd,
+		); err != nil {
+			c.errs = append(
+				c.errs,
+				fmt.Errorf("run test command failed: %w", err),
+			)
+		}
 	}
 }
