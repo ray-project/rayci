@@ -57,14 +57,14 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 
 	req, err := http.NewRequest(http.MethodDelete, reqURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+a.token)
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)
+		return fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -74,7 +74,7 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 		)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to read response body: %w", err,
+				"read response body: %w", err,
 			)
 		}
 		return &apiError{
