@@ -19,6 +19,7 @@ Global flags:
 Commands:
 	go-coverage    Run test coverage and check minimum thresholds
 	go-filelength  Check that Go files don't exceed line limit
+	prsize         Check PR diff size against thresholds
 `
 
 // Main is the entry point for the rayci-lint CLI, dispatching
@@ -61,6 +62,8 @@ func Main(args []string) (int, error) {
 		err = cmdCoverage(cfg, subArgs)
 	case "go-filelength":
 		err = cmdFilelength(cfg, subArgs)
+	case "prsize":
+		err = cmdPrsize(cfg, subArgs)
 	default:
 		fmt.Fprintf(
 			os.Stderr, "unknown command: %s\n\n%s", cmd, usage,
