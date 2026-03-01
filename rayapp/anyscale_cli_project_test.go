@@ -32,16 +32,10 @@ func TestGetDefaultProject(t *testing.T) {
 			t.Fatal("expected projectInfo, got nil")
 		}
 		if projectInfo.Name != "my-default-project" {
-			t.Errorf(
-				"projectInfo.Name = %q, want %q",
-				projectInfo.Name, "my-default-project",
-			)
+			t.Errorf("projectInfo.Name = %q, want %q", projectInfo.Name, "my-default-project")
 		}
 		if projectInfo.ID != "prj_abc123" {
-			t.Errorf(
-				"projectInfo.ID = %q, want %q",
-				projectInfo.ID, "prj_abc123",
-			)
+			t.Errorf("projectInfo.ID = %q, want %q", projectInfo.ID, "prj_abc123")
 		}
 	})
 
@@ -60,13 +54,9 @@ func TestGetDefaultProject(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(
-			err.Error(), "get default project failed",
-		) {
+		if !strings.Contains(err.Error(), "get default project failed") {
 			t.Errorf(
-				"error %q should contain "+
-					"'get default project failed'",
-				err.Error(),
+				"error %q should contain 'get default project failed'", err.Error(),
 			)
 		}
 	})
@@ -86,13 +76,9 @@ func TestGetDefaultProject(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(
-			err.Error(), "failed to parse project info",
-		) {
+		if !strings.Contains(err.Error(), "failed to parse project info") {
 			t.Errorf(
-				"error %q should contain "+
-					"'failed to parse project info'",
-				err.Error(),
+				"error %q should contain 'failed to parse project info'", err.Error(),
 			)
 		}
 	})
@@ -113,16 +99,10 @@ func TestGetDefaultProject(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if projectInfo.Name != "" {
-			t.Errorf(
-				"projectInfo.Name = %q, want empty string",
-				projectInfo.Name,
-			)
+			t.Errorf("projectInfo.Name = %q, want empty string", projectInfo.Name)
 		}
 		if projectInfo.ID != "" {
-			t.Errorf(
-				"projectInfo.ID = %q, want empty string",
-				projectInfo.ID,
-			)
+			t.Errorf("projectInfo.ID = %q, want empty string", projectInfo.ID)
 		}
 	})
 }

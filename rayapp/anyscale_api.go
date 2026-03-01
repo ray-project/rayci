@@ -18,10 +18,7 @@ type apiError struct {
 }
 
 func (e *apiError) Error() string {
-	return fmt.Sprintf(
-		"request failed with status %d: %s",
-		e.StatusCode, e.Body,
-	)
+	return fmt.Sprintf("request failed with status %d: %s", e.StatusCode, e.Body)
 }
 
 var validWorkspaceID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
@@ -68,13 +65,9 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, err := io.ReadAll(
-			io.LimitReader(resp.Body, 1024),
-		)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		if err != nil {
-			return fmt.Errorf(
-				"read response body: %w", err,
-			)
+			return fmt.Errorf("read response body: %w", err)
 		}
 		return &apiError{
 			StatusCode: resp.StatusCode,
@@ -126,13 +119,9 @@ func (a *anyscaleAPI) launchTemplateInWorkspace(
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(
-		io.LimitReader(resp.Body, 1024*1024),
-	)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to read response body: %w", err,
-		)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

@@ -32,10 +32,7 @@ func newFakeAnyscaleAPI(t *testing.T) *anyscaleAPI {
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodDelete {
-				http.Error(
-					w, "method not allowed",
-					http.StatusMethodNotAllowed,
-				)
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -86,36 +83,19 @@ func Test_newWorkspaceTestConfig(t *testing.T) {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
 			}
 			if config.tmplName != tt.tmplName {
-				t.Errorf(
-					"tmplName = %q, want %q",
-					config.tmplName, tt.tmplName,
-				)
+				t.Errorf("tmplName = %q, want %q", config.tmplName, tt.tmplName)
 			}
 			if config.template.Name != tt.tmplName {
-				t.Errorf(
-					"template.Name = %q, want %q",
-					config.template.Name, tt.tmplName,
-				)
+				t.Errorf("template.Name = %q, want %q", config.template.Name, tt.tmplName)
 			}
 			if tmpl.Dir != "" {
-				t.Errorf(
-					"original template Dir should be unchanged, got %q",
-					tmpl.Dir,
-				)
+				t.Errorf("original template Dir should be unchanged, got %q", tmpl.Dir)
 			}
 			if config.buildDir != tt.buildDir {
-				t.Errorf(
-					"buildDir = %q, want %q",
-					config.buildDir, tt.buildDir,
-				)
+				t.Errorf("buildDir = %q, want %q", config.buildDir, tt.buildDir)
 			}
-			if !strings.HasPrefix(
-				config.workspaceName, tt.tmplName,
-			) {
-				t.Errorf(
-					"workspaceName %q should start with %q",
-					config.workspaceName, tt.tmplName,
-				)
+			if !strings.HasPrefix(config.workspaceName, tt.tmplName) {
+				t.Errorf("workspaceName %q should start with %q", config.workspaceName, tt.tmplName)
 			}
 		})
 	}
@@ -208,24 +188,16 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 				return
 			}
 			if err == nil {
-				t.Fatalf(
-					"expected error containing %q, got nil",
-					tt.wantErr,
-				)
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf(
-					"error %q should contain %q",
-					err.Error(), tt.wantErr,
-				)
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestWorkspaceTestConfigRun_EscapesSingleQuotes(
-	t *testing.T,
-) {
+func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
@@ -251,16 +223,11 @@ func TestWorkspaceTestConfigRun_EscapesSingleQuotes(
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(capturedCmd, "bash -c '") {
-		t.Errorf(
-			"command %q should contain bash -c invocation",
-			capturedCmd,
-		)
+		t.Errorf("command %q should contain bash -c invocation", capturedCmd)
 	}
 }
 
-func TestWorkspaceTestConfigRun_TestCommandFails(
-	t *testing.T,
-) {
+func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
@@ -285,10 +252,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(
 		t.Fatal("expected error when test command fails")
 	}
 	if !strings.Contains(err.Error(), "run test command failed") {
-		t.Errorf(
-			"error %q should contain 'run test command failed'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'run test command failed'", err.Error())
 	}
 }
 
@@ -311,22 +275,14 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "test failed") {
-		t.Errorf(
-			"error %q should contain 'test failed'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'test failed'", err.Error())
 	}
 	if !strings.Contains(err.Error(), "fishy-ray") {
-		t.Errorf(
-			"error %q should contain template name 'fishy-ray'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain template name 'fishy-ray'", err.Error())
 	}
 }
 
-func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(
-	t *testing.T,
-) {
+func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool {
@@ -335,16 +291,11 @@ func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(
 		nil, nil,
 	)
 	if err == nil {
-		t.Fatal(
-			"expected error when matched template has no test config",
-		)
+		t.Fatal("expected error when matched template has no test config")
 	}
 	wantMsg := "no templates with test configuration"
 	if !strings.Contains(err.Error(), wantMsg) {
-		t.Errorf(
-			"error %q should contain %q",
-			err.Error(), wantMsg,
-		)
+		t.Errorf("error %q should contain %q", err.Error(), wantMsg)
 	}
 }
 
@@ -360,10 +311,7 @@ func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
 		t.Fatal("expected error when no templates match filter")
 	}
 	if !strings.Contains(err.Error(), "no templates to test") {
-		t.Errorf(
-			"error %q should contain 'no templates to test'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 
@@ -375,16 +323,11 @@ func TestRunTemplateTest_ReadTemplatesFailed(t *testing.T) {
 		t.Fatal("expected error for invalid build file")
 	}
 	if !strings.Contains(err.Error(), "read templates failed") {
-		t.Errorf(
-			"error %q should contain 'read templates failed'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'read templates failed'", err.Error())
 	}
 }
 
-func TestRunTemplateTest_FilterSelectsSingleTemplate(
-	t *testing.T,
-) {
+func TestRunTemplateTest_FilterSelectsSingleTemplate(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
@@ -419,15 +362,10 @@ func TestRunAllTemplateTests_NoTemplatesToTest(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(f, nil, nil, nil)
 	if err == nil {
-		t.Fatal(
-			"expected error when build file has no templates",
-		)
+		t.Fatal("expected error when build file has no templates")
 	}
 	if !strings.Contains(err.Error(), "no templates to test") {
-		t.Errorf(
-			"error %q should contain 'no templates to test'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 
@@ -447,10 +385,7 @@ func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
 	}
 	wantMsg := "test failed for templates"
 	if !strings.Contains(err.Error(), wantMsg) {
-		t.Errorf(
-			"error %q should contain %q",
-			err.Error(), wantMsg,
-		)
+		t.Errorf("error %q should contain %q", err.Error(), wantMsg)
 	}
 }
 
@@ -480,31 +415,23 @@ func createEmptyBuildFile(t *testing.T) string {
 	return f
 }
 
-// newProbeTestAPI creates a fake Anyscale API server that handles
-// both POST /from_template and DELETE requests.
+// newProbeTestAPI creates a fake Anyscale API server that handles both
+// POST /from_template and DELETE requests.
 func newProbeTestAPI(
-	t *testing.T,
-	launchResult map[string]any,
-	launchStatus int,
+	t *testing.T, launchResult map[string]any, launchStatus int,
 ) *anyscaleAPI {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.Method == http.MethodPost &&
-				strings.HasSuffix(
-					r.URL.Path, "/from_template",
-				):
+				strings.HasSuffix(r.URL.Path, "/from_template"):
 				if launchStatus != 0 {
 					w.WriteHeader(launchStatus)
-					w.Write([]byte(
-						`{"error":"launch failed"}`,
-					))
+					w.Write([]byte(`{"error":"launch failed"}`))
 					return
 				}
-				resp := map[string]any{
-					"result": launchResult,
-				}
+				resp := map[string]any{"result": launchResult}
 				bs, _ := json.Marshal(resp)
 				w.WriteHeader(http.StatusOK)
 				w.Write(bs)
@@ -512,10 +439,7 @@ func newProbeTestAPI(
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("{}"))
 			default:
-				http.Error(
-					w, "not found",
-					http.StatusNotFound,
-				)
+				http.Error(w, "not found", http.StatusNotFound)
 			}
 		},
 	))
@@ -546,9 +470,7 @@ func TestProbe(t *testing.T) {
 		{
 			name: "get default project fails",
 			commandErrors: map[string]error{
-				"project get-default": fmt.Errorf(
-					"project error",
-				),
+				"project get-default": fmt.Errorf("project error"),
 			},
 			wantErr: "get default project failed",
 		},
@@ -571,9 +493,7 @@ func TestProbe(t *testing.T) {
 				"id":   "expwrk_test",
 			},
 			commandErrors: map[string]error{
-				"workspace_v2 wait": fmt.Errorf(
-					"wait failed",
-				),
+				"workspace_v2 wait": fmt.Errorf("wait failed"),
 			},
 			wantErr: "wait for workspace running state failed",
 		},
@@ -592,14 +512,9 @@ func TestProbe(t *testing.T) {
 			fake := newDefaultFake()
 			fake.commandErrors = tt.commandErrors
 			cli := newTestCLI(fake)
-			api := newProbeTestAPI(
-				t, tt.launchResult, tt.launchStatus,
-			)
+			api := newProbeTestAPI(t, tt.launchResult, tt.launchStatus)
 
-			err := probe(
-				"fishy-ray", "testdata/BUILD.yaml",
-				cli, api,
-			)
+			err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
 
 			if tt.wantErr == "" {
 				if err != nil {
@@ -608,16 +523,10 @@ func TestProbe(t *testing.T) {
 				return
 			}
 			if err == nil {
-				t.Fatalf(
-					"expected error containing %q, got nil",
-					tt.wantErr,
-				)
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf(
-					"error %q should contain %q",
-					err.Error(), tt.wantErr,
-				)
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
 			}
 		})
 	}
@@ -626,9 +535,7 @@ func TestProbe(t *testing.T) {
 func TestProbe_CleanupFails(t *testing.T) {
 	fake := newDefaultFake()
 	fake.commandErrors = map[string]error{
-		"workspace_v2 terminate": fmt.Errorf(
-			"terminate failed",
-		),
+		"workspace_v2 terminate": fmt.Errorf("terminate failed"),
 	}
 	cli := newTestCLI(fake)
 	api := newProbeTestAPI(t, map[string]any{
@@ -636,19 +543,12 @@ func TestProbe_CleanupFails(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := probe(
-		"fishy-ray", "testdata/BUILD.yaml", cli, api,
-	)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
 	if err == nil {
 		t.Fatal("expected error when cleanup fails")
 	}
-	if !strings.Contains(
-		err.Error(), "terminate workspace failed",
-	) {
-		t.Errorf(
-			"error %q should contain 'terminate workspace failed'",
-			err.Error(),
-		)
+	if !strings.Contains(err.Error(), "terminate workspace failed") {
+		t.Errorf("error %q should contain 'terminate workspace failed'", err.Error())
 	}
 }
 
@@ -680,10 +580,7 @@ func TestProbe_RunsTestCommand(t *testing.T) {
 		t.Fatal("expected test command to be executed")
 	}
 	if !strings.Contains(capturedCmd, "bash -c '") {
-		t.Errorf(
-			"command %q should contain bash -c invocation",
-			capturedCmd,
-		)
+		t.Errorf("command %q should contain bash -c invocation", capturedCmd)
 	}
 }
 
@@ -697,26 +594,18 @@ func TestProbe_TestCommandFails(t *testing.T) {
 
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" &&
-			strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
 			return "", fmt.Errorf("test execution failed")
 		}
 		return fake.run(args)
 	})
 
-	err := probe(
-		"fishy-ray", "testdata/BUILD.yaml", cli, api,
-	)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
 	if err == nil {
 		t.Fatal("expected error when test command fails")
 	}
-	if !strings.Contains(
-		err.Error(), "run test command failed",
-	) {
-		t.Errorf(
-			"error %q should contain 'run test command failed'",
-			err.Error(),
-		)
+	if !strings.Contains(err.Error(), "run test command failed") {
+		t.Errorf("error %q should contain 'run test command failed'", err.Error())
 	}
 }
 
@@ -728,42 +617,28 @@ func TestProbe_WithTestsPath(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := probe(
-		"testy-ray", "testdata/BUILD.yaml", cli, api,
-	)
+	err := probe("testy-ray", "testdata/BUILD.yaml", cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestProbe_TemplateNotFound(t *testing.T) {
-	err := probe(
-		"nonexistent", "testdata/BUILD.yaml", nil, nil,
-	)
+	err := probe("nonexistent", "testdata/BUILD.yaml", nil, nil)
 	if err == nil {
 		t.Fatal("expected error when template not found")
 	}
 	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf(
-			"error %q should contain 'not found'",
-			err.Error(),
-		)
+		t.Errorf("error %q should contain 'not found'", err.Error())
 	}
 }
 
 func TestProbe_ReadTemplatesFails(t *testing.T) {
-	err := probe(
-		"any", "nonexistent/BUILD.yaml", nil, nil,
-	)
+	err := probe("any", "nonexistent/BUILD.yaml", nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
 	}
-	if !strings.Contains(
-		err.Error(), "read templates failed",
-	) {
-		t.Errorf(
-			"error %q should contain 'read templates failed'",
-			err.Error(),
-		)
+	if !strings.Contains(err.Error(), "read templates failed") {
+		t.Errorf("error %q should contain 'read templates failed'", err.Error())
 	}
 }

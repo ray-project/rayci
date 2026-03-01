@@ -24,9 +24,7 @@ func main() {
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
 
 	probeFlags := flag.NewFlagSet("probe", flag.ExitOnError)
-	probeBuildFile := probeFlags.String(
-		"build", "BUILD.yaml", "build file",
-	)
+	probeBuildFile := probeFlags.String("build", "BUILD.yaml", "build file")
 
 	switch os.Args[1] {
 	case "build":
