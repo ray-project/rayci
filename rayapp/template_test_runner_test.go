@@ -528,7 +528,7 @@ func newProbeTestAPI(
 	return api
 }
 
-func TestRunProbe(t *testing.T) {
+func TestProbe(t *testing.T) {
 	tests := []struct {
 		name          string
 		commandErrors map[string]error
@@ -596,7 +596,7 @@ func TestRunProbe(t *testing.T) {
 				t, tt.launchResult, tt.launchStatus,
 			)
 
-			err := runProbe(
+			err := probe(
 				"fishy-ray", "testdata/BUILD.yaml",
 				cli, api,
 			)
@@ -623,7 +623,7 @@ func TestRunProbe(t *testing.T) {
 	}
 }
 
-func TestRunProbe_CleanupFails(t *testing.T) {
+func TestProbe_CleanupFails(t *testing.T) {
 	fake := newDefaultFake()
 	fake.commandErrors = map[string]error{
 		"workspace_v2 terminate": fmt.Errorf(
@@ -636,7 +636,7 @@ func TestRunProbe_CleanupFails(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := runProbe(
+	err := probe(
 		"fishy-ray", "testdata/BUILD.yaml", cli, api,
 	)
 	if err == nil {
@@ -652,7 +652,7 @@ func TestRunProbe_CleanupFails(t *testing.T) {
 	}
 }
 
-func TestRunProbe_RunsTestCommand(t *testing.T) {
+func TestProbe_RunsTestCommand(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newProbeTestAPI(t, map[string]any{
@@ -670,7 +670,7 @@ func TestRunProbe_RunsTestCommand(t *testing.T) {
 		return fake.run(args)
 	})
 
-	err := runProbe(
+	err := probe(
 		"fishy-ray", "testdata/BUILD.yaml", cli, api,
 	)
 	if err != nil {
@@ -687,7 +687,7 @@ func TestRunProbe_RunsTestCommand(t *testing.T) {
 	}
 }
 
-func TestRunProbe_TestCommandFails(t *testing.T) {
+func TestProbe_TestCommandFails(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newProbeTestAPI(t, map[string]any{
@@ -704,7 +704,7 @@ func TestRunProbe_TestCommandFails(t *testing.T) {
 		return fake.run(args)
 	})
 
-	err := runProbe(
+	err := probe(
 		"fishy-ray", "testdata/BUILD.yaml", cli, api,
 	)
 	if err == nil {
@@ -720,7 +720,7 @@ func TestRunProbe_TestCommandFails(t *testing.T) {
 	}
 }
 
-func TestRunProbe_WithTestsPath(t *testing.T) {
+func TestProbe_WithTestsPath(t *testing.T) {
 	fake := newDefaultFake()
 	cli := newTestCLI(fake)
 	api := newProbeTestAPI(t, map[string]any{
@@ -728,7 +728,7 @@ func TestRunProbe_WithTestsPath(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := runProbe(
+	err := probe(
 		"testy-ray", "testdata/BUILD.yaml", cli, api,
 	)
 	if err != nil {
@@ -736,8 +736,8 @@ func TestRunProbe_WithTestsPath(t *testing.T) {
 	}
 }
 
-func TestRunProbe_TemplateNotFound(t *testing.T) {
-	err := runProbe(
+func TestProbe_TemplateNotFound(t *testing.T) {
+	err := probe(
 		"nonexistent", "testdata/BUILD.yaml", nil, nil,
 	)
 	if err == nil {
@@ -751,8 +751,8 @@ func TestRunProbe_TemplateNotFound(t *testing.T) {
 	}
 }
 
-func TestRunProbe_ReadTemplatesFails(t *testing.T) {
-	err := runProbe(
+func TestProbe_ReadTemplatesFails(t *testing.T) {
+	err := probe(
 		"any", "nonexistent/BUILD.yaml", nil, nil,
 	)
 	if err == nil {

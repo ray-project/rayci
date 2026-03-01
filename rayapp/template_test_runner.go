@@ -167,10 +167,10 @@ func RunProbe(tmplName, buildFile string) error {
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runProbe(tmplName, buildFile, cli, api)
+	return probe(tmplName, buildFile, cli, api)
 }
 
-func runProbe(
+func probe(
 	tmplName, buildFile string,
 	cli *AnyscaleCLI, api *anyscaleAPI,
 ) error {

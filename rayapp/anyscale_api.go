@@ -82,6 +82,7 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 			Body:       string(body),
 		}
 	}
+	io.Copy(io.Discard, resp.Body)
 
 	return nil
 }
@@ -127,11 +128,10 @@ func (a *anyscaleAPI) launchTemplateInWorkspace(
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf(
-			"launch template in workspace failed "+
-				"with status %d: %s",
-			resp.StatusCode, string(body),
-		)
+		return nil, &apiError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
 	}
 
 	var response map[string]any
