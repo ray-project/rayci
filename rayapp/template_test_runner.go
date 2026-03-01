@@ -10,134 +10,6 @@ import (
 	"time"
 )
 
-// setupEmptyWorkspace creates an empty workspace, starts it,
-// and pushes template files into it.
-func (c *WorkspaceTestConfig) setupEmptyWorkspace() error {
-	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
-		c.computeConfig = generateComputeConfigName(awsConfigPath)
-		resolvedPath := filepath.Join(c.buildDir, awsConfigPath)
-		if err := c.anyscaleCLI.CreateComputeConfig(
-			c.computeConfig, resolvedPath,
-		); err != nil {
-			return fmt.Errorf(
-				"create compute config failed: %w", err,
-			)
-		}
-	}
-
-	if err := c.anyscaleCLI.createEmptyWorkspace(c); err != nil {
-		return fmt.Errorf(
-			"create empty workspace failed: %w", err,
-		)
-	}
-	workspaceID, err := c.anyscaleCLI.getWorkspaceID(
-		c.workspaceName,
-	)
-	if err != nil {
-		return fmt.Errorf("get workspace ID failed: %w", err)
-	}
-	c.workspaceID = workspaceID
-
-	if err := c.anyscaleCLI.startWorkspace(
-		c.workspaceName,
-	); err != nil {
-		return fmt.Errorf("start workspace failed: %w", err)
-	}
-
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(
-		c.workspaceName, StateRunning,
-	); err != nil {
-		return fmt.Errorf(
-			"wait for workspace running state failed: %w", err,
-		)
-	}
-
-	templateZipDir, err := os.MkdirTemp("", "template_zip")
-	if err != nil {
-		return fmt.Errorf(
-			"create temp directory failed: %w", err,
-		)
-	}
-	defer os.RemoveAll(templateZipDir)
-
-	zipFileName := filepath.Join(
-		templateZipDir,
-		fmt.Sprintf("%s.zip", c.tmplName),
-	)
-	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
-		return fmt.Errorf(
-			"zip template directory failed: %w", err,
-		)
-	}
-
-	if err := c.anyscaleCLI.pushFolderToWorkspace(
-		c.workspaceName, templateZipDir,
-	); err != nil {
-		return fmt.Errorf(
-			"push zip to workspace failed: %w", err,
-		)
-	}
-
-	if err := c.anyscaleCLI.runCmdInWorkspace(
-		c.workspaceName,
-		fmt.Sprintf("unzip -o %s.zip", c.tmplName),
-	); err != nil {
-		return fmt.Errorf("unzip template failed: %w", err)
-	}
-
-	return nil
-}
-
-// setupTemplateWorkspace launches a workspace from a template
-// via the Anyscale API.
-func (c *WorkspaceTestConfig) setupTemplateWorkspace() error {
-	cloudInfo, err := c.anyscaleCLI.GetDefaultCloud()
-	if err != nil {
-		return fmt.Errorf(
-			"get default cloud failed: %w", err,
-		)
-	}
-
-	projectInfo, err := c.anyscaleCLI.GetDefaultProject(
-		cloudInfo.ID,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"get default project failed: %w", err,
-		)
-	}
-
-	result, err := c.anyscaleAPI.launchTemplateInWorkspace(
-		cloudInfo.ID, projectInfo.ID, c.tmplName,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"launch template in workspace failed: %w", err,
-		)
-	}
-
-	workspaceName, okName := result["name"].(string)
-	workspaceID, okID := result["id"].(string)
-	if !okName || !okID {
-		return fmt.Errorf(
-			"unexpected response format: missing name or id",
-		)
-	}
-	c.workspaceName = workspaceName
-	c.workspaceID = workspaceID
-
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(
-		c.workspaceName, StateRunning,
-	); err != nil {
-		return fmt.Errorf(
-			"wait for workspace running state failed: %w",
-			err,
-		)
-	}
-
-	return nil
-}
-
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	anyscaleAPI   *anyscaleAPI
@@ -154,6 +26,30 @@ type WorkspaceTestConfig struct {
 	probe         bool
 	success       bool
 	errs          []error
+}
+
+// newWorkspaceTestConfig creates a new WorkspaceTestConfig that
+// uses an empty workspace to test a template.
+func newWorkspaceTestConfig(
+	t *Template,
+	anyscaleCLI *AnyscaleCLI,
+	anyscaleAPI *anyscaleAPI,
+	buildDir string,
+) *WorkspaceTestConfig {
+	tmplCopy := *t
+	tmplCopy.Dir = filepath.Join(buildDir, t.Dir)
+	return &WorkspaceTestConfig{
+		tmplName:    t.Name,
+		anyscaleCLI: anyscaleCLI,
+		anyscaleAPI: anyscaleAPI,
+		success:     false,
+		errs:        nil,
+		template:    &tmplCopy,
+		buildDir:    buildDir,
+		workspaceName: fmt.Sprintf(
+			"%s-%s", t.Name, time.Now().Format("20060102150405"),
+		),
+	}
 }
 
 // RunProbe launches a template into a workspace, runs tests if
@@ -209,30 +105,6 @@ func probe(
 		return errors.Join(c.errs...)
 	}
 	return nil
-}
-
-// newWorkspaceTestConfig creates a new WorkspaceTestConfig that
-// uses an empty workspace to test a template.
-func newWorkspaceTestConfig(
-	t *Template,
-	anyscaleCLI *AnyscaleCLI,
-	anyscaleAPI *anyscaleAPI,
-	buildDir string,
-) *WorkspaceTestConfig {
-	tmplCopy := *t
-	tmplCopy.Dir = filepath.Join(buildDir, t.Dir)
-	return &WorkspaceTestConfig{
-		tmplName:    t.Name,
-		anyscaleCLI: anyscaleCLI,
-		anyscaleAPI: anyscaleAPI,
-		success:     false,
-		errs:        nil,
-		template:    &tmplCopy,
-		buildDir:    buildDir,
-		workspaceName: fmt.Sprintf(
-			"%s-%s", t.Name, time.Now().Format("20060102150405"),
-		),
-	}
 }
 
 func RunAllTemplateTests(buildFile string) error {
@@ -322,6 +194,134 @@ func runTemplateTestsWithFilter(
 		return fmt.Errorf(
 			"test failed for templates:\n%s",
 			strings.Join(failed, "\n"),
+		)
+	}
+
+	return nil
+}
+
+// setupEmptyWorkspace creates an empty workspace, starts it,
+// and pushes template files into it.
+func (c *WorkspaceTestConfig) setupEmptyWorkspace() error {
+	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
+		c.computeConfig = generateComputeConfigName(awsConfigPath)
+		resolvedPath := filepath.Join(c.buildDir, awsConfigPath)
+		if err := c.anyscaleCLI.CreateComputeConfig(
+			c.computeConfig, resolvedPath,
+		); err != nil {
+			return fmt.Errorf(
+				"create compute config failed: %w", err,
+			)
+		}
+	}
+
+	if err := c.anyscaleCLI.createEmptyWorkspace(c); err != nil {
+		return fmt.Errorf(
+			"create empty workspace failed: %w", err,
+		)
+	}
+	workspaceID, err := c.anyscaleCLI.getWorkspaceID(
+		c.workspaceName,
+	)
+	if err != nil {
+		return fmt.Errorf("get workspace ID failed: %w", err)
+	}
+	c.workspaceID = workspaceID
+
+	if err := c.anyscaleCLI.startWorkspace(
+		c.workspaceName,
+	); err != nil {
+		return fmt.Errorf("start workspace failed: %w", err)
+	}
+
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(
+		c.workspaceName, StateRunning,
+	); err != nil {
+		return fmt.Errorf(
+			"wait for workspace running state failed: %w", err,
+		)
+	}
+
+	templateZipDir, err := os.MkdirTemp("", "template_zip")
+	if err != nil {
+		return fmt.Errorf(
+			"create temp directory failed: %w", err,
+		)
+	}
+	defer os.RemoveAll(templateZipDir)
+
+	zipFileName := filepath.Join(
+		templateZipDir,
+		fmt.Sprintf("%s.zip", c.tmplName),
+	)
+	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
+		return fmt.Errorf(
+			"zip template directory failed: %w", err,
+		)
+	}
+
+	if err := c.anyscaleCLI.pushFolderToWorkspace(
+		c.workspaceName, templateZipDir,
+	); err != nil {
+		return fmt.Errorf(
+			"push zip to workspace failed: %w", err,
+		)
+	}
+
+	if err := c.anyscaleCLI.runCmdInWorkspace(
+		c.workspaceName,
+		fmt.Sprintf("unzip -o %s.zip", c.tmplName),
+	); err != nil {
+		return fmt.Errorf("unzip template failed: %w", err)
+	}
+
+	return nil
+}
+
+// setupTemplateWorkspace launches a workspace from a template
+// via the Anyscale API.
+func (c *WorkspaceTestConfig) setupTemplateWorkspace() error {
+	cloudInfo, err := c.anyscaleCLI.GetDefaultCloud()
+	if err != nil {
+		return fmt.Errorf(
+			"get default cloud failed: %w", err,
+		)
+	}
+
+	projectInfo, err := c.anyscaleCLI.getDefaultProject(
+		cloudInfo.ID,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"get default project failed: %w", err,
+		)
+	}
+
+	result, err := c.anyscaleAPI.launchTemplateInWorkspace(
+		cloudInfo.ID, projectInfo.ID, c.tmplName, c.workspaceName,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"launch template in workspace failed: %w", err,
+		)
+	}
+
+	workspaceName, okName := result["name"].(string)
+	workspaceID, okID := result["id"].(string)
+	if !okName || !okID {
+		return fmt.Errorf(
+			"unexpected response format: missing name or id",
+		)
+	}
+	c.workspaceName = workspaceName
+	c.workspaceID = workspaceID
+
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(
+		c.workspaceName, StateRunning,
+	); err != nil {
+		return fmt.Errorf(
+			"wait for workspace running state failed: %w",
+			err,
 		)
 	}
 

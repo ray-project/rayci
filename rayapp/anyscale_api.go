@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"time"
 )
 
 // apiError represents a non-2xx HTTP response from the Anyscale API.
@@ -88,15 +87,24 @@ func (a *anyscaleAPI) deleteWorkspaceByID(workspaceID string) error {
 }
 
 func (a *anyscaleAPI) launchTemplateInWorkspace(
-	cloudID, projectID, templateName string,
+	cloudID, projectID, templateName string, workspaceName string,
 ) (map[string]any, error) {
+	if cloudID == "" {
+		return nil, errors.New("cloudID is empty")
+	}
+	if projectID == "" {
+		return nil, errors.New("projectID is empty")
+	}
+	if templateName == "" {
+		return nil, errors.New("templateName is empty")
+	}
 	reqURL, err := url.JoinPath(a.host, "api/v2/experimental_workspaces/from_template")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
 	payload := map[string]any{
 		"template_id": templateName,
-		"name":        slugify(templateName) + "-" + time.Now().Format("20060102150405"),
+		"name":        workspaceName,
 		"cloud_id":    cloudID,
 		"project_id":  projectID,
 	}

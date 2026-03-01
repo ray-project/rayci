@@ -24,22 +24,22 @@ func TestGetDefaultProject(t *testing.T) {
 			return fake.run(args)
 		})
 
-		projectInfo, err := cli.GetDefaultProject("cld_abc123")
+		projectInfo, err := cli.getDefaultProject("cld_abc123")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if projectInfo == nil {
-			t.Fatal("expected ProjectInfo, got nil")
+			t.Fatal("expected projectInfo, got nil")
 		}
 		if projectInfo.Name != "my-default-project" {
 			t.Errorf(
-				"ProjectInfo.Name = %q, want %q",
+				"projectInfo.Name = %q, want %q",
 				projectInfo.Name, "my-default-project",
 			)
 		}
 		if projectInfo.ID != "prj_abc123" {
 			t.Errorf(
-				"ProjectInfo.ID = %q, want %q",
+				"projectInfo.ID = %q, want %q",
 				projectInfo.ID, "prj_abc123",
 			)
 		}
@@ -56,16 +56,16 @@ func TestGetDefaultProject(t *testing.T) {
 			return "", fmt.Errorf("exit status 1")
 		})
 
-		_, err := cli.GetDefaultProject("cld_abc123")
+		_, err := cli.getDefaultProject("cld_abc123")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
 		if !strings.Contains(
-			err.Error(), "get default Project failed",
+			err.Error(), "get default project failed",
 		) {
 			t.Errorf(
 				"error %q should contain "+
-					"'get default Project failed'",
+					"'get default project failed'",
 				err.Error(),
 			)
 		}
@@ -82,7 +82,7 @@ func TestGetDefaultProject(t *testing.T) {
 			return "invalid: yaml: output: [", nil
 		})
 
-		_, err := cli.GetDefaultProject("cld_abc123")
+		_, err := cli.getDefaultProject("cld_abc123")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -108,19 +108,19 @@ func TestGetDefaultProject(t *testing.T) {
 			return "", nil
 		})
 
-		projectInfo, err := cli.GetDefaultProject("cld_abc123")
+		projectInfo, err := cli.getDefaultProject("cld_abc123")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if projectInfo.Name != "" {
 			t.Errorf(
-				"ProjectInfo.Name = %q, want empty string",
+				"projectInfo.Name = %q, want empty string",
 				projectInfo.Name,
 			)
 		}
 		if projectInfo.ID != "" {
 			t.Errorf(
-				"ProjectInfo.ID = %q, want empty string",
+				"projectInfo.ID = %q, want empty string",
 				projectInfo.ID,
 			)
 		}

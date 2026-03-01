@@ -6,25 +6,24 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ProjectInfo represents the Project information returned from the CLI.
-type ProjectInfo struct {
+// projectInfo represents the project information returned from the CLI.
+type projectInfo struct {
 	Name string `yaml:"name"`
 	ID   string `yaml:"id"`
 }
 
-// GetDefaultProject retrieves the default Project from the Anyscale CLI.
-// Returns the Project name and ID from the YAML output.
-func (ac *AnyscaleCLI) GetDefaultProject(cloudID string) (*ProjectInfo, error) {
+// getDefaultProject retrieves the default project from the Anyscale CLI.
+func (ac *AnyscaleCLI) getDefaultProject(cloudID string) (*projectInfo, error) {
 	args := []string{"project", "get-default", "--cloud", cloudID}
 	output, err := ac.runAnyscaleCLI(args)
 	if err != nil {
-		return nil, fmt.Errorf("get default Project failed: %w", err)
+		return nil, fmt.Errorf("get default project failed: %w", err)
 	}
 
-	var projectInfo ProjectInfo
-	if err := yaml.Unmarshal([]byte(output), &projectInfo); err != nil {
+	var pInfo projectInfo
+	if err := yaml.Unmarshal([]byte(output), &pInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse project info: %w", err)
 	}
 
-	return &projectInfo, nil
+	return &pInfo, nil
 }
