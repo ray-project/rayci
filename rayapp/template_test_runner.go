@@ -332,23 +332,25 @@ func (c *WorkspaceTestConfig) Run() {
 			return
 		}
 
+		// Push test zip to workspace
 		if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, testZipDir); err != nil {
 			c.errs = append(c.errs, fmt.Errorf("push test zip to workspace failed: %w", err))
 			return
 		}
 
+		// Unzip test folder in workspace
 		if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, "unzip -o tests.zip"); err != nil {
 			c.errs = append(c.errs, fmt.Errorf("unzip tests in workspace failed: %w", err))
 			return
 		}
 	}
 
-	// Run test command from template config.
-	if c.template != nil && c.template.Test != nil {
-		escaped := strings.ReplaceAll(c.template.Test.Command, "'", "'\\''")
-		cmd := fmt.Sprintf("timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, escaped)
-		if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, cmd); err != nil {
-			c.errs = append(c.errs, fmt.Errorf("run test command failed: %w", err))
-		}
+	// Run test command from test configuration.
+	// Escape single quotes to prevent command injection via bash -c '...'.
+	escapedCmd := strings.ReplaceAll(c.template.Test.Command, "'", "'\\''")
+	testCommand := fmt.Sprintf("timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, escapedCmd)
+	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCommand); err != nil {
+		c.errs = append(c.errs, fmt.Errorf("run test command failed: %w", err))
+		return
 	}
 }
