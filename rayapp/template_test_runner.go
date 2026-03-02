@@ -308,9 +308,7 @@ func (c *WorkspaceTestConfig) Run() {
 		c.setupEmptyWorkspace()
 	}
 
-	if c.workspaceID != "" {
-		defer c.cleanup()
-	}
+	defer c.cleanup()
 
 	if len(c.errs) > 0 {
 		return
