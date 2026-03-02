@@ -12,21 +12,20 @@ import (
 
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
-	anyscaleAPI      *anyscaleAPI
-	anyscaleCLI      *AnyscaleCLI
-	tmplName         string
-	buildDir         string
-	workspaceName    string
-	workspaceID      string
-	configFile       string
-	computeConfig    string
-	imageURI         string
-	rayVersion       string
-	template         *Template
-	probe            bool
-	workspaceCreated bool
-	success          bool
-	errs             []error
+	anyscaleAPI   *anyscaleAPI
+	anyscaleCLI   *AnyscaleCLI
+	tmplName      string
+	buildDir      string
+	workspaceName string
+	workspaceID   string
+	configFile    string
+	computeConfig string
+	imageURI      string
+	rayVersion    string
+	template      *Template
+	probe         bool
+	success       bool
+	errs          []error
 }
 
 // newWorkspaceTestConfig creates a new WorkspaceTestConfig that uses an empty
@@ -196,8 +195,6 @@ func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
 		c.errs = append(c.errs, fmt.Errorf("create empty workspace failed: %w", err))
 		return
 	}
-	c.workspaceCreated = true
-
 	workspaceID, err := c.anyscaleCLI.getWorkspaceID(c.workspaceName)
 	if err != nil {
 		c.errs = append(c.errs, fmt.Errorf("get workspace ID failed: %w", err))
@@ -271,8 +268,6 @@ func (c *WorkspaceTestConfig) setupTemplateWorkspace() {
 	}
 	c.workspaceName = workspaceName
 	c.workspaceID = workspaceID
-	c.workspaceCreated = true
-
 	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceName, StateRunning); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("wait for workspace running state failed: %w", err))
 		return
@@ -289,12 +284,8 @@ func (c *WorkspaceTestConfig) cleanup() {
 		c.errs = append(c.errs, fmt.Errorf("wait for workspace terminated state failed: %w", err))
 		return
 	}
-	log.Println("Terminated workspace:", c.workspaceName)
+	log.Println("Terminated workspace:", c.workspaceID)
 
-	if c.workspaceID == "" {
-		log.Println("Workspace ID unknown, skipping delete")
-		return
-	}
 	if err := c.anyscaleAPI.deleteWorkspaceByID(c.workspaceID); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("delete workspace failed: %w", err))
 		return
@@ -323,7 +314,7 @@ func (c *WorkspaceTestConfig) Run() {
 		c.setupEmptyWorkspace()
 	}
 
-	if c.workspaceCreated {
+	if c.workspaceID != "" {
 		defer c.cleanup()
 	}
 
