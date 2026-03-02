@@ -317,7 +317,7 @@ func (c *WorkspaceTestConfig) Run() {
 	}
 
 	// If tests_path is provided, zip and push test folder.
-	if c.template != nil && c.template.Test != nil && c.template.Test.TestsPath != "" {
+	if c.template.Test.TestsPath != "" {
 		testsPath := filepath.Join(c.buildDir, c.template.Test.TestsPath)
 		testZipDir, err := os.MkdirTemp("", "test_zip")
 		if err != nil {
