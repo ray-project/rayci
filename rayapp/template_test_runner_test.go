@@ -12,12 +12,8 @@ import (
 
 func newDefaultFake() *fakeAnyscale {
 	return &fakeAnyscale{
-		defaultCloud: &fakeCloud{
-			Name: "test-cloud", ID: "cld_test",
-		},
-		defaultProject: &fakeProject{
-			Name: "test-project", ID: "prj_test",
-		},
+		defaultCloud:   &fakeCloud{Name: "test-cloud", ID: "cld_test"},
+		defaultProject: &fakeProject{Name: "test-project", ID: "prj_test"},
 	}
 }
 
@@ -134,11 +130,11 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 			wantErr: "wait for workspace running state failed",
 		},
 		{
-			name: "push zip fails",
+			name: "push template fails",
 			commandErrors: map[string]error{
 				"workspace_v2 push": fmt.Errorf("push failed"),
 			},
-			wantErr: "push zip to workspace failed",
+			wantErr: "push template to workspace failed",
 		},
 		{
 			name: "unzip fails",
@@ -169,9 +165,7 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
-				func(tmpl *Template) bool {
-					return tmpl.Name == "fishy-ray"
-				},
+				func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 				cli, api,
 			)
 
@@ -207,9 +201,7 @@ func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "fishy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err != nil {
@@ -235,9 +227,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "fishy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
@@ -258,9 +248,7 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "fishy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err == nil {
@@ -277,26 +265,21 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "reefy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
 		nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when matched template has no test config")
 	}
-	wantMsg := "no templates with test configuration"
-	if !strings.Contains(err.Error(), wantMsg) {
-		t.Errorf("error %q should contain %q", err.Error(), wantMsg)
+	if !strings.Contains(err.Error(), "no templates with test configuration") {
+		t.Errorf("error %q should contain 'no templates with test configuration'", err.Error())
 	}
 }
 
 func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "nonexistent-template"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "nonexistent-template" },
 		nil, nil,
 	)
 	if err == nil {
@@ -324,9 +307,7 @@ func TestRunTemplateTest_FilterSelectsSingleTemplate(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "fishy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
 		cli, api,
 	)
 	if err != nil {
@@ -369,9 +350,8 @@ func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when some templates fail")
 	}
-	wantMsg := "test failed for templates"
-	if !strings.Contains(err.Error(), wantMsg) {
-		t.Errorf("error %q should contain %q", err.Error(), wantMsg)
+	if !strings.Contains(err.Error(), "test failed for templates") {
+		t.Errorf("error %q should contain 'test failed for templates'", err.Error())
 	}
 }
 
@@ -382,9 +362,7 @@ func TestWorkspaceTestConfigRun_WithTestsPath(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool {
-			return tmpl.Name == "testy-ray"
-		},
+		func(tmpl *Template) bool { return tmpl.Name == "testy-ray" },
 		cli, api,
 	)
 	if err != nil {

@@ -114,13 +114,9 @@ func RunTemplateTest(tmplName, buildFile string) error {
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runTemplateTestsWithFilter(
-		buildFile,
-		func(tmpl *Template) bool {
-			return tmpl.Name == tmplName
-		},
-		cli, api,
-	)
+	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
+		return tmpl.Name == tmplName
+	}, cli, api)
 }
 
 func runTemplateTestsWithFilter(
@@ -217,14 +213,14 @@ func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
 	}
 	defer os.RemoveAll(templateZipDir)
 
-	zipFileName := filepath.Join(templateZipDir, fmt.Sprintf("%s.zip", c.tmplName))
-	if err := zipDirectory(c.template.Dir, zipFileName); err != nil {
+	templateZipFileName := filepath.Join(templateZipDir, fmt.Sprintf("%s.zip", c.tmplName))
+	if err := zipDirectory(c.template.Dir, templateZipFileName); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("zip template directory failed: %w", err))
 		return
 	}
 
 	if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, templateZipDir); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("push zip to workspace failed: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("push template to workspace failed: %w", err))
 		return
 	}
 
