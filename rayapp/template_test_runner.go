@@ -39,16 +39,14 @@ func newWorkspaceTestConfig(
 	tmplCopy := *t
 	tmplCopy.Dir = filepath.Join(buildDir, t.Dir)
 	return &WorkspaceTestConfig{
-		tmplName:    t.Name,
-		anyscaleCLI: anyscaleCLI,
-		anyscaleAPI: anyscaleAPI,
-		success:     false,
-		errs:        nil,
-		template:    &tmplCopy,
-		buildDir:    buildDir,
-		workspaceName: fmt.Sprintf(
-			"%s-%s", t.Name, time.Now().Format("20060102150405"),
-		),
+		tmplName:      t.Name,
+		anyscaleCLI:   anyscaleCLI,
+		anyscaleAPI:   anyscaleAPI,
+		success:       false,
+		errs:          nil,
+		template:      &tmplCopy,
+		buildDir:      buildDir,
+		workspaceName: fmt.Sprintf("%s-%s", t.Name, time.Now().Format("20060102150405")),
 	}
 }
 
