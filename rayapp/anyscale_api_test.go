@@ -44,23 +44,19 @@ func TestNewAnyscaleAPI(t *testing.T) {
 
 func TestDeleteWorkspaceByID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodDelete {
-					t.Errorf("method = %s, want DELETE", r.Method)
-				}
-				wantPath := "/api/v2/experimental_workspaces/expwrk_abc"
-				if r.URL.Path != wantPath {
-					t.Errorf("path = %s, want %s", r.URL.Path, wantPath)
-				}
-				auth := r.Header.Get("Authorization")
-				if auth != "Bearer test-token" {
-					t.Errorf("Authorization = %q, want Bearer test-token", auth)
-				}
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"status":"deleted"}`))
-			},
-		))
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodDelete {
+				t.Errorf("method = %s, want DELETE", r.Method)
+			}
+			if want := "/api/v2/experimental_workspaces/expwrk_abc"; r.URL.Path != want {
+				t.Errorf("path = %s, want %s", r.URL.Path, want)
+			}
+			if auth := r.Header.Get("Authorization"); auth != "Bearer test-token" {
+				t.Errorf("Authorization = %q, want Bearer test-token", auth)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"deleted"}`))
+		}))
 		defer server.Close()
 
 		api, err := newAnyscaleAPI(server.URL, "test-token")
@@ -73,12 +69,10 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 	})
 
 	t.Run("non-2xx status", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(`{"error":"not found"}`))
-			},
-		))
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":"not found"}`))
+		}))
 		defer server.Close()
 
 		api, err := newAnyscaleAPI(server.URL, "test-token")
@@ -127,8 +121,7 @@ func TestDeleteWorkspaceByID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		ids := []string{"", "../../admin", "id with spaces", "a/b"}
-		for _, id := range ids {
+		for _, id := range []string{"", "../../admin", "id with spaces", "a/b"} {
 			err = api.deleteWorkspaceByID(id)
 			if err == nil {
 				t.Errorf("deleteWorkspaceByID(%q): expected error, got nil", id)
