@@ -75,9 +75,7 @@ func Test_newWorkspaceTestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := &Template{Name: tt.tmplName}
-			config := newWorkspaceTestConfig(
-				tmpl, cli, nil, tt.buildDir,
-			)
+			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
@@ -145,18 +143,14 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 		{
 			name: "unzip fails",
 			commandErrors: map[string]error{
-				"workspace_v2 run_command": fmt.Errorf(
-					"run failed",
-				),
+				"workspace_v2 run_command": fmt.Errorf("run failed"),
 			},
 			wantErr: "unzip template failed",
 		},
 		{
 			name: "terminate fails",
 			commandErrors: map[string]error{
-				"workspace_v2 terminate": fmt.Errorf(
-					"terminate failed",
-				),
+				"workspace_v2 terminate": fmt.Errorf("terminate failed"),
 			},
 			wantErr: "terminate workspace failed",
 		},
@@ -205,8 +199,7 @@ func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 	var capturedCmd string
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" &&
-			strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
 			capturedCmd = args[4]
 		}
 		return fake.run(args)
@@ -234,8 +227,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" &&
-			strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
 			return "", fmt.Errorf("test execution failed")
 		}
 		return fake.run(args)
@@ -316,9 +308,7 @@ func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
 }
 
 func TestRunTemplateTest_ReadTemplatesFailed(t *testing.T) {
-	err := runTemplateTestsWithFilter(
-		"nonexistent/BUILD.yaml", nil, nil, nil,
-	)
+	err := runTemplateTestsWithFilter("nonexistent/BUILD.yaml", nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
 	}
@@ -349,9 +339,7 @@ func TestRunAllTemplateTests_Success(t *testing.T) {
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
 
-	err := runTemplateTestsWithFilter(
-		"testdata/BUILD.yaml", nil, cli, api,
-	)
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -377,9 +365,7 @@ func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
 
-	err := runTemplateTestsWithFilter(
-		"testdata/BUILD.yaml", nil, cli, api,
-	)
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, cli, api)
 	if err == nil {
 		t.Fatal("expected error when some templates fail")
 	}
@@ -417,15 +403,12 @@ func createEmptyBuildFile(t *testing.T) string {
 
 // newProbeTestAPI creates a fake Anyscale API server that handles both
 // POST /from_template and DELETE requests.
-func newProbeTestAPI(
-	t *testing.T, launchResult map[string]any, launchStatus int,
-) *anyscaleAPI {
+func newProbeTestAPI(t *testing.T, launchResult map[string]any, launchStatus int) *anyscaleAPI {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
-			case r.Method == http.MethodPost &&
-				strings.HasSuffix(r.URL.Path, "/from_template"):
+			case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/from_template"):
 				if launchStatus != 0 {
 					w.WriteHeader(launchStatus)
 					w.Write([]byte(`{"error":"launch failed"}`))
@@ -563,16 +546,13 @@ func TestProbe_RunsTestCommand(t *testing.T) {
 	var capturedCmd string
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" &&
-			strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
 			capturedCmd = args[4]
 		}
 		return fake.run(args)
 	})
 
-	err := probe(
-		"fishy-ray", "testdata/BUILD.yaml", cli, api,
-	)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

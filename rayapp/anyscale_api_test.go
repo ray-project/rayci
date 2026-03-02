@@ -197,9 +197,7 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		result, err := api.launchTemplateInWorkspace(
-			"cld_1", "prj_1", "my-tmpl", "my-ws",
-		)
+		result, err := api.launchTemplateInWorkspace("cld_1", "prj_1", "my-tmpl", "my-ws")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -224,9 +222,7 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		_, err = api.launchTemplateInWorkspace(
-			"cld_1", "prj_1", "my-tmpl", "my-ws",
-		)
+		_, err = api.launchTemplateInWorkspace("cld_1", "prj_1", "my-tmpl", "my-ws")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -248,9 +244,7 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		_, err = api.launchTemplateInWorkspace(
-			"cld_1", "prj_1", "my-tmpl", "my-ws",
-		)
+		_, err = api.launchTemplateInWorkspace("cld_1", "prj_1", "my-tmpl", "my-ws")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -272,9 +266,7 @@ func TestLaunchTemplateInWorkspace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newAnyscaleAPI: %v", err)
 		}
-		_, err = api.launchTemplateInWorkspace(
-			"cld_1", "prj_1", "my-tmpl", "my-ws",
-		)
+		_, err = api.launchTemplateInWorkspace("cld_1", "prj_1", "my-tmpl", "my-ws")
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

@@ -55,9 +55,7 @@ func TestGetDefaultProject(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 		if !strings.Contains(err.Error(), "get default project failed") {
-			t.Errorf(
-				"error %q should contain 'get default project failed'", err.Error(),
-			)
+			t.Errorf("error %q should contain 'get default project failed'", err.Error())
 		}
 	})
 
@@ -77,9 +75,7 @@ func TestGetDefaultProject(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 		if !strings.Contains(err.Error(), "failed to parse project info") {
-			t.Errorf(
-				"error %q should contain 'failed to parse project info'", err.Error(),
-			)
+			t.Errorf("error %q should contain 'failed to parse project info'", err.Error())
 		}
 	})
 
