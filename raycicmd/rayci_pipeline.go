@@ -46,7 +46,7 @@ var (
 	triggerStepDropKeys = []string{"tags"}
 
 	commandStepAllowedKeys = []string{
-		"command", "commands", "priority", "parallelism", "if",
+		"command", "commands", "priority", "parallelism", "if", "skip",
 		"label", "name", "key", "depends_on", "soft_fail", "matrix",
 		"allow_dependency_failure", "concurrency", "concurrency_group",
 		"timeout_in_minutes",
