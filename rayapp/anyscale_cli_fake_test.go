@@ -11,6 +11,11 @@ type fakeCloud struct {
 	ID   string
 }
 
+type fakeProject struct {
+	Name string
+	ID   string
+}
+
 type fakeComputeConfig struct {
 	ID             string
 	Name           string
@@ -31,6 +36,7 @@ type fakeWorkspace struct {
 // subcommands based on its fake data fields.
 type fakeAnyscale struct {
 	defaultCloud   *fakeCloud
+	defaultProject *fakeProject
 	computeConfigs []*fakeComputeConfig
 	workspaces     []*fakeWorkspace
 
@@ -60,6 +66,8 @@ func (f *fakeAnyscale) run(args []string) (string, error) {
 	switch cmd {
 	case "cloud get-default":
 		return f.cloudGetDefault()
+	case "project get-default":
+		return f.projectGetDefault()
 	case "compute-config list":
 		return f.computeConfigList(args[2:])
 	case "compute-config create":
@@ -98,6 +106,17 @@ func (f *fakeAnyscale) cloudGetDefault() (string, error) {
 	return strings.Join([]string{
 		fmt.Sprintf("name: %s", f.defaultCloud.Name),
 		fmt.Sprintf("id: %s", f.defaultCloud.ID),
+		"",
+	}, "\n"), nil
+}
+
+func (f *fakeAnyscale) projectGetDefault() (string, error) {
+	if f.defaultProject == nil {
+		return "", fmt.Errorf("no default project configured")
+	}
+	return strings.Join([]string{
+		fmt.Sprintf("name: %s", f.defaultProject.Name),
+		fmt.Sprintf("id: %s", f.defaultProject.ID),
 		"",
 	}, "\n"), nil
 }
