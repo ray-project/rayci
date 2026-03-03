@@ -35,6 +35,7 @@ func newWorkspaceTestConfig(
 	anyscaleCLI *AnyscaleCLI,
 	anyscaleAPI *anyscaleAPI,
 	buildDir string,
+	probe bool,
 ) *WorkspaceTestConfig {
 	tmplCopy := *t
 	tmplCopy.Dir = filepath.Join(buildDir, t.Dir)
@@ -42,6 +43,7 @@ func newWorkspaceTestConfig(
 		tmplName:      t.Name,
 		anyscaleCLI:   anyscaleCLI,
 		anyscaleAPI:   anyscaleAPI,
+		probe:         probe,
 		success:       false,
 		errs:          nil,
 		template:      &tmplCopy,
@@ -77,19 +79,12 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	if tmpl == nil {
 		return fmt.Errorf("template %q not found in %s", tmplName, buildFile)
 	}
+	if tmpl.Test == nil {
+		return fmt.Errorf("template %q has no test configuration", tmplName)
+	}
 
 	buildDir := filepath.Dir(buildFile)
-	tmplCopy := *tmpl
-	tmplCopy.Dir = filepath.Join(buildDir, tmpl.Dir)
-
-	c := &WorkspaceTestConfig{
-		tmplName:    tmplName,
-		anyscaleCLI: cli,
-		anyscaleAPI: api,
-		probe:       true,
-		template:    &tmplCopy,
-		buildDir:    buildDir,
-	}
+	c := newWorkspaceTestConfig(tmpl, cli, api, buildDir, true)
 	c.Run()
 	if !c.success {
 		return errors.Join(c.errs...)
@@ -154,7 +149,7 @@ func runTemplateTestsWithFilter(
 
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := newWorkspaceTestConfig(t, cli, api, buildDir)
+		c := newWorkspaceTestConfig(t, cli, api, buildDir, false)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()

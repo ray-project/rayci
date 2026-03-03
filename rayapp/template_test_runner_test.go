@@ -71,7 +71,7 @@ func Test_newWorkspaceTestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := &Template{Name: tt.tmplName}
-			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir)
+			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir, false)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
