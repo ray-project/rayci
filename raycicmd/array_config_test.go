@@ -34,15 +34,15 @@ func TestExpandArray(t *testing.T) {
 		},
 	}
 
-	instances := cfg.expand()
+	elements := cfg.expand()
 
-	if len(instances) != 4 {
-		t.Fatalf("len(instances) = %d, want 4", len(instances))
+	if len(elements) != 4 {
+		t.Fatalf("len(elements) = %d, want 4", len(elements))
 	}
 
 	var combos []string
-	for _, inst := range instances {
-		combos = append(combos, inst.values["python"]+"-"+inst.values["cuda"])
+	for _, elem := range elements {
+		combos = append(combos, elem.values["python"]+"-"+elem.values["cuda"])
 	}
 	sort.Strings(combos)
 
@@ -57,10 +57,10 @@ func TestExpandArray(t *testing.T) {
 	}
 }
 
-func TestGenerateArrayInstanceKey(t *testing.T) {
-	inst := &arrayInstance{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}}
+func TestGenerateArrayElementKey(t *testing.T) {
+	elem := &arrayElement{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}}
 
-	got := inst.generateKey("ray-build")
+	got := elem.generateKey("ray-build")
 	want := "ray-build--cuda1211-python311"
 	if got != want {
 		t.Errorf("generateKey() = %q, want %q", got, want)
@@ -71,32 +71,32 @@ func TestSubstituteValues(t *testing.T) {
 	tests := []struct {
 		name  string
 		input any
-		inst  *arrayInstance
+		elem  *arrayElement
 		want  any
 	}{
 		{
 			name:  "named dimensions",
 			input: "python {{array.python}} cuda {{array.cuda}}",
-			inst:  &arrayInstance{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}},
+			elem:  &arrayElement{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}},
 			want:  "python 3.11 cuda 12.1.1",
 		},
 		{
 			name:  "nested map",
 			input: map[string]any{"cmd": "./build.sh --python={{array.python}}"},
-			inst:  &arrayInstance{values: map[string]string{"python": "3.11"}},
+			elem:  &arrayElement{values: map[string]string{"python": "3.11"}},
 			want:  map[string]any{"cmd": "./build.sh --python=3.11"},
 		},
 		{
 			name:  "array",
 			input: []any{"echo {{array.python}}", "echo {{array.cuda}}"},
-			inst:  &arrayInstance{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}},
+			elem:  &arrayElement{values: map[string]string{"python": "3.11", "cuda": "12.1.1"}},
 			want:  []any{"echo 3.11", "echo 12.1.1"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.inst.substituteValues(tt.input)
+			got := tt.elem.substituteValues(tt.input)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("substituteValues() = %v, want %v", got, tt.want)
 			}

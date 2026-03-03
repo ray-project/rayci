@@ -1,5 +1,10 @@
 package raycicmd
 
+// resolvedStep carries the result of array expansion for a single step.
+type resolvedStep struct {
+	src map[string]any
+}
+
 type pipelineGroup struct {
 	filename string
 	sortKey  string
@@ -16,6 +21,10 @@ type pipelineGroup struct {
 	DefaultJobEnv string `yaml:"default_job_env"`
 
 	Steps []map[string]any `yaml:"steps"`
+
+	// resolvedSteps is populated by expandArraySteps, containing one
+	// entry per step after array expansion.
+	resolvedSteps []*resolvedStep
 }
 
 func (g *pipelineGroup) lessThan(other *pipelineGroup) bool {
