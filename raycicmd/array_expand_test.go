@@ -125,6 +125,153 @@ func TestExpandArraySteps_MatrixAndArrayMutuallyExclusive(t *testing.T) {
 	}
 }
 
+func TestExpandArraySteps_SelectorDependsOn(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.python}} {{array.cuda}}",
+				"key":      "build-step",
+				"commands": []any{"echo {{array.python}} {{array.cuda}}"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+					"cuda":   []any{"12.1.1", "12.8.1"},
+				},
+			},
+			{
+				"key":      "test-311-only",
+				"commands": []any{"echo test"},
+				"depends_on": []any{
+					map[string]any{
+						"build-step": map[string]any{
+							"python": "3.11",
+							"cuda":   "12.8.1",
+						},
+					},
+				},
+			},
+			{
+				"key":      "test-all-python311",
+				"commands": []any{"echo test"},
+				"depends_on": []any{
+					map[string]any{
+						"build-step": map[string]any{
+							"python": "3.11",
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// 4 expanded steps + 2 downstream steps = 6 total
+	rs := groups[0].resolvedSteps
+	if len(rs) != 6 {
+		t.Fatalf("got %d resolvedSteps, want 6", len(rs))
+	}
+
+	// Exact match: python=3.11, cuda=12.8.1 -> 1 dep
+	exactDeps := rs[4].resolvedDependsOn
+	if len(exactDeps) != 1 {
+		t.Fatalf("exact selector: got %d deps, want 1: %v", len(exactDeps), exactDeps)
+	}
+	if exactDeps[0] != "build-step--cuda1281-python311" {
+		t.Errorf("exact selector: got %q, want %q", exactDeps[0], "build-step--cuda1281-python311")
+	}
+
+	// Partial match: python=3.11 (any cuda) -> 2 deps
+	partialDeps := rs[5].resolvedDependsOn
+	if len(partialDeps) != 2 {
+		t.Fatalf("partial selector: got %d deps, want 2: %v", len(partialDeps), partialDeps)
+	}
+	if partialDeps[0] != "build-step--cuda1211-python311" || partialDeps[1] != "build-step--cuda1281-python311" {
+		t.Errorf("partial selector: got %v, want [build-step--cuda1211-python311, build-step--cuda1281-python311]", partialDeps)
+	}
+}
+
+func TestExpandArraySteps_BaseKeyDependsOn(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"key":        "test-step",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step",
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	// 2 expanded + test-step = index 2
+	resolved := rs[2].resolvedDependsOn
+	if len(resolved) != 2 {
+		t.Fatalf("got %d deps, want 2: %v", len(resolved), resolved)
+	}
+	if resolved[0] != "build-step--python310" || resolved[1] != "build-step--python311" {
+		t.Errorf("resolved deps: got %v, want [build-step--python310, build-step--python311]", resolved)
+	}
+}
+
+func TestExpandArraySteps_SelectorOnNonArrayStep(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"key":      "test-step",
+			"commands": []any{"echo test"},
+			"depends_on": []any{
+				map[string]any{
+					"plain-step": map[string]any{"python": "3.11"},
+				},
+			},
+		}},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for array selector on non-array step, got nil")
+	}
+	if !strings.Contains(err.Error(), "non-array step") {
+		t.Errorf("error = %q, want to contain \"non-array step\"", err.Error())
+	}
+}
+
+func TestExpandArraySteps_NonArrayDependsOn(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"key":        "test-step",
+			"commands":   []any{"echo test"},
+			"depends_on": "plain-step",
+		}},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps[0]
+	resolved := rs.resolvedDependsOn
+	if len(resolved) != 1 || resolved[0] != "plain-step" {
+		t.Errorf("resolvedDependsOn = %v, want [\"plain-step\"]", resolved)
+	}
+}
+
 func TestParseArrayDependsOnString(t *testing.T) {
 	selectors, err := parseArrayDependsOn("ray-build")
 	if err != nil {
@@ -240,6 +387,116 @@ func TestParseArrayDependsOnMixed(t *testing.T) {
 	}
 	if selectors[1].filter != nil {
 		t.Errorf("selectors[1].filter = %v, want nil", selectors[1].filter)
+	}
+}
+
+func TestResolveArraySelector(t *testing.T) {
+	cfg := &arrayConfig{
+		dims: map[string][]string{
+			"python": {"3.10", "3.11"},
+			"cuda":   {"12.1.1", "12.8.1"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		sel     *arraySelector
+		wantLen int
+		wantErr bool
+	}{
+		{
+			name: "partial match - python only",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"python": {"3.11"}},
+			},
+			wantLen: 2,
+		},
+		{
+			name: "partial match - cuda only",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"cuda": {"12.1.1"}},
+			},
+			wantLen: 2,
+		},
+		{
+			name: "exact match",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"python": {"3.11"}, "cuda": {"12.1.1"}},
+			},
+			wantLen: 1,
+		},
+		{
+			name: "invalid dimension",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"invalid": {"value"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "no match",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"python": {"3.12"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "multi-value match",
+			sel: &arraySelector{
+				key:    "ray-build",
+				filter: map[string][]string{"python": {"3.10", "3.11"}},
+			},
+			wantLen: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveArraySelector(tt.sel, cfg)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("resolveArraySelector() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveArraySelector() error = %v", err)
+			}
+			if len(got) != tt.wantLen {
+				t.Errorf("resolveArraySelector() returned %d matches, want %d: %v", len(got), tt.wantLen, got)
+			}
+		})
+	}
+}
+
+func TestResolveArraySelectorKeyFormat(t *testing.T) {
+	cfg := &arrayConfig{
+		dims: map[string][]string{
+			"python": {"3.11"},
+			"cuda":   {"12.1.1"},
+		},
+	}
+
+	sel := &arraySelector{
+		key:    "ray-build",
+		filter: map[string][]string{"python": {"3.11"}, "cuda": {"12.1.1"}},
+	}
+
+	got, err := resolveArraySelector(sel, cfg)
+	if err != nil {
+		t.Fatalf("resolveArraySelector() error = %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("resolveArraySelector() returned %d matches, want 1", len(got))
+	}
+
+	if !strings.HasPrefix(got[0], "ray-build--") {
+		t.Errorf("key = %q, want prefix \"ray-build--\"", got[0])
 	}
 }
 

@@ -2,15 +2,38 @@ package raycicmd
 
 import (
 	"fmt"
+	"slices"
 )
 
-// expandArraySteps expands array steps into resolvedSteps.
+// expandArraySteps expands array steps into resolvedSteps and resolves
+// depends_on references to point to the expanded keys.
 func expandArraySteps(gs []*pipelineGroup) error {
 	configs := make(map[string]*arrayConfig)
 
+	// Pass 1: expand array steps into resolvedSteps.
 	for _, g := range gs {
 		if err := g.buildResolvedSteps(configs); err != nil {
 			return fmt.Errorf("expand arrays: %w", err)
+		}
+	}
+
+	// Pass 2: resolve depends_on references that point to array steps.
+	for _, g := range gs {
+		for _, rs := range g.resolvedSteps {
+			dependsOn, ok := rs.src["depends_on"]
+			if !ok {
+				continue
+			}
+			resolved, err := resolveDependsOn(
+				dependsOn, configs,
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"resolve depends_on for step %q: %w",
+					stepKey(rs.src), err,
+				)
+			}
+			rs.resolvedDependsOn = resolved
 		}
 	}
 
@@ -214,4 +237,71 @@ func parseSelectorFilter(m map[string]any) (map[string][]string, error) {
 		}
 	}
 	return result, nil
+}
+
+// resolveDependsOn resolves a depends_on field to concrete step keys.
+// Plain references to array steps fan out to all instances.
+// Selector references resolve to only matching instances.
+func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string, error) {
+	selectors, err := parseArrayDependsOn(dependsOn)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []string
+	for _, sel := range selectors {
+		cfg, isArray := configs[sel.key]
+		if !isArray {
+			if sel.filter != nil {
+				return nil, fmt.Errorf(
+					"cannot use array selector on non-array step %q",
+					sel.key,
+				)
+			}
+			result = append(result, sel.key)
+			continue
+		}
+		matches, err := resolveArraySelector(sel, cfg)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, matches...)
+	}
+
+	return result, nil
+}
+
+// resolveArraySelector resolves a selector against an array config to concrete step keys.
+func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error) {
+	for dim := range sel.filter {
+		if _, ok := cfg.dims[dim]; !ok {
+			return nil, fmt.Errorf(
+				"selector dimension %q not found in array for %q (valid: %v)",
+				dim, sel.key, cfg.sortedDimensions(),
+			)
+		}
+	}
+
+	elements := cfg.expand()
+	var matches []string
+	for _, elem := range elements {
+		if elem.matchesSelector(sel) {
+			matches = append(matches, elem.generateKey(sel.key))
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no matches for selector {key: %q, array: %v}", sel.key, sel.filter)
+	}
+
+	return matches, nil
+}
+
+func (elem *arrayElement) matchesSelector(sel *arraySelector) bool {
+	for dim, allowedVals := range sel.filter {
+		if !slices.Contains(allowedVals, elem.values[dim]) {
+			return false
+		}
+	}
+	return true
 }

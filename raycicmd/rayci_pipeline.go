@@ -1,8 +1,10 @@
 package raycicmd
 
-// resolvedStep carries the result of array expansion for a single step.
+// resolvedStep carries the result of array expansion and dependency
+// resolution for a single step.
 type resolvedStep struct {
-	src map[string]any
+	src               map[string]any
+	resolvedDependsOn []string
 }
 
 type pipelineGroup struct {

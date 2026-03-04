@@ -1035,3 +1035,82 @@ func TestConvertPipelineGroups(t *testing.T) {
 		t.Errorf("convertPipelineGroup: got %d steps, want 2", len(bk1.Steps))
 	}
 }
+
+func TestConvertPipelineGroups_ArrayBaseKeyDependencyExpansion(t *testing.T) {
+	// Verify that when a downstream step depends on the base key,
+	// the dependency is expanded to all expanded keys directly.
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"label":      "Final validation",
+				"key":        "final-step",
+				"commands":   []any{"echo final"},
+				"tags":       []any{"run-me"},
+				"depends_on": "build-step", // Depends on base key
+			},
+		},
+	}}
+
+	// Filter to only "run-me" tag - this selects final-step,
+	// which should pull in all expanded steps via dependency propagation
+	filter := &stepFilter{tags: stringSet("run-me")}
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups() error = %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("got %d groups, want 1", len(bk))
+	}
+
+	// Should have: 2 expanded steps + 1 final step = 3 steps
+	if len(bk[0].Steps) != 3 {
+		var keys []string
+		for _, s := range bk[0].Steps {
+			step := s.(map[string]any)
+			if k, ok := step["key"]; ok {
+				keys = append(keys, k.(string))
+			}
+		}
+		t.Fatalf("got %d steps %v, want 3 (2 expanded + final)", len(bk[0].Steps), keys)
+	}
+
+	// Find final-step and verify its depends_on was expanded
+	var finalStep map[string]any
+	for _, s := range bk[0].Steps {
+		step := s.(map[string]any)
+		if step["key"] == "final-step" {
+			finalStep = step
+			break
+		}
+	}
+	if finalStep == nil {
+		t.Fatal("final-step not found")
+	}
+
+	// depends_on should be expanded to both python versions
+	dependsOn, ok := finalStep["depends_on"].([]string)
+	if !ok {
+		t.Fatalf("depends_on is %T, want []string", finalStep["depends_on"])
+	}
+	if len(dependsOn) != 2 {
+		t.Errorf("depends_on has %d elements, want 2: %v", len(dependsOn), dependsOn)
+	}
+}
