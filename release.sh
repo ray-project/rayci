@@ -13,7 +13,8 @@ build_go() {
   local os="$3"
   local arch="$4"
 
-  GOOS="$os" GOARCH="$arch" \
+ # Disable CGO to build a statically-linked binary without C dependencies.
+  CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
     go build -trimpath -o "$OUTPUT_DIR/${name}-${os}-${arch}" "$pkg"
 }
 
