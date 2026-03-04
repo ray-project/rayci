@@ -33,7 +33,8 @@ type stepNode struct {
 	subSteps []*stepNode
 
 	// Fields used for steps.
-	src map[string]any // Source definition of the step when it is not a group.
+	src               map[string]any // Source definition of the step when it is not a group.
+	resolvedDependsOn []string
 
 	depSet        map[string]struct{}
 	reverseDepSet map[string]struct{}
