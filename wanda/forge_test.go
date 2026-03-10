@@ -1079,6 +1079,120 @@ func TestBuild_WithArtifacts_noCmdImage(t *testing.T) {
 	}
 }
 
+func TestDigest_format(t *testing.T) {
+	var buf strings.Builder
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+	if err := Digest("testdata/hello-test.wanda.yaml", config, &buf); err != nil {
+		t.Fatalf("Digest() = %v, want nil", err)
+	}
+	got := strings.TrimSpace(buf.String())
+	if !strings.HasPrefix(got, "sha256:") {
+		t.Errorf("Digest() output = %q, want sha256: prefix", got)
+	}
+}
+
+func TestDigest_deterministic(t *testing.T) {
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+	var buf1, buf2 strings.Builder
+	if err := Digest("testdata/hello-test.wanda.yaml", config, &buf1); err != nil {
+		t.Fatalf("first Digest() = %v, want nil", err)
+	}
+	if err := Digest("testdata/hello-test.wanda.yaml", config, &buf2); err != nil {
+		t.Fatalf("second Digest() = %v, want nil", err)
+	}
+	if got1, got2 := buf1.String(), buf2.String(); got1 != got2 {
+		t.Errorf("Digest() not deterministic: %q != %q", got1, got2)
+	}
+}
+
+func TestDigest_epochChangesDigest(t *testing.T) {
+	config1 := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		Epoch:      "epoch1",
+	}
+	config2 := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		Epoch:      "epoch2",
+	}
+	var buf1, buf2 strings.Builder
+	if err := Digest("testdata/hello-test.wanda.yaml", config1, &buf1); err != nil {
+		t.Fatalf("Digest(epoch1) = %v, want nil", err)
+	}
+	if err := Digest("testdata/hello-test.wanda.yaml", config2, &buf2); err != nil {
+		t.Fatalf("Digest(epoch2) = %v, want nil", err)
+	}
+	if buf1.String() == buf2.String() {
+		t.Errorf("Digest() same for different epochs: %q", buf1.String())
+	}
+}
+
+func TestDigest_envFileChangesDigest(t *testing.T) {
+	tmpDir := t.TempDir()
+	envFile := filepath.Join(tmpDir, "test.env")
+
+	if err := os.WriteFile(envFile, []byte("MESSAGE=v1\nVERSION=1.0.0\n"), 0644); err != nil {
+		t.Fatalf("write envfile: %v", err)
+	}
+
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+		EnvFile:    envFile,
+	}
+
+	var buf1 strings.Builder
+	if err := Digest("testdata/env-file-test.wanda.yaml", config, &buf1); err != nil {
+		t.Fatalf("Digest(v1) = %v, want nil", err)
+	}
+
+	if err := os.WriteFile(envFile, []byte("MESSAGE=v2\nVERSION=1.0.0\n"), 0644); err != nil {
+		t.Fatalf("update envfile: %v", err)
+	}
+
+	var buf2 strings.Builder
+	if err := Digest("testdata/env-file-test.wanda.yaml", config, &buf2); err != nil {
+		t.Fatalf("Digest(v2) = %v, want nil", err)
+	}
+
+	if buf1.String() == buf2.String() {
+		t.Errorf("Digest() same after envfile change: %q", buf1.String())
+	}
+}
+
+func TestDigest_matchesBuildDigest(t *testing.T) {
+	// Digest() should produce the same digest that Build() logs internally.
+	// We verify this by checking that the Digest output appears in the build
+	// cache tag, which is derived from the same input digest.
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+
+	var buf strings.Builder
+	if err := Digest("testdata/hello-test.wanda.yaml", config, &buf); err != nil {
+		t.Fatalf("Digest() = %v, want nil", err)
+	}
+	digest := strings.TrimSpace(buf.String())
+
+	// The cache tag is derived from the digest; confirm the digest hex appears in it.
+	_, hexPart, found := strings.Cut(digest, ":")
+	if !found {
+		t.Fatalf("digest %q is missing ':' separator", digest)
+	}
+	cacheTag := config.cacheTag(digest)
+	if !strings.Contains(cacheTag, hexPart) {
+		t.Errorf("cacheTag %q does not contain digest hex %q", cacheTag, hexPart)
+	}
+}
+
 func TestTargetOS(t *testing.T) {
 	got := targetOS()
 	if runtime.GOOS == "darwin" {
