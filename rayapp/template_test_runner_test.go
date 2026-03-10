@@ -601,14 +601,15 @@ func TestRunTemplateTestsWithRayVersionOverride(t *testing.T) {
 
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
 		"2.44.0", cli, api,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if capturedImageURI != "anyscale/ray:2.44.0-py311" {
-		t.Errorf("image URI = %q, want %q", capturedImageURI, "anyscale/ray:2.44.0-py311")
+	want := "us-docker.pkg.dev/anyscale/templates/template_byod:2.44.0"
+	if capturedImageURI != want {
+		t.Errorf("image URI = %q, want %q", capturedImageURI, want)
 	}
 }
 

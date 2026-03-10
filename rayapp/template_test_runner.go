@@ -140,9 +140,14 @@ func runTemplateTestsWithFilter(
 			continue
 		}
 		if rayVersion != "" {
-			if t.ClusterEnv == nil || strings.TrimSpace(t.ClusterEnv.BuildID) == "" {
+			hasBuildID := t.ClusterEnv != nil &&
+				strings.TrimSpace(t.ClusterEnv.BuildID) != ""
+			hasBYOD := t.ClusterEnv != nil && t.ClusterEnv.BYOD != nil &&
+				strings.TrimSpace(t.ClusterEnv.BYOD.DockerImage) != ""
+			if !hasBuildID && !hasBYOD {
 				log.Printf(
-					"Template %s has no build_id, skipping ray version override",
+					"Template %s has no build_id or docker_image, "+
+						"skipping ray version override",
 					t.Name,
 				)
 				continue

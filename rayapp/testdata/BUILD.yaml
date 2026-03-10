@@ -50,3 +50,18 @@
   test:
     command: pytest tests/ -s -vv
     tests_path: tests/
+
+- name: byod-ray
+  emoji: 🐳
+  title: BYOD Ray
+  description: Ray with a custom docker image.
+  dir: byod-ray
+  cluster_env:
+    byod:
+      docker_image: us-docker.pkg.dev/anyscale/templates/template_byod:2.37.0
+      ray_version: "2.37.0"
+  compute_config:
+    GCP: configs/gcp.yaml
+    AWS: configs/aws.yaml
+  test:
+    command: pytest . -s -vv
