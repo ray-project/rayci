@@ -23,6 +23,9 @@ Runs in either remote mode or local mode.
    Takes exactly one argument for the spec file and builds the image for local
    use only.
 
+Subcommands:
+  digest  Print the content-addressed digest for a spec file without building.
+
 Supported platforms:
   {{.Platforms}}
 
@@ -38,39 +41,46 @@ func usageText() string {
 }
 
 func main() {
-	workDir := flag.String("work_dir", ".", "root directory for the build")
-	docker := flag.String("docker", "", "path to the docker client binary")
-	rayCI := flag.Bool(
+	args := os.Args[1:]
+	digest := len(args) > 0 && args[0] == "digest"
+	if digest {
+		args = args[1:]
+	}
+
+	fs := flag.NewFlagSet("wanda", flag.ExitOnError)
+	workDir := fs.String("work_dir", ".", "root directory for the build")
+	docker := fs.String("docker", "", "path to the docker client binary")
+	rayCI := fs.Bool(
 		"rayci", false,
 		"takes RAYCI_ env vars for input and run in remote mode",
 	)
-	workRepo := flag.String("work_repo", "", "cache container repository")
-	namePrefix := flag.String(
+	workRepo := fs.String("work_repo", "", "cache container repository")
+	namePrefix := fs.String(
 		"name_prefix", "cr.ray.io/rayproject/",
 		"prefix for the image name",
 	)
-	buildID := flag.String("build_id", "", "build ID for the image tag")
-	readOnly := flag.Bool("read_only", false, "read-only cache repository")
-	epoch := flag.String("epoch", "", "epoch for the image tag")
-	rebuild := flag.Bool("rebuild", false, "always rebuild the image")
-	wandaSpecsFile := flag.String(
+	buildID := fs.String("build_id", "", "build ID for the image tag")
+	readOnly := fs.Bool("read_only", false, "read-only cache repository")
+	epoch := fs.String("epoch", "", "epoch for the image tag")
+	rebuild := fs.Bool("rebuild", false, "always rebuild the image")
+	wandaSpecsFile := fs.String(
 		"wanda_specs_file", "",
 		"file listing spec directories; if empty, uses .wandaspecs under work_dir",
 	)
-	envFile := flag.String(
+	envFile := fs.String(
 		"env_file", "",
 		"env file for variable expansion; values override OS environment variables",
 	)
-	artifactsDir := flag.String(
+	artifactsDir := fs.String(
 		"artifacts_dir", "",
 		"base directory for artifact extraction",
 	)
 
-	flag.Usage = func() {
+	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, usageText())
-		flag.PrintDefaults()
+		fs.PrintDefaults()
 	}
-	flag.Parse()
+	fs.Parse(args)
 
 	if *rayCI {
 		*workRepo = os.Getenv("RAYCI_WORK_REPO")
@@ -86,14 +96,12 @@ func main() {
 		}
 	}
 
-	args := flag.Args()
-
 	var input string
 	if !*rayCI {
-		if len(args) != 1 {
+		if fs.NArg() != 1 {
 			log.Fatal("needs exactly one argument for the spec file in local mode. Run with -help for usage.")
 		}
-		input = args[0]
+		input = fs.Arg(0)
 	} else {
 		input = os.Getenv("RAYCI_WANDA_FILE")
 	}
@@ -113,6 +121,13 @@ func main() {
 		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,
+	}
+
+	if digest {
+		if err := wanda.Digest(input, config, os.Stdout); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	if err := wanda.Build(input, config); err != nil {
