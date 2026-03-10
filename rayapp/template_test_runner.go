@@ -126,17 +126,6 @@ func runTemplateTestsWithFilter(
 		return fmt.Errorf("read templates failed: %w", err)
 	}
 
-	if rayVersion != "" {
-		for _, t := range tmpls {
-			env, err := overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
-			if err != nil {
-				return fmt.Errorf("override ray version for %q: %w", t.Name, err)
-			}
-			t.ClusterEnv = env
-		}
-		log.Printf("Overriding ray version to %s for all templates", rayVersion)
-	}
-
 	buildDir := filepath.Dir(buildFile)
 
 	var filteredTmpls []*Template
@@ -149,6 +138,20 @@ func runTemplateTestsWithFilter(
 			log.Printf("Template %s has no test configuration, skipping", t.Name)
 			skippedNoTest++
 			continue
+		}
+		if rayVersion != "" {
+			if t.ClusterEnv == nil || strings.TrimSpace(t.ClusterEnv.BuildID) == "" {
+				log.Printf(
+					"Template %s has no build_id, skipping ray version override",
+					t.Name,
+				)
+				continue
+			}
+			env, err := overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
+			if err != nil {
+				return fmt.Errorf("override ray version for %q: %w", t.Name, err)
+			}
+			t.ClusterEnv = env
 		}
 		filteredTmpls = append(filteredTmpls, t)
 	}

@@ -1,0 +1,149 @@
+# UNDER CONSTRUCTION: we in the process of adding template definitions
+# into this file. This file does not contain all the templates yet.
+
+# job-intro template is to be removed and replaced by
+# https://github.com/anyscale/first-job
+# owner: matthew owen
+- name: job-intro
+  emoji: 🔰
+  title: Intro to Jobs
+  description: Introduction on how to use Anyscale Jobs
+  dir: templates/intro-jobs
+  cluster_env:
+    build_id: anyscaleray2501-py311
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+  test:
+    tests_path: tests/job-intro/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: huaiwei
+- name: workspace-intro
+  emoji: 🔰
+  title: Intro to Workspaces
+  description: Introduction on how to use Anyscale Workspaces
+  dir: templates/intro-workspaces
+  cluster_env:
+    build_id: anyscaleray2501-py311
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+  test:
+    tests_path: tests/workspace-intro/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: edward
+- name: service-intro
+  emoji: 🔰
+  title: Intro to Services
+  description: Introduction on how to use Anyscale Services
+  dir: templates/intro-services
+  cluster_env:
+    build_id: anyscaleray2501-py311
+  compute_config:
+    GCP: configs/basic-serverless-config/gce.yaml
+    AWS: configs/basic-serverless-config/aws.yaml
+  test:
+    tests_path: tests/service-intro/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: stephen
+- name: unstructured_data_ingestion
+  emoji: 📄📊
+  title: Ingest unstructured documents into structured datasets
+  description: Ingest unstructured documents from data lakes and convert them into structured datasets using Ray Data's distributed processing.
+  dir: templates/unstructured_data_ingestion
+  cluster_env:
+    byod:
+      docker_image: us-docker.pkg.dev/anyscale-workspace-templates/workspace-templates/template_unstructured_data_ingestion:2.51.1
+      ray_version: 2.51.1
+  compute_config:
+    GCP: configs/unstructured-data-ingestion/gce.yaml
+    AWS: configs/unstructured-data-ingestion/aws.yaml
+  test:
+    tests_path: tests/unstructured_data_ingestion/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: Aydin
+- name: model-multiplexing
+  emoji: 🔰
+  title: Model Multiplexing Forecast
+  description: Deploy multiple forecasting models with Ray Serve and route requests to the appropriate model.
+  dir: templates/model-multiplexing-forecast
+  cluster_env:
+    build_id: anyscaleray2530-slim-py312-cu129
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+  test:
+    tests_path: tests/model-multiplexing/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+- name: model-composition-recsys
+  emoji: 🧩
+  title: Model composition for recommendation systems
+  description: Build a recommendation system using Ray Serve's model composition pattern to break ML pipelines into independent, scalable deployments.
+  dir: templates/model-composition-recsys
+  cluster_env:
+    build_id: anyscaleray2530-slim-py312-cu129
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+  test:
+    tests_path: tests/model-composition-recsys/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: akshay
+- name: serve-stable-diffusion-v2
+  emoji: 🔰
+  title: Deploy Stable Diffusion
+  description: Text-to-image generation model by Stability AI. Deploy with Ray Serve.
+  dir: templates/serve-stable-diffusion
+  cluster_env:
+    build_id: anyscaleray2441-py312-cu128
+  compute_config:
+    GCP: configs/basic-serverless-config/gce.yaml
+    AWS: configs/basic-serverless-config/aws.yaml
+  test:
+    tests_path: tests/serve-stable-diffusion-v2/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: Aydin
+- name: deployment-serve-llm
+  emoji: 🚀🤖
+  title: Deploy LLMs
+  description: Deploy small to large LLMs including vision, reasoning, and hybrid reasoning LLM models optimized with Ray Serve LLM.
+  dir: templates/deployment-serve-llm
+  cluster_env:
+    build_id: anyscaleray-llm2540-py311-cu128
+  compute_config:
+    GCP: configs/basic-single-node/gce.yaml
+    AWS: configs/basic-single-node/aws.yaml
+  test:
+    tests_path: tests/deployment-serve-llm/
+    command: bash tests.sh
+    timeout_in_sec: 900
+
+# owner: @omar
+- name: vla-fine-tuning
+  emoji: 🚀
+  title: Distributed VLA Fine-tuning with Ray
+  description: Fine-tune a Vision-Language-Action with Ray Data & Ray Train
+  dir: templates/vla-fine-tuning
+  cluster_env:
+    build_id: anyscaleray2540-py312-cu129
+  compute_config:
+    AWS: configs/vla-fine-tuning/aws.yaml
+    GCP: configs/vla-fine-tuning/gce.yaml
+  test:
+    tests_path: tests/vla-fine-tuning/
+    command: bash tests.sh
+    timeout_in_sec: 900
