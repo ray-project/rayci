@@ -32,7 +32,7 @@ build_raycilint linux  amd64
 build_raycilint linux  arm64
 
 build_rayapp linux   amd64
-build_rayapp darwin arm64
+build_rayapp darwin  arm64
 
 build_rayci  linux   amd64
 
