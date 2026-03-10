@@ -134,6 +134,33 @@ func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err erro
 	return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
 }
 
+// overrideClusterEnvRayVersion returns a new ClusterEnv with its ray version replaced.
+// It converts the original cluster env to an image URI, swaps the version portion, and
+// returns a ClusterEnv using image_uri with the new version.
+func overrideClusterEnvRayVersion(env *ClusterEnv, newVersion string) (*ClusterEnv, error) {
+	if env.BYOD != nil {
+		byodCopy := *env.BYOD
+		byodCopy.RayVersion = newVersion
+		if byodCopy.DockerImage != "" {
+			updated := imageURIVersionRe.ReplaceAllStringFunc(
+				byodCopy.DockerImage, func(string) string { return newVersion },
+			)
+			byodCopy.DockerImage = updated
+		}
+		return &ClusterEnv{BYOD: &byodCopy}, nil
+	}
+
+	imageURI, _, err := getImageURIAndRayVersionFromClusterEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("resolve cluster env: %w", err)
+	}
+
+	newImageURI := imageURIVersionRe.ReplaceAllStringFunc(
+		imageURI, func(string) string { return newVersion },
+	)
+	return &ClusterEnv{ImageURI: newImageURI}, nil
+}
+
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.
 // It supports BYOD (docker_image + ray_version) or BuildID/ImageURI.
 func getImageURIAndRayVersionFromClusterEnv(env *ClusterEnv) (string, string, error) {

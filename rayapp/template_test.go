@@ -760,3 +760,69 @@ func TestConvertImageURIToBuildID(t *testing.T) {
 		})
 	}
 }
+
+func TestOverrideClusterEnvRayVersion(t *testing.T) {
+	tests := []struct {
+		name         string
+		env          *ClusterEnv
+		newVersion   string
+		wantImageURI string
+		wantBYOD     bool
+	}{
+		{
+			name:         "override build_id",
+			env:          &ClusterEnv{BuildID: "anyscaleray2370-py311"},
+			newVersion:   "2.44.0",
+			wantImageURI: "anyscale/ray:2.44.0-py311",
+		},
+		{
+			name:         "override image_uri",
+			env:          &ClusterEnv{ImageURI: "anyscale/ray:2.37.0-py311"},
+			newVersion:   "2.44.0",
+			wantImageURI: "anyscale/ray:2.44.0-py311",
+		},
+		{
+			name: "override BYOD",
+			env: &ClusterEnv{
+				BYOD: &ClusterEnvBYOD{
+					DockerImage: "cr.ray.io/ray:2.37.0-py311",
+					RayVersion:  "2.37.0",
+				},
+			},
+			newVersion: "2.44.0",
+			wantBYOD:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := overrideClusterEnvRayVersion(tt.env, tt.newVersion)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantBYOD {
+				if got.BYOD == nil {
+					t.Fatal("expected BYOD to be set")
+				}
+				if got.BYOD.RayVersion != tt.newVersion {
+					t.Errorf(
+						"BYOD.RayVersion = %q, want %q",
+						got.BYOD.RayVersion, tt.newVersion,
+					)
+				}
+				if !strings.Contains(got.BYOD.DockerImage, tt.newVersion) {
+					t.Errorf(
+						"BYOD.DockerImage = %q, want to contain %q",
+						got.BYOD.DockerImage, tt.newVersion,
+					)
+				}
+			} else {
+				if got.ImageURI != tt.wantImageURI {
+					t.Errorf("ImageURI = %q, want %q", got.ImageURI, tt.wantImageURI)
+				}
+				if got.BuildID != "" {
+					t.Errorf("BuildID should be empty, got %q", got.BuildID)
+				}
+			}
+		})
+	}
+}

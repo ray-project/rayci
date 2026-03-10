@@ -92,17 +92,17 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	return nil
 }
 
-func RunAllTemplateTests(buildFile string) error {
+func RunAllTemplateTests(buildFile, rayVersion string) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runTemplateTestsWithFilter(buildFile, nil, cli, api)
+	return runTemplateTestsWithFilter(buildFile, nil, rayVersion, cli, api)
 }
 
-func RunTemplateTest(tmplName, buildFile string) error {
+func RunTemplateTest(tmplName, buildFile, rayVersion string) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
@@ -111,18 +111,30 @@ func RunTemplateTest(tmplName, buildFile string) error {
 	}
 	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
-	}, cli, api)
+	}, rayVersion, cli, api)
 }
 
 func runTemplateTestsWithFilter(
 	buildFile string,
 	filter func(tmpl *Template) bool,
+	rayVersion string,
 	cli *AnyscaleCLI,
 	api *anyscaleAPI,
 ) error {
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
 		return fmt.Errorf("read templates failed: %w", err)
+	}
+
+	if rayVersion != "" {
+		for _, t := range tmpls {
+			env, err := overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
+			if err != nil {
+				return fmt.Errorf("override ray version for %q: %w", t.Name, err)
+			}
+			t.ClusterEnv = env
+		}
+		log.Printf("Overriding ray version to %s for all templates", rayVersion)
 	}
 
 	buildDir := filepath.Dir(buildFile)
