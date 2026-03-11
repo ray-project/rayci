@@ -131,6 +131,9 @@ func convertImageURIToBuildID(imageURI string) (buildID string, err error) {
 
 var imageURIVersionRe = regexp.MustCompile(`(\d)\.(\d{2})\.(\d+)`)
 
+// validRayVersionRe matches a full ray version string like "2.44.0".
+var validRayVersionRe = regexp.MustCompile(`^\d\.\d{2}\.\d+$`)
+
 // extractRayVersionFromImageURI returns the ray version from the image URI.
 func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err error) {
 	matches := imageURIVersionRe.FindStringSubmatch(imageURI)

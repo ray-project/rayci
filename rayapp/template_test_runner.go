@@ -121,6 +121,13 @@ func runTemplateTestsWithFilter(
 	cli *AnyscaleCLI,
 	api *anyscaleAPI,
 ) error {
+	if rayVersion != "" && !validRayVersionRe.MatchString(rayVersion) {
+		return fmt.Errorf(
+			"invalid ray version %q: must match X.YY.Z (e.g. 2.44.0)",
+			rayVersion,
+		)
+	}
+
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
 		return fmt.Errorf("read templates failed: %w", err)

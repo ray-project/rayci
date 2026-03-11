@@ -636,6 +636,33 @@ func TestRunTemplateTestsWithRayVersionOverride(t *testing.T) {
 	}
 }
 
+func TestRunTemplateTestsWithFilter_InvalidRayVersion(t *testing.T) {
+	invalidVersions := []struct {
+		name       string
+		rayVersion string
+	}{
+		{"missing minor digit", "2.4.0"},
+		{"no dots", "2440"},
+		{"extra prefix", "v2.44.0"},
+		{"trailing text", "2.44.0-rc1"},
+		{"two-digit major", "22.44.0"},
+	}
+
+	for _, tt := range invalidVersions {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runTemplateTestsWithFilter(
+				"testdata/BUILD.yaml", nil, tt.rayVersion, nil, nil,
+			)
+			if err == nil {
+				t.Fatal("expected error for invalid ray version")
+			}
+			if !strings.Contains(err.Error(), "invalid ray version") {
+				t.Errorf("error %q should contain 'invalid ray version'", err.Error())
+			}
+		})
+	}
+}
+
 func TestRunTemplateTestsWithRayVersionOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
