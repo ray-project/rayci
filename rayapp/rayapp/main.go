@@ -90,5 +90,5 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Test flags (test):")
 	fmt.Println("  --build string       Build file (default \"BUILD.yaml\")")
-fmt.Println("  --ray-version string ray version to test against")
+	fmt.Println("  --ray-version string ray version to test against")
 }

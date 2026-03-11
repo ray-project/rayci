@@ -582,34 +582,71 @@ func TestProbe_WithTestsPath(t *testing.T) {
 }
 
 func TestRunTemplateTestsWithRayVersionOverride(t *testing.T) {
-	fake := newDefaultFake()
-	cli := newTestCLI(fake)
-	api := newFakeAnyscaleAPI(t)
+	tests := []struct {
+		name         string
+		tmplName     string
+		rayVersion   string
+		wantImageURI string
+	}{
+		{
+			name:         "override build_id template",
+			tmplName:     "fishy-ray",
+			rayVersion:   "2.44.0",
+			wantImageURI: "anyscale/ray:2.44.0-py311",
+		},
+		{
+			name:         "override image_uri template",
+			tmplName:     "image-uri-ray",
+			rayVersion:   "2.44.0",
+			wantImageURI: "anyscale/ray:2.44.0-py311",
+		},
+	}
 
-	var capturedImageURI string
-	cli.setRunFunc(func(args []string) (string, error) {
-		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 create" {
-			for i, arg := range args {
-				if arg == "--image-uri" && i+1 < len(args) {
-					capturedImageURI = args[i+1]
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := newDefaultFake()
+			cli := newTestCLI(fake)
+			api := newFakeAnyscaleAPI(t)
+
+			var capturedImageURI string
+			cli.setRunFunc(func(args []string) (string, error) {
+				cmd := fmt.Sprintf("%s %s", args[0], args[1])
+				if cmd == "workspace_v2 create" {
+					for i, arg := range args {
+						if arg == "--image-uri" && i+1 < len(args) {
+							capturedImageURI = args[i+1]
+						}
+					}
 				}
-			}
-		}
-		return fake.run(args)
-	})
+				return fake.run(args)
+			})
 
+			err := runTemplateTestsWithFilter(
+				"testdata/BUILD.yaml",
+				func(tmpl *Template) bool { return tmpl.Name == tt.tmplName },
+				tt.rayVersion, cli, api,
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if capturedImageURI != tt.wantImageURI {
+				t.Errorf("image URI = %q, want %q", capturedImageURI, tt.wantImageURI)
+			}
+		})
+	}
+}
+
+func TestRunTemplateTestsWithRayVersionOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
-		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
-		"2.44.0", cli, api,
+		func(tmpl *Template) bool { return tmpl.Name == "custom-image" },
+		"2.44.0", nil, nil,
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error when non-ray image_uri is skipped")
 	}
-	want := "us-docker.pkg.dev/anyscale/templates/template_byod:2.44.0"
-	if capturedImageURI != want {
-		t.Errorf("image URI = %q, want %q", capturedImageURI, want)
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 

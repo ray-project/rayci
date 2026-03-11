@@ -56,6 +56,17 @@ var validTemplateName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 var buildIDVersionFindRe = regexp.MustCompile(`(\d)(\d{2})(\d+)`)
 
+// isRayImageURI returns true if the image URI refers to a ray image
+// (e.g. "anyscale/ray:2.44.0", "anyscale/ray-llm:2.44.0-py312").
+func isRayImageURI(imageURI string) bool {
+	parts := strings.SplitN(imageURI, "/", 2)
+	if len(parts) < 2 {
+		return false
+	}
+	imageName := strings.SplitN(parts[1], ":", 2)[0]
+	return imageName == "ray" || strings.HasPrefix(imageName, "ray-")
+}
+
 // buildIDToImageName maps build ID slugified image-type (after "anyscale") to image name for URI.
 var buildIDToImageName = map[string]string{
 	"ray":    "ray",

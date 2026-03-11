@@ -721,6 +721,28 @@ func TestConvertBuildIDToImageURI(t *testing.T) {
 	}
 }
 
+func TestIsRayImageURI(t *testing.T) {
+	tests := []struct {
+		imageURI string
+		want     bool
+	}{
+		{"anyscale/ray:2.44.0-py311", true},
+		{"anyscale/ray-llm:2.44.1-py312-cu128", true},
+		{"anyscale/ray-ml:2.44.0-py311", true},
+		{"other/ray:2.44.0", true},
+		{"anyscale/notray:2.44.0", false},
+		{"anyscale/myimage:latest", false},
+		{"noregistry", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.imageURI, func(t *testing.T) {
+			if got := isRayImageURI(tt.imageURI); got != tt.want {
+				t.Errorf("isRayImageURI(%q) = %v, want %v", tt.imageURI, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConvertImageURIToBuildID(t *testing.T) {
 	tests := []struct {
 		name        string
