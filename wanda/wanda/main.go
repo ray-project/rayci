@@ -23,6 +23,9 @@ Runs in either remote mode or local mode.
    Takes exactly one argument for the spec file and builds the image for local
    use only.
 
+Subcommands:
+  digest  Print the content-addressed digest for a spec file without building.
+
 Supported platforms:
   {{.Platforms}}
 
@@ -38,6 +41,11 @@ func usageText() string {
 }
 
 func main() {
+	digest := len(os.Args) > 1 && os.Args[1] == "digest"
+	if digest {
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	}
+
 	workDir := flag.String("work_dir", ".", "root directory for the build")
 	docker := flag.String("docker", "", "path to the docker client binary")
 	rayCI := flag.Bool(
@@ -113,6 +121,13 @@ func main() {
 		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,
+	}
+
+	if digest {
+		if err := wanda.Digest(input, config, os.Stdout); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	if err := wanda.Build(input, config); err != nil {
