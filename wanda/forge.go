@@ -2,6 +2,7 @@ package wanda
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,11 +16,15 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Build builds a container image from the given specification file, and builds
-// all its dependencies in topological order.
-// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
-// the root is built.
-func Build(specFile string, config *ForgeConfig) error {
+// buildSession holds the shared context for a build or digest run.
+type buildSession struct {
+	forge *Forge
+	graph *depGraph
+}
+
+// newBuildSession sets up a Forge and builds the dependency graph for specFile.
+// It normalizes config and resolves the env lookup chain.
+func newBuildSession(specFile string, config *ForgeConfig) (*buildSession, error) {
 	if config == nil {
 		config = &ForgeConfig{}
 	}
@@ -33,7 +38,7 @@ func Build(specFile string, config *ForgeConfig) error {
 	if config.EnvFile != "" {
 		envfileVars, err := ParseEnvFile(config.EnvFile)
 		if err != nil {
-			return fmt.Errorf("parse envfile: %w", err)
+			return nil, fmt.Errorf("parse envfile: %w", err)
 		}
 		lookup = func(key string) (string, bool) {
 			if v, ok := envfileVars[key]; ok {
@@ -43,35 +48,51 @@ func Build(specFile string, config *ForgeConfig) error {
 		}
 	}
 
-	graph, err := buildDepGraph(specFile, lookup, config.NamePrefix, wandaSpecsFile)
+	s := new(buildSession)
+
+	var err error
+	s.graph, err = buildDepGraph(specFile, lookup, config.NamePrefix, wandaSpecsFile)
 	if err != nil {
-		return fmt.Errorf("build dep graph: %w", err)
+		return nil, fmt.Errorf("build dep graph: %w", err)
 	}
 
-	forge, err := NewForge(config)
+	s.forge, err = NewForge(config)
 	if err != nil {
-		return fmt.Errorf("make forge: %w", err)
+		return nil, fmt.Errorf("make forge: %w", err)
 	}
-	forge.lookup = lookup
+	s.forge.lookup = lookup
+
+	return s, nil
+}
+
+// Build builds a container image from the given specification file, and builds
+// all its dependencies in topological order.
+// In RayCI mode, dependencies are assumed built by prior pipeline steps; only
+// the root is built.
+func Build(specFile string, config *ForgeConfig) error {
+	s, err := newBuildSession(specFile, config)
+	if err != nil {
+		return err
+	}
 
 	// In RayCI mode, only build the root (deps built by prior pipeline steps).
-	order := graph.Order
+	order := s.graph.Order
 	if config.RayCI {
-		order = []string{graph.Root}
+		order = []string{s.graph.Root}
 	}
 
 	var targetCacheHit bool
 	for _, name := range order {
-		rs := graph.Specs[name]
+		rs := s.graph.Specs[name]
 
 		log.Printf("building %s (from %s)", name, rs.Path)
 
-		hitsBefore := forge.cacheHit()
-		if err := forge.Build(rs.Spec); err != nil {
+		hitsBefore := s.forge.cacheHit()
+		if err := s.forge.Build(rs.Spec); err != nil {
 			return fmt.Errorf("build %s: %w", name, err)
 		}
-		if name == graph.Root {
-			targetCacheHit = forge.cacheHit() > hitsBefore
+		if name == s.graph.Root {
+			targetCacheHit = s.forge.cacheHit() > hitsBefore
 		}
 	}
 
@@ -79,10 +100,10 @@ func Build(specFile string, config *ForgeConfig) error {
 	// built (not a cache hit). On cache hit, the image exists only in the
 	// remote registry; extracting would require pulling it first.
 	if config.ArtifactsDir != "" {
-		rootSpec := graph.Specs[graph.Root].Spec
+		rootSpec := s.graph.Specs[s.graph.Root].Spec
 		if len(rootSpec.Artifacts) > 0 && !targetCacheHit {
-			rootTag := forge.workTag(rootSpec.Name)
-			if err := forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
+			rootTag := s.forge.workTag(rootSpec.Name)
+			if err := s.forge.ExtractArtifacts(rootSpec, rootTag); err != nil {
 				return fmt.Errorf("extract artifacts: %w", err)
 			}
 		} else if targetCacheHit && len(rootSpec.Artifacts) > 0 {
@@ -274,14 +295,14 @@ func (f *Forge) ExtractArtifacts(spec *Spec, imageTag string) error {
 	return nil
 }
 
-// Build builds a container image from the given specification.
-func (f *Forge) Build(spec *Spec) error {
-	// Prepare the tar stream.
+// resolveBuildInput assembles the build input and core for a spec.
+// This is the shared setup used by both Build and digestSpec.
+func (f *Forge) resolveBuildInput(spec *Spec) (*buildInput, *buildInputCore, error) {
 	ts := newTarStream()
 
 	files, err := listSrcFiles(f.workDir, spec.Srcs, spec.Dockerfile)
 	if err != nil {
-		return fmt.Errorf("list src files: %w", err)
+		return nil, nil, fmt.Errorf("list src files: %w", err)
 	}
 	for _, file := range files {
 		f.addSrcFile(ts, file)
@@ -291,15 +312,54 @@ func (f *Forge) Build(spec *Spec) error {
 
 	froms, err := f.resolveBases(spec.Froms)
 	if err != nil {
-		return fmt.Errorf("resolve bases: %w", err)
+		return nil, nil, fmt.Errorf("resolve bases: %w", err)
 	}
 	in.froms = froms
 
 	inputCore, err := in.makeCore(spec.Dockerfile, f.lookup)
 	if err != nil {
-		return fmt.Errorf("make build input core: %w", err)
+		return nil, nil, fmt.Errorf("make build input core: %w", err)
 	}
 	inputCore.Epoch = f.config.Epoch
+
+	return in, inputCore, nil
+}
+
+// digestSpec computes the content-addressed digest for the given spec without
+// checking the cache or building the image.
+func (f *Forge) digestSpec(spec *Spec) (string, error) {
+	_, inputCore, err := f.resolveBuildInput(spec)
+	if err != nil {
+		return "", err
+	}
+	return inputCore.digest()
+}
+
+// Digest computes and writes the content-addressed digest for the given spec
+// file to w. It performs all the standard digest-generation steps (resolving
+// base images, hashing the build context, expanding build args) but does not
+// check the cache or build the image.
+func Digest(specFile string, config *ForgeConfig, w io.Writer) error {
+	s, err := newBuildSession(specFile, config)
+	if err != nil {
+		return err
+	}
+
+	inputDigest, err := s.forge.digestSpec(s.graph.Specs[s.graph.Root].Spec)
+	if err != nil {
+		return fmt.Errorf("compute digest for %s: %w", s.graph.Root, err)
+	}
+
+	fmt.Fprintln(w, inputDigest)
+	return nil
+}
+
+// Build builds a container image from the given specification.
+func (f *Forge) Build(spec *Spec) error {
+	in, inputCore, err := f.resolveBuildInput(spec)
+	if err != nil {
+		return err
+	}
 
 	caching := !spec.DisableCaching
 
