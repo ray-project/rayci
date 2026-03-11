@@ -789,7 +789,7 @@ func TestOverrideClusterEnvRayVersion(t *testing.T) {
 		env          *ClusterEnv
 		newVersion   string
 		wantImageURI string
-		wantBYOD     bool
+		wantSameEnv  bool
 	}{
 		{
 			name:         "override build_id",
@@ -804,15 +804,15 @@ func TestOverrideClusterEnvRayVersion(t *testing.T) {
 			wantImageURI: "anyscale/ray:2.44.0-py311",
 		},
 		{
-			name: "override BYOD",
+			name: "BYOD returned unchanged",
 			env: &ClusterEnv{
 				BYOD: &ClusterEnvBYOD{
 					DockerImage: "cr.ray.io/ray:2.37.0-py311",
 					RayVersion:  "2.37.0",
 				},
 			},
-			newVersion: "2.44.0",
-			wantBYOD:   true,
+			newVersion:  "2.44.0",
+			wantSameEnv: true,
 		},
 	}
 	for _, tt := range tests {
@@ -821,21 +821,9 @@ func TestOverrideClusterEnvRayVersion(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tt.wantBYOD {
-				if got.BYOD == nil {
-					t.Fatal("expected BYOD to be set")
-				}
-				if got.BYOD.RayVersion != tt.newVersion {
-					t.Errorf(
-						"BYOD.RayVersion = %q, want %q",
-						got.BYOD.RayVersion, tt.newVersion,
-					)
-				}
-				if !strings.Contains(got.BYOD.DockerImage, tt.newVersion) {
-					t.Errorf(
-						"BYOD.DockerImage = %q, want to contain %q",
-						got.BYOD.DockerImage, tt.newVersion,
-					)
+			if tt.wantSameEnv {
+				if got != tt.env {
+					t.Errorf("expected same env pointer back, got a different one")
 				}
 			} else {
 				if got.ImageURI != tt.wantImageURI {

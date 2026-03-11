@@ -150,15 +150,7 @@ func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err erro
 // returns a ClusterEnv using image_uri with the new version.
 func overrideClusterEnvRayVersion(env *ClusterEnv, newVersion string) (*ClusterEnv, error) {
 	if env.BYOD != nil {
-		byodCopy := *env.BYOD
-		byodCopy.RayVersion = newVersion
-		if byodCopy.DockerImage != "" {
-			updated := imageURIVersionRe.ReplaceAllStringFunc(
-				byodCopy.DockerImage, func(string) string { return newVersion },
-			)
-			byodCopy.DockerImage = updated
-		}
-		return &ClusterEnv{BYOD: &byodCopy}, nil
+		return env, nil
 	}
 
 	imageURI, _, err := getImageURIAndRayVersionFromClusterEnv(env)
