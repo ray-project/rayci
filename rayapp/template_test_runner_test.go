@@ -663,6 +663,20 @@ func TestRunTemplateTestsWithFilter_InvalidRayVersion(t *testing.T) {
 	}
 }
 
+func TestRunTemplateTestsWithRayVersionOverride_SkipsBYODImage(t *testing.T) {
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
+		"2.44.0", nil, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error when BYOD image is skipped")
+	}
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
+	}
+}
+
 func TestRunTemplateTestsWithRayVersionOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
