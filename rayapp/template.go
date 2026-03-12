@@ -56,6 +56,17 @@ var validTemplateName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 var buildIDVersionFindRe = regexp.MustCompile(`(\d)(\d{2})(\d+)`)
 
+// isRayImageURI returns true if the image URI refers to a ray image
+// (e.g. "anyscale/ray:2.44.0", "anyscale/ray-llm:2.44.0-py312").
+func isRayImageURI(imageURI string) bool {
+	parts := strings.SplitN(imageURI, "/", 2)
+	if len(parts) < 2 {
+		return false
+	}
+	imageName := strings.SplitN(parts[1], ":", 2)[0]
+	return imageName == "ray" || strings.HasPrefix(imageName, "ray-")
+}
+
 // buildIDToImageName maps build ID slugified image-type (after "anyscale") to image name for URI.
 var buildIDToImageName = map[string]string{
 	"ray":    "ray",
@@ -120,6 +131,9 @@ func convertImageURIToBuildID(imageURI string) (buildID string, err error) {
 
 var imageURIVersionRe = regexp.MustCompile(`(\d)\.(\d{2})\.(\d+)`)
 
+// validRayVersionRe matches a full ray version string like "2.44.0".
+var validRayVersionRe = regexp.MustCompile(`^\d\.\d{2}\.\d+$`)
+
 // extractRayVersionFromImageURI returns the ray version from the image URI.
 func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err error) {
 	matches := imageURIVersionRe.FindStringSubmatch(imageURI)
@@ -132,6 +146,25 @@ func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err erro
 	}
 	major, minor, patch := matches[1], matches[2], matches[3]
 	return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+}
+
+// overrideClusterEnvRayVersion returns a new ClusterEnv with its ray version replaced.
+// It converts the original cluster env to an image URI, swaps the version portion, and
+// returns a ClusterEnv using image_uri with the new version.
+func overrideClusterEnvRayVersion(env *ClusterEnv, newVersion string) (*ClusterEnv, error) {
+	if env.BYOD != nil {
+		return env, nil
+	}
+
+	imageURI, _, err := getImageURIAndRayVersionFromClusterEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("resolve cluster env: %w", err)
+	}
+
+	newImageURI := imageURIVersionRe.ReplaceAllStringFunc(
+		imageURI, func(string) string { return newVersion },
+	)
+	return &ClusterEnv{ImageURI: newImageURI}, nil
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.

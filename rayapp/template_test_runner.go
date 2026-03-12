@@ -92,17 +92,17 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	return nil
 }
 
-func RunAllTemplateTests(buildFile string) error {
+func RunAllTemplateTests(buildFile, rayVersion string) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runTemplateTestsWithFilter(buildFile, nil, cli, api)
+	return runTemplateTestsWithFilter(buildFile, nil, rayVersion, cli, api)
 }
 
-func RunTemplateTest(tmplName, buildFile string) error {
+func RunTemplateTest(tmplName, buildFile, rayVersion string) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
@@ -111,15 +111,23 @@ func RunTemplateTest(tmplName, buildFile string) error {
 	}
 	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
-	}, cli, api)
+	}, rayVersion, cli, api)
 }
 
 func runTemplateTestsWithFilter(
 	buildFile string,
 	filter func(tmpl *Template) bool,
+	rayVersion string,
 	cli *AnyscaleCLI,
 	api *anyscaleAPI,
 ) error {
+	if rayVersion != "" && !validRayVersionRe.MatchString(rayVersion) {
+		return fmt.Errorf(
+			"invalid ray version %q: must match X.YY.Z (e.g. 2.44.0)",
+			rayVersion,
+		)
+	}
+
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
 		return fmt.Errorf("read templates failed: %w", err)
@@ -137,6 +145,39 @@ func runTemplateTestsWithFilter(
 			log.Printf("Template %s has no test configuration, skipping", t.Name)
 			skippedNoTest++
 			continue
+		}
+		if rayVersion != "" {
+			if t.ClusterEnv == nil {
+				log.Printf(
+					"Template %s has no cluster_env, "+
+						"skipping ray version override",
+					t.Name,
+				)
+				continue
+			}
+			hasBuildID := strings.TrimSpace(t.ClusterEnv.BuildID) != ""
+			hasImageURI := strings.TrimSpace(t.ClusterEnv.ImageURI) != ""
+			if !hasBuildID && !hasImageURI {
+				log.Printf(
+					"Template %s has no build_id or image_uri, "+
+						"skipping ray version override",
+					t.Name,
+				)
+				continue
+			}
+			if hasImageURI && !isRayImageURI(t.ClusterEnv.ImageURI) {
+				log.Printf(
+					"Template %s image_uri %q is not a ray image, "+
+						"skipping ray version override",
+					t.Name, t.ClusterEnv.ImageURI,
+				)
+				continue
+			}
+			env, err := overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
+			if err != nil {
+				return fmt.Errorf("override ray version for %q: %w", t.Name, err)
+			}
+			t.ClusterEnv = env
 		}
 		filteredTmpls = append(filteredTmpls, t)
 	}
