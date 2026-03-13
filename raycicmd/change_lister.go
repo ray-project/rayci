@@ -61,9 +61,17 @@ func (g *GitChangeLister) runNoOutput(args ...string) error {
 func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
 	remote := g.remote()
 
-	// Ensure we have the latest base branch refs.
-	if err := g.runNoOutput("fetch", "-q", remote, g.BaseBranch); err != nil {
-		return nil, fmt.Errorf("git fetch %s %s: %w", remote, g.BaseBranch, err)
+	// Ensure we have the latest base branch refs. If the repo is shallow,
+	// it must be unshallowed for merge-base to work.
+	isShallowOut, _ := g.run("rev-parse", "--is-shallow-repository")
+	if strings.TrimSpace(string(isShallowOut)) == "true" {
+		if err := g.runNoOutput("fetch", "--unshallow", "-q", remote, g.BaseBranch); err != nil {
+			return nil, fmt.Errorf("git fetch --unshallow %s %s: %w", remote, g.BaseBranch, err)
+		}
+	} else {
+		if err := g.runNoOutput("fetch", "-q", remote, g.BaseBranch); err != nil {
+			return nil, fmt.Errorf("git fetch %s %s: %w", remote, g.BaseBranch, err)
+		}
 	}
 
 	// Find the merge-base (common ancestor) between the base branch and the commit.
