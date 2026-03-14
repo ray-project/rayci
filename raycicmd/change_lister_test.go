@@ -437,6 +437,47 @@ func TestListChangedFiles_SameFileModifiedOnBothBranches(t *testing.T) {
 	}
 }
 
+// TestListChangedFiles_ShallowClone verifies that ListChangedFiles works when
+// the repository is a shallow clone, as used in CI environments like Buildkite.
+//
+// Git history (time flows left to right):
+//
+//	feature-branch:              [A] ---------> [B]
+//	                              |              + feature.go
+//	origin/master:   ... ------> [A]
+//
+//	The shallow clone only has [A] with no parent history. ListChangedFiles
+//	must unshallow to trace ancestry and find the merge-base.
+func TestListChangedFiles_ShallowClone(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	h.git("checkout", "-b", "feature-branch")
+	featureCommit := h.commitFiles("add feature", "feature.go")
+	h.git("push", "origin", "feature-branch")
+
+	// Create a shallow clone of origin (depth=1), simulating Buildkite CI.
+	shallowDir := t.TempDir()
+	runGitCommand(t, shallowDir, "clone", "--depth=1", h.Origin, ".")
+	runGitCommand(t, shallowDir, "config", "user.email", "test@test.com")
+	runGitCommand(t, shallowDir, "config", "user.name", "Test")
+
+	// Fetch the feature branch shallowly, as Buildkite does for PR heads.
+	runGitCommand(t, shallowDir, "fetch", "--depth=1", "origin", "feature-branch")
+	runGitCommand(t, shallowDir, "checkout", "-f", featureCommit)
+
+	lister := &GitChangeLister{WorkDir: shallowDir, BaseBranch: "master", Commit: featureCommit}
+	files, err := lister.ListChangedFiles()
+	if err != nil {
+		t.Fatalf("ListChangedFiles() = %v, want nil", err)
+	}
+
+	if len(files) != 1 || files[0] != "feature.go" {
+		t.Errorf("ListChangedFiles() = %v, want [feature.go]", files)
+	}
+}
+
 // TestListChangedFiles_DeepDirectoryStructure verifies files in nested directories.
 //
 // Git history (time flows left to right):
