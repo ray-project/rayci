@@ -67,6 +67,7 @@ var (
 		"docker_publish_tcp_ports", "docker_network",
 		"mount_buildkite_agent", "mount_windows_artifacts",
 		"aws_assume_role", "aws_assume_role_duration_seconds",
+		"fetch_full_history",
 	}
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
@@ -76,6 +77,7 @@ var (
 
 		// The following keys are processed by rayci.
 		"timeout_in_minutes",
+		"fetch_full_history",
 	}
 
 	wandaStepAllowedKeys = []string{

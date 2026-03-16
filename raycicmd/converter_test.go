@@ -113,7 +113,10 @@ func TestConvertPipelineStep_concurrency_group(t *testing.T) {
 		"concurrency_group": "group",
 	}
 	if _, err := c.convertStep("fakeid", step); err == nil {
-		t.Errorf("TestConvertPipelineStep_concurrency_group %+v: step concurrent group should not be allowed", step)
+		t.Errorf(
+			"TestConvertPipelineStep_concurrency_group %+v: step concurrent group should not be allowed",
+			step,
+		)
 	}
 }
 
@@ -524,6 +527,30 @@ func TestConvertPipelineStep(t *testing.T) {
 		out: map[string]any{
 			"wait": nil, "continue_on_failure": true,
 			"depends_on": "dep", "if": "false",
+		},
+	}, {
+		in: map[string]any{
+			"label":              "say hello",
+			"command":            "echo hello",
+			"fetch_full_history": true,
+		},
+		out: map[string]any{
+			"agents":             newBkAgents("fakerunner"),
+			"timeout_in_minutes": defaultTimeoutInMinutes,
+			"artifact_paths":     defaultArtifactPaths,
+			"retry":              defaultRayRetry,
+			"env": map[string]string{
+				"BUILDKITE_ARTIFACT_UPLOAD_DESTINATION": artifactDest,
+				"BUILDKITE_BAZEL_CACHE_URL":             "https://bazel-build-cache",
+				"RAYCI_BRANCH":                          "beta",
+				"RAYCI_BUILD_ID":                        "abc123",
+				"RAYCI_STEP_ID":                         "fakeid",
+				"RAYCI_TEMP":                            "s3://ci-temp/abc123/",
+				"RAYCI_WORK_REPO":                       "fakeecr",
+				"RAYCI_FETCH_FULL_HISTORY":              "1",
+			},
+			"label":   "say hello [fakeid]",
+			"command": "echo hello",
 		},
 	}, {
 		in: map[string]any{
