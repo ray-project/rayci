@@ -154,6 +154,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if id != "" {
 		envMap["RAYCI_STEP_ID"] = id
 	}
+	if v, _ := boolInMap(step, "fetch_full_history"); v {
+		envMap["RAYCI_FETCH_FULL_HISTORY"] = "1"
+	}
 	result["env"] = envMap
 
 	envKeys := make(map[string]struct{})
