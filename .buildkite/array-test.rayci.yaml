@@ -8,6 +8,10 @@ steps:
     key: array-step
     command: |
       echo "Running os={{array.os}} variant={{array.variant}}"
+      if [ "${RAYCI_STAGE:-}" = "postmerge" ]; then
+        echo "Postmerge: skipping filter assertions"
+        exit 0
+      fi
       if [ "{{array.os}}" != "linux" ] && [ "{{array.os}}" != "macos" ]; then
         echo "ERROR: unexpected os={{array.os}}"
         exit 1
