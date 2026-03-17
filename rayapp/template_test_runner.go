@@ -162,13 +162,6 @@ func runTemplateTestsWithFilter(
 				continue
 			}
 			if t.ClusterEnv.BYOD != nil {
-				if nightly {
-					return fmt.Errorf(
-						"template %q uses BYOD cluster env, "+
-							"which is not compatible with --nightly",
-						t.Name,
-					)
-				}
 				log.Printf(
 					"Template %s uses BYOD cluster env, "+
 						"skipping ray version override",
@@ -187,13 +180,6 @@ func runTemplateTestsWithFilter(
 				continue
 			}
 			if hasImageURI && !isRayImageURI(t.ClusterEnv.ImageURI) {
-				if nightly {
-					return fmt.Errorf(
-						"template %q image_uri %q is not a ray image, "+
-							"which is not compatible with --nightly",
-						t.Name, t.ClusterEnv.ImageURI,
-					)
-				}
 				log.Printf(
 					"Template %s image_uri %q is not a ray image, "+
 						"skipping ray version override",

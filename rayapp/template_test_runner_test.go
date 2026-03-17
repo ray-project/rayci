@@ -743,37 +743,31 @@ func TestRunTemplateTestsWithNightlyOverride(t *testing.T) {
 	}
 }
 
-func TestRunTemplateTestsWithNightlyOverride_ErrorsOnBYODImage(t *testing.T) {
+func TestRunTemplateTestsWithNightlyOverride_SkipsBYODImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
 		"", true, nil, nil,
 	)
 	if err == nil {
-		t.Fatal("expected error for BYOD with --nightly")
+		t.Fatal("expected error when BYOD image is skipped")
 	}
-	if !strings.Contains(err.Error(), "BYOD") {
-		t.Errorf("error %q should mention BYOD", err.Error())
-	}
-	if !strings.Contains(err.Error(), "not compatible with --nightly") {
-		t.Errorf("error %q should mention not compatible with --nightly", err.Error())
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 
-func TestRunTemplateTestsWithNightlyOverride_ErrorsOnNonRayImage(t *testing.T) {
+func TestRunTemplateTestsWithNightlyOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "custom-image" },
 		"", true, nil, nil,
 	)
 	if err == nil {
-		t.Fatal("expected error for non-ray image with --nightly")
+		t.Fatal("expected error when non-ray image_uri is skipped")
 	}
-	if !strings.Contains(err.Error(), "not a ray image") {
-		t.Errorf("error %q should mention not a ray image", err.Error())
-	}
-	if !strings.Contains(err.Error(), "not compatible with --nightly") {
-		t.Errorf("error %q should mention not compatible with --nightly", err.Error())
+	if !strings.Contains(err.Error(), "no templates to test") {
+		t.Errorf("error %q should contain 'no templates to test'", err.Error())
 	}
 }
 
