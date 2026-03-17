@@ -18,6 +18,9 @@ type tarStream struct {
 	// all files will use this mod time default. This makes the stream
 	// deterministic and cachable.
 	modTime time.Time
+
+	// owner overrides the uid/gid for all entries when set.
+	owner *contextOwner
 }
 
 // newTarStream creates a new tarball stream.
@@ -57,8 +60,10 @@ func (s *tarStream) writeTo(tw *tar.Writer) error {
 
 	for _, name := range names {
 		f := s.files[name]
-		if err := f.writeTo(tw, s.modTime); err != nil {
-			return fmt.Errorf("write file %q to stream: %w", name, err)
+		if err := f.writeTo(tw, s.modTime, s.owner); err != nil {
+			return fmt.Errorf(
+				"write file %q to stream: %w", name, err,
+			)
 		}
 	}
 	return nil
@@ -90,7 +95,7 @@ func (s *tarStream) digest() (string, error) {
 	for _, name := range names {
 		f := s.files[name]
 
-		r, err := f.record()
+		r, err := f.record(s.owner)
 		if err != nil {
 			return "", fmt.Errorf("digest file %q: %w", name, err)
 		}

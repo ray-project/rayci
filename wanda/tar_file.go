@@ -19,7 +19,9 @@ type tarFile struct {
 	meta *tarMeta
 }
 
-func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
+func (t *tarFile) writeTo(
+	tw *tar.Writer, modTime time.Time, owner *contextOwner,
+) error {
 	stat, err := os.Lstat(t.srcFile)
 	if err != nil {
 		return fmt.Errorf("stat file %q: %w", t.srcFile, err)
@@ -36,6 +38,10 @@ func (t *tarFile) writeTo(tw *tar.Writer, modTime time.Time) error {
 		Gid:     meta.GroupID,
 		Uid:     meta.UserID,
 		ModTime: modTime,
+	}
+	if owner != nil {
+		hdr.Uid = owner.UserID
+		hdr.Gid = owner.GroupID
 	}
 
 	switch stat.Mode() & os.ModeType {
@@ -94,7 +100,7 @@ type tarFileRecord struct {
 	Symlink string `json:"symlink,omitempty"`
 }
 
-func (t *tarFile) record() (*tarFileRecord, error) {
+func (t *tarFile) record(owner *contextOwner) (*tarFileRecord, error) {
 	// Use Lstat to detect symlinks without following them.
 	stat, err := os.Lstat(t.srcFile)
 	if err != nil {
@@ -125,7 +131,7 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 		h.Write([]byte(target))
 		contentDigest := sha256DigestString(h)
 
-		return &tarFileRecord{
+		r := &tarFileRecord{
 			Name:          t.name,
 			Mode:          mode,
 			GroupID:       meta.GroupID,
@@ -133,7 +139,12 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 			Size:          0, // Symlinks have no content size in tar.
 			ContentDigest: contentDigest,
 			Symlink:       target,
-		}, nil
+		}
+		if owner != nil {
+			r.UserID = owner.UserID
+			r.GroupID = owner.GroupID
+		}
+		return r, nil
 	default:
 		f, err := os.Open(t.srcFile)
 		if err != nil {
@@ -156,7 +167,10 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 
 			ContentDigest: contentDigest,
 		}
-
+		if owner != nil {
+			r.UserID = owner.UserID
+			r.GroupID = owner.GroupID
+		}
 		return r, nil
 	}
 }
