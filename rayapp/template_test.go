@@ -836,3 +836,98 @@ func TestOverrideClusterEnvRayVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertImageURIToNightly(t *testing.T) {
+	tests := []struct {
+		name     string
+		imageURI string
+		want     string
+	}{
+		{
+			name:     "ray with python suffix",
+			imageURI: "anyscale/ray:2.44.0-py311",
+			want:     "anyscale/ray:nightly-py311",
+		},
+		{
+			name:     "ray with python and cuda suffix",
+			imageURI: "anyscale/ray:2.44.1-py312-cu128",
+			want:     "anyscale/ray:nightly-py312-cu128",
+		},
+		{
+			name:     "ray without suffix",
+			imageURI: "anyscale/ray:2.44.0",
+			want:     "anyscale/ray:nightly",
+		},
+		{
+			name:     "ray-llm",
+			imageURI: "anyscale/ray-llm:2.44.1-py312-cu128",
+			want:     "anyscale/ray-llm:nightly-py312-cu128",
+		},
+		{
+			name:     "ray-ml",
+			imageURI: "anyscale/ray-ml:2.44.0-py311",
+			want:     "anyscale/ray-ml:nightly-py311",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := convertImageURIToNightly(tt.imageURI)
+			if got != tt.want {
+				t.Errorf(
+					"convertImageURIToNightly(%q) = %q, want %q",
+					tt.imageURI, got, tt.want,
+				)
+			}
+		})
+	}
+}
+
+func TestOverrideClusterEnvNightly(t *testing.T) {
+	tests := []struct {
+		name         string
+		env          *ClusterEnv
+		wantImageURI string
+		wantSameEnv  bool
+	}{
+		{
+			name:         "nightly override build_id",
+			env:          &ClusterEnv{BuildID: "anyscaleray2370-py311"},
+			wantImageURI: "anyscale/ray:nightly-py311",
+		},
+		{
+			name:         "nightly override image_uri",
+			env:          &ClusterEnv{ImageURI: "anyscale/ray:2.37.0-py311"},
+			wantImageURI: "anyscale/ray:nightly-py311",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := overrideClusterEnvNightly(tt.env)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.ImageURI != tt.wantImageURI {
+				t.Errorf("ImageURI = %q, want %q", got.ImageURI, tt.wantImageURI)
+			}
+			if got.BuildID != "" {
+				t.Errorf("BuildID should be empty, got %q", got.BuildID)
+			}
+		})
+	}
+}
+
+func TestOverrideClusterEnvNightly_BYODReturnsError(t *testing.T) {
+	env := &ClusterEnv{
+		BYOD: &ClusterEnvBYOD{
+			DockerImage: "cr.ray.io/ray:2.37.0-py311",
+			RayVersion:  "2.37.0",
+		},
+	}
+	_, err := overrideClusterEnvNightly(env)
+	if err == nil {
+		t.Fatal("expected error for BYOD cluster env, got nil")
+	}
+	if !strings.Contains(err.Error(), "BYOD") {
+		t.Errorf("error %q should mention BYOD", err.Error())
+	}
+}

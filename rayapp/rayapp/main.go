@@ -23,6 +23,7 @@ func main() {
 	testFlags := flag.NewFlagSet("test", flag.ExitOnError)
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
 	testRayVersion := testFlags.String("ray-version", "", "ray version to test against")
+	testNightly := testFlags.Bool("nightly", false, "test against nightly ray image")
 
 	probeFlags := flag.NewFlagSet("probe", flag.ExitOnError)
 	probeBuildFile := probeFlags.String("build", "BUILD.yaml", "build file")
@@ -50,11 +51,15 @@ func main() {
 			log.Fatal("test requires <template-name> or 'all'")
 		}
 		if args[0] == "all" {
-			if err := rayapp.RunAllTemplateTests(*testBuildFile, *testRayVersion); err != nil {
+			if err := rayapp.RunAllTemplateTests(
+				*testBuildFile, *testRayVersion, *testNightly,
+			); err != nil {
 				log.Fatal(err)
 			}
 		} else {
-			if err := rayapp.RunTemplateTest(args[0], *testBuildFile, *testRayVersion); err != nil {
+			if err := rayapp.RunTemplateTest(
+				args[0], *testBuildFile, *testRayVersion, *testNightly,
+			); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -91,4 +96,5 @@ func printUsage() {
 	fmt.Println("Test flags (test):")
 	fmt.Println("  --build string       Build file (default \"BUILD.yaml\")")
 	fmt.Println("  --ray-version string ray version to test against")
+	fmt.Println("  --nightly            test against nightly ray image")
 }
