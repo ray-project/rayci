@@ -54,7 +54,10 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
 				return fmt.Errorf("cluster env: %w", err)
 			}
 			args = append(args, "--image-uri", imageURI)
-			if rayVersion != "nightly" {
+			if nightlyTagRe.MatchString(imageURI) {
+				// Nightly images don't need --ray-version; the version
+				// is embedded in the image URI tag.
+			} else {
 				args = append(args, "--ray-version", rayVersion)
 			}
 		}
