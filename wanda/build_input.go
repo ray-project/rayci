@@ -76,6 +76,8 @@ type buildInputCore struct {
 
 	Platform string `json:",omitempty"` // "amd64" (empty string) or GOARCH
 	OS       string `json:",omitempty"` // "linux" (empty string) or GOOS
+
+	ContextOwner string `json:",omitempty"` // "uid:gid" override
 }
 
 func (i *buildInput) makeCore(dockerfile string, lookup lookupFunc) (*buildInputCore, error) {

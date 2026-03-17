@@ -300,6 +300,14 @@ func (f *Forge) ExtractArtifacts(spec *Spec, imageTag string) error {
 func (f *Forge) resolveBuildInput(spec *Spec) (*buildInput, *buildInputCore, error) {
 	ts := newTarStream()
 
+	if spec.ContextOwner != "" {
+		owner, err := parseContextOwner(spec.ContextOwner)
+		if err != nil {
+			return nil, nil, err
+		}
+		ts.owner = owner
+	}
+
 	files, err := listSrcFiles(f.workDir, spec.Srcs, spec.Dockerfile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list src files: %w", err)
@@ -321,6 +329,7 @@ func (f *Forge) resolveBuildInput(spec *Spec) (*buildInput, *buildInputCore, err
 		return nil, nil, fmt.Errorf("make build input core: %w", err)
 	}
 	inputCore.Epoch = f.config.Epoch
+	inputCore.ContextOwner = spec.ContextOwner
 
 	return in, inputCore, nil
 }

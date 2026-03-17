@@ -88,6 +88,7 @@ func TestSpecExpand(t *testing.T) {
 		BuildHintArgs: []string{
 			"REMOTE_CACHE_URL=$REMOTE_CACHE_URL",
 		},
+		ContextOwner: "$OWNER_UID:$OWNER_GID",
 	}
 
 	envs := map[string]string{
@@ -95,6 +96,8 @@ func TestSpecExpand(t *testing.T) {
 		"UBUNTU_VERSION":   "22.04",
 		"RAYCI_BUILDID":    "abc123",
 		"REMOTE_CACHE_URL": "http://localhost:5000",
+		"OWNER_UID":        "1000",
+		"OWNER_GID":        "1000",
 	}
 
 	expanded := spec.expandVar(func(k string) (string, bool) {
@@ -114,6 +117,7 @@ func TestSpecExpand(t *testing.T) {
 		BuildHintArgs: []string{
 			"REMOTE_CACHE_URL=http://localhost:5000",
 		},
+		ContextOwner: "1000:1000",
 	}
 
 	if !reflect.DeepEqual(expanded, want) {
