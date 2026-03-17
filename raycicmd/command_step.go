@@ -182,6 +182,10 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 			v, _ := boolInMap(step, "mount_buildkite_agent")
 			dockerPluginConfig.mountBuildkiteAgent = v
 		}
+		if d.AllowMountSSHAgent {
+			v, _ := boolInMap(step, "mount_ssh_agent")
+			dockerPluginConfig.mountSSHAgent = v
+		}
 		if d.WorkDir != "" {
 			dockerPluginConfig.workDir = d.WorkDir
 		}

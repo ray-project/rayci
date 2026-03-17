@@ -92,6 +92,7 @@ type stepDockerPluginConfig struct {
 	publishTCPPorts []string
 
 	mountBuildkiteAgent bool
+	mountSSHAgent       bool
 
 	propagateAWSAuthTokens bool
 }
@@ -166,6 +167,9 @@ func makeRayDockerPlugin(
 
 	if config.mountBuildkiteAgent {
 		m["mount-buildkite-agent"] = true
+	}
+	if config.mountSSHAgent {
+		m["mount-ssh-agent"] = true
 	}
 	if len(config.publishTCPPorts) > 0 {
 		var publish []string

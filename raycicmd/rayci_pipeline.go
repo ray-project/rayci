@@ -65,14 +65,16 @@ var (
 		// The following keys will be processed by rayci and dropped.
 		"instance_type", "queue", "job_env", "tags",
 		"docker_publish_tcp_ports", "docker_network",
-		"mount_buildkite_agent", "mount_windows_artifacts",
+		"mount_buildkite_agent", "mount_ssh_agent",
+		"mount_windows_artifacts",
 		"aws_assume_role", "aws_assume_role_duration_seconds",
 		"fetch_full_history",
 	}
 	commandStepDropKeys = []string{
 		"instance_type", "queue", "job_env", "tags",
 		"docker_publish_tcp_ports", "docker_network",
-		"mount_buildkite_agent", "mount_windows_artifacts",
+		"mount_buildkite_agent", "mount_ssh_agent",
+		"mount_windows_artifacts",
 		"aws_assume_role", "aws_assume_role_duration_seconds",
 
 		// The following keys are processed by rayci.
