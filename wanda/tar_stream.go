@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
 	"sort"
 	"time"
 )
@@ -52,7 +53,40 @@ func (s *tarStream) sortedNames() []string {
 	return names
 }
 
+// implicitDirs returns the sorted parent directories implied by the
+// file names that are not themselves files in the stream.
+func (s *tarStream) implicitDirs() []string {
+	dirs := make(map[string]struct{})
+	for name := range s.files {
+		for dir := path.Dir(name); dir != "." && dir != "/"; dir = path.Dir(dir) {
+			dirSlash := dir + "/"
+			if _, isFile := s.files[dir]; isFile {
+				break
+			}
+			dirs[dirSlash] = struct{}{}
+		}
+	}
+	sorted := make([]string, 0, len(dirs))
+	for d := range dirs {
+		sorted = append(sorted, d)
+	}
+	sort.Strings(sorted)
+	return sorted
+}
+
 func (s *tarStream) writeTo(tw *tar.Writer) error {
+	for _, dir := range s.implicitDirs() {
+		hdr := &tar.Header{
+			Typeflag: tar.TypeDir,
+			Name:     dir,
+			Mode:     0755,
+			ModTime:  s.modTime,
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return fmt.Errorf("write dir header %q: %w", dir, err)
+		}
+	}
+
 	names := s.sortedNames()
 
 	for _, name := range names {

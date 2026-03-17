@@ -9,6 +9,97 @@ import (
 	"testing"
 )
 
+func TestTarStreamImplicitDirs(t *testing.T) {
+	tmp := t.TempDir()
+
+	f := filepath.Join(tmp, "testfile")
+	if err := os.WriteFile(f, []byte("data"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	ts := newTarStream()
+	ts.addFile("a/b/c/file.txt", nil, f)
+	ts.addFile("a/other.txt", nil, f)
+
+	dirs := ts.implicitDirs()
+	want := []string{"a/", "a/b/", "a/b/c/"}
+	if len(dirs) != len(want) {
+		t.Fatalf("implicitDirs() = %v, want %v", dirs, want)
+	}
+	for i, d := range dirs {
+		if d != want[i] {
+			t.Errorf("implicitDirs()[%d] = %q, want %q", i, d, want[i])
+		}
+	}
+
+	r := newWriterToReader(ts)
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, r); err != nil {
+		t.Fatalf("copy tar stream: %v", err)
+	}
+
+	tr := tar.NewReader(buf)
+
+	for _, wantDir := range want {
+		hdr, err := tr.Next()
+		if err != nil {
+			t.Fatalf("read dir header for %q: %v", wantDir, err)
+		}
+		if hdr.Name != wantDir {
+			t.Errorf("got name %q, want %q", hdr.Name, wantDir)
+		}
+		if hdr.Typeflag != tar.TypeDir {
+			t.Errorf(
+				"got typeflag %d for %q, want TypeDir (%d)",
+				hdr.Typeflag,
+				wantDir,
+				tar.TypeDir,
+			)
+		}
+		if hdr.Mode != 0755 {
+			t.Errorf("got mode %o for %q, want %o", hdr.Mode, wantDir, 0755)
+		}
+		if hdr.Uid != 0 {
+			t.Errorf("got uid %d for %q, want %d", hdr.Uid, wantDir, 0)
+		}
+		if hdr.Gid != 0 {
+			t.Errorf("got gid %d for %q, want %d", hdr.Gid, wantDir, 0)
+		}
+	}
+
+	hdr, err := tr.Next()
+	if err != nil {
+		t.Fatalf("read file header: %v", err)
+	}
+	if hdr.Name != "a/b/c/file.txt" {
+		t.Errorf("got name %q, want %q", hdr.Name, "a/b/c/file.txt")
+	}
+
+	hdr, err = tr.Next()
+	if err != nil {
+		t.Fatalf("read file header: %v", err)
+	}
+	if hdr.Name != "a/other.txt" {
+		t.Errorf("got name %q, want %q", hdr.Name, "a/other.txt")
+	}
+}
+
+func TestTarStreamImplicitDirsNone(t *testing.T) {
+	ts := newTarStream()
+
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "testfile")
+	if err := os.WriteFile(f, []byte("data"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	ts.addFile("flat-file", nil, f)
+	dirs := ts.implicitDirs()
+	if len(dirs) != 0 {
+		t.Errorf("implicitDirs() = %v, want empty", dirs)
+	}
+}
+
 func TestTarStream(t *testing.T) {
 	tmp := t.TempDir()
 
