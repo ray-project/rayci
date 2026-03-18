@@ -18,10 +18,19 @@ type arrayElement struct {
 }
 
 // parseArrayConfig parses the array field from a step.
+// The "adjustments" key, if present, is reserved and not treated as a dimension.
 //
 //	array:
 //	  python: ["3.10", "3.11"]
 //	  cuda: ["12.1.1", "12.8.1"]
+//	  adjustments:
+//	    - with:
+//	        python: "3.10"
+//	        cuda: "12.1.1"
+//	      skip: true
+//	    - with:
+//	        python: "3.12"
+//	        cuda: "12.8.1"
 func parseArrayConfig(v any) (*arrayConfig, error) {
 	m, ok := v.(map[string]any)
 	if !ok {
@@ -35,6 +44,9 @@ func parseArrayConfig(v any) (*arrayConfig, error) {
 		dims: make(map[string][]string, len(m)),
 	}
 	for dim, vals := range m {
+		if dim == "adjustments" {
+			continue // handled separately
+		}
 		valsSlice, ok := vals.([]any)
 		if !ok {
 			return nil, fmt.Errorf("array.%s must be an array, got %T", dim, vals)
@@ -48,6 +60,9 @@ func parseArrayConfig(v any) (*arrayConfig, error) {
 		}
 		cfg.dims[dim] = values
 	}
+	if len(cfg.dims) == 0 {
+		return nil, fmt.Errorf("array must have at least one dimension")
+	}
 	return cfg, nil
 }
 
@@ -59,6 +74,20 @@ func toStringSlice(arr []any) ([]string, error) {
 			return nil, fmt.Errorf("element %d must be a string, got %T", i, v)
 		}
 		result[i] = s
+	}
+	return result, nil
+}
+
+func toStringMap(m map[string]any) (map[string]string, error) {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf(
+				"value for key %q must be a string, got %T", k, v,
+			)
+		}
+		result[k] = s
 	}
 	return result, nil
 }
@@ -155,4 +184,90 @@ func (elem *arrayElement) substituteString(s string) string {
 
 func hasArrayPlaceholder(s string) bool {
 	return strings.Contains(s, "{{array.")
+}
+
+// arrayAdjustment represents a single adjustment to the array expansion.
+type arrayAdjustment struct {
+	with map[string]string
+	skip bool
+}
+
+// parseArrayAdjustments parses the adjustments field from a step.
+func parseArrayAdjustments(v any) ([]*arrayAdjustment, error) {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf(
+			"adjustments must be an array, got %T", v,
+		)
+	}
+
+	seen := make(map[string]struct{})
+	var result []*arrayAdjustment
+	for i, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf(
+				"adjustments[%d] must be a map, got %T", i, item,
+			)
+		}
+
+		adj, err := parseAdjustment(m)
+		if err != nil {
+			return nil, fmt.Errorf("adjustments[%d]: %w", i, err)
+		}
+
+		key := marshalStringMap(adj.with)
+		if _, dup := seen[key]; dup {
+			return nil, fmt.Errorf(
+				"adjustments[%d]: duplicate \"with\" %v",
+				i, adj.with,
+			)
+		}
+		seen[key] = struct{}{}
+
+		result = append(result, adj)
+	}
+	return result, nil
+}
+
+// marshalStringMap returns a deterministic string for dedup of string maps.
+func marshalStringMap(m map[string]string) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, k+"="+m[k])
+	}
+	return strings.Join(parts, ",")
+}
+
+func parseAdjustment(m map[string]any) (*arrayAdjustment, error) {
+	withVal, ok := m["with"]
+	if !ok {
+		return nil, fmt.Errorf("missing required \"with\" key")
+	}
+	withMap, ok := withVal.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("\"with\" must be a map, got %T", withVal)
+	}
+	if len(withMap) == 0 {
+		return nil, fmt.Errorf("\"with\" cannot be empty")
+	}
+	with, err := toStringMap(withMap)
+	if err != nil {
+		return nil, fmt.Errorf("with: %w", err)
+	}
+
+	skip, _ := m["skip"].(bool)
+
+	for k := range m {
+		if k != "with" && k != "skip" {
+			return nil, fmt.Errorf("unknown key %q", k)
+		}
+	}
+
+	return &arrayAdjustment{with: with, skip: skip}, nil
 }
