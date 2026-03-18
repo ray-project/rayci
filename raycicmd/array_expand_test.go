@@ -397,6 +397,7 @@ func TestResolveArraySelector(t *testing.T) {
 			"cuda":   {"12.1.1", "12.8.1"},
 		},
 	}
+	cfg.elements = cfg.expand()
 
 	tests := []struct {
 		name    string
@@ -480,6 +481,7 @@ func TestResolveArraySelectorKeyFormat(t *testing.T) {
 			"cuda":   {"12.1.1"},
 		},
 	}
+	cfg.elements = cfg.expand()
 
 	sel := &arraySelector{
 		key:    "ray-build",
@@ -497,6 +499,266 @@ func TestResolveArraySelectorKeyFormat(t *testing.T) {
 
 	if !strings.HasPrefix(got[0], "ray-build--") {
 		t.Errorf("key = %q, want prefix \"ray-build--\"", got[0])
+	}
+}
+
+func TestExpandArraySteps_SkipAdjustment(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.os}} {{array.arch}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{array.os}} {{array.arch}}"},
+			"array": map[string]any{
+				"os":   []any{"windows", "linux"},
+				"arch": []any{"amd64", "arm64"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"os": "windows", "arch": "arm64"},
+						"skip": true,
+					},
+				},
+			},
+		}},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	if len(rs) != 3 {
+		t.Fatalf("got %d resolvedSteps, want 3", len(rs))
+	}
+
+	for _, r := range rs {
+		key := r.src["key"].(string)
+		if key == "build-step--archarm64-oswindows" {
+			t.Errorf("skipped combination should not appear: %q", key)
+		}
+	}
+}
+
+func TestExpandArraySteps_AddAdjustment(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.os}} {{array.arch}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{array.os}} {{array.arch}}"},
+			"array": map[string]any{
+				"os":   []any{"windows", "linux"},
+				"arch": []any{"amd64"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"os": "Plan 9", "arch": "arm64"},
+					},
+				},
+			},
+		}},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	// 2 original + 1 added = 3
+	if len(rs) != 3 {
+		t.Fatalf("got %d resolvedSteps, want 3", len(rs))
+	}
+
+	lastKey := rs[2].src["key"].(string)
+	if lastKey != "build-step--archarm64-osPlan9" {
+		t.Errorf("added step key = %q, want %q", lastKey, "build-step--archarm64-osPlan9")
+	}
+}
+
+func TestExpandArraySteps_AddToSingleElementProduct(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build py{{array.python}} cu{{array.cuda}}",
+			"key":      "cuda-build",
+			"commands": []any{"echo {{array.python}} {{array.cuda}}"},
+			"array": map[string]any{
+				"python": []any{"3.12"},
+				"cuda":   []any{"13.0.0-cudnn"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{
+							"python": "3.11",
+							"cuda":   "12.8.1-cudnn",
+						},
+					},
+				},
+			},
+		}},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	if len(rs) != 2 {
+		t.Fatalf("got %d resolvedSteps, want 2", len(rs))
+	}
+
+	got0 := rs[0].src["key"].(string)
+	want0 := "cuda-build--cuda1300cudnn-python312"
+	if got0 != want0 {
+		t.Errorf("resolvedSteps[0] key = %q, want %q", got0, want0)
+	}
+
+	got1 := rs[1].src["key"].(string)
+	want1 := "cuda-build--cuda1281cudnn-python311"
+	if got1 != want1 {
+		t.Errorf("resolvedSteps[1] key = %q, want %q", got1, want1)
+	}
+}
+
+func TestExpandArraySteps_DependsOnExcludesSkipped(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.os}}",
+				"key":      "build-step",
+				"commands": []any{"echo {{array.os}}"},
+				"array": map[string]any{
+					"os": []any{"linux", "windows", "macos"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{"os": "windows"},
+							"skip": true,
+						},
+					},
+				},
+			},
+			{
+				"key":        "test-step",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step",
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// 2 expanded (linux, macos) + test-step = 3 total
+	rs := groups[0].resolvedSteps
+	if len(rs) != 3 {
+		t.Fatalf("got %d resolvedSteps, want 3", len(rs))
+	}
+
+	deps := rs[2].resolvedDependsOn
+	if len(deps) != 2 {
+		t.Fatalf("got %d deps, want 2: %v", len(deps), deps)
+	}
+	for _, dep := range deps {
+		if dep == "build-step--oswindows" {
+			t.Error("depends_on should not include skipped element")
+		}
+	}
+}
+
+func TestExpandArraySteps_DependsOnIncludesAdded(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.os}}",
+				"key":      "build-step",
+				"commands": []any{"echo {{array.os}}"},
+				"array": map[string]any{
+					"os": []any{"linux"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{"os": "Plan 9"},
+						},
+					},
+				},
+			},
+			{
+				"key":        "test-step",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step",
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	// 2 expanded (linux + Plan 9) + test-step = 3
+	if len(rs) != 3 {
+		t.Fatalf("got %d resolvedSteps, want 3", len(rs))
+	}
+
+	deps := rs[2].resolvedDependsOn
+	if len(deps) != 2 {
+		t.Fatalf("got %d deps, want 2: %v", len(deps), deps)
+	}
+}
+
+func TestExpandArraySteps_SkipNoMatch(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.os}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{array.os}}"},
+			"array": map[string]any{
+				"os": []any{"linux", "windows"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"os": "macos"},
+						"skip": true,
+					},
+				},
+			},
+		}},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for skip with no match, got nil")
+	}
+	if !strings.Contains(err.Error(), "matches no element") {
+		t.Errorf("error = %q, want to contain \"matches no element\"", err.Error())
+	}
+}
+
+func TestExpandArraySteps_AddMissingDimension(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.os}} {{array.arch}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{array.os}} {{array.arch}}"},
+			"array": map[string]any{
+				"os":   []any{"linux"},
+				"arch": []any{"amd64"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"os": "Plan 9"},
+					},
+				},
+			},
+		}},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for addition missing dimension, got nil")
+	}
+	if !strings.Contains(err.Error(), "missing") {
+		t.Errorf("error = %q, want to contain \"missing\"", err.Error())
 	}
 }
 
