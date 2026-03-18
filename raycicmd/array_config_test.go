@@ -125,6 +125,111 @@ func TestHasArrayPlaceholder(t *testing.T) {
 	}
 }
 
+func TestParseArrayAdjustments(t *testing.T) {
+	input := []any{
+		map[string]any{
+			"with": map[string]any{"os": "windows", "arch": "arm64"},
+			"skip": true,
+		},
+		map[string]any{
+			"with": map[string]any{"os": "Plan 9", "arch": "arm64"},
+		},
+	}
+
+	adjs, err := parseArrayAdjustments(input)
+	if err != nil {
+		t.Fatalf("parseArrayAdjustments() error = %v", err)
+	}
+	if len(adjs) != 2 {
+		t.Fatalf("len(adjs) = %d, want 2", len(adjs))
+	}
+
+	if !adjs[0].skip {
+		t.Error("adjs[0].skip = false, want true")
+	}
+	if adjs[0].with["os"] != "windows" || adjs[0].with["arch"] != "arm64" {
+		t.Errorf("adjs[0].with = %v, want {os:windows, arch:arm64}", adjs[0].with)
+	}
+
+	if adjs[1].skip {
+		t.Error("adjs[1] should be a pure addition, got skip=true")
+	}
+}
+
+func TestParseArrayAdjustmentsErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		wantErr string
+	}{
+		{
+			name:    "not an array",
+			input:   "bad",
+			wantErr: "must be an array",
+		},
+		{
+			name:    "element not a map",
+			input:   []any{"bad"},
+			wantErr: "must be a map",
+		},
+		{
+			name:    "missing with",
+			input:   []any{map[string]any{"skip": true}},
+			wantErr: "missing required \"with\"",
+		},
+		{
+			name:    "with not a map",
+			input:   []any{map[string]any{"with": "bad"}},
+			wantErr: "\"with\" must be a map",
+		},
+		{
+			name:    "empty with",
+			input:   []any{map[string]any{"with": map[string]any{}}},
+			wantErr: "\"with\" cannot be empty",
+		},
+		{
+			name: "with value not a string",
+			input: []any{map[string]any{
+				"with": map[string]any{"os": 42},
+			}},
+			wantErr: "must be a string",
+		},
+		{
+			name: "duplicate with",
+			input: []any{
+				map[string]any{
+					"with": map[string]any{"os": "linux"},
+					"skip": true,
+				},
+				map[string]any{
+					"with": map[string]any{"os": "linux"},
+				},
+			},
+			wantErr: "duplicate \"with\"",
+		},
+		{
+			name: "unknown key",
+			input: []any{map[string]any{
+				"with": map[string]any{"os": "linux"},
+				"skp":  true,
+			}},
+			wantErr: "unknown key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseArrayAdjustments(tt.input)
+			if err == nil {
+				t.Fatal("parseArrayAdjustments() expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestParseArrayConfigErrors(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -155,6 +260,11 @@ func TestParseArrayConfigErrors(t *testing.T) {
 			name:    "empty dimension",
 			input:   map[string]any{"python": []any{}},
 			wantErr: "cannot be empty",
+		},
+		{
+			name:    "only adjustments key",
+			input:   map[string]any{"adjustments": []any{}},
+			wantErr: "at least one dimension",
 		},
 	}
 
