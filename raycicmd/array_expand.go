@@ -2,6 +2,7 @@ package raycicmd
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 )
 
@@ -113,6 +114,27 @@ func expandSingleArrayStep(
 		)
 	}
 
+	// Parse and apply adjustments if present.
+	var adjustments []*arrayAdjustment
+	if arrayMap, ok := arrayDef.(map[string]any); ok {
+		if adjDef, ok := arrayMap["adjustments"]; ok {
+			adjustments, err = parseArrayAdjustments(adjDef)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"step %q: %w", baseKey, err,
+				)
+			}
+		}
+	}
+
+	elements, err = applyAdjustments(elements, adjustments, cfg)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"step %q: %w", baseKey, err,
+		)
+	}
+
+	cfg.elements = elements
 	configs[baseKey] = cfg
 
 	var result []map[string]any
@@ -135,6 +157,78 @@ func expandSingleArrayStep(
 	}
 
 	return result, nil
+}
+
+// applyAdjustments processes adjustments in two passes: first appends
+// additions, then filters out skipped elements.
+func applyAdjustments(
+	elements []*arrayElement,
+	adjustments []*arrayAdjustment,
+	cfg *arrayConfig,
+) ([]*arrayElement, error) {
+	// Pass 1: append additions.
+	for _, adj := range adjustments {
+		if adj.skip {
+			continue
+		}
+		for dim := range cfg.dims {
+			if _, ok := adj.with[dim]; !ok {
+				return nil, fmt.Errorf(
+					"addition adjustment must specify all "+
+						"dimensions; missing %q", dim,
+				)
+			}
+		}
+		elements = append(elements, &arrayElement{
+			values: maps.Clone(adj.with),
+		})
+	}
+
+	// Pass 2: collect skip adjustments, validate, then remove.
+	var skipAdjs []*arrayAdjustment
+	for _, adj := range adjustments {
+		if adj.skip {
+			skipAdjs = append(skipAdjs, adj)
+		}
+	}
+	for _, adj := range skipAdjs {
+		if !hasElement(elements, adj.with) {
+			return nil, fmt.Errorf(
+				"skip adjustment with=%v matches no element",
+				adj.with,
+			)
+		}
+	}
+	elements = slices.DeleteFunc(elements, func(e *arrayElement) bool {
+		for _, adj := range skipAdjs {
+			if elemMatchesWith(e, adj.with) {
+				return true
+			}
+		}
+		return false
+	})
+
+	return elements, nil
+}
+
+func hasElement(
+	elements []*arrayElement, with map[string]string,
+) bool {
+	for _, elem := range elements {
+		if elemMatchesWith(elem, with) {
+			return true
+		}
+	}
+	return false
+}
+
+func elemMatchesWith(elem *arrayElement, with map[string]string) bool {
+	for dim, val := range with {
+		if elem.values[dim] != val {
+			return false
+		}
+	}
+	return true
 }
 
 // arraySelector represents a dependency selector with optional array filter.
@@ -271,7 +365,8 @@ func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string,
 	return result, nil
 }
 
-// resolveArraySelector resolves a selector against an array config to concrete step keys.
+// resolveArraySelector resolves a selector against an array config
+// to concrete step keys, using the final element list (post-adjustments).
 func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error) {
 	for dim := range sel.filter {
 		if _, ok := cfg.dims[dim]; !ok {
@@ -282,9 +377,8 @@ func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error
 		}
 	}
 
-	elements := cfg.expand()
 	var matches []string
-	for _, elem := range elements {
+	for _, elem := range cfg.elements {
 		if elem.matchesSelector(sel) {
 			matches = append(matches, elem.generateKey(sel.key))
 		}

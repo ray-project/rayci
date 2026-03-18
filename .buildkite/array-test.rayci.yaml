@@ -8,11 +8,11 @@ steps:
     key: array-step
     command: |
       echo "Running os={{array.os}} variant={{array.variant}}"
-      if [ "{{array.os}}" != "linux" ] && [ "{{array.os}}" != "macos" ]; then
+      if [[ "{{array.os}}" != "linux" && "{{array.os}}" != "macos" ]]; then
         echo "ERROR: unexpected os={{array.os}}"
         exit 1
       fi
-      if [ "{{array.variant}}" != "1" ]; then
+      if [[ "{{array.variant}}" != "1" ]]; then
         echo "ERROR: unexpected variant={{array.variant}}"
         exit 1
       fi
@@ -20,6 +20,35 @@ steps:
     array:
       os: ["linux", "windows", "macos"]
       variant: ["1", "2"]
+
+  - name: array-cuda-build
+    label: "wanda: cuda py{{array.python}} cu{{array.cuda}}"
+    wanda: .buildkite/array-test.wanda.yaml
+    env:
+      PYTHON_VERSION: "{{array.python}}"
+      CUDA_VERSION: "{{array.cuda}}"
+    depends_on: forge
+    array:
+      python: ["3.12"]
+      cuda: ["13.0.0-cudnn"]
+      adjustments:
+        - with:
+            python: "3.11"
+            cuda: "12.8.1-cudnn"
+
+  # Verify that the expected images were built
+  - label: "Verify cuda images"
+    key: verify-cuda-images
+    command: |
+      tag="${RAYCI_WORK_REPO}:${RAYCI_BUILD_ID}"
+      expected="array-test-py3.12-cu13.0.0-cudnn array-test-py3.11-cu12.8.1-cudnn"
+      for name in $expected; do
+        echo "Checking ${tag}-${name} ..."
+        docker manifest inspect "${tag}-${name}"
+      done
+    depends_on:
+      - array-cuda-build
+      - forge
 
   # Depends on only the linux-1 and macos-1 variants
   - label: "Depends check only"
@@ -35,4 +64,6 @@ steps:
     tags: always
     key: final-validation
     command: echo "Trigger check"
-    depends_on: depends-on-variants
+    depends_on:
+      - depends-on-variants
+      - verify-cuda-images

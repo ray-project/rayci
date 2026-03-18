@@ -1,0 +1,7 @@
+name: "array-test-py$PYTHON_VERSION-cu$CUDA_VERSION"
+froms:
+  - ubuntu:22.04
+dockerfile: .buildkite/array-test.Dockerfile
+build_args:
+  - PYTHON_VERSION
+  - CUDA_VERSION

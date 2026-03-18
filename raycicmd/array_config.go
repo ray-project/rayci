@@ -7,9 +7,11 @@ import (
 	"strings"
 )
 
-// arrayConfig represents a parsed array definition.
+// arrayConfig represents a parsed array definition. After expansion,
+// elements holds the final list (post-adjustments).
 type arrayConfig struct {
-	dims map[string][]string // dimension name -> values
+	dims     map[string][]string // dimension name -> values
+	elements []*arrayElement     // populated during expansion
 }
 
 // arrayElement is one combination from expand().
