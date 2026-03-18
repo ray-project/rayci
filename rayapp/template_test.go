@@ -931,3 +931,25 @@ func TestOverrideClusterEnvNightly_BYODReturnsError(t *testing.T) {
 		t.Errorf("error %q should mention BYOD", err.Error())
 	}
 }
+
+func TestOverrideClusterEnvRayVersion_NightlyImageErrors(t *testing.T) {
+	env := &ClusterEnv{ImageURI: "anyscale/ray:nightly-py311"}
+	_, err := overrideClusterEnvRayVersion(env, "2.44.0")
+	if err == nil {
+		t.Fatal("expected error for nightly image URI, got nil")
+	}
+	if !strings.Contains(err.Error(), "does not contain a version") {
+		t.Errorf("error %q should mention missing version", err.Error())
+	}
+}
+
+func TestOverrideClusterEnvNightly_AlreadyNightlyErrors(t *testing.T) {
+	env := &ClusterEnv{ImageURI: "anyscale/ray:nightly-py311"}
+	_, err := overrideClusterEnvNightly(env)
+	if err == nil {
+		t.Fatal("expected error for already-nightly image URI, got nil")
+	}
+	if !strings.Contains(err.Error(), "does not contain a version") {
+		t.Errorf("error %q should mention missing version", err.Error())
+	}
+}

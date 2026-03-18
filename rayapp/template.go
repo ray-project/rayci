@@ -170,6 +170,12 @@ func overrideClusterEnvRayVersion(env *ClusterEnv, newVersion string) (*ClusterE
 	newImageURI := imageURIVersionRe.ReplaceAllStringFunc(
 		imageURI, func(string) string { return newVersion },
 	)
+	if newImageURI == imageURI {
+		return nil, fmt.Errorf(
+			"image URI %q does not contain a version matching %s",
+			imageURI, imageURIVersionRe.String(),
+		)
+	}
 	return &ClusterEnv{ImageURI: newImageURI}, nil
 }
 
@@ -187,6 +193,12 @@ func overrideClusterEnvNightly(env *ClusterEnv) (*ClusterEnv, error) {
 	}
 
 	newImageURI := convertImageURIToNightly(imageURI)
+	if newImageURI == imageURI {
+		return nil, fmt.Errorf(
+			"image URI %q does not contain a version matching %s",
+			imageURI, imageURIVersionRe.String(),
+		)
+	}
 	return &ClusterEnv{ImageURI: newImageURI}, nil
 }
 
