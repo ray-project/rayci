@@ -17,6 +17,11 @@ type dockerPluginConfig struct {
 	// on the pipeline are trusted.
 	AllowMountBuildkiteAgent bool `yaml:"allow_mount_buildkite_agent"`
 
+	// AllowMountSSHAgent sets if it is allowed for jobs to mount the
+	// SSH agent. This should only be set for pipelines where builds
+	// need SSH access.
+	AllowMountSSHAgent bool `yaml:"allow_mount_ssh_agent"`
+
 	// WorkDir is the working directory for the docker plugin to use.
 	WorkDir string `yaml:"work_dir"`
 

@@ -867,6 +867,107 @@ func TestConvertPipelineGroup_dockerPlugin(t *testing.T) {
 	}
 }
 
+func TestConvertPipelineGroup_mountSSHAgent(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID:        buildID,
+		launcherBranch: "beta",
+		gitCommit:      "abcdefg1234567890",
+	}
+
+	t.Run("allowed and enabled", func(t *testing.T) {
+		c := newConverter(&config{
+			ArtifactsBucket: "artifacts_bucket",
+			CITemp:          "s3://ci-temp/",
+			CIWorkRepo:      "fakeecr",
+			RunnerQueues:    map[string]string{"default": "fakerunner"},
+			DockerPlugin: &dockerPluginConfig{
+				AllowMountSSHAgent: true,
+			},
+		}, info)
+
+		g := &pipelineGroup{
+			Group: "ssh-test",
+			Steps: []map[string]any{{
+				"commands":        []string{"has ssh"},
+				"mount_ssh_agent": true,
+			}, {
+				"commands":        []string{"no ssh"},
+				"mount_ssh_agent": false,
+			}},
+		}
+		filter := &stepFilter{runAll: true}
+		bk, err := convertSingleGroup(c, g, filter)
+		if err != nil {
+			t.Fatalf("convert: %v", err)
+		}
+
+		steps := bk.Steps
+
+		p0, ok := findDockerPlugin(
+			steps[0].(map[string]any)["plugins"].([]any),
+		)
+		if !ok {
+			t.Fatal("docker plugin not found in step 0")
+		}
+		if v, ok := boolInMap(p0, "mount-ssh-agent"); !v || !ok {
+			t.Errorf(
+				"step 0: mount-ssh-agent = %v, %v, want true, true",
+				v, ok,
+			)
+		}
+
+		p1, ok := findDockerPlugin(
+			steps[1].(map[string]any)["plugins"].([]any),
+		)
+		if !ok {
+			t.Fatal("docker plugin not found in step 1")
+		}
+		if v, ok := boolInMap(p1, "mount-ssh-agent"); v || ok {
+			t.Errorf(
+				"step 1: mount-ssh-agent = %v, %v, want false, false",
+				v, ok,
+			)
+		}
+	})
+
+	t.Run("not allowed ignores step setting", func(t *testing.T) {
+		c := newConverter(&config{
+			ArtifactsBucket: "artifacts_bucket",
+			CITemp:          "s3://ci-temp/",
+			CIWorkRepo:      "fakeecr",
+			RunnerQueues:    map[string]string{"default": "fakerunner"},
+			DockerPlugin:    &dockerPluginConfig{},
+		}, info)
+
+		g := &pipelineGroup{
+			Group: "ssh-test",
+			Steps: []map[string]any{{
+				"commands":        []string{"tries ssh"},
+				"mount_ssh_agent": true,
+			}},
+		}
+		filter := &stepFilter{runAll: true}
+		bk, err := convertSingleGroup(c, g, filter)
+		if err != nil {
+			t.Fatalf("convert: %v", err)
+		}
+
+		p, ok := findDockerPlugin(
+			bk.Steps[0].(map[string]any)["plugins"].([]any),
+		)
+		if !ok {
+			t.Fatal("docker plugin not found")
+		}
+		if v, ok := boolInMap(p, "mount-ssh-agent"); v || ok {
+			t.Errorf(
+				"mount-ssh-agent = %v, %v, want false, false (should be blocked by config)",
+				v, ok,
+			)
+		}
+	})
+}
+
 func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	const buildID = "abc123"
 	info := &buildInfo{
