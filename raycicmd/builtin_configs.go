@@ -101,20 +101,29 @@ func makePRPipelineConfig(name string) *config {
 
 var prPipelineConfig = makePRPipelineConfig("ray-pr")
 
+func applyTrustedCache(c *config, envs Envs) *config {
+	if !isTrustedCacheUser(envs) {
+		return c
+	}
+	delete(c.Env, "BUILDKITE_CACHE_READONLY")
+	c.BuilderQueues = branchPipelineConfig.BuilderQueues
+	return c
+}
+
 func ciDefaultConfig(envs Envs) *config {
 	pipelineID := getEnv(envs, "BUILDKITE_PIPELINE_ID")
 	switch pipelineID {
 	case rayBranchPipeline, rayV2PostmergePipeline, rayCIPipeline:
 		return branchPipelineConfig
 	case rayPRPipeline, rayV2PremergePipeline, rayDevPipeline:
-		return prPipelineConfig
+		c := makePRPipelineConfig("ray-pr")
+		return applyTrustedCache(c, envs)
 	case rayV2MicrocheckPipeline:
 		c := makePRPipelineConfig("ray-pr-microcheck")
 		c.MaxParallelism = 1
 		c.NotifyOwnerOnFailure = true
 		c.SkipTags = append(c.SkipTags, "skip-on-microcheck")
-
-		return c
+		return applyTrustedCache(c, envs)
 	}
 
 	// By default, assume it is less privileged.

@@ -61,6 +61,71 @@ func TestDefaultConfig(t *testing.T) {
 		}
 	})
 
+	for _, tt := range []struct {
+		name           string
+		pipelineID     string
+		teams          string
+		wantReadonly   bool
+		wantBuilderQ   string
+	}{
+		{
+			name:         "PR untrusted",
+			pipelineID:   rayPRPipeline,
+			teams:        "builders:viewers",
+			wantReadonly: true,
+			wantBuilderQ: "builder_queue_pr",
+		},
+		{
+			name:         "PR trusted",
+			pipelineID:   rayPRPipeline,
+			teams:        "builders:trusted:viewers",
+			wantReadonly: false,
+			wantBuilderQ: "builder_queue_branch",
+		},
+		{
+			name:         "microcheck untrusted",
+			pipelineID:   rayV2MicrocheckPipeline,
+			teams:        "builders:viewers",
+			wantReadonly: true,
+			wantBuilderQ: "builder_queue_pr",
+		},
+		{
+			name:         "microcheck trusted",
+			pipelineID:   rayV2MicrocheckPipeline,
+			teams:        "trusted",
+			wantReadonly: false,
+			wantBuilderQ: "builder_queue_branch",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			envs := newEnvsMap(map[string]string{
+				"CI":                            "true",
+				"BUILDKITE_PIPELINE_ID":         tt.pipelineID,
+				"BUILDKITE_BUILD_CREATOR_TEAMS": tt.teams,
+			})
+
+			config := defaultConfig(envs)
+			val, ok := config.Env["BUILDKITE_CACHE_READONLY"]
+			if tt.wantReadonly && (!ok || val != "true") {
+				t.Errorf(
+					"BUILDKITE_CACHE_READONLY = %q (present=%v), want %q",
+					val, ok, "true",
+				)
+			}
+			if !tt.wantReadonly && ok {
+				t.Errorf(
+					"BUILDKITE_CACHE_READONLY = %q, want absent", val,
+				)
+			}
+			if got := config.BuilderQueues["builder"]; got != tt.wantBuilderQ {
+				t.Errorf(
+					"BuilderQueues[builder] = %q, want %q",
+					got, tt.wantBuilderQ,
+				)
+			}
+		})
+	}
+
 	t.Run("load local config", func(t *testing.T) {
 		envs := newEnvsMap(map[string]string{
 			"HOME": "/opt/fakehome",
