@@ -762,6 +762,88 @@ func TestExpandArraySteps_AddMissingDimension(t *testing.T) {
 	}
 }
 
+func TestExpandArraySteps_GroupDependsOnArrayStep(t *testing.T) {
+	groups := []*pipelineGroup{
+		{
+			Group: "build",
+			Steps: []map[string]any{{
+				"label":    "Build {{array.python}}",
+				"name":     "ray-core-build",
+				"commands": []any{"echo {{array.python}}"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12"},
+				},
+			}},
+		},
+		{
+			Group:     "tests",
+			DependsOn: []string{"forge", "ray-core-build"},
+			Steps: []map[string]any{{
+				"key":      "test-step",
+				"commands": []any{"echo test"},
+			}},
+		},
+	}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// Group DependsOn should have "forge" unchanged, and
+	// "ray-core-build" fanned out to all expanded keys.
+	got := groups[1].DependsOn
+	want := []string{
+		"forge",
+		"ray-core-build--python310",
+		"ray-core-build--python311",
+		"ray-core-build--python312",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("group DependsOn = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("group DependsOn[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestExpandArraySteps_GroupDependsOnNonArrayStep(t *testing.T) {
+	groups := []*pipelineGroup{
+		{
+			Group: "build",
+			Steps: []map[string]any{{
+				"key":      "plain-build",
+				"commands": []any{"echo build"},
+			}},
+		},
+		{
+			Group:     "tests",
+			DependsOn: []string{"plain-build", "forge"},
+			Steps: []map[string]any{{
+				"key":      "test-step",
+				"commands": []any{"echo test"},
+			}},
+		},
+	}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// Group DependsOn should be unchanged for non-array refs.
+	got := groups[1].DependsOn
+	want := []string{"plain-build", "forge"}
+	if len(got) != len(want) {
+		t.Fatalf("group DependsOn = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("group DependsOn[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 func TestParseArrayDependsOnErrors(t *testing.T) {
 	tests := []struct {
 		name    string
