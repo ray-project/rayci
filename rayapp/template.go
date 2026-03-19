@@ -134,8 +134,14 @@ var imageURIVersionRe = regexp.MustCompile(`(\d)\.(\d{2})\.(\d+)`)
 // validRayVersionRe matches a full ray version string like "2.44.0".
 var validRayVersionRe = regexp.MustCompile(`^\d\.\d{2}\.\d+$`)
 
+// nightlyTagRe matches a nightly tag in an image URI (e.g., ":nightly" or ":nightly-py311").
+var nightlyTagRe = regexp.MustCompile(`:nightly(-|$)`)
+
 // extractRayVersionFromImageURI returns the ray version from the image URI.
 func extractRayVersionFromImageURI(imageURI string) (rayVersion string, err error) {
+	if nightlyTagRe.MatchString(imageURI) {
+		return "nightly", nil
+	}
 	matches := imageURIVersionRe.FindStringSubmatch(imageURI)
 	if matches == nil {
 		err := fmt.Errorf(
@@ -164,7 +170,45 @@ func overrideClusterEnvRayVersion(env *ClusterEnv, newVersion string) (*ClusterE
 	newImageURI := imageURIVersionRe.ReplaceAllStringFunc(
 		imageURI, func(string) string { return newVersion },
 	)
+	if newImageURI == imageURI {
+		return nil, fmt.Errorf(
+			"image URI %q does not contain a version matching %s",
+			imageURI, imageURIVersionRe.String(),
+		)
+	}
 	return &ClusterEnv{ImageURI: newImageURI}, nil
+}
+
+// overrideClusterEnvNightly returns a new ClusterEnv with its image tag replaced
+// to use the nightly version. For example, "anyscale/ray:2.44.0-py311" becomes
+// "anyscale/ray:nightly-py311".
+func overrideClusterEnvNightly(env *ClusterEnv) (*ClusterEnv, error) {
+	if env.BYOD != nil {
+		return nil, fmt.Errorf("nightly override is not supported for BYOD cluster environments")
+	}
+
+	imageURI, _, err := getImageURIAndRayVersionFromClusterEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("resolve cluster env: %w", err)
+	}
+
+	newImageURI := convertImageURIToNightly(imageURI)
+	if newImageURI == imageURI {
+		return nil, fmt.Errorf(
+			"image URI %q does not contain a version matching %s",
+			imageURI, imageURIVersionRe.String(),
+		)
+	}
+	return &ClusterEnv{ImageURI: newImageURI}, nil
+}
+
+// convertImageURIToNightly replaces the version portion of an image URI tag
+// with "nightly". For example, "anyscale/ray:2.44.0-py311" becomes
+// "anyscale/ray:nightly-py311".
+func convertImageURIToNightly(imageURI string) string {
+	return imageURIVersionRe.ReplaceAllStringFunc(
+		imageURI, func(string) string { return "nightly" },
+	)
 }
 
 // getImageURIAndRayVersionFromClusterEnv returns image URI and ray version from cluster env.

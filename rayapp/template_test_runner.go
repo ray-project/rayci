@@ -92,17 +92,17 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	return nil
 }
 
-func RunAllTemplateTests(buildFile, rayVersion string) error {
+func RunAllTemplateTests(buildFile, rayVersion string, nightly bool) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runTemplateTestsWithFilter(buildFile, nil, rayVersion, cli, api)
+	return runTemplateTestsWithFilter(buildFile, nil, rayVersion, nightly, cli, api)
 }
 
-func RunTemplateTest(tmplName, buildFile, rayVersion string) error {
+func RunTemplateTest(tmplName, buildFile, rayVersion string, nightly bool) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
@@ -111,22 +111,28 @@ func RunTemplateTest(tmplName, buildFile, rayVersion string) error {
 	}
 	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
-	}, rayVersion, cli, api)
+	}, rayVersion, nightly, cli, api)
 }
 
 func runTemplateTestsWithFilter(
 	buildFile string,
 	filter func(tmpl *Template) bool,
 	rayVersion string,
+	nightly bool,
 	cli *AnyscaleCLI,
 	api *anyscaleAPI,
 ) error {
+	if rayVersion != "" && nightly {
+		return fmt.Errorf("--ray-version and --nightly are mutually exclusive")
+	}
 	if rayVersion != "" && !validRayVersionRe.MatchString(rayVersion) {
 		return fmt.Errorf(
 			"invalid ray version %q: must match X.YY.Z (e.g. 2.44.0)",
 			rayVersion,
 		)
 	}
+
+	needsOverride := rayVersion != "" || nightly
 
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
@@ -146,10 +152,18 @@ func runTemplateTestsWithFilter(
 			skippedNoTest++
 			continue
 		}
-		if rayVersion != "" {
+		if needsOverride {
 			if t.ClusterEnv == nil {
 				log.Printf(
 					"Template %s has no cluster_env, "+
+						"skipping ray version override",
+					t.Name,
+				)
+				continue
+			}
+			if t.ClusterEnv.BYOD != nil {
+				log.Printf(
+					"Template %s uses BYOD cluster env, "+
 						"skipping ray version override",
 					t.Name,
 				)
@@ -173,7 +187,12 @@ func runTemplateTestsWithFilter(
 				)
 				continue
 			}
-			env, err := overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
+			var env *ClusterEnv
+			if nightly {
+				env, err = overrideClusterEnvNightly(t.ClusterEnv)
+			} else {
+				env, err = overrideClusterEnvRayVersion(t.ClusterEnv, rayVersion)
+			}
 			if err != nil {
 				return fmt.Errorf("override ray version for %q: %w", t.Name, err)
 			}
