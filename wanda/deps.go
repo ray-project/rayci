@@ -157,24 +157,25 @@ func (g *depGraph) filterReachable() map[string]bool {
 	return reachable
 }
 
-// localDeps extracts wanda-built dependency names from a spec's Froms.
-// Images with the namePrefix (e.g. "cr.ray.io/rayproject/foo") are identified
-// as wanda-built and the name portion ("foo") is returned.
-// Tags are stripped (e.g. "foo:v1.0" becomes "foo") since the spec index uses names without tags.
-// If namePrefix is empty, no dependencies are detected.
-func localDeps(spec *Spec, namePrefix string) []string {
-	if namePrefix == "" {
-		return nil
+// localDepName returns the short dependency name for a from reference
+// (e.g. "cr.ray.io/rayproject/foo:v1" → "foo"), stripping the prefix
+// and any tag. Returns "" if the reference does not have the prefix.
+func localDepName(from, namePrefix string) string {
+	name, ok := strings.CutPrefix(from, namePrefix)
+	if !ok || namePrefix == "" {
+		return ""
 	}
+	// Strip tag if present.
+	name, _, _ = strings.Cut(name, ":")
+	return name
+}
+
+// localDeps extracts wanda-built dependency names from a spec's Froms.
+func localDeps(spec *Spec, namePrefix string) []string {
 	var deps []string
 	for _, from := range spec.Froms {
-		if strings.HasPrefix(from, namePrefix) {
-			depName := strings.TrimPrefix(from, namePrefix)
-			// Strip tag if present.
-			if idx := strings.Index(depName, ":"); idx != -1 {
-				depName = depName[:idx]
-			}
-			deps = append(deps, depName)
+		if name := localDepName(from, namePrefix); name != "" {
+			deps = append(deps, name)
 		}
 	}
 	return deps
