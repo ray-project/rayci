@@ -844,6 +844,135 @@ func TestExpandArraySteps_GroupDependsOnNonArrayStep(t *testing.T) {
 	}
 }
 
+func TestExpandArraySteps_DuplicateBaseKey(t *testing.T) {
+	groups := []*pipelineGroup{
+		{
+			Group: "build",
+			Steps: []map[string]any{{
+				"label":    "Build {{array.python}}",
+				"name":     "shared-name",
+				"commands": []any{"echo build"},
+				"array": map[string]any{
+					"python": []any{"3.10"},
+				},
+			}},
+		},
+		{
+			Group: "test",
+			Steps: []map[string]any{{
+				"label":    "Test {{array.python}}",
+				"name":     "shared-name",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.11"},
+				},
+			}},
+		},
+	}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for duplicate base key, got nil")
+	}
+	if !strings.Contains(err.Error(), "duplicate array step key") {
+		t.Errorf(
+			"error = %q, want to contain \"duplicate array step key\"",
+			err.Error(),
+		)
+	}
+}
+
+func TestExpandArraySteps_DuplicateElementFromAdjustment(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.python}}",
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"array": map[string]any{
+				"python": []any{"3.10", "3.11"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"python": "3.10"},
+					},
+				},
+			},
+		}},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for duplicate element, got nil")
+	}
+	if !strings.Contains(err.Error(), "duplicates") {
+		t.Errorf(
+			"error = %q, want to contain \"duplicates\"",
+			err.Error(),
+		)
+	}
+}
+
+func TestExpandArraySteps_KeyCollisionFromSanitization(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.ver}}",
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"array": map[string]any{
+				"ver": []any{"1.2.1", "121"},
+			},
+		}},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for key collision, got nil")
+	}
+	if !strings.Contains(err.Error(), "duplicate generated key") {
+		t.Errorf(
+			"error = %q, want to contain \"duplicate generated key\"",
+			err.Error(),
+		)
+	}
+}
+
+func TestExpandArraySteps_PartialDimensionSkip(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.os}} {{array.arch}}",
+			"key":      "build-step",
+			"commands": []any{"echo {{array.os}} {{array.arch}}"},
+			"array": map[string]any{
+				"os":   []any{"linux", "windows"},
+				"arch": []any{"amd64", "arm64"},
+				"adjustments": []any{
+					map[string]any{
+						"with": map[string]any{"os": "windows"},
+						"skip": true,
+					},
+				},
+			},
+		}},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	if len(rs) != 2 {
+		t.Fatalf("got %d resolvedSteps, want 2", len(rs))
+	}
+	for _, r := range rs {
+		key := r.src["key"].(string)
+		if strings.Contains(key, "oswindows") {
+			t.Errorf("skipped os=windows should not appear: %q", key)
+		}
+	}
+}
+
 func TestParseArrayDependsOnErrors(t *testing.T) {
 	tests := []struct {
 		name    string
