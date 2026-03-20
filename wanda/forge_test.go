@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	mathrand "math/rand/v2"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -1005,8 +1006,10 @@ func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
+	// Use a nonce in BUILD_VALUE so cache keys don't collide across runs.
+	nonce := mathrand.IntN(99999999)
 	envFile := filepath.Join(tmpDir, "build.env")
-	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v1\n"), 0644); err != nil {
+	if err := os.WriteFile(envFile, []byte(fmt.Sprintf("BUILD_VALUE=v1-%d\n", nonce)), 0644); err != nil {
 		t.Fatalf("write envfile: %v", err)
 	}
 
@@ -1032,7 +1035,7 @@ func TestBuild_WithArtifacts_depCacheHitRootRebuilt(t *testing.T) {
 
 	// Change BUILD_VALUE. This invalidates the root's cache (different
 	// build arg) but NOT the dep's (dep doesn't use BUILD_VALUE).
-	if err := os.WriteFile(envFile, []byte("BUILD_VALUE=v2\n"), 0644); err != nil {
+	if err := os.WriteFile(envFile, []byte(fmt.Sprintf("BUILD_VALUE=v2-%d\n", nonce)), 0644); err != nil {
 		t.Fatalf("update envfile: %v", err)
 	}
 
