@@ -1191,7 +1191,7 @@ func TestConvertPipelineGroups_ArrayBaseKeyDependencyExpansion(t *testing.T) {
 				"key":        "final-step",
 				"commands":   []any{"echo final"},
 				"tags":       []any{"run-me"},
-				"depends_on": "build-step", // Depends on base key
+				"depends_on": "build-step(*)", // Depends on all variants
 			},
 		},
 	}}
@@ -1238,7 +1238,13 @@ func TestConvertPipelineGroups_ArrayBaseKeyDependencyExpansion(t *testing.T) {
 	if !ok {
 		t.Fatalf("depends_on is %T, want []string", finalStep["depends_on"])
 	}
-	if len(dependsOn) != 2 {
-		t.Errorf("depends_on has %d elements, want 2: %v", len(dependsOn), dependsOn)
+	wantDeps := []string{"build-step--python310", "build-step--python311"}
+	if len(dependsOn) != len(wantDeps) {
+		t.Fatalf("depends_on = %v, want %v", dependsOn, wantDeps)
+	}
+	for i, want := range wantDeps {
+		if dependsOn[i] != want {
+			t.Errorf("depends_on[%d] = %q, want %q", i, dependsOn[i], want)
+		}
 	}
 }

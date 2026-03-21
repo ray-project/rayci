@@ -47,7 +47,7 @@ steps:
         docker manifest inspect "${tag}-${name}"
       done
     depends_on:
-      - array-cuda-build
+      - array-cuda-build(*)
       - forge
 
   # Depends on only the linux-1 and macos-1 variants
@@ -55,9 +55,7 @@ steps:
     key: depends-on-variants
     command: echo "This step depends on only the variants we want."
     depends_on:
-      - array-step:
-          os: ["linux", "macos"]
-          variant: "1"
+      - array-step(os=linux, os=macos, variant=1)
       - forge
 
   - label: "Final validation"

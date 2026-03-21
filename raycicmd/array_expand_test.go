@@ -3,18 +3,7 @@ package raycicmd
 import (
 	"strings"
 	"testing"
-
-	yaml "gopkg.in/yaml.v3"
 )
-
-func mustParseYAML(t *testing.T, s string) any {
-	t.Helper()
-	var v any
-	if err := yaml.Unmarshal([]byte(s), &v); err != nil {
-		t.Fatalf("yaml.Unmarshal() error = %v", err)
-	}
-	return v
-}
 
 func TestExpandArraySteps(t *testing.T) {
 	groups := []*pipelineGroup{{
@@ -139,27 +128,14 @@ func TestExpandArraySteps_SelectorDependsOn(t *testing.T) {
 				},
 			},
 			{
-				"key":      "test-311-only",
-				"commands": []any{"echo test"},
-				"depends_on": []any{
-					map[string]any{
-						"build-step": map[string]any{
-							"python": "3.11",
-							"cuda":   "12.8.1",
-						},
-					},
-				},
+				"key":        "test-311-only",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step(python=3.11, cuda=12.8.1)",
 			},
 			{
-				"key":      "test-all-python311",
-				"commands": []any{"echo test"},
-				"depends_on": []any{
-					map[string]any{
-						"build-step": map[string]any{
-							"python": "3.11",
-						},
-					},
-				},
+				"key":        "test-all-python311",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step(python=3.11)",
 			},
 		},
 	}}
@@ -193,7 +169,7 @@ func TestExpandArraySteps_SelectorDependsOn(t *testing.T) {
 	}
 }
 
-func TestExpandArraySteps_BaseKeyDependsOn(t *testing.T) {
+func TestExpandArraySteps_MatchAllDependsOn(t *testing.T) {
 	groups := []*pipelineGroup{{
 		Group: "build",
 		Steps: []map[string]any{
@@ -208,7 +184,7 @@ func TestExpandArraySteps_BaseKeyDependsOn(t *testing.T) {
 			{
 				"key":        "test-step",
 				"commands":   []any{"echo test"},
-				"depends_on": "build-step",
+				"depends_on": "build-step(*)",
 			},
 		},
 	}}
@@ -229,25 +205,29 @@ func TestExpandArraySteps_BaseKeyDependsOn(t *testing.T) {
 }
 
 func TestExpandArraySteps_SelectorOnNonArrayStep(t *testing.T) {
-	groups := []*pipelineGroup{{
-		Group: "build",
-		Steps: []map[string]any{{
-			"key":      "test-step",
-			"commands": []any{"echo test"},
-			"depends_on": []any{
-				map[string]any{
-					"plain-step": map[string]any{"python": "3.11"},
-				},
-			},
-		}},
-	}}
+	for _, dep := range []string{
+		"plain-step(python=3.11)",
+		"plain-step(*)",
+		"plain-step($)",
+	} {
+		t.Run(dep, func(t *testing.T) {
+			groups := []*pipelineGroup{{
+				Group: "build",
+				Steps: []map[string]any{{
+					"key":        "test-step",
+					"commands":   []any{"echo test"},
+					"depends_on": dep,
+				}},
+			}}
 
-	err := expandArraySteps(groups)
-	if err == nil {
-		t.Fatal("expected error for array selector on non-array step, got nil")
-	}
-	if !strings.Contains(err.Error(), "non-array step") {
-		t.Errorf("error = %q, want to contain \"non-array step\"", err.Error())
+			err := expandArraySteps(groups)
+			if err == nil {
+				t.Fatal("expected error for array selector on non-array step, got nil")
+			}
+			if !strings.Contains(err.Error(), "non-array step") {
+				t.Errorf("error = %q, want to contain \"non-array step\"", err.Error())
+			}
+		})
 	}
 }
 
@@ -269,236 +249,6 @@ func TestExpandArraySteps_NonArrayDependsOn(t *testing.T) {
 	resolved := rs.resolvedDependsOn
 	if len(resolved) != 1 || resolved[0] != "plain-step" {
 		t.Errorf("resolvedDependsOn = %v, want [\"plain-step\"]", resolved)
-	}
-}
-
-func TestParseArrayDependsOnString(t *testing.T) {
-	selectors, err := parseArrayDependsOn("ray-build")
-	if err != nil {
-		t.Fatalf("parseArrayDependsOn() error = %v", err)
-	}
-
-	if len(selectors) != 1 {
-		t.Fatalf("len(selectors) = %d, want 1", len(selectors))
-	}
-	if selectors[0].key != "ray-build" {
-		t.Errorf("selectors[0].key = %q, want \"ray-build\"", selectors[0].key)
-	}
-	if selectors[0].filter != nil {
-		t.Errorf("selectors[0].filter = %v, want nil", selectors[0].filter)
-	}
-}
-
-func TestParseArrayDependsOnArray(t *testing.T) {
-	input := []any{"step-a", "step-b"}
-
-	selectors, err := parseArrayDependsOn(input)
-	if err != nil {
-		t.Fatalf("parseArrayDependsOn() error = %v", err)
-	}
-
-	if len(selectors) != 2 {
-		t.Fatalf("len(selectors) = %d, want 2", len(selectors))
-	}
-	if selectors[0].key != "step-a" {
-		t.Errorf("selectors[0].key = %q, want \"step-a\"", selectors[0].key)
-	}
-	if selectors[1].key != "step-b" {
-		t.Errorf("selectors[1].key = %q, want \"step-b\"", selectors[1].key)
-	}
-}
-
-func TestParseArrayDependsOnSelector(t *testing.T) {
-	input := mustParseYAML(t, strings.Join([]string{
-		"- ray-build:",
-		`    python: "3.11"`,
-	}, "\n"))
-
-	selectors, err := parseArrayDependsOn(input)
-	if err != nil {
-		t.Fatalf("parseArrayDependsOn() error = %v", err)
-	}
-
-	if len(selectors) != 1 {
-		t.Fatalf("len(selectors) = %d, want 1", len(selectors))
-	}
-	if selectors[0].key != "ray-build" {
-		t.Errorf("selectors[0].key = %q, want \"ray-build\"", selectors[0].key)
-	}
-	got := selectors[0].filter["python"]
-	if len(got) != 1 || got[0] != "3.11" {
-		t.Errorf("selectors[0].filter[\"python\"] = %v, want [\"3.11\"]", got)
-	}
-}
-
-func TestParseArrayDependsOnSelectorArray(t *testing.T) {
-	input := mustParseYAML(t, strings.Join([]string{
-		"- ray-build:",
-		"    python:",
-		`      - "3.10"`,
-		`      - "3.11"`,
-	}, "\n"))
-
-	selectors, err := parseArrayDependsOn(input)
-	if err != nil {
-		t.Fatalf("parseArrayDependsOn() error = %v", err)
-	}
-
-	if len(selectors) != 1 {
-		t.Fatalf("len(selectors) = %d, want 1", len(selectors))
-	}
-	got := selectors[0].filter["python"]
-	if len(got) != 2 || got[0] != "3.10" || got[1] != "3.11" {
-		t.Errorf("selectors[0].filter[\"python\"] = %v, want [\"3.10\", \"3.11\"]", got)
-	}
-}
-
-func TestParseArrayDependsOnMixed(t *testing.T) {
-	input := mustParseYAML(t, strings.Join([]string{
-		`- array-step:`,
-		`    os: [linux, macos]`,
-		`    variant: "1"`,
-		`- forge`,
-	}, "\n"))
-
-	selectors, err := parseArrayDependsOn(input)
-	if err != nil {
-		t.Fatalf("parseArrayDependsOn() error = %v", err)
-	}
-
-	if len(selectors) != 2 {
-		t.Fatalf("len(selectors) = %d, want 2", len(selectors))
-	}
-
-	if selectors[0].key != "array-step" {
-		t.Errorf("selectors[0].key = %q, want \"array-step\"", selectors[0].key)
-	}
-	gotOS := selectors[0].filter["os"]
-	if len(gotOS) != 2 || gotOS[0] != "linux" || gotOS[1] != "macos" {
-		t.Errorf("selectors[0].filter[\"os\"] = %v, want [\"linux\", \"macos\"]", gotOS)
-	}
-	gotVariant := selectors[0].filter["variant"]
-	if len(gotVariant) != 1 || gotVariant[0] != "1" {
-		t.Errorf("selectors[0].filter[\"variant\"] = %v, want [\"1\"]", gotVariant)
-	}
-
-	if selectors[1].key != "forge" {
-		t.Errorf("selectors[1].key = %q, want \"forge\"", selectors[1].key)
-	}
-	if selectors[1].filter != nil {
-		t.Errorf("selectors[1].filter = %v, want nil", selectors[1].filter)
-	}
-}
-
-func TestResolveArraySelector(t *testing.T) {
-	cfg := &arrayConfig{
-		dims: map[string][]string{
-			"python": {"3.10", "3.11"},
-			"cuda":   {"12.1.1", "12.8.1"},
-		},
-	}
-	cfg.elements = cfg.expand()
-
-	tests := []struct {
-		name    string
-		sel     *arraySelector
-		wantLen int
-		wantErr bool
-	}{
-		{
-			name: "partial match - python only",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"python": {"3.11"}},
-			},
-			wantLen: 2,
-		},
-		{
-			name: "partial match - cuda only",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"cuda": {"12.1.1"}},
-			},
-			wantLen: 2,
-		},
-		{
-			name: "exact match",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"python": {"3.11"}, "cuda": {"12.1.1"}},
-			},
-			wantLen: 1,
-		},
-		{
-			name: "invalid dimension",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"invalid": {"value"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "no match",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"python": {"3.12"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "multi-value match",
-			sel: &arraySelector{
-				key:    "ray-build",
-				filter: map[string][]string{"python": {"3.10", "3.11"}},
-			},
-			wantLen: 4,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveArraySelector(tt.sel, cfg)
-			if tt.wantErr {
-				if err == nil {
-					t.Error("resolveArraySelector() expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("resolveArraySelector() error = %v", err)
-			}
-			if len(got) != tt.wantLen {
-				t.Errorf("resolveArraySelector() returned %d matches, want %d: %v", len(got), tt.wantLen, got)
-			}
-		})
-	}
-}
-
-func TestResolveArraySelectorKeyFormat(t *testing.T) {
-	cfg := &arrayConfig{
-		dims: map[string][]string{
-			"python": {"3.11"},
-			"cuda":   {"12.1.1"},
-		},
-	}
-	cfg.elements = cfg.expand()
-
-	sel := &arraySelector{
-		key:    "ray-build",
-		filter: map[string][]string{"python": {"3.11"}, "cuda": {"12.1.1"}},
-	}
-
-	got, err := resolveArraySelector(sel, cfg)
-	if err != nil {
-		t.Fatalf("resolveArraySelector() error = %v", err)
-	}
-
-	if len(got) != 1 {
-		t.Fatalf("resolveArraySelector() returned %d matches, want 1", len(got))
-	}
-
-	if !strings.HasPrefix(got[0], "ray-build--") {
-		t.Errorf("key = %q, want prefix \"ray-build--\"", got[0])
 	}
 }
 
@@ -639,7 +389,7 @@ func TestExpandArraySteps_DependsOnExcludesSkipped(t *testing.T) {
 			{
 				"key":        "test-step",
 				"commands":   []any{"echo test"},
-				"depends_on": "build-step",
+				"depends_on": "build-step(*)",
 			},
 		},
 	}}
@@ -685,7 +435,7 @@ func TestExpandArraySteps_DependsOnIncludesAdded(t *testing.T) {
 			{
 				"key":        "test-step",
 				"commands":   []any{"echo test"},
-				"depends_on": "build-step",
+				"depends_on": "build-step(*)",
 			},
 		},
 	}}
@@ -701,8 +451,14 @@ func TestExpandArraySteps_DependsOnIncludesAdded(t *testing.T) {
 	}
 
 	deps := rs[2].resolvedDependsOn
-	if len(deps) != 2 {
-		t.Fatalf("got %d deps, want 2: %v", len(deps), deps)
+	wantDeps := []string{"build-step--oslinux", "build-step--osPlan9"}
+	if len(deps) != len(wantDeps) {
+		t.Fatalf("got deps %v, want %v", deps, wantDeps)
+	}
+	for i, want := range wantDeps {
+		if deps[i] != want {
+			t.Errorf("deps[%d] = %q, want %q", i, deps[i], want)
+		}
 	}
 }
 
@@ -913,6 +669,8 @@ func TestExpandArraySteps_DuplicateElementFromAdjustment(t *testing.T) {
 }
 
 func TestExpandArraySteps_KeyCollisionFromSanitization(t *testing.T) {
+	// Values "1.2.1" and "121" both sanitize to "121", causing
+	// a key collision.
 	groups := []*pipelineGroup{{
 		Group: "build",
 		Steps: []map[string]any{{
@@ -938,6 +696,8 @@ func TestExpandArraySteps_KeyCollisionFromSanitization(t *testing.T) {
 }
 
 func TestExpandArraySteps_PartialDimensionSkip(t *testing.T) {
+	// Skip by one dimension on a two-dimension array removes all
+	// matching combinations.
 	groups := []*pipelineGroup{{
 		Group: "build",
 		Steps: []map[string]any{{
@@ -962,6 +722,7 @@ func TestExpandArraySteps_PartialDimensionSkip(t *testing.T) {
 	}
 
 	rs := groups[0].resolvedSteps
+	// 4 total - 2 windows combos = 2 remaining (linux/amd64, linux/arm64)
 	if len(rs) != 2 {
 		t.Fatalf("got %d resolvedSteps, want 2", len(rs))
 	}
@@ -973,43 +734,34 @@ func TestExpandArraySteps_PartialDimensionSkip(t *testing.T) {
 	}
 }
 
-func TestParseArrayDependsOnErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   any
-		wantErr string
-	}{
-		{
-			name:    "invalid type",
-			input:   42,
-			wantErr: "must be string or array",
+func TestExpandArraySteps_PlainStringTargetsArrayStep(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"key":        "test-step",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step",
+			},
 		},
-		{
-			name:    "selector with multiple keys",
-			input:   []any{map[string]any{"step-a": map[string]any{}, "step-b": map[string]any{}}},
-			wantErr: "exactly one key",
-		},
-		{
-			name:    "selector filter not a map",
-			input:   []any{map[string]any{"ray-build": "invalid"}},
-			wantErr: "filter must be a map",
-		},
-		{
-			name:    "invalid value in array filter",
-			input:   []any{map[string]any{"ray-build": map[string]any{"python": 123}}},
-			wantErr: "in selector for \"ray-build\"",
-		},
-	}
+	}}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseArrayDependsOn(tt.input)
-			if err == nil {
-				t.Fatal("parseArrayDependsOn() expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("error = %q, want to contain %q", err.Error(), tt.wantErr)
-			}
-		})
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for plain depends_on targeting array step, got nil")
+	}
+	if !strings.Contains(err.Error(), "plain depends_on") {
+		t.Errorf("error = %q, want to contain \"plain depends_on\"", err.Error())
+	}
+	if !strings.Contains(err.Error(), "($)") {
+		t.Errorf("error = %q, want to contain \"($)\"", err.Error())
 	}
 }
