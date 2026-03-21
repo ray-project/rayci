@@ -600,6 +600,649 @@ func TestExpandArraySteps_GroupDependsOnNonArrayStep(t *testing.T) {
 	}
 }
 
+// Tests for implicit dimension matching in array-to-array depends_on.
+
+func TestExpandArraySteps_ImplicitMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseDims map[string]any
+		testDims map[string]any
+		wantDeps map[string][]string // test step name → expected deps
+	}{
+		{
+			name: "identical dims",
+			baseDims: map[string]any{
+				"python": []any{"3.10", "3.11"},
+				"cuda":   []any{"12.3.2"},
+			},
+			testDims: map[string]any{
+				"python": []any{"3.10", "3.11"},
+				"cuda":   []any{"12.3.2"},
+			},
+			wantDeps: map[string][]string{
+				"test-image--cuda1232-python310": {
+					"base-image--cuda1232-python310",
+				},
+				"test-image--cuda1232-python311": {
+					"base-image--cuda1232-python311",
+				},
+			},
+		},
+		{
+			name: "partial overlap",
+			baseDims: map[string]any{
+				"python": []any{"3.10", "3.11"},
+			},
+			testDims: map[string]any{
+				"python": []any{"3.10", "3.11"},
+				"cuda":   []any{"12.3.2", "12.8.1"},
+			},
+			wantDeps: map[string][]string{
+				"test-image--cuda1232-python310": {
+					"base-image--python310",
+				},
+				"test-image--cuda1232-python311": {
+					"base-image--python311",
+				},
+				"test-image--cuda1281-python310": {
+					"base-image--python310",
+				},
+				"test-image--cuda1281-python311": {
+					"base-image--python311",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDims := tt.baseDims
+			testDims := tt.testDims
+
+			// Build label from dim names.
+			baseLabel := "Base"
+			for dim := range baseDims {
+				baseLabel += " {{array." + dim + "}}"
+			}
+			testLabel := "Test"
+			for dim := range testDims {
+				testLabel += " {{array." + dim + "}}"
+			}
+
+			groups := []*pipelineGroup{{
+				Group: "build",
+				Steps: []map[string]any{
+					{
+						"label":    baseLabel,
+						"name":     "base-image",
+						"commands": []any{"echo base"},
+						"array":    baseDims,
+					},
+					{
+						"label":      testLabel,
+						"name":       "test-image",
+						"commands":   []any{"echo test"},
+						"array":      testDims,
+						"depends_on": "base-image($)",
+					},
+				},
+			}}
+
+			if err := expandArraySteps(groups); err != nil {
+				t.Fatalf("expandArraySteps() error = %v", err)
+			}
+
+			gotDeps := make(map[string][]string)
+			for _, rs := range groups[0].resolvedSteps {
+				name := rs.src["name"].(string)
+				if strings.HasPrefix(name, "test-image") {
+					gotDeps[name] = rs.resolvedDependsOn
+				}
+			}
+
+			if len(gotDeps) != len(tt.wantDeps) {
+				t.Fatalf(
+					"got %d test variants, want %d",
+					len(gotDeps), len(tt.wantDeps),
+				)
+			}
+			for name, want := range tt.wantDeps {
+				got, ok := gotDeps[name]
+				if !ok {
+					t.Errorf("missing test variant %q", name)
+					continue
+				}
+				if len(got) != len(want) {
+					t.Errorf(
+						"%s: got %d deps %v, want %v",
+						name, len(got), got, want,
+					)
+					continue
+				}
+				for i := range want {
+					if got[i] != want[i] {
+						t.Errorf(
+							"%s: deps[%d] = %q, want %q",
+							name, i, got[i], want[i],
+						)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestExpandArraySteps_ImplicitMatchNoOverlapError(t *testing.T) {
+	// Step A has {python}, step B has {os}. No overlap -> error.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.os}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"os": []any{"linux", "macos"},
+				},
+			},
+			{
+				"label":    "Test {{array.python}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+				"depends_on": "base-image($)",
+			},
+		},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for ($) with no overlap, got nil")
+	}
+	if !strings.Contains(err.Error(), "no overlapping dimensions") {
+		t.Errorf(
+			"error = %q, want to contain \"no overlapping dimensions\"",
+			err.Error(),
+		)
+	}
+	if !strings.Contains(err.Error(), "(*)") {
+		t.Errorf(
+			"error = %q, want to contain \"(*)\"",
+			err.Error(),
+		)
+	}
+}
+
+func TestExpandArraySteps_ImplicitMatchMixedDeps(t *testing.T) {
+	// Array step depends on both an array step (overlapping) and a
+	// non-array step. Smart matching for the array dep, plain pass-
+	// through for the non-array dep.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.python}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"key":      "wheel-build",
+				"commands": []any{"echo wheel"},
+			},
+			{
+				"label":    "Test {{array.python}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+				"depends_on": []any{"base-image($)", "wheel-build"},
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// 2 base + 1 wheel + 2 test = 5
+	rs := groups[0].resolvedSteps
+	if len(rs) != 5 {
+		t.Fatalf("got %d resolvedSteps, want 5", len(rs))
+	}
+
+	// test py3.10: [base-image--python310, wheel-build]
+	deps310 := rs[3].resolvedDependsOn
+	if len(deps310) != 2 {
+		t.Fatalf(
+			"test py3.10: got %d deps, want 2: %v",
+			len(deps310), deps310,
+		)
+	}
+	if deps310[0] != "base-image--python310" {
+		t.Errorf(
+			"test py3.10: deps[0] = %q, want %q",
+			deps310[0], "base-image--python310",
+		)
+	}
+	if deps310[1] != "wheel-build" {
+		t.Errorf(
+			"test py3.10: deps[1] = %q, want %q",
+			deps310[1], "wheel-build",
+		)
+	}
+
+	// test py3.11: [base-image--python311, wheel-build]
+	deps311 := rs[4].resolvedDependsOn
+	if len(deps311) != 2 {
+		t.Fatalf(
+			"test py3.11: got %d deps, want 2: %v",
+			len(deps311), deps311,
+		)
+	}
+	if deps311[0] != "base-image--python311" {
+		t.Errorf(
+			"test py3.11: deps[0] = %q, want %q",
+			deps311[0], "base-image--python311",
+		)
+	}
+	if deps311[1] != "wheel-build" {
+		t.Errorf(
+			"test py3.11: deps[1] = %q, want %q",
+			deps311[1], "wheel-build",
+		)
+	}
+}
+
+func TestExpandArraySteps_ExplicitSelectorOverridesImplicit(t *testing.T) {
+	// Array step A depends on array step B with an explicit selector.
+	// The explicit filter should be used, not implicit matching.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.python}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12"},
+				},
+			},
+			{
+				"label":    "Test {{array.python}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12"},
+				},
+				"depends_on": []any{
+					"base-image(python=3.10, python=3.11)",
+				},
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// 3 base + 3 test = 6
+	rs := groups[0].resolvedSteps
+	if len(rs) != 6 {
+		t.Fatalf("got %d resolvedSteps, want 6", len(rs))
+	}
+
+	// All test variants get the same deps pinned by the explicit
+	// filter (py3.10 + py3.11), NOT their own python value.
+	wantDeps := []string{
+		"base-image--python310",
+		"base-image--python311",
+	}
+	for i := 3; i < 6; i++ {
+		deps := rs[i].resolvedDependsOn
+		if len(deps) != len(wantDeps) {
+			t.Errorf(
+				"rs[%d]: got %d deps, want %d: %v",
+				i, len(deps), len(wantDeps), deps,
+			)
+			continue
+		}
+		for j, want := range wantDeps {
+			if deps[j] != want {
+				t.Errorf(
+					"rs[%d]: deps[%d] = %q, want %q",
+					i, j, deps[j], want,
+				)
+			}
+		}
+	}
+}
+
+func TestExpandArraySteps_ImplicitMatchPublishScenario(t *testing.T) {
+	// Real-world scenario: publish step (python+cuda) depends on
+	// cpu-build (python only) and cuda-build (python+cuda with
+	// adjustment). Each publish variant should only depend on its
+	// matching cpu-build (by python) and cuda-build (by python+cuda).
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "cpu {{array.python}}",
+				"name":     "ray-anyscale-cpu-build",
+				"commands": []any{"echo cpu"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12", "3.13"},
+				},
+			},
+			{
+				"label":    "cuda {{array.python}} {{array.cuda}}",
+				"name":     "ray-anyscale-cuda-build",
+				"commands": []any{"echo cuda"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12", "3.13"},
+					"cuda":   []any{"12.3.2-cudnn9"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.12",
+								"cuda":   "13.0.0-cudnn",
+							},
+						},
+					},
+				},
+			},
+			{
+				"label":    "publish {{array.python}} {{array.cuda}}",
+				"name":     "publish-ray-anyscale",
+				"commands": []any{"echo publish"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12", "3.13"},
+					"cuda":   []any{"12.3.2-cudnn9"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.12",
+								"cuda":   "13.0.0-cudnn",
+							},
+						},
+					},
+				},
+				"depends_on": []any{
+					"ray-anyscale-cpu-build($)",
+					"ray-anyscale-cuda-build($)",
+				},
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// 4 cpu + 5 cuda (4 + 1 adj) + 5 publish (4 + 1 adj) = 14
+	rs := groups[0].resolvedSteps
+	if len(rs) != 14 {
+		t.Fatalf("got %d resolvedSteps, want 14", len(rs))
+	}
+
+	// Build a lookup of publish step deps by name.
+	publishDeps := make(map[string][]string)
+	for _, r := range rs {
+		name := r.src["name"].(string)
+		if strings.HasPrefix(name, "publish-") {
+			publishDeps[name] = r.resolvedDependsOn
+		}
+	}
+
+	// publish py3.12 cu12.3.2-cudnn9:
+	//   cpu dep:  ray-anyscale-cpu-build--python312 (1, not all 4)
+	//   cuda dep: ray-anyscale-cuda-build--cuda1232cudnn9-python312 (1, not all 5)
+	key := "publish-ray-anyscale--cuda1232cudnn9-python312"
+	deps := publishDeps[key]
+	if len(deps) != 2 {
+		t.Fatalf("%s: got %d deps, want 2: %v", key, len(deps), deps)
+	}
+	if deps[0] != "ray-anyscale-cpu-build--python312" {
+		t.Errorf(
+			"%s: cpu dep = %q, want %q",
+			key, deps[0], "ray-anyscale-cpu-build--python312",
+		)
+	}
+	if deps[1] != "ray-anyscale-cuda-build--cuda1232cudnn9-python312" {
+		t.Errorf(
+			"%s: cuda dep = %q, want %q",
+			key, deps[1],
+			"ray-anyscale-cuda-build--cuda1232cudnn9-python312",
+		)
+	}
+
+	// publish py3.12 cu13.0.0-cudnn (adjustment variant):
+	//   cpu dep:  ray-anyscale-cpu-build--python312
+	//   cuda dep: ray-anyscale-cuda-build--cuda1300cudnn-python312
+	key = "publish-ray-anyscale--cuda1300cudnn-python312"
+	deps = publishDeps[key]
+	if len(deps) != 2 {
+		t.Fatalf("%s: got %d deps, want 2: %v", key, len(deps), deps)
+	}
+	if deps[0] != "ray-anyscale-cpu-build--python312" {
+		t.Errorf(
+			"%s: cpu dep = %q, want %q",
+			key, deps[0], "ray-anyscale-cpu-build--python312",
+		)
+	}
+	if deps[1] != "ray-anyscale-cuda-build--cuda1300cudnn-python312" {
+		t.Errorf(
+			"%s: cuda dep = %q, want %q",
+			key, deps[1],
+			"ray-anyscale-cuda-build--cuda1300cudnn-python312",
+		)
+	}
+
+	// Every publish variant should have exactly 2 deps (1 cpu + 1 cuda).
+	for name, d := range publishDeps {
+		if len(d) != 2 {
+			t.Errorf("%s: got %d deps, want 2: %v", name, len(d), d)
+		}
+	}
+}
+
+func TestExpandArraySteps_ImplicitMatchWithAdjustments(t *testing.T) {
+	// Step B has a skip adjustment. After implicit matching,
+	// the skipped variant should not appear in results.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.python}} {{array.cuda}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12"},
+					"cuda":   []any{"12.3.2"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.12",
+								"cuda":   "13.0.0",
+							},
+						},
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.10",
+								"cuda":   "12.3.2",
+							},
+							"skip": true,
+						},
+					},
+				},
+			},
+			{
+				"label":    "Test {{array.python}} {{array.cuda}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11", "3.12"},
+					"cuda":   []any{"12.3.2"},
+					"adjustments": []any{
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.12",
+								"cuda":   "13.0.0",
+							},
+						},
+						map[string]any{
+							"with": map[string]any{
+								"python": "3.10",
+								"cuda":   "12.3.2",
+							},
+							"skip": true,
+						},
+					},
+				},
+				"depends_on": "base-image($)",
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	// base: 3 original - 1 skipped + 1 added = 3 elements
+	// test: same = 3 elements. Total = 6
+	rs := groups[0].resolvedSteps
+	if len(rs) != 6 {
+		t.Fatalf("got %d resolvedSteps, want 6", len(rs))
+	}
+
+	// Each test variant should have exactly 1 matching dep.
+	for i := 3; i < 6; i++ {
+		deps := rs[i].resolvedDependsOn
+		if len(deps) != 1 {
+			t.Errorf(
+				"rs[%d] (%v): got %d deps, want 1: %v",
+				i, rs[i].src["name"], len(deps), deps,
+			)
+		}
+	}
+
+	// Verify the py3.12 cu13.0.0 test depends on py3.12 cu13.0.0 base
+	// (the added adjustment variant).
+	found := false
+	for i := 3; i < 6; i++ {
+		name := rs[i].src["name"].(string)
+		if name == "test-image--cuda1300-python312" {
+			found = true
+			deps := rs[i].resolvedDependsOn
+			if deps[0] != "base-image--cuda1300-python312" {
+				t.Errorf(
+					"test cu13/py312: dep = %q, want %q",
+					deps[0], "base-image--cuda1300-python312",
+				)
+			}
+		}
+	}
+	if !found {
+		t.Error("did not find test-image--cuda1300-python312 variant")
+	}
+}
+
+func TestExpandArraySteps_MatchAllFromArrayStep(t *testing.T) {
+	// Using base-image(*) from an array step gets all-variants fanout.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.python}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"label":    "Test {{array.python}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+				"depends_on": "base-image(*)",
+			},
+		},
+	}}
+
+	if err := expandArraySteps(groups); err != nil {
+		t.Fatalf("expandArraySteps() error = %v", err)
+	}
+
+	rs := groups[0].resolvedSteps
+	if len(rs) != 4 {
+		t.Fatalf("got %d resolvedSteps, want 4", len(rs))
+	}
+
+	// Each test variant should depend on ALL base variants.
+	for i := 2; i < 4; i++ {
+		deps := rs[i].resolvedDependsOn
+		if len(deps) != 2 {
+			t.Errorf(
+				"rs[%d]: got %d deps, want 2 (all): %v",
+				i, len(deps), deps,
+			)
+		}
+	}
+}
+
+func TestExpandArraySteps_ImplicitMatchValueMismatchError(t *testing.T) {
+	// Step A has python=3.12 but step B only has python=[3.10, 3.11].
+	// Implicit matching should produce a clear error mentioning
+	// implicit dimension matching.
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Base {{array.python}}",
+				"name":     "base-image",
+				"commands": []any{"echo base"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"label":    "Test {{array.python}}",
+				"name":     "test-image",
+				"commands": []any{"echo test"},
+				"array": map[string]any{
+					"python": []any{"3.12"},
+				},
+				"depends_on": "base-image($)",
+			},
+		},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for value mismatch, got nil")
+	}
+	if !strings.Contains(err.Error(), "implicit dimension matching") {
+		t.Errorf(
+			"error = %q, want to contain \"implicit dimension matching\"",
+			err.Error(),
+		)
+	}
+	if !strings.Contains(err.Error(), "(*)") {
+		t.Errorf(
+			"error = %q, want to contain \"(*)\"",
+			err.Error(),
+		)
+	}
+}
+
 func TestExpandArraySteps_DuplicateBaseKey(t *testing.T) {
 	groups := []*pipelineGroup{
 		{
@@ -763,5 +1406,37 @@ func TestExpandArraySteps_PlainStringTargetsArrayStep(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "($)") {
 		t.Errorf("error = %q, want to contain \"($)\"", err.Error())
+	}
+}
+
+func TestExpandArraySteps_ImplicitFromNonArrayStepError(t *testing.T) {
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{
+			{
+				"label":    "Build {{array.python}}",
+				"key":      "build-step",
+				"commands": []any{"echo build"},
+				"array": map[string]any{
+					"python": []any{"3.10", "3.11"},
+				},
+			},
+			{
+				"key":        "test-step",
+				"commands":   []any{"echo test"},
+				"depends_on": "build-step($)",
+			},
+		},
+	}}
+
+	err := expandArraySteps(groups)
+	if err == nil {
+		t.Fatal("expected error for ($) from non-array step, got nil")
+	}
+	if !strings.Contains(err.Error(), "can only be used from an array step") {
+		t.Errorf(
+			"error = %q, want to contain \"can only be used from an array step\"",
+			err.Error(),
+		)
 	}
 }

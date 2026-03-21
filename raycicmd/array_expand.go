@@ -10,10 +10,13 @@ import (
 // depends_on references to point to the expanded keys.
 func expandArraySteps(gs []*pipelineGroup) error {
 	configs := make(map[string]*arrayConfig)
+	// elems maps each expanded step key to its arrayElement,
+	// used for implicit dimension matching in Pass 2.
+	elems := make(map[string]*arrayElement)
 
 	// Pass 1: expand array steps into resolvedSteps.
 	for _, g := range gs {
-		if err := g.buildResolvedSteps(configs); err != nil {
+		if err := g.buildResolvedSteps(configs, elems); err != nil {
 			return fmt.Errorf("expand arrays: %w", err)
 		}
 	}
@@ -25,8 +28,9 @@ func expandArraySteps(gs []*pipelineGroup) error {
 			if !ok {
 				continue
 			}
+			currentElem := elems[stepKey(rs.src)]
 			resolved, err := resolveDependsOn(
-				dependsOn, configs,
+				dependsOn, configs, currentElem,
 			)
 			if err != nil {
 				return fmt.Errorf(
@@ -65,6 +69,7 @@ func expandArraySteps(gs []*pipelineGroup) error {
 // array steps into multiple entries.
 func (g *pipelineGroup) buildResolvedSteps(
 	configs map[string]*arrayConfig,
+	elems map[string]*arrayElement,
 ) error {
 	var result []*resolvedStep
 
@@ -95,8 +100,10 @@ func (g *pipelineGroup) buildResolvedSteps(
 		if err != nil {
 			return err
 		}
-		for _, es := range expanded {
+		cfg := configs[baseKey]
+		for j, es := range expanded {
 			result = append(result, &resolvedStep{src: es})
+			elems[stepKey(es)] = cfg.elements[j]
 		}
 	}
 

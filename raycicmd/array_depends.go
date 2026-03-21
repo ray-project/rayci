@@ -169,12 +169,13 @@ func parseArrayDependsOnList(arr []any) ([]*arraySelector, error) {
 //
 // Selector semantics:
 //   - No parens (literal): pass through if non-array; error if array
-//   - ($): implicit dimension matching (not yet supported)
+//   - ($): implicit dimension matching via overlapping dims
 //   - (*): all variants
 //   - (key=val): explicit filter
 func resolveDependsOn(
 	dependsOn any,
 	configs map[string]*arrayConfig,
+	currentElem *arrayElement,
 ) ([]string, error) {
 	selectors, err := parseArrayDependsOn(dependsOn)
 	if err != nil {
@@ -196,6 +197,8 @@ func resolveDependsOn(
 			continue
 		}
 
+		origMode := sel.mode
+
 		switch sel.mode {
 		case selectorLiteral:
 			return nil, fmt.Errorf(
@@ -205,10 +208,24 @@ func resolveDependsOn(
 			)
 
 		case selectorImplicit:
-			return nil, fmt.Errorf(
-				"($) on %q: implicit matching not yet supported; use %s(*) or %s(key=val)",
-				sel.key, sel.key, sel.key,
-			)
+			if currentElem == nil {
+				return nil, fmt.Errorf(
+					"($) on %q can only be used from an array "+
+						"step; use %s(*) for non-array steps",
+					sel.key, sel.key,
+				)
+			}
+			f := implicitDimFilter(currentElem, cfg)
+			if f == nil {
+				return nil, fmt.Errorf(
+					"($) on %q: no overlapping dimensions; "+
+						"use %s(*) to depend on all variants",
+					sel.key, sel.key,
+				)
+			}
+			sel = &arraySelector{
+				key: sel.key, mode: selectorFilter, filter: f,
+			}
 
 		case selectorMatchAll, selectorFilter:
 			// use sel as-is
@@ -216,12 +233,39 @@ func resolveDependsOn(
 
 		matches, err := resolveArraySelector(sel, cfg)
 		if err != nil {
+			if origMode == selectorImplicit {
+				return nil, fmt.Errorf(
+					"implicit dimension matching on %q: %w; "+
+						"use %s(*) to depend on all variants",
+					sel.key, err, sel.key,
+				)
+			}
 			return nil, err
 		}
 		result = append(result, matches...)
 	}
 
 	return result, nil
+}
+
+// implicitDimFilter builds a selector filter from the overlapping
+// dimensions between the current element and the target config.
+// Returns nil if there is no overlap.
+func implicitDimFilter(
+	current *arrayElement, target *arrayConfig,
+) map[string][]string {
+	var filter map[string][]string
+	for dim := range target.dims {
+		val, ok := current.values[dim]
+		if !ok {
+			continue
+		}
+		if filter == nil {
+			filter = make(map[string][]string)
+		}
+		filter[dim] = []string{val}
+	}
+	return filter
 }
 
 // resolveArraySelector resolves a selector against an array config
