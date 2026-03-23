@@ -8,6 +8,34 @@ import (
 	"testing"
 )
 
+func TestLocalDepName(t *testing.T) {
+	const prefix = "cr.ray.io/rayproject/"
+
+	tests := []struct {
+		from string
+		want string
+	}{
+		{"cr.ray.io/rayproject/foo", "foo"},
+		{"cr.ray.io/rayproject/foo:v1", "foo"},
+		{"cr.ray.io/rayproject/foo:latest", "foo"},
+		{"ubuntu:22.04", ""},
+		{"@localimage", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		got := localDepName(tt.from, prefix)
+		if got != tt.want {
+			t.Errorf("localDepName(%q) = %q, want %q", tt.from, got, tt.want)
+		}
+	}
+
+	// Empty prefix always returns "".
+	if got := localDepName("cr.ray.io/rayproject/foo", ""); got != "" {
+		t.Errorf("localDepName with empty prefix = %q, want \"\"", got)
+	}
+}
+
 func TestLocalDeps(t *testing.T) {
 	const prefix = "cr.ray.io/rayproject/"
 
