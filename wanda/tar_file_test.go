@@ -120,8 +120,8 @@ func TestTarFileRecord(t *testing.T) {
 	if r.Name != "userfile" {
 		t.Errorf("got name %q, want %q", r.Name, "userfile")
 	}
-	if r.Mode != 0600 {
-		t.Errorf("got mode %o, want %o", r.Mode, 0600)
+	if r.Mode != 0644 {
+		t.Errorf("got mode %o, want %o", r.Mode, 0644)
 	}
 	if r.UserID != 2000 {
 		t.Errorf("got uid %d, want %d", r.UserID, 2000)

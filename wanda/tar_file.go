@@ -106,6 +106,13 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 		meta = tarMetaFromFileInfo(stat)
 	}
 
+	// A file in git only tracks the executable bit; other mode bits are
+	// determined by the user's umask and may differ across systems.
+	mode := int64(0o644)
+	if stat.Mode()&0o100 != 0 {
+		mode = 0o755
+	}
+
 	switch stat.Mode() & os.ModeType {
 	case os.ModeSymlink:
 		target, err := os.Readlink(t.srcFile)
@@ -120,7 +127,7 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 
 		return &tarFileRecord{
 			Name:          t.name,
-			Mode:          meta.Mode,
+			Mode:          mode,
 			GroupID:       meta.GroupID,
 			UserID:        meta.UserID,
 			Size:          0, // Symlinks have no content size in tar.
@@ -142,7 +149,7 @@ func (t *tarFile) record() (*tarFileRecord, error) {
 
 		r := &tarFileRecord{
 			Name:    t.name,
-			Mode:    meta.Mode,
+			Mode:    mode,
 			GroupID: meta.GroupID,
 			UserID:  meta.UserID,
 			Size:    stat.Size(),
