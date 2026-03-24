@@ -34,8 +34,9 @@ func (ac *AnyscaleCLI) setRunFunc(f func(args []string) (string, error)) {
 }
 
 // runAnyscaleCLI runs the anyscale CLI with the given arguments.
-// Returns the combined output and any error that occurred.
-// Output is displayed to the terminal with colors preserved.
+// Returns stdout output only, so that CLI warnings on stderr do not
+// corrupt structured (JSON/YAML) output used for parsing.
+// Both streams are still displayed to the terminal.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if ac.runFunc != nil {
 		return ac.runFunc(args)
@@ -47,18 +48,20 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	fmt.Fprintf(os.Stdout, ">>> anyscale %s\n", strings.Join(args, " "))
 	cmd := exec.Command(ac.bin, args...)
 
-	tw := newTailWriter(maxOutputBufferSize)
-	cmd.Stdout = io.MultiWriter(os.Stdout, tw)
-	cmd.Stderr = io.MultiWriter(os.Stderr, tw)
+	stdoutBuf := newTailWriter(maxOutputBufferSize)
+	stderrBuf := newTailWriter(maxOutputBufferSize)
+	cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 
 	err := cmd.Run()
-	output := tw.String()
+	stdout := stdoutBuf.String()
 	if err != nil {
-		return output, fmt.Errorf("anyscale error: %w", err)
+		stderr := stderrBuf.String()
+		return stdout, fmt.Errorf("anyscale error: %w\nstderr: %s", err, stderr)
 	}
-	if strings.Contains(output, "exec failed with exit code") {
-		return output, fmt.Errorf("anyscale error: command failed: %s", output)
+	if strings.Contains(stdout, "exec failed with exit code") {
+		return stdout, fmt.Errorf("anyscale error: command failed: %s", stdout)
 	}
 
-	return output, nil
+	return stdout, nil
 }
