@@ -22,7 +22,7 @@ func (ac *AnyscaleCLI) GetDefaultCloud() (*CloudInfo, error) {
 	}
 
 	var cloudInfo CloudInfo
-	if err := yaml.Unmarshal([]byte(output), &cloudInfo); err != nil {
+	if err := yaml.Unmarshal([]byte(stripCLIWarnings(output)), &cloudInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse cloud info: %w", err)
 	}
 

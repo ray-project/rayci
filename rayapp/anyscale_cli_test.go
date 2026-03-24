@@ -109,7 +109,8 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			name:       "command fails with stderr",
 			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
-			wantErrStr: "error msg",
+			wantSubstr: "error msg",
+			wantErrStr: "anyscale error",
 		},
 		{
 			name:       "exec failed with exit code in output",
@@ -145,22 +146,76 @@ func TestRunAnyscaleCLI(t *testing.T) {
 	}
 }
 
-func TestRunAnyscaleCLI_StderrNotInOutput(t *testing.T) {
-	script := strings.Join([]string{
-		"#!/bin/sh",
-		`echo "[WARNING] upgrade your CLI" >&2`,
-		`echo '{"id": "ws-123"}'`,
-	}, "\n")
-	cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+func TestStripCLIWarnings(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "no warnings",
+			input: `{"id": "ws-123"}`,
+			want:  `{"id": "ws-123"}`,
+		},
+		{
+			name: "warning before json object",
+			input: strings.Join([]string{
+				"[WARNING] A newer version of the Anyscale CLI is available.",
+				`{"id": "ws-123"}`,
+			}, "\n"),
+			want: `{"id": "ws-123"}`,
+		},
+		{
+			name: "warning before json array",
+			input: strings.Join([]string{
+				"[WARNING] upgrade now",
+				`[{"id": "1"}, {"id": "2"}]`,
+			}, "\n"),
+			want: `[{"id": "1"}, {"id": "2"}]`,
+		},
+		{
+			name: "warning before yaml",
+			input: strings.Join([]string{
+				"[WARNING] A newer version of the Anyscale CLI is available.",
+				"name: default",
+				"id: cloud-123",
+			}, "\n"),
+			want: strings.Join([]string{
+				"name: default",
+				"id: cloud-123",
+			}, "\n"),
+		},
+		{
+			name: "multiple warnings",
+			input: strings.Join([]string{
+				"[WARNING] first warning",
+				"(NOTICE) second notice",
+				"name: default",
+			}, "\n"),
+			want: "name: default",
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "plain text passthrough",
+			input: "just some text",
+			want:  "just some text",
+		},
+		{
+			name:  "json array without warning",
+			input: `[{"id": "1"}]`,
+			want:  `[{"id": "1"}]`,
+		},
+	}
 
-	output, err := cli.runAnyscaleCLI([]string{"workspace_v2", "get"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Contains(output, "WARNING") {
-		t.Errorf("stdout output should not contain stderr warning, got %q", output)
-	}
-	if !strings.Contains(output, `{"id": "ws-123"}`) {
-		t.Errorf("stdout output should contain JSON payload, got %q", output)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripCLIWarnings(tt.input); got != tt.want {
+				t.Errorf("stripCLIWarnings() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

@@ -34,9 +34,8 @@ func (ac *AnyscaleCLI) setRunFunc(f func(args []string) (string, error)) {
 }
 
 // runAnyscaleCLI runs the anyscale CLI with the given arguments.
-// Returns stdout output only, so that CLI warnings on stderr do not
-// corrupt structured (JSON/YAML) output used for parsing.
-// Both streams are still displayed to the terminal.
+// Returns the combined output and any error that occurred.
+// Output is displayed to the terminal with colors preserved.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if ac.runFunc != nil {
 		return ac.runFunc(args)
@@ -48,20 +47,53 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	fmt.Fprintf(os.Stdout, ">>> anyscale %s\n", strings.Join(args, " "))
 	cmd := exec.Command(ac.bin, args...)
 
-	stdoutBuf := newTailWriter(maxOutputBufferSize)
-	stderrBuf := newTailWriter(maxOutputBufferSize)
-	cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
+	tw := newTailWriter(maxOutputBufferSize)
+	cmd.Stdout = io.MultiWriter(os.Stdout, tw)
+	cmd.Stderr = io.MultiWriter(os.Stderr, tw)
 
 	err := cmd.Run()
-	stdout := stdoutBuf.String()
+	output := tw.String()
 	if err != nil {
-		stderr := stderrBuf.String()
-		return stdout, fmt.Errorf("anyscale error: %w\nstderr: %s", err, stderr)
+		return output, fmt.Errorf("anyscale error: %w", err)
 	}
-	if strings.Contains(stdout, "exec failed with exit code") {
-		return stdout, fmt.Errorf("anyscale error: command failed: %s", stdout)
+	if strings.Contains(output, "exec failed with exit code") {
+		return output, fmt.Errorf("anyscale error: command failed: %s", output)
 	}
 
-	return stdout, nil
+	return output, nil
+}
+
+// stripCLIWarnings removes leading lines that look like CLI warnings
+// (e.g. "[WARNING] ...") before structured output. This handles the
+// Anyscale CLI printing upgrade notices to stdout before JSON/YAML.
+func stripCLIWarnings(s string) string {
+	for {
+		if len(s) == 0 {
+			return s
+		}
+		if s[0] != '[' && s[0] != '(' {
+			return s
+		}
+		// Lines starting with "[" could be a JSON array or a warning
+		// like "[WARNING]". Check if it looks like a bracketed tag
+		// followed by a space (e.g., "[WARNING] ...", "(NOTICE) ...").
+		closers := map[byte]byte{'[': ']', '(': ')'}
+		closer := closers[s[0]]
+		end := strings.IndexByte(s, closer)
+		if end < 0 {
+			return s
+		}
+		// If the bracket pair is followed by content on the same
+		// line (e.g., "[WARNING] ..."), treat it as a warning line.
+		rest := s[end+1:]
+		if len(rest) > 0 && rest[0] == ' ' {
+			if idx := strings.IndexByte(s, '\n'); idx >= 0 {
+				s = s[idx+1:]
+				continue
+			}
+			return "" // single-line warning, nothing after it
+		}
+		// Otherwise it's likely structured data (e.g., JSON array).
+		return s
+	}
 }

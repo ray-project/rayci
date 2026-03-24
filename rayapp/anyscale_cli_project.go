@@ -21,7 +21,7 @@ func (ac *AnyscaleCLI) getDefaultProject(cloudID string) (*projectInfo, error) {
 	}
 
 	var pInfo projectInfo
-	if err := yaml.Unmarshal([]byte(output), &pInfo); err != nil {
+	if err := yaml.Unmarshal([]byte(stripCLIWarnings(output)), &pInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse project info: %w", err)
 	}
 

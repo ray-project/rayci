@@ -100,7 +100,7 @@ func (ac *AnyscaleCLI) ListComputeConfigs(name *string) ([]ComputeConfigListItem
 	}
 
 	var m map[string]any
-	if err := json.Unmarshal([]byte(output), &m); err != nil {
+	if err := json.Unmarshal([]byte(stripCLIWarnings(output)), &m); err != nil {
 		return nil, fmt.Errorf("parse list output: %w", err)
 	}
 

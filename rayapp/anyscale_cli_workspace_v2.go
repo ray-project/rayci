@@ -94,7 +94,7 @@ func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceName string) (map[string
 		return nil, fmt.Errorf("get workspace failed: %w", err)
 	}
 	var workspaceDescription map[string]any
-	if err := json.Unmarshal([]byte(output), &workspaceDescription); err != nil {
+	if err := json.Unmarshal([]byte(stripCLIWarnings(output)), &workspaceDescription); err != nil {
 		return nil, fmt.Errorf("parse workspace get output: %w", err)
 	}
 	return workspaceDescription, nil
