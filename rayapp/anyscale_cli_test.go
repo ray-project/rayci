@@ -109,8 +109,13 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			name:       "command fails with stderr",
 			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
-			wantSubstr: "error msg",
-			wantErrStr: "anyscale error",
+			wantErrStr: "stderr: error msg",
+		},
+		{
+			name:       "command fails includes stdout in error",
+			script:     "#!/bin/sh\necho \"useful context\"; echo \"error msg\" >&2; exit 1",
+			args:       []string{"deploy"},
+			wantErrStr: "stdout: useful context",
 		},
 		{
 			name:       "exec failed with exit code in output",
@@ -133,6 +138,9 @@ func TestRunAnyscaleCLI(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.wantErrStr) {
 					t.Errorf("error %q should contain %q", err.Error(), tt.wantErrStr)
 				}
+				if output != "" {
+					t.Errorf("output should be empty on error, got %q", output)
+				}
 				return
 			}
 
@@ -143,5 +151,25 @@ func TestRunAnyscaleCLI(t *testing.T) {
 				t.Errorf("output %q should contain %q", output, tt.wantSubstr)
 			}
 		})
+	}
+}
+
+func TestRunAnyscaleCLI_StderrNotInOutput(t *testing.T) {
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		`echo "[WARNING] upgrade your CLI" >&2`,
+		`echo '{"id": "ws-123"}'`,
+	}, "\n")
+	cli := &AnyscaleCLI{bin: writeFakeAnyscale(t, script)}
+
+	output, err := cli.runAnyscaleCLI([]string{"workspace_v2", "get"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(output, "WARNING") {
+		t.Errorf("stdout output should not contain stderr warning, got %q", output)
+	}
+	if !strings.Contains(output, `{"id": "ws-123"}`) {
+		t.Errorf("stdout output should contain JSON payload, got %q", output)
 	}
 }
