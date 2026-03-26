@@ -3,23 +3,116 @@ package raycicmd
 import (
 	"fmt"
 	"slices"
+	"strings"
+)
+
+const (
+	selectorLiteral  int = iota // no parens: pass through
+	selectorImplicit            // ($): match on shared dimensions
+	selectorMatchAll            // (*): all variants
+	selectorFilter              // (key=val): explicit filter
 )
 
 // arraySelector represents a dependency selector with optional array filter.
 type arraySelector struct {
-	key    string              // step identifier: "key" for command steps, "name" for wanda steps
-	filter map[string][]string // dimension -> allowed values (nil = all instances)
+	key    string              // step name (without parens)
+	mode   int                 // how to resolve the dependency
+	filter map[string][]string // only set when mode == selectorFilter
+}
+
+// parseSelector parses a depends_on string with optional paren syntax.
+//
+//	"ray-cpu-build"                       → literal
+//	"ray-cpu-build($)"                    → implicit dimension matching
+//	"ray-cpu-build(*)"                    → all variants
+//	"ray-cpu-build(python=3.10, cuda=12)" → explicit filter
+func parseSelector(s string) (*arraySelector, error) {
+	open := strings.Index(s, "(")
+	if open < 0 {
+		return &arraySelector{key: s}, nil
+	}
+	if open == 0 {
+		return nil, fmt.Errorf(
+			"depends_on %q: step name before '(' is empty", s,
+		)
+	}
+	if !strings.HasSuffix(s, ")") {
+		return nil, fmt.Errorf(
+			"depends_on %q: missing closing ')'", s,
+		)
+	}
+	base := s[:open]
+	content := s[open+1 : len(s)-1]
+
+	switch content {
+	case "$":
+		return &arraySelector{key: base, mode: selectorImplicit}, nil
+	case "*":
+		return &arraySelector{key: base, mode: selectorMatchAll}, nil
+	case "":
+		return nil, fmt.Errorf(
+			"depends_on %q: empty parentheses", s,
+		)
+	}
+
+	filter, err := parseSelectorFilter(content)
+	if err != nil {
+		return nil, fmt.Errorf("depends_on %q: %w", s, err)
+	}
+	return &arraySelector{
+		key: base, mode: selectorFilter, filter: filter,
+	}, nil
+}
+
+// parseSelectorFilter parses "key=val, key=val" into a filter map.
+// Trailing or double commas are rejected.
+func parseSelectorFilter(content string) (map[string][]string, error) {
+	filter := make(map[string][]string)
+	pairs := strings.Split(content, ",")
+	for i, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			return nil, fmt.Errorf(
+				"empty filter entry at position %d", i+1,
+			)
+		}
+		eq := strings.Index(pair, "=")
+		if eq < 0 {
+			return nil, fmt.Errorf(
+				"invalid filter %q: expected key=value", pair,
+			)
+		}
+		dim := strings.TrimSpace(pair[:eq])
+		val := strings.TrimSpace(pair[eq+1:])
+		if dim == "" {
+			return nil, fmt.Errorf(
+				"invalid filter %q: empty dimension name", pair,
+			)
+		}
+		if val == "" {
+			return nil, fmt.Errorf(
+				"invalid filter %q: empty value", pair,
+			)
+		}
+		if slices.Contains(filter[dim], val) {
+			return nil, fmt.Errorf(
+				"duplicate filter entry %s=%s", dim, val,
+			)
+		}
+		filter[dim] = append(filter[dim], val)
+	}
+	return filter, nil
 }
 
 // parseArrayDependsOn parses a depends_on field into a list of selectors.
 //
 // Supported YAML formats:
 //
-//	depends_on: step-key              # single string
-//	depends_on: [step-a, step-b]      # string array
-//	depends_on:                       # selector with array filter
-//	  - ray-build:
-//	      python: "3.11"
+//	depends_on: step-key                  # literal pass-through
+//	depends_on: ray-build($)              # implicit dimension matching
+//	depends_on: ray-build(*)              # all variants
+//	depends_on: ray-build(python=3.11)    # explicit filter
+//	depends_on: [step-a($), step-b]       # array with selectors
 func parseArrayDependsOn(v any) ([]*arraySelector, error) {
 	if v == nil {
 		return nil, nil
@@ -27,17 +120,27 @@ func parseArrayDependsOn(v any) ([]*arraySelector, error) {
 
 	switch val := v.(type) {
 	case string:
-		return []*arraySelector{{key: val}}, nil
-	case []string:
+		sel, err := parseSelector(val)
+		if err != nil {
+			return nil, err
+		}
+		return []*arraySelector{sel}, nil
+	case []string: // from Go callers constructing steps programmatically
 		selectors := make([]*arraySelector, len(val))
-		for i, key := range val {
-			selectors[i] = &arraySelector{key: key}
+		for i, s := range val {
+			sel, err := parseSelector(s)
+			if err != nil {
+				return nil, fmt.Errorf("depends_on[%d]: %w", i, err)
+			}
+			selectors[i] = sel
 		}
 		return selectors, nil
 	case []any:
 		return parseArrayDependsOnList(val)
 	default:
-		return nil, fmt.Errorf("depends_on must be string or array, got %T", v)
+		return nil, fmt.Errorf(
+			"depends_on must be string or array, got %T", v,
+		)
 	}
 }
 
@@ -46,71 +149,33 @@ func parseArrayDependsOnList(arr []any) ([]*arraySelector, error) {
 	for i, item := range arr {
 		switch val := item.(type) {
 		case string:
-			selectors = append(selectors, &arraySelector{key: val})
-		case map[string]any:
-			sel, err := parseArraySelectorMap(val)
+			sel, err := parseSelector(val)
 			if err != nil {
 				return nil, fmt.Errorf("depends_on[%d]: %w", i, err)
 			}
 			selectors = append(selectors, sel)
 		default:
-			return nil, fmt.Errorf("depends_on[%d]: expected string or map, got %T", i, item)
+			return nil, fmt.Errorf(
+				"depends_on[%d]: expected string, got %T; "+
+					"use selector syntax like step(key=val)",
+				i, item,
+			)
 		}
 	}
 	return selectors, nil
 }
 
-func parseArraySelectorMap(m map[string]any) (*arraySelector, error) {
-	if len(m) != 1 {
-		return nil, fmt.Errorf("selector must have exactly one key (the step name), got %d", len(m))
-	}
-	var stepName string
-	var filterVal any
-	for k, v := range m {
-		stepName = k
-		filterVal = v
-	}
-
-	sel := &arraySelector{key: stepName}
-
-	if filterVal != nil {
-		filterMap, ok := filterVal.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("selector %q filter must be a map, got %T", stepName, filterVal)
-		}
-		parsed, err := parseSelectorFilter(filterMap)
-		if err != nil {
-			return nil, fmt.Errorf("in selector for %q: %w", stepName, err)
-		}
-		sel.filter = parsed
-	}
-
-	return sel, nil
-}
-
-func parseSelectorFilter(m map[string]any) (map[string][]string, error) {
-	result := make(map[string][]string, len(m))
-	for dim, v := range m {
-		switch val := v.(type) {
-		case string:
-			result[dim] = []string{val}
-		case []any:
-			values, err := toStringSlice(val)
-			if err != nil {
-				return nil, fmt.Errorf("selector %q: %w", dim, err)
-			}
-			result[dim] = values
-		default:
-			return nil, fmt.Errorf("selector %q must be a string or array, got %T", dim, v)
-		}
-	}
-	return result, nil
-}
-
 // resolveDependsOn resolves a depends_on field to concrete step keys.
-// Plain references to array steps fan out to all instances.
-// Selector references resolve to only matching instances.
-func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string, error) {
+//
+// Selector semantics:
+//   - No parens (literal): pass through if non-array; error if array
+//   - ($): implicit dimension matching (not yet supported)
+//   - (*): all variants
+//   - (key=val): explicit filter
+func resolveDependsOn(
+	dependsOn any,
+	configs map[string]*arrayConfig,
+) ([]string, error) {
 	selectors, err := parseArrayDependsOn(dependsOn)
 	if err != nil {
 		return nil, err
@@ -119,8 +184,9 @@ func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string,
 	var result []string
 	for _, sel := range selectors {
 		cfg, isArray := configs[sel.key]
+
 		if !isArray {
-			if sel.filter != nil {
+			if sel.mode != selectorLiteral {
 				return nil, fmt.Errorf(
 					"cannot use array selector on non-array step %q",
 					sel.key,
@@ -129,6 +195,25 @@ func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string,
 			result = append(result, sel.key)
 			continue
 		}
+
+		switch sel.mode {
+		case selectorLiteral:
+			return nil, fmt.Errorf(
+				"plain depends_on %q targets an array step; "+
+					"use ($), (*), or (key=val) suffix",
+				sel.key,
+			)
+
+		case selectorImplicit:
+			return nil, fmt.Errorf(
+				"($) on %q: implicit matching not yet supported; use %s(*) or %s(key=val)",
+				sel.key, sel.key, sel.key,
+			)
+
+		case selectorMatchAll, selectorFilter:
+			// use sel as-is
+		}
+
 		matches, err := resolveArraySelector(sel, cfg)
 		if err != nil {
 			return nil, err
@@ -142,6 +227,14 @@ func resolveDependsOn(dependsOn any, configs map[string]*arrayConfig) ([]string,
 // resolveArraySelector resolves a selector against an array config
 // to concrete step keys, using the final element list (post-adjustments).
 func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error) {
+	if sel.mode == selectorMatchAll {
+		matches := make([]string, len(cfg.elements))
+		for i, elem := range cfg.elements {
+			matches[i] = elem.generateKey(sel.key)
+		}
+		return matches, nil
+	}
+
 	for dim := range sel.filter {
 		if _, ok := cfg.dims[dim]; !ok {
 			return nil, fmt.Errorf(
@@ -159,7 +252,10 @@ func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matches for selector {key: %q, array: %v}", sel.key, sel.filter)
+		return nil, fmt.Errorf(
+			"selector on %q with filter %v matches no elements",
+			sel.key, sel.filter,
+		)
 	}
 
 	return matches, nil
