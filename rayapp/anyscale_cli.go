@@ -34,9 +34,11 @@ func (ac *AnyscaleCLI) setRunFunc(f func(args []string) (string, error)) {
 }
 
 // runAnyscaleCLI runs the anyscale CLI with the given arguments.
-// Returns stdout output only, so that CLI warnings on stderr do not
+// On success, returns stdout only so that CLI warnings on stderr do not
 // corrupt structured (JSON/YAML) output used for parsing.
-// Both streams are still displayed to the terminal.
+// On failure, returns an empty string and an error containing both
+// stdout and stderr for full diagnostic context.
+// Both streams are always displayed to the terminal.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	if ac.runFunc != nil {
 		return ac.runFunc(args)
@@ -57,10 +59,13 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	stdout := stdoutBuf.String()
 	if err != nil {
 		stderr := stderrBuf.String()
-		return stdout, fmt.Errorf("anyscale error: %w\nstderr: %s", err, stderr)
+		return "", fmt.Errorf(
+			"anyscale error: %w\nstdout: %s\nstderr: %s",
+			err, stdout, stderr,
+		)
 	}
 	if strings.Contains(stdout, "exec failed with exit code") {
-		return stdout, fmt.Errorf("anyscale error: command failed: %s", stdout)
+		return "", fmt.Errorf("anyscale error: command failed: %s", stdout)
 	}
 
 	return stdout, nil

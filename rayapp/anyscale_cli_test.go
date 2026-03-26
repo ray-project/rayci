@@ -109,7 +109,13 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			name:       "command fails with stderr",
 			script:     "#!/bin/sh\necho \"error msg\" >&2; exit 1",
 			args:       []string{"deploy"},
-			wantErrStr: "error msg",
+			wantErrStr: "stderr: error msg",
+		},
+		{
+			name:       "command fails includes stdout in error",
+			script:     "#!/bin/sh\necho \"useful context\"; echo \"error msg\" >&2; exit 1",
+			args:       []string{"deploy"},
+			wantErrStr: "stdout: useful context",
 		},
 		{
 			name:       "exec failed with exit code in output",
@@ -131,6 +137,9 @@ func TestRunAnyscaleCLI(t *testing.T) {
 				}
 				if !strings.Contains(err.Error(), tt.wantErrStr) {
 					t.Errorf("error %q should contain %q", err.Error(), tt.wantErrStr)
+				}
+				if output != "" {
+					t.Errorf("output should be empty on error, got %q", output)
 				}
 				return
 			}
