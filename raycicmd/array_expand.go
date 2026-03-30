@@ -43,21 +43,19 @@ func expandArraySteps(gs []*pipelineGroup) error {
 	}
 
 	// Pass 3: resolve group-level DependsOn references that point to
-	// array steps. Replace each array base key with the expanded keys.
+	// array steps, including selector syntax like (*) and (key=val).
 	for _, g := range gs {
 		if len(g.DependsOn) == 0 {
 			continue
 		}
-		resolved := make([]string, 0, len(g.DependsOn))
-		for _, dep := range g.DependsOn {
-			cfg, isArray := configs[dep]
-			if !isArray {
-				resolved = append(resolved, dep)
-				continue
-			}
-			for _, elem := range cfg.elements {
-				resolved = append(resolved, elem.generateKey(dep))
-			}
+		resolved, err := resolveGroupDependsOn(
+			g.DependsOn, configs,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"resolve depends_on for group %q: %w",
+				g.Group, err,
+			)
 		}
 		g.DependsOn = resolved
 	}
