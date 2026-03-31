@@ -61,16 +61,18 @@ func (g *GitChangeLister) runNoOutput(args ...string) error {
 func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
 	remote := g.remote()
 
-	// Ensure we have the latest base branch refs. If the repo is shallow,
-	// it must be unshallowed for merge-base to work.
+	// Fetch the base branch with a refspec so the remote-tracking ref exists
+	// for merge-base. Plain `git fetch origin <branch>` only updates FETCH_HEAD.
+	remoteBranchRef := fmt.Sprintf("refs/remotes/%s/%s", remote, g.BaseBranch)
+	refspec := fmt.Sprintf("+%s:%s", g.BaseBranch, remoteBranchRef)
 	isShallowOut, _ := g.run("rev-parse", "--is-shallow-repository")
 	if strings.TrimSpace(string(isShallowOut)) == "true" {
-		if err := g.runNoOutput("fetch", "--unshallow", "-q", remote, g.BaseBranch); err != nil {
-			return nil, fmt.Errorf("git fetch --unshallow %s %s: %w", remote, g.BaseBranch, err)
+		if err := g.runNoOutput("fetch", "--unshallow", "-q", remote, refspec); err != nil {
+			return nil, fmt.Errorf("git fetch --unshallow %s %s: %w", remote, refspec, err)
 		}
 	} else {
-		if err := g.runNoOutput("fetch", "-q", remote, g.BaseBranch); err != nil {
-			return nil, fmt.Errorf("git fetch %s %s: %w", remote, g.BaseBranch, err)
+		if err := g.runNoOutput("fetch", "-q", remote, refspec); err != nil {
+			return nil, fmt.Errorf("git fetch %s %s: %w", remote, refspec, err)
 		}
 	}
 
