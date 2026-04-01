@@ -305,6 +305,61 @@ func resolveArraySelector(sel *arraySelector, cfg *arrayConfig) ([]string, error
 	return matches, nil
 }
 
+// resolveGroupDependsOn resolves group-level depends_on entries.
+//
+// Unlike step-level resolveDependsOn, groups are not array elements
+// themselves, so:
+//   - Literal references to array steps expand to all variants (same as *).
+//   - ($) is rejected because there is no current element for dimension
+//     matching.
+//   - (*) and (key=val) work the same as step-level.
+func resolveGroupDependsOn(
+	deps []string, configs map[string]*arrayConfig,
+) ([]string, error) {
+	result := make([]string, 0, len(deps))
+	for _, dep := range deps {
+		sel, err := parseSelector(dep)
+		if err != nil {
+			return nil, err
+		}
+
+		cfg, isArray := configs[sel.key]
+
+		if !isArray {
+			if sel.mode != selectorLiteral {
+				return nil, fmt.Errorf(
+					"cannot use array selector on non-array step %q",
+					sel.key,
+				)
+			}
+			result = append(result, sel.key)
+			continue
+		}
+
+		switch sel.mode {
+		case selectorLiteral:
+			sel = &arraySelector{
+				key: sel.key, mode: selectorMatchAll,
+			}
+		case selectorImplicit:
+			return nil, fmt.Errorf(
+				"($) on %q cannot be used in group depends_on; "+
+					"use %s(*) or an explicit filter",
+				sel.key, sel.key,
+			)
+		case selectorMatchAll, selectorFilter:
+			// use as-is
+		}
+
+		matches, err := resolveArraySelector(sel, cfg)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, matches...)
+	}
+	return result, nil
+}
+
 func (elem *arrayElement) matchesSelector(sel *arraySelector) bool {
 	for dim, allowedVals := range sel.filter {
 		if !slices.Contains(allowedVals, elem.values[dim]) {

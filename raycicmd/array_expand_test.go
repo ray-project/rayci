@@ -1440,3 +1440,65 @@ func TestExpandArraySteps_ImplicitFromNonArrayStepError(t *testing.T) {
 		)
 	}
 }
+
+func TestExpandArraySteps_GroupDependsOnSelector(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		dependsOn string
+		want      []string
+	}{
+		{
+			name:      "WildcardSelector",
+			dependsOn: "build-step(*)",
+			want: []string{
+				"build-step--python310",
+				"build-step--python311",
+			},
+		},
+		{
+			name:      "FilterSelector",
+			dependsOn: "build-step(python=3.11)",
+			want:      []string{"build-step--python311"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			buildGroup := &pipelineGroup{
+				Group: "build",
+				Steps: []map[string]any{{
+					"label":    "Build {{array.python}}",
+					"name":     "build-step",
+					"commands": []any{"echo build"},
+					"array": map[string]any{
+						"python": []any{"3.10", "3.11"},
+					},
+				}},
+			}
+			testGroup := &pipelineGroup{
+				Group:     "test",
+				DependsOn: []string{tc.dependsOn},
+				Steps: []map[string]any{{
+					"key":      "test-step",
+					"commands": []any{"echo test"},
+				}},
+			}
+
+			groups := []*pipelineGroup{buildGroup, testGroup}
+			if err := expandArraySteps(groups); err != nil {
+				t.Fatalf("expandArraySteps() error: %v", err)
+			}
+
+			got := testGroup.DependsOn
+			if len(got) != len(tc.want) {
+				t.Fatalf("group DependsOn = %v, want %v", got, tc.want)
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Errorf(
+						"group DependsOn[%d] = %q, want %q",
+						i, got[i], tc.want[i],
+					)
+				}
+			}
+		})
+	}
+}
