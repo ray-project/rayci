@@ -478,6 +478,59 @@ func TestListChangedFiles_ShallowClone(t *testing.T) {
 	}
 }
 
+// TestListChangedFiles_ShallowCloneNonDefaultBase verifies that ListChangedFiles
+// works when the base branch is not the default branch and was never fetched.
+// This happens with stacked PRs (e.g., revup Relative:) where the PR targets
+// a feature branch instead of master.
+//
+// Git history:
+//
+//	stacked-branch:                     [B] ---------> [C]
+//	                                     |              + stacked.go
+//	base-branch:         [A] ---------> [B]
+//	                      |              + base.go
+//	origin/master:  ... > [A]
+//
+//	The shallow clone fetches only stacked-branch. base-branch was never
+//	cloned. ListChangedFiles must fetch it with a refspec to create
+//	origin/base-branch for merge-base.
+func TestListChangedFiles_ShallowCloneNonDefaultBase(t *testing.T) {
+	h := newGitTestHelper(t)
+	h.initialCommit()
+	h.git("push", "origin", "master")
+
+	// Create a base branch (simulates the first PR in a stack).
+	h.git("checkout", "-b", "base-branch")
+	h.commitFiles("add base feature", "base.go")
+	h.git("push", "origin", "base-branch")
+
+	// Create a stacked branch targeting base-branch.
+	h.git("checkout", "-b", "stacked-branch")
+	stackedCommit := h.commitFiles("add stacked feature", "stacked.go")
+	h.git("push", "origin", "stacked-branch")
+
+	// Shallow clone that only fetches master (default branch).
+	shallowDir := t.TempDir()
+	runGitCommand(t, shallowDir, "clone", "--depth=1", h.Origin, ".")
+	runGitCommand(t, shallowDir, "config", "user.email", "test@test.com")
+	runGitCommand(t, shallowDir, "config", "user.name", "Test")
+
+	// Fetch only the stacked branch (as Buildkite does for the PR head).
+	// base-branch is NOT fetched — origin/base-branch does not exist.
+	runGitCommand(t, shallowDir, "fetch", "--depth=1", "origin", "stacked-branch")
+	runGitCommand(t, shallowDir, "checkout", "-f", stackedCommit)
+
+	lister := &GitChangeLister{WorkDir: shallowDir, BaseBranch: "base-branch", Commit: stackedCommit}
+	files, err := lister.ListChangedFiles()
+	if err != nil {
+		t.Fatalf("ListChangedFiles() got %v, want nil", err)
+	}
+
+	if len(files) != 1 || files[0] != "stacked.go" {
+		t.Errorf("ListChangedFiles() = %v, want [stacked.go]", files)
+	}
+}
+
 // TestListChangedFiles_DeepDirectoryStructure verifies files in nested directories.
 //
 // Git history (time flows left to right):
