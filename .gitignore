@@ -1,9 +1,13 @@
 /tags
 /.vscode
-/_release
+/.cursor
+/.cursorignore
 .DS_Store
 
 __pycache__
 .hypothesis
 
+/_release
 wheels/raymake/VERSION
+
+/.claude
