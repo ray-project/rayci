@@ -22,10 +22,18 @@ type ChangeLister interface {
 // correctly shows only changes in a style similar to GitHub PR diffs, excluding
 // changes that happened on the base branch after the PR branch was created.
 type gitChangeLister struct {
-	workDir    string
-	remote     string
+	// WorkDir is the directory to run git commands in. If empty, uses current
+	// directory.
+	workDir string
+
+	// Remote is the name of the git remote. If empty, defaults to "origin".
+	remote string
+
+	// BaseBranch is the base branch to diff against (e.g., "main" or "master").
 	baseBranch string
-	commit     string
+
+	// Commit is the commit to diff from the base branch.
+	commit string
 }
 
 func newGitChangeLister(
