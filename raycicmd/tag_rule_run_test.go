@@ -455,7 +455,7 @@ func TestWithTestRulesSnapshot(t *testing.T) {
 		tags, err := RunTagAnalysis(
 			[]string{testRulesAlwaysSnapshot, testRulesSnapshot},
 			envs,
-			&GitChangeLister{WorkDir: workDir, BaseBranch: "master", Commit: commit},
+			mustNewGitChangeLister(t, workDir, "", "master", commit),
 		)
 		if err != nil {
 			t.Fatalf("RunTagAnalysis: %v", err)

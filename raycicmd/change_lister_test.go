@@ -98,6 +98,17 @@ func (h *gitTestHelper) initialCommit() {
 	h.git("commit", "-m", "initial commit")
 }
 
+func mustNewGitChangeLister(
+	t *testing.T, workDir, remote, baseBranch, commit string,
+) *gitChangeLister {
+	t.Helper()
+	lister, err := newGitChangeLister(workDir, remote, baseBranch, commit)
+	if err != nil {
+		t.Fatalf("newGitChangeLister: %v", err)
+	}
+	return lister
+}
+
 // TestListChangedFiles verifies basic changed file detection.
 //
 // Git history (time flows left to right):
@@ -121,7 +132,7 @@ func TestListChangedFiles(t *testing.T) {
 	wantFiles := []string{"src/main.go", "src/util.go", "docs/readme.txt"}
 	commit := h.commitFiles("add files", wantFiles...)
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -175,7 +186,7 @@ func TestListChangedFiles_MergeBase(t *testing.T) {
 
 	// The diff should only show feature.go, not other.go,
 	// because we diff against the merge-base (common ancestor).
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: featureCommit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", featureCommit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -203,7 +214,7 @@ func TestListChangedFiles_CustomRemote(t *testing.T) {
 	commit := h.commitFiles("add feature", "feature.go")
 
 	// Use a lister with custom remote.
-	lister := &GitChangeLister{WorkDir: h.WorkDir, Remote: "upstream", BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "upstream", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -234,7 +245,7 @@ func TestListChangedFiles_MultipleCommits(t *testing.T) {
 	h.commitFiles("first commit", "first.go")
 	commit := h.commitFiles("second commit", "second.go")
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -275,7 +286,7 @@ func TestListChangedFiles_ModifyExistingFile(t *testing.T) {
 	h.git("commit", "-m", "modify readme")
 	commit := h.head()
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -312,7 +323,7 @@ func TestListChangedFiles_DeleteFile(t *testing.T) {
 	h.git("commit", "-m", "delete file")
 	commit := h.head()
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -347,7 +358,7 @@ func TestListChangedFiles_RenameFile(t *testing.T) {
 	h.git("commit", "-m", "rename file")
 	commit := h.head()
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -382,7 +393,7 @@ func TestListChangedFiles_NoChanges(t *testing.T) {
 	// No changes, just branch off
 	commit := h.head()
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -425,7 +436,7 @@ func TestListChangedFiles_SameFileModifiedOnBothBranches(t *testing.T) {
 	h.git("commit", "-m", "modify shared.go on master")
 	h.git("push", "origin", "master")
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: featureCommit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", featureCommit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -467,7 +478,7 @@ func TestListChangedFiles_ShallowClone(t *testing.T) {
 	runGitCommand(t, shallowDir, "fetch", "--depth=1", "origin", "feature-branch")
 	runGitCommand(t, shallowDir, "checkout", "-f", featureCommit)
 
-	lister := &GitChangeLister{WorkDir: shallowDir, BaseBranch: "master", Commit: featureCommit}
+	lister := mustNewGitChangeLister(t, shallowDir, "", "master", featureCommit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles() = %v, want nil", err)
@@ -520,7 +531,7 @@ func TestListChangedFiles_ShallowCloneNonDefaultBase(t *testing.T) {
 	runGitCommand(t, shallowDir, "fetch", "--depth=1", "origin", "stacked-branch")
 	runGitCommand(t, shallowDir, "checkout", "-f", stackedCommit)
 
-	lister := &GitChangeLister{WorkDir: shallowDir, BaseBranch: "base-branch", Commit: stackedCommit}
+	lister := mustNewGitChangeLister(t, shallowDir, "", "base-branch", stackedCommit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles() got %v, want nil", err)
@@ -550,7 +561,7 @@ func TestListChangedFiles_DeepDirectoryStructure(t *testing.T) {
 	wantFiles := []string{"a/b/c/deep.go", "x/y/z/another.go"}
 	commit := h.commitFiles("add nested files", wantFiles...)
 
-	lister := &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "master", Commit: commit}
+	lister := mustNewGitChangeLister(t, h.WorkDir, "", "master", commit)
 	files, err := lister.ListChangedFiles()
 	if err != nil {
 		t.Fatalf("ListChangedFiles: %v", err)
@@ -563,5 +574,110 @@ func TestListChangedFiles_DeepDirectoryStructure(t *testing.T) {
 		if !slices.Contains(files, want) {
 			t.Errorf("got %v, want %s in result", files, want)
 		}
+	}
+}
+
+func TestNewGitChangeLister(t *testing.T) {
+	tests := []struct {
+		name       string
+		remote     string
+		baseBranch string
+		commit     string
+		wantErr    bool
+		wantRemote string
+	}{
+		{
+			name:       "valid inputs",
+			remote:     "origin",
+			baseBranch: "main",
+			commit:     "abc123def456",
+			wantRemote: "origin",
+		},
+		{
+			name:       "empty remote defaults to origin",
+			remote:     "",
+			baseBranch: "main",
+			commit:     "abc123def456",
+			wantRemote: "origin",
+		},
+		{
+			name:       "remote with dash prefix",
+			remote:     "--upload-pack=evil",
+			baseBranch: "main",
+			commit:     "abc123def456",
+			wantErr:    true,
+		},
+		{
+			name:       "base branch with dash prefix",
+			remote:     "origin",
+			baseBranch: "--upload-pack=evil",
+			commit:     "abc123def456",
+			wantErr:    true,
+		},
+		{
+			name:       "commit with non-hex characters",
+			remote:     "origin",
+			baseBranch: "main",
+			commit:     "not-a-hex-hash",
+			wantErr:    true,
+		},
+		{
+			name:       "commit too short",
+			remote:     "origin",
+			baseBranch: "main",
+			commit:     "abc",
+			wantErr:    true,
+		},
+		{
+			name:       "full 40-char commit hash",
+			remote:     "origin",
+			baseBranch: "main",
+			commit:     "abc123def456abc123def456abc123def456abcd",
+			wantRemote: "origin",
+		},
+		{
+			name:       "branch with slashes",
+			remote:     "origin",
+			baseBranch: "feature/my-branch",
+			commit:     "abc123def456",
+			wantRemote: "origin",
+		},
+		{
+			name:       "empty base branch",
+			remote:     "origin",
+			baseBranch: "",
+			commit:     "abc123def456",
+			wantErr:    true,
+		},
+		{
+			name:       "empty commit",
+			remote:     "origin",
+			baseBranch: "main",
+			commit:     "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lister, err := newGitChangeLister(
+				"/tmp", tc.remote, tc.baseBranch, tc.commit,
+			)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("newGitChangeLister() = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("newGitChangeLister() = %v, want nil", err)
+			}
+			if lister.remote != tc.wantRemote {
+				t.Errorf(
+					"remote = %q, want %q",
+					lister.remote, tc.wantRemote,
+				)
+			}
+		})
 	}
 }

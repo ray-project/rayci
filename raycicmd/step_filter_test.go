@@ -45,7 +45,7 @@ func setupTestGitRepo(t *testing.T, changedFiles []string) *testGitRepo {
 	})
 
 	return &testGitRepo{
-		lister:  &GitChangeLister{WorkDir: h.WorkDir, BaseBranch: "main", Commit: commit},
+		lister:  mustNewGitChangeLister(t, h.WorkDir, "", "main", commit),
 		envs:    envs,
 		workDir: h.WorkDir,
 	}
@@ -81,7 +81,14 @@ func TestNewTagsStepFilter(t *testing.T) {
 		want:     &stepFilter{skipTags: stringSet("disabled", "skip"), runAll: true},
 	}} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := newStepFilter(test.skipTags, nil, test.filterCmd, test.filterConfig, nil, nil)
+			got, err := newStepFilter(
+				test.skipTags,
+				nil,
+				test.filterCmd,
+				test.filterConfig,
+				nil,
+				nil,
+			)
 			if err != nil {
 				t.Fatalf("newStepFilter: %s", err)
 			}

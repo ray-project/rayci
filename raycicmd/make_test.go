@@ -11,7 +11,7 @@ import (
 )
 
 // setupGitRepoInDir initializes a git repository in workDir and returns a
-// GitChangeLister configured for testing.
+// gitChangeLister configured for testing.
 //
 // The workDir should already contain files that should exist on the main branch
 // (the "base" state). This function will:
@@ -20,7 +20,11 @@ import (
 //  3. Return a repo and envs configured for the feature branch
 //
 // This uses gitTestHelper from change_lister_test.go.
-func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*GitChangeLister, *envsMap) {
+func setupGitRepoInDir(
+	t *testing.T,
+	workDir string,
+	changedFiles []string,
+) (*gitChangeLister, *envsMap) {
 	t.Helper()
 
 	h := newGitTestHelper(t)
@@ -55,10 +59,9 @@ func setupGitRepoInDir(t *testing.T, workDir string, changedFiles []string) (*Gi
 		"BUILDKITE_BRANCH":                   "feature-branch",
 	})
 
-	lister := &GitChangeLister{
-		WorkDir:    workDir,
-		BaseBranch: "main",
-		Commit:     commit,
+	lister, err := newGitChangeLister(workDir, "", "main", commit)
+	if err != nil {
+		t.Fatalf("newGitChangeLister: %v", err)
 	}
 
 	return lister, envs
@@ -596,7 +599,8 @@ func TestMakePipeline(t *testing.T) {
 		if err != nil {
 			t.Fatalf("makePipeline: %v", err)
 		}
-		if len(got.Notify) == 0 || got.Notify[0].Email != email || got.Notify[0].If != `build.state == "failing"` {
+		if len(got.Notify) == 0 || got.Notify[0].Email != email ||
+			got.Notify[0].If != `build.state == "failing"` {
 			t.Errorf(`got %v, want email %v, want if build.state == "failing"`, got.Notify, email)
 		}
 	})
@@ -669,7 +673,11 @@ func TestMakePipelineAutoDiscoverRules(t *testing.T) {
 			totalSteps += len(g.Steps)
 		}
 		if want := 1; totalSteps != want {
-			t.Errorf("got %d steps, want %d (auto-discovered rules should filter)", totalSteps, want)
+			t.Errorf(
+				"got %d steps, want %d (auto-discovered rules should filter)",
+				totalSteps,
+				want,
+			)
 		}
 	})
 
@@ -757,7 +765,11 @@ func TestMakePipelineAutoDiscoverRules(t *testing.T) {
 			t.Errorf("got %d steps, want %d", totalSteps, want)
 		}
 		if want := []string{"testB"}; !reflect.DeepEqual(keys, want) {
-			t.Errorf("got step keys %v, want %v (explicit rules should take precedence)", keys, want)
+			t.Errorf(
+				"got step keys %v, want %v (explicit rules should take precedence)",
+				keys,
+				want,
+			)
 		}
 	})
 }

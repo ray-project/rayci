@@ -197,10 +197,19 @@ func Main(args []string, envs Envs) error {
 		return fmt.Errorf("make build info: %w", err)
 	}
 
-	lister := &GitChangeLister{
-		WorkDir:    flags.RepoDir,
-		BaseBranch: getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH"),
-		Commit:     getEnv(envs, "BUILDKITE_COMMIT"),
+	// baseBranch and commit are empty for non-PR Buildkite builds (e.g.,
+	// branch pushes, scheduled builds). The lister is only used for PR
+	// builds, where RunTagAnalysis diffs changed files against the base.
+	var lister *gitChangeLister
+	baseBranch := getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
+	commit := getEnv(envs, "BUILDKITE_COMMIT")
+	if baseBranch != "" && commit != "" {
+		lister, err = newGitChangeLister(
+			flags.RepoDir, "origin", baseBranch, commit,
+		)
+		if err != nil {
+			return fmt.Errorf("create change lister: %w", err)
+		}
 	}
 	pipeline, err := makePipeline(&pipelineContext{
 		repoDir:      flags.RepoDir,
