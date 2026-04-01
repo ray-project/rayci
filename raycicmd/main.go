@@ -200,7 +200,7 @@ func Main(args []string, envs Envs) error {
 	// baseBranch and commit are empty for non-PR Buildkite builds (e.g.,
 	// branch pushes, scheduled builds). The lister is only used for PR
 	// builds, where RunTagAnalysis diffs changed files against the base.
-	var lister *gitChangeLister
+	var lister ChangeLister
 	baseBranch := getEnv(envs, "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
 	commit := getEnv(envs, "BUILDKITE_COMMIT")
 	if baseBranch != "" && commit != "" {
