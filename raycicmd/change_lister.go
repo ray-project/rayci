@@ -61,11 +61,21 @@ func (g *GitChangeLister) runNoOutput(args ...string) error {
 func (g *GitChangeLister) ListChangedFiles() ([]string, error) {
 	remote := g.remote()
 
+	if strings.HasPrefix(remote, "-") {
+		return nil, fmt.Errorf("invalid remote name: %q", remote)
+	}
+	if strings.HasPrefix(g.BaseBranch, "-") {
+		return nil, fmt.Errorf("invalid base branch name: %q", g.BaseBranch)
+	}
+
 	// Fetch the base branch with a refspec so the remote-tracking ref exists
 	// for merge-base. Plain `git fetch origin <branch>` only updates FETCH_HEAD.
 	remoteBranchRef := fmt.Sprintf("refs/remotes/%s/%s", remote, g.BaseBranch)
 	refspec := fmt.Sprintf("+%s:%s", g.BaseBranch, remoteBranchRef)
-	isShallowOut, _ := g.run("rev-parse", "--is-shallow-repository")
+	isShallowOut, err := g.run("rev-parse", "--is-shallow-repository")
+	if err != nil {
+		return nil, fmt.Errorf("git rev-parse --is-shallow-repository: %w", err)
+	}
 	if strings.TrimSpace(string(isShallowOut)) == "true" {
 		if err := g.runNoOutput("fetch", "--unshallow", "-q", remote, refspec); err != nil {
 			return nil, fmt.Errorf("git fetch --unshallow %s %s: %w", remote, refspec, err)
