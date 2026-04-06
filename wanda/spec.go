@@ -31,6 +31,10 @@ type Spec struct {
 
 	// Artifacts defines files and directories to extract from the built image.
 	Artifacts []*Artifact `yaml:"artifacts,omitempty"`
+
+	// ContextOwner overrides the uid:gid for all files and directories
+	// in the build context tar. Format: "uid:gid" (e.g. "2000:100").
+	ContextOwner string `yaml:"context_owner,omitempty"`
 }
 
 func parseSpecFile(f string) (*Spec, error) {
@@ -146,6 +150,7 @@ func (s *Spec) expandVar(lookup lookupFunc) *Spec {
 	result.BuildHintArgs = stringsExpandVar(s.BuildHintArgs, lookup)
 	result.DisableCaching = s.DisableCaching
 	result.Artifacts = artifactsExpandVar(s.Artifacts, lookup)
+	result.ContextOwner = expandVar(s.ContextOwner, lookup)
 
 	return result
 }
