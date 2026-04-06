@@ -8,6 +8,34 @@ import (
 	"path/filepath"
 )
 
+func TestParseContextOwner(t *testing.T) {
+	owner, err := parseContextOwner("2000:100")
+	if err != nil {
+		t.Fatalf("parseContextOwner: %v", err)
+	}
+	if owner.UserID != 2000 {
+		t.Errorf("got uid %d, want %d", owner.UserID, 2000)
+	}
+	if owner.GroupID != 100 {
+		t.Errorf("got gid %d, want %d", owner.GroupID, 100)
+	}
+}
+
+func TestParseContextOwnerInvalid(t *testing.T) {
+	for _, input := range []string{
+		"", "2000", "abc:100", "2000:xyz",
+		"-1:100", "100:-1", "100:200:300", " 100:200",
+	} {
+		_, err := parseContextOwner(input)
+		if err == nil {
+			t.Errorf(
+				"parseContextOwner(%q) = nil error, want error",
+				input,
+			)
+		}
+	}
+}
+
 func TestTarMetaFromFileInfo(t *testing.T) {
 	tmp := t.TempDir()
 
