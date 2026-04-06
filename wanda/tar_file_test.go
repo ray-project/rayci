@@ -38,7 +38,7 @@ func TestTarFile(t *testing.T) {
 	// Tarball only stores the mod time with second precision.
 	modTime := time.Now().Truncate(time.Second)
 
-	if err := tf.writeTo(tw, modTime); err != nil {
+	if err := tf.writeTo(tw, modTime, nil); err != nil {
 		t.Fatalf("write to tar stream: %v", err)
 	}
 	if err := tw.Close(); err != nil {
@@ -100,7 +100,7 @@ func TestTarFileRecord(t *testing.T) {
 		},
 	}
 
-	r, err := tf.record()
+	r, err := tf.record(nil)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestTarFileRecord(t *testing.T) {
 		meta:    tf.meta, // The same meta as the first file.
 	}
 
-	r2, err := tf2.record()
+	r2, err := tf2.record(nil)
 	if err != nil {
 		t.Fatalf("record for file 2: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestTarFileSymlink(t *testing.T) {
 	tw := tar.NewWriter(tarBuf)
 	modTime := time.Now().Truncate(time.Second)
 
-	if err := tf.writeTo(tw, modTime); err != nil {
+	if err := tf.writeTo(tw, modTime, nil); err != nil {
 		t.Fatalf("write symlink to tar stream: %v", err)
 	}
 	if err := tw.Close(); err != nil {
@@ -234,7 +234,7 @@ func TestTarFileSymlinkRecord(t *testing.T) {
 		},
 	}
 
-	r, err := tf.record()
+	r, err := tf.record(nil)
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestTarFileSymlinkRecord(t *testing.T) {
 		meta:    tf.meta,
 	}
 
-	r2, err := tf2.record()
+	r2, err := tf2.record(nil)
 	if err != nil {
 		t.Fatalf("record for link2: %v", err)
 	}
