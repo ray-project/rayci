@@ -239,13 +239,30 @@ func Main(args []string, envs Envs) error {
 			}
 		}
 	} else {
-		// Prints out the pipeline content to logs.
-		log.Printf("%s", bs)
+		const maxUploadJobs = 500
+		batches, err := pipeline.splitIntoBatches(maxUploadJobs)
+		if err != nil {
+			return fmt.Errorf("split pipeline into batches: %w", err)
+		}
 
-		args := []string{"pipeline", "upload"}
 		agent := flags.BuildkiteAgent
-		if err := execWithInput(agent, args, bs, nil); err != nil {
-			return fmt.Errorf("upload pipeline: %w", err)
+		args := []string{"pipeline", "upload"}
+		for i, batch := range batches {
+			bs, err := yaml.Marshal(batch)
+			if err != nil {
+				return fmt.Errorf("marshal batch %d: %w", i, err)
+			}
+			if len(batches) > 1 {
+				log.Printf("uploading batch %d/%d (%d jobs)",
+					i+1, len(batches), batch.totalJobs())
+			}
+			log.Printf("%s", bs)
+
+			if err := execWithInput(agent, args, bs, nil); err != nil {
+				return fmt.Errorf(
+					"upload batch %d/%d: %w", i+1, len(batches), err,
+				)
+			}
 		}
 	}
 
