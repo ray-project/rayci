@@ -31,7 +31,9 @@ func (p *bkPipeline) totalSteps() int {
 }
 
 func groupJobCount(g *bkPipelineGroup) int {
-	total := 0
+	// Buildkite counts the group itself as a job, plus each step
+	// (with parallelism expanding into multiple jobs).
+	total := 1
 	for _, s := range g.Steps {
 		m, ok := s.(map[string]any)
 		if !ok {

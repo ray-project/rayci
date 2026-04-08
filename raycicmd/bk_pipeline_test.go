@@ -41,11 +41,15 @@ func makeGroup(name string, n int) *bkPipelineGroup {
 }
 
 func TestSplitIntoBatches(t *testing.T) {
+	// groupJobCount counts the group itself as 1 job plus each step
+	// (with parallelism expanding into multiple jobs).
+	// So makeGroup("x", N) produces a group with N+1 jobs.
+
 	t.Run("all groups fit in one batch", func(t *testing.T) {
 		p := &bkPipeline{
 			Steps: []*bkPipelineGroup{
-				makeGroup("a", 100),
-				makeGroup("b", 200),
+				makeGroup("a", 100), // 101 jobs
+				makeGroup("b", 200), // 201 jobs
 			},
 			Notify: []*bkNotify{{Email: "a@b.com"}},
 		}
@@ -56,8 +60,8 @@ func TestSplitIntoBatches(t *testing.T) {
 		if got := len(batches); got != 1 {
 			t.Fatalf("len(batches) = %d, want 1", got)
 		}
-		if got := batches[0].totalJobs(); got != 300 {
-			t.Errorf("batch[0].totalSteps() = %d, want 300", got)
+		if got := batches[0].totalJobs(); got != 302 {
+			t.Errorf("batch[0].totalJobs() = %d, want 302", got)
 		}
 		if len(batches[0].Notify) != 1 {
 			t.Errorf("batch[0].Notify = %v, want 1 entry", batches[0].Notify)
@@ -67,12 +71,14 @@ func TestSplitIntoBatches(t *testing.T) {
 	t.Run("splits across multiple batches", func(t *testing.T) {
 		p := &bkPipeline{
 			Steps: []*bkPipelineGroup{
-				makeGroup("a", 300),
-				makeGroup("b", 300),
-				makeGroup("c", 100),
+				makeGroup("a", 300), // 301 jobs
+				makeGroup("b", 300), // 301 jobs
+				makeGroup("c", 100), // 101 jobs
 			},
 			Notify: []*bkNotify{{Email: "a@b.com"}},
 		}
+		// a=301 fits alone, b=301 doesn't fit with a (602>500),
+		// b+c = 301+101 = 402 fits together.
 		batches, err := p.splitIntoBatches(500)
 		if err != nil {
 			t.Fatalf("splitIntoBatches() error = %v", err)
@@ -80,11 +86,11 @@ func TestSplitIntoBatches(t *testing.T) {
 		if got := len(batches); got != 2 {
 			t.Fatalf("len(batches) = %d, want 2", got)
 		}
-		if got := batches[0].totalJobs(); got != 300 {
-			t.Errorf("batch[0].totalSteps() = %d, want 300", got)
+		if got := batches[0].totalJobs(); got != 301 {
+			t.Errorf("batch[0].totalJobs() = %d, want 301", got)
 		}
-		if got := batches[1].totalJobs(); got != 400 {
-			t.Errorf("batch[1].totalSteps() = %d, want 400", got)
+		if got := batches[1].totalJobs(); got != 402 {
+			t.Errorf("batch[1].totalJobs() = %d, want 402", got)
 		}
 		if len(batches[0].Notify) != 1 {
 			t.Errorf("batch[0] should have Notify")
@@ -97,7 +103,7 @@ func TestSplitIntoBatches(t *testing.T) {
 	t.Run("group exceeds limit", func(t *testing.T) {
 		p := &bkPipeline{
 			Steps: []*bkPipelineGroup{
-				makeGroup("big", 501),
+				makeGroup("big", 500), // 501 jobs (500 steps + 1 group)
 			},
 		}
 		_, err := p.splitIntoBatches(500)
@@ -135,27 +141,28 @@ func TestSplitIntoBatches(t *testing.T) {
 				},
 			},
 		}
-		// Group a = 4 + 1 = 5 jobs, group b = 3 jobs, total = 8
-		batches, err := p.splitIntoBatches(7)
+		// Group a = 1 (group) + 4 + 1 = 6 jobs
+		// Group b = 1 (group) + 3 = 4 jobs, total = 10
+		batches, err := p.splitIntoBatches(8)
 		if err != nil {
 			t.Fatalf("splitIntoBatches() error = %v", err)
 		}
 		if got := len(batches); got != 2 {
 			t.Fatalf("len(batches) = %d, want 2", got)
 		}
-		if got := batches[0].totalJobs(); got != 5 {
-			t.Errorf("batch[0].totalJobs() = %d, want 5", got)
+		if got := batches[0].totalJobs(); got != 6 {
+			t.Errorf("batch[0].totalJobs() = %d, want 6", got)
 		}
-		if got := batches[1].totalJobs(); got != 3 {
-			t.Errorf("batch[1].totalJobs() = %d, want 3", got)
+		if got := batches[1].totalJobs(); got != 4 {
+			t.Errorf("batch[1].totalJobs() = %d, want 4", got)
 		}
 	})
 
 	t.Run("exact limit boundary", func(t *testing.T) {
 		p := &bkPipeline{
 			Steps: []*bkPipelineGroup{
-				makeGroup("a", 500),
-				makeGroup("b", 1),
+				makeGroup("a", 499), // 500 jobs (499 steps + 1 group)
+				makeGroup("b", 1),   // 2 jobs (1 step + 1 group)
 			},
 		}
 		batches, err := p.splitIntoBatches(500)
@@ -166,10 +173,10 @@ func TestSplitIntoBatches(t *testing.T) {
 			t.Fatalf("len(batches) = %d, want 2", got)
 		}
 		if got := batches[0].totalJobs(); got != 500 {
-			t.Errorf("batch[0].totalSteps() = %d, want 500", got)
+			t.Errorf("batch[0].totalJobs() = %d, want 500", got)
 		}
-		if got := batches[1].totalJobs(); got != 1 {
-			t.Errorf("batch[1].totalSteps() = %d, want 1", got)
+		if got := batches[1].totalJobs(); got != 2 {
+			t.Errorf("batch[1].totalJobs() = %d, want 2", got)
 		}
 	})
 }
