@@ -30,6 +30,61 @@ func (p *bkPipeline) totalSteps() int {
 	return total
 }
 
+func groupJobCount(g *bkPipelineGroup) int {
+	total := 0
+	for _, s := range g.Steps {
+		m, ok := s.(map[string]any)
+		if !ok {
+			total++
+			continue
+		}
+		if p, ok := intInMap(m, "parallelism"); ok && p > 1 {
+			total += p
+		} else {
+			total++
+		}
+	}
+	return total
+}
+
+func (p *bkPipeline) totalJobs() int {
+	total := 0
+	for _, group := range p.Steps {
+		total += groupJobCount(group)
+	}
+	return total
+}
+
+func (p *bkPipeline) splitIntoBatches(
+	limit int,
+) ([]*bkPipeline, error) {
+	cur := &bkPipeline{Notify: p.Notify}
+	batches := []*bkPipeline{cur}
+	curCount := 0
+
+	for _, group := range p.Steps {
+		n := groupJobCount(group)
+		if n > limit {
+			return nil, fmt.Errorf(
+				"group %q has %d jobs, exceeding the limit of %d; "+
+					"split this group into smaller groups",
+				group.Group, n, limit,
+			)
+		}
+
+		if curCount+n > limit {
+			cur = &bkPipeline{}
+			batches = append(batches, cur)
+			curCount = 0
+		}
+
+		cur.Steps = append(cur.Steps, group)
+		curCount += n
+	}
+
+	return batches, nil
+}
+
 func newBkAgents(queue string) map[string]any {
 	return map[string]any{"queue": queue}
 }
