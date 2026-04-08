@@ -239,7 +239,7 @@ func Main(args []string, envs Envs) error {
 			}
 		}
 	} else {
-		const maxUploadJobs = 500
+		const maxUploadJobs = 450
 		batches, err := pipeline.splitIntoBatches(maxUploadJobs)
 		if err != nil {
 			return fmt.Errorf("split pipeline into batches: %w", err)
