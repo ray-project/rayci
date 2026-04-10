@@ -1,0 +1,6 @@
+name: scratch-from-test
+froms:
+  - "$OPTIONAL_IMAGE"
+dockerfile: Dockerfile.scratch-from
+build_args:
+  - OPTIONAL_IMAGE

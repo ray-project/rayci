@@ -848,6 +848,19 @@ func TestBuild_EnvfileCacheInvalidation(t *testing.T) {
 	}
 }
 
+func TestBuild_ScratchFrom(t *testing.T) {
+	t.Setenv("OPTIONAL_IMAGE", "scratch")
+
+	config := &ForgeConfig{
+		WorkDir:    "testdata",
+		NamePrefix: "cr.ray.io/rayproject/",
+	}
+
+	if err := Build("testdata/scratch-from.wanda.yaml", config); err != nil {
+		t.Fatalf("build with scratch from: %v", err)
+	}
+}
+
 func TestForgeConfigArtifactsDir(t *testing.T) {
 	config := &ForgeConfig{ArtifactsDir: "/custom/artifacts", WorkDir: "/work"}
 	if got := config.ArtifactsDir; got != "/custom/artifacts" {
@@ -1211,7 +1224,12 @@ func TestTargetOS(t *testing.T) {
 
 func TestCheckPlatformSupport(t *testing.T) {
 	if err := checkPlatformSupport(); err != nil {
-		t.Errorf("checkPlatformSupport() on %s/%s = %v, want nil", runtime.GOOS, runtime.GOARCH, err)
+		t.Errorf(
+			"checkPlatformSupport() on %s/%s = %v, want nil",
+			runtime.GOOS,
+			runtime.GOARCH,
+			err,
+		)
 	}
 }
 
