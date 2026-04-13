@@ -6,6 +6,7 @@ steps:
   # when filtered (others are skipped)
   - label: "Array {{array.os}}-{{array.variant}}"
     key: array-step
+    if: build.env("RAYCI_STAGE") != "postmerge"
     command: |
       echo "Running os={{array.os}} variant={{array.variant}}"
       if [[ "{{array.os}}" != "linux" && "{{array.os}}" != "macos" ]]; then
