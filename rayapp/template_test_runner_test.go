@@ -268,11 +268,8 @@ func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
 		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
 		"", false, nil, nil,
 	)
-	if err == nil {
-		t.Fatal("expected error when matched template has no test config")
-	}
-	if !strings.Contains(err.Error(), "no templates with test configuration") {
-		t.Errorf("error %q should contain 'no templates with test configuration'", err.Error())
+	if err != nil {
+		t.Fatalf("expected no error when matched template has no test config, got: %v", err)
 	}
 }
 
