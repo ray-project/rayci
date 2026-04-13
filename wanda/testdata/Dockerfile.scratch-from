@@ -1,0 +1,4 @@
+ARG OPTIONAL_IMAGE=scratch
+FROM ${OPTIONAL_IMAGE} AS optional
+FROM scratch
+COPY Dockerfile.scratch-from /opt/Dockerfile

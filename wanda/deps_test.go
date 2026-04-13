@@ -465,6 +465,78 @@ func TestBuildDepGraph_ExternalDep(t *testing.T) {
 	}
 }
 
+func TestBuildDepGraph_OptionalFromViaEnvVar(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	specsFile := writeWandaSpecs(t, tmpDir, []string{"."})
+
+	// "java" is a wanda-built dependency that can be swapped out
+	// via an environment variable.
+	writeSpec(t, tmpDir, "java.wanda.yaml", strings.Join([]string{
+		"name: java",
+		"dockerfile: Dockerfile",
+	}, "\n"))
+
+	// "wheel" depends on java via $JAVA_IMAGE.
+	// When JAVA_IMAGE points to the wanda-built image, java is a dependency.
+	// When JAVA_IMAGE is set to "scratch", there is no wanda dependency.
+	writeSpec(t, tmpDir, "wheel.wanda.yaml", strings.Join([]string{
+		"name: wheel",
+		`froms: ["$JAVA_IMAGE"]`,
+		"dockerfile: Dockerfile",
+		"build_args:",
+		"  - JAVA_IMAGE",
+	}, "\n"))
+
+	t.Run("wanda dep when pointing to prefixed image", func(t *testing.T) {
+		lookup := func(key string) (string, bool) {
+			if key == "JAVA_IMAGE" {
+				return "cr.ray.io/rayproject/java", true
+			}
+			return "", false
+		}
+
+		graph, err := buildDepGraph(
+			filepath.Join(tmpDir, "wheel.wanda.yaml"),
+			lookup, testPrefix, specsFile,
+		)
+		if err != nil {
+			t.Fatalf("buildDepGraph: %v", err)
+		}
+
+		if len(graph.Order) != 2 {
+			t.Fatalf("Order = %v, want 2 specs", graph.Order)
+		}
+		if graph.Specs["java"] == nil {
+			t.Error("expected java in graph as a wanda dependency")
+		}
+	})
+
+	t.Run("no wanda dep when set to scratch", func(t *testing.T) {
+		lookup := func(key string) (string, bool) {
+			if key == "JAVA_IMAGE" {
+				return "scratch", true
+			}
+			return "", false
+		}
+
+		graph, err := buildDepGraph(
+			filepath.Join(tmpDir, "wheel.wanda.yaml"),
+			lookup, testPrefix, specsFile,
+		)
+		if err != nil {
+			t.Fatalf("buildDepGraph: %v", err)
+		}
+
+		if len(graph.Order) != 1 {
+			t.Fatalf("Order = %v, want only wheel", graph.Order)
+		}
+		if graph.Specs["java"] != nil {
+			t.Error("java should not be in graph when JAVA_IMAGE=scratch")
+		}
+	})
+}
+
 func TestBuildDepGraph_TransitiveDeps(t *testing.T) {
 	tmpDir := t.TempDir()
 

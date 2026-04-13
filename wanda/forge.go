@@ -175,11 +175,27 @@ func (f *Forge) newDockerCmd() *dockerCmd {
 	})
 }
 
+// isDockerScratch reports whether s is Docker's built-in empty base image.
+// "scratch" is not a real registry image; Docker handles it as a special
+// keyword in FROM instructions, so it must not be pulled or resolved.
+func isDockerScratch(s string) bool {
+	return s == "scratch"
+}
+
 func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 	m := make(map[string]*imageSource)
 	namePrefix := f.config.NamePrefix
 
 	for _, from := range froms {
+		if isDockerScratch(from) {
+			m[from] = &imageSource{
+				name:  from,
+				id:    from,
+				local: from,
+			}
+			continue
+		}
+
 		if strings.HasPrefix(from, "@") { // A local image.
 			name := strings.TrimPrefix(from, "@")
 			src, err := resolveDockerImage(f.docker, from, name)
