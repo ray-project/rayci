@@ -118,6 +118,19 @@ func stepTags(step map[string]any) []string {
 	return nil
 }
 
+// arrayVariantKeySet builds a set of all expanded keys from array configs.
+func arrayVariantKeySet(
+	configs map[string]*arrayConfig,
+) map[string]struct{} {
+	keys := make(map[string]struct{})
+	for baseKey, cfg := range configs {
+		for _, elem := range cfg.elements {
+			keys[elem.generateKey(baseKey)] = struct{}{}
+		}
+	}
+	return keys
+}
+
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
@@ -158,6 +171,13 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		return nil, fmt.Errorf("build index: %w", err)
 	}
 
+	// Build set of array variant keys for group dep pruning.
+	// Only computed when selects are active.
+	var arrayVariantKeys map[string]struct{}
+	if filter.hasSelects() {
+		arrayVariantKeys = arrayVariantKeySet(configs)
+	}
+
 	// Populate dependsOn.
 	for _, groupNode := range groupNodes {
 		// A group node is different from a step node.
@@ -171,6 +191,14 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 		groupDeps := make(map[string]struct{})
 		for _, dep := range groupNode.srcGroup.DependsOn {
 			if depNode, ok := set.byKey(dep); ok {
+				// When selects are active, skip group deps that
+				// are array variants. Steps must declare their
+				// own depends_on to pull in specific variants.
+				if len(arrayVariantKeys) > 0 {
+					if _, ok := arrayVariantKeys[depNode.key]; ok {
+						continue
+					}
+				}
 				groupDeps[depNode.id] = struct{}{}
 			}
 		}
