@@ -23,6 +23,30 @@ type stepFilter struct {
 	noTagMeansAlways bool
 }
 
+func (f *stepFilter) hasSelects() bool {
+	return f.selects != nil || f.tagSelects != nil
+}
+
+// resolveArraySelects expands bare keys in selects that match array
+// base keys into all their variant keys.
+// Must be called after expandArraySteps populates the configs.
+func (f *stepFilter) resolveArraySelects(
+	configs map[string]*arrayConfig,
+) {
+	if f.selects == nil {
+		return
+	}
+	for key, cfg := range configs {
+		if !f.selects[key] {
+			continue
+		}
+		delete(f.selects, key)
+		for _, elem := range cfg.elements {
+			f.selects[elem.generateKey(key)] = true
+		}
+	}
+}
+
 func (f *stepFilter) reject(step *stepNode) bool {
 	return step.hasTagInMap(f.skipTags)
 }
@@ -59,7 +83,11 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags, selects []string, filterCmd []string, testRulesFiles []string, envs Envs, lister ChangeLister,
+	skipTags, selects []string,
+	filterCmd []string,
+	testRulesFiles []string,
+	envs Envs,
+	lister ChangeLister,
 ) (*stepFilter, error) {
 	var setup *filterSetup
 
@@ -110,7 +138,11 @@ type filterSetup struct {
 	tags   map[string]bool
 }
 
-func filterFromRuleFiles(testRulesFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
+func filterFromRuleFiles(
+	testRulesFiles []string,
+	envs Envs,
+	lister ChangeLister,
+) (*filterSetup, error) {
 	tags, err := RunTagAnalysis(testRulesFiles, envs, lister)
 	if err != nil {
 		return nil, err

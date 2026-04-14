@@ -121,9 +121,11 @@ func stepTags(step map[string]any) []string {
 func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 	[]*bkPipelineGroup, error,
 ) {
-	if err := expandArraySteps(gs); err != nil {
+	configs, err := expandArraySteps(gs)
+	if err != nil {
 		return nil, fmt.Errorf("expand array: %w", err)
 	}
+	filter.resolveArraySelects(configs)
 
 	set := newStepNodeSet()
 	var groupNodes []*stepNode

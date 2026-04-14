@@ -1164,6 +1164,115 @@ func TestConvertPipelineGroups(t *testing.T) {
 	}
 }
 
+func TestConvertPipelineGroups_ArraySelectWithDeps(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.python}}",
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"array": map[string]any{
+				"python": []any{"3.10", "3.11", "3.12"},
+			},
+		}},
+	}, {
+		Group: "test",
+		Steps: []map[string]any{{
+			"label":      "Test py3.10",
+			"key":        "test-py310",
+			"commands":   []any{"echo test"},
+			"depends_on": "build-step--python310",
+		}},
+	}}
+
+	// Select the test step; dependency should pull in only
+	// build-step--python310, not the other variants.
+	filter, err := newStepFilter(
+		nil, []string{"test-py310"}, nil, nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
+
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups: %v", err)
+	}
+
+	var allKeys []string
+	for _, g := range bk {
+		for _, s := range g.Steps {
+			step := s.(map[string]any)
+			if k, ok := step["key"]; ok {
+				allKeys = append(allKeys, k.(string))
+			}
+		}
+	}
+
+	wantKeys := []string{"build-step--python310", "test-py310"}
+	if !reflect.DeepEqual(allKeys, wantKeys) {
+		t.Errorf("step keys = %v, want %v", allKeys, wantKeys)
+	}
+}
+
+func TestConvertPipelineGroups_BareArrayKeySelect(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{buildID: buildID}
+
+	c := newConverter(&config{
+		CITemp:       "s3://ci-temp/",
+		RunnerQueues: map[string]string{"default": "runner"},
+	}, info)
+
+	groups := []*pipelineGroup{{
+		Group: "build",
+		Steps: []map[string]any{{
+			"label":    "Build {{array.python}}",
+			"key":      "build-step",
+			"commands": []any{"echo build"},
+			"array": map[string]any{
+				"python": []any{"3.10", "3.11"},
+			},
+		}},
+	}, {
+		Group: "other",
+		Steps: []map[string]any{{
+			"label":    "Other",
+			"key":      "other-step",
+			"commands": []any{"echo other"},
+		}},
+	}}
+
+	// Bare "build-step" should expand to all variants, and
+	// "other-step" group should be excluded.
+	filter, err := newStepFilter(
+		nil, []string{"build-step"}, nil, nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
+
+	bk, err := c.convertGroups(groups, filter)
+	if err != nil {
+		t.Fatalf("convertGroups: %v", err)
+	}
+
+	if len(bk) != 1 {
+		t.Fatalf("got %d groups, want 1", len(bk))
+	}
+	if len(bk[0].Steps) != 2 {
+		t.Fatalf("got %d steps, want 2", len(bk[0].Steps))
+	}
+}
+
 func TestConvertPipelineGroups_ArrayBaseKeyDependencyExpansion(t *testing.T) {
 	// Verify that when a downstream step depends on the base key,
 	// the dependency is expanded to all expanded keys directly.
