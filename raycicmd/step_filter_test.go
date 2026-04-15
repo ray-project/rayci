@@ -251,6 +251,102 @@ func TestStepFilter_selects(t *testing.T) {
 	}
 }
 
+func TestResolveArraySelects_bareKeyExpansion(t *testing.T) {
+	filter, err := newStepFilter(
+		nil,
+		[]string{"build", "non-array-step"},
+		nil, nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
+
+	configs := map[string]*arrayConfig{
+		"build": {
+			dims: map[string][]string{"python": {"3.10", "3.11"}},
+			elements: []*arrayElement{
+				{values: map[string]string{"python": "3.10"}},
+				{values: map[string]string{"python": "3.11"}},
+			},
+		},
+	}
+
+	filter.resolveArraySelects(configs)
+
+	if !filter.selects["build--python310"] {
+		t.Errorf("build--python310 not in selects")
+	}
+	if !filter.selects["build--python311"] {
+		t.Errorf("build--python311 not in selects")
+	}
+	if filter.selects["build"] {
+		t.Errorf("bare key 'build' should have been removed")
+	}
+	if !filter.selects["non-array-step"] {
+		t.Errorf("non-array-step should remain in selects")
+	}
+}
+
+func TestResolveArraySelects_multipleArrayConfigs(t *testing.T) {
+	filter, err := newStepFilter(
+		nil,
+		[]string{"build-a", "build-b"},
+		nil, nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("newStepFilter: %v", err)
+	}
+
+	configs := map[string]*arrayConfig{
+		"build-a": {
+			dims: map[string][]string{"python": {"3.10"}},
+			elements: []*arrayElement{
+				{values: map[string]string{"python": "3.10"}},
+			},
+		},
+		"build-b": {
+			dims: map[string][]string{"cuda": {"12", "13"}},
+			elements: []*arrayElement{
+				{values: map[string]string{"cuda": "12"}},
+				{values: map[string]string{"cuda": "13"}},
+			},
+		},
+	}
+
+	filter.resolveArraySelects(configs)
+
+	want := map[string]bool{
+		"build-a--python310": true,
+		"build-b--cuda12":    true,
+		"build-b--cuda13":    true,
+	}
+	for k := range want {
+		if !filter.selects[k] {
+			t.Errorf("%s not in selects", k)
+		}
+	}
+	if filter.selects["build-a"] || filter.selects["build-b"] {
+		t.Errorf("bare keys should have been removed")
+	}
+	if len(filter.selects) != len(want) {
+		t.Errorf("selects has %d entries, want %d", len(filter.selects), len(want))
+	}
+}
+
+func TestResolveArraySelects_noSelects(t *testing.T) {
+	filter := &stepFilter{}
+	configs := map[string]*arrayConfig{
+		"build": {
+			dims:     map[string][]string{"python": {"3.10"}},
+			elements: []*arrayElement{{values: map[string]string{"python": "3.10"}}},
+		},
+	}
+	filter.resolveArraySelects(configs)
+	if filter.selects != nil {
+		t.Errorf("selects should remain nil")
+	}
+}
+
 func TestStepFilter_tagSelects(t *testing.T) {
 	filter, _ := newStepFilter(nil, []string{"tag:foo", "bar"}, nil, nil, nil, nil)
 	for _, node := range []*stepNode{

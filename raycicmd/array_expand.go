@@ -8,7 +8,10 @@ import (
 
 // expandArraySteps expands array steps into resolvedSteps and resolves
 // depends_on references to point to the expanded keys.
-func expandArraySteps(gs []*pipelineGroup) error {
+// Returns the configs map so callers can resolve array selectors.
+func expandArraySteps(
+	gs []*pipelineGroup,
+) (map[string]*arrayConfig, error) {
 	configs := make(map[string]*arrayConfig)
 	// elems maps each expanded step key to its arrayElement,
 	// used for implicit dimension matching in Pass 2.
@@ -17,7 +20,7 @@ func expandArraySteps(gs []*pipelineGroup) error {
 	// Pass 1: expand array steps into resolvedSteps.
 	for _, g := range gs {
 		if err := g.buildResolvedSteps(configs, elems); err != nil {
-			return fmt.Errorf("expand arrays: %w", err)
+			return nil, fmt.Errorf("expand arrays: %w", err)
 		}
 	}
 
@@ -33,7 +36,7 @@ func expandArraySteps(gs []*pipelineGroup) error {
 				dependsOn, configs, currentElem,
 			)
 			if err != nil {
-				return fmt.Errorf(
+				return nil, fmt.Errorf(
 					"resolve depends_on for step %q: %w",
 					stepKey(rs.src), err,
 				)
@@ -52,7 +55,7 @@ func expandArraySteps(gs []*pipelineGroup) error {
 			g.DependsOn, configs,
 		)
 		if err != nil {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"resolve depends_on for group %q: %w",
 				g.Group, err,
 			)
@@ -60,7 +63,7 @@ func expandArraySteps(gs []*pipelineGroup) error {
 		g.DependsOn = resolved
 	}
 
-	return nil
+	return configs, nil
 }
 
 // buildResolvedSteps populates g.resolvedSteps from g.Steps, expanding

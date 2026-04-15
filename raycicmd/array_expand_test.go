@@ -18,7 +18,7 @@ func TestExpandArraySteps(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -49,7 +49,7 @@ func TestExpandArraySteps_DoesNotMutateSrc(t *testing.T) {
 		Steps: []map[string]any{origStep},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -78,7 +78,7 @@ func TestExpandArraySteps_LabelPlaceholderRequired(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for missing placeholder, got nil")
 	}
@@ -105,7 +105,7 @@ func TestExpandArraySteps_MatrixAndArrayMutuallyExclusive(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for both matrix and array, got nil")
 	}
@@ -140,7 +140,7 @@ func TestExpandArraySteps_SelectorDependsOn(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -164,8 +164,12 @@ func TestExpandArraySteps_SelectorDependsOn(t *testing.T) {
 	if len(partialDeps) != 2 {
 		t.Fatalf("partial selector: got %d deps, want 2: %v", len(partialDeps), partialDeps)
 	}
-	if partialDeps[0] != "build-step--cuda1211-python311" || partialDeps[1] != "build-step--cuda1281-python311" {
-		t.Errorf("partial selector: got %v, want [build-step--cuda1211-python311, build-step--cuda1281-python311]", partialDeps)
+	if partialDeps[0] != "build-step--cuda1211-python311" ||
+		partialDeps[1] != "build-step--cuda1281-python311" {
+		t.Errorf(
+			"partial selector: got %v, want [build-step--cuda1211-python311, build-step--cuda1281-python311]",
+			partialDeps,
+		)
 	}
 }
 
@@ -189,7 +193,7 @@ func TestExpandArraySteps_MatchAllDependsOn(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -200,7 +204,10 @@ func TestExpandArraySteps_MatchAllDependsOn(t *testing.T) {
 		t.Fatalf("got %d deps, want 2: %v", len(resolved), resolved)
 	}
 	if resolved[0] != "build-step--python310" || resolved[1] != "build-step--python311" {
-		t.Errorf("resolved deps: got %v, want [build-step--python310, build-step--python311]", resolved)
+		t.Errorf(
+			"resolved deps: got %v, want [build-step--python310, build-step--python311]",
+			resolved,
+		)
 	}
 }
 
@@ -220,7 +227,7 @@ func TestExpandArraySteps_SelectorOnNonArrayStep(t *testing.T) {
 				}},
 			}}
 
-			err := expandArraySteps(groups)
+			_, err := expandArraySteps(groups)
 			if err == nil {
 				t.Fatal("expected error for array selector on non-array step, got nil")
 			}
@@ -241,7 +248,7 @@ func TestExpandArraySteps_NonArrayDependsOn(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -272,7 +279,7 @@ func TestExpandArraySteps_SkipAdjustment(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -308,7 +315,7 @@ func TestExpandArraySteps_AddAdjustment(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -346,7 +353,7 @@ func TestExpandArraySteps_AddToSingleElementProduct(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -394,7 +401,7 @@ func TestExpandArraySteps_DependsOnExcludesSkipped(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -440,7 +447,7 @@ func TestExpandArraySteps_DependsOnIncludesAdded(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -481,7 +488,7 @@ func TestExpandArraySteps_SkipNoMatch(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for skip with no match, got nil")
 	}
@@ -509,7 +516,7 @@ func TestExpandArraySteps_AddMissingDimension(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for addition missing dimension, got nil")
 	}
@@ -541,7 +548,7 @@ func TestExpandArraySteps_GroupDependsOnArrayStep(t *testing.T) {
 		},
 	}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -583,7 +590,7 @@ func TestExpandArraySteps_GroupDependsOnNonArrayStep(t *testing.T) {
 		},
 	}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -688,7 +695,7 @@ func TestExpandArraySteps_ImplicitMatch(t *testing.T) {
 				},
 			}}
 
-			if err := expandArraySteps(groups); err != nil {
+			if _, err := expandArraySteps(groups); err != nil {
 				t.Fatalf("expandArraySteps() error = %v", err)
 			}
 
@@ -757,7 +764,7 @@ func TestExpandArraySteps_ImplicitMatchNoOverlapError(t *testing.T) {
 		},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for ($) with no overlap, got nil")
 	}
@@ -806,7 +813,7 @@ func TestExpandArraySteps_ImplicitMatchMixedDeps(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -887,7 +894,7 @@ func TestExpandArraySteps_ExplicitSelectorOverridesImplicit(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -980,7 +987,7 @@ func TestExpandArraySteps_ImplicitMatchPublishScenario(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -1109,7 +1116,7 @@ func TestExpandArraySteps_ImplicitMatchWithAdjustments(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -1177,7 +1184,7 @@ func TestExpandArraySteps_MatchAllFromArrayStep(t *testing.T) {
 		},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -1225,7 +1232,7 @@ func TestExpandArraySteps_ImplicitMatchValueMismatchError(t *testing.T) {
 		},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for value mismatch, got nil")
 	}
@@ -1269,7 +1276,7 @@ func TestExpandArraySteps_DuplicateBaseKey(t *testing.T) {
 		},
 	}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for duplicate base key, got nil")
 	}
@@ -1299,7 +1306,7 @@ func TestExpandArraySteps_DuplicateElementFromAdjustment(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for duplicate element, got nil")
 	}
@@ -1326,7 +1333,7 @@ func TestExpandArraySteps_KeyCollisionFromSanitization(t *testing.T) {
 		}},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for key collision, got nil")
 	}
@@ -1360,7 +1367,7 @@ func TestExpandArraySteps_PartialDimensionSkip(t *testing.T) {
 		}},
 	}}
 
-	if err := expandArraySteps(groups); err != nil {
+	if _, err := expandArraySteps(groups); err != nil {
 		t.Fatalf("expandArraySteps() error = %v", err)
 	}
 
@@ -1397,7 +1404,7 @@ func TestExpandArraySteps_PlainStringTargetsArrayStep(t *testing.T) {
 		},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for plain depends_on targeting array step, got nil")
 	}
@@ -1429,7 +1436,7 @@ func TestExpandArraySteps_ImplicitFromNonArrayStepError(t *testing.T) {
 		},
 	}}
 
-	err := expandArraySteps(groups)
+	_, err := expandArraySteps(groups)
 	if err == nil {
 		t.Fatal("expected error for ($) from non-array step, got nil")
 	}
@@ -1483,7 +1490,7 @@ func TestExpandArraySteps_GroupDependsOnSelector(t *testing.T) {
 			}
 
 			groups := []*pipelineGroup{buildGroup, testGroup}
-			if err := expandArraySteps(groups); err != nil {
+			if _, err := expandArraySteps(groups); err != nil {
 				t.Fatalf("expandArraySteps() error: %v", err)
 			}
 
