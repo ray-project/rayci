@@ -246,7 +246,7 @@ localSrc, localErr := resolveDockerImage(f.docker, from, from)
 		// Local image not found, try remote
 		src, err := resolveRemoteImage(from, from, f.remoteOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("resolve remote image %s (local error: %v): %w", from, localErr, err)
+return nil, fmt.Errorf("resolve remote image %s: %w", from, err)
 		}
 		m[from] = src
 	}
