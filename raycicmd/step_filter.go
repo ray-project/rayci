@@ -103,10 +103,11 @@ func newStepFilter(
 		for _, k := range selects {
 			switch {
 			case strings.HasPrefix(k, "tag:"):
-				filter.tagSelects[strings.TrimPrefix(k, "tag:")] = true
+				if t := strings.TrimPrefix(k, "tag:"); t != "" {
+					filter.tagSelects[t] = true
+				}
 			case strings.HasPrefix(k, "prefix:"):
-				p := strings.TrimPrefix(k, "prefix:")
-				if p != "" {
+				if p := strings.TrimPrefix(k, "prefix:"); p != "" {
 					filter.prefixSelects[p] = true
 				}
 			default:

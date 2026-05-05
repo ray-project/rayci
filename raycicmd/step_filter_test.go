@@ -318,16 +318,18 @@ func TestStepFilter_prefixSelects(t *testing.T) {
 		}
 	}
 
-	// `prefix:` with nothing after the colon is dropped at parse time so
-	// it never matches everything.
-	filter, _ = newStepFilter(nil, []string{"prefix:"}, nil, nil, nil, nil)
-	for _, node := range []*stepNode{
-		{key: "anything"},
-		{id: "anything"},
-		{id: "anything", tags: []string{"x"}},
-	} {
-		if filter.accept(node) {
-			t.Errorf("empty prefix should not match %+v", node)
+	// `prefix:` and `tag:` with nothing after the colon are dropped at
+	// parse time so they never match everything.
+	for _, token := range []string{"prefix:", "tag:"} {
+		filter, _ := newStepFilter(nil, []string{token}, nil, nil, nil, nil)
+		for _, node := range []*stepNode{
+			{key: "anything"},
+			{id: "anything"},
+			{id: "anything", tags: []string{"x"}},
+		} {
+			if filter.accept(node) {
+				t.Errorf("empty %q should not match %+v", token, node)
+			}
 		}
 	}
 }
