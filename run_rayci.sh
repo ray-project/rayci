@@ -18,15 +18,15 @@ TMP_DIR="$(mktemp -d)"
 
 RAYCI_BRANCH="select-prefix-token"
 
-echo "--- Install rayci"
+echo "--- Build rayci locally"
 
 readonly GO_VERSION=1.24.5
 curl -sfL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xzf - -C "$TMP_DIR"
 export GOROOT="$TMP_DIR/go"
 export GOPATH="$TMP_DIR/gopath"
 export GOPRIVATE="github.com/ray-project/rayci"
-"$TMP_DIR/go/bin/go" install 'github.com/ray-project/rayci@'"${RAYCI_BRANCH}"
+"$TMP_DIR/go/bin/go" build -o "$TMP_DIR/rayci" .
 
 echo "--- Run rayci"
 
-exec "$GOPATH/bin/rayci" "$@"
+exec "$TMP_DIR/rayci" "$@"
