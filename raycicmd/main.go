@@ -53,7 +53,15 @@ func parseFlags(args []string) (*Flags, []string) {
 	)
 	set.StringVar(
 		&flags.Select, "select", "",
-		"Select specific step IDs or keys to run, separated by commas.",
+		"Select steps to run, separated by commas. Entry forms: "+
+			"<value> matches a step whose ID or key equals <value> exactly; "+
+			"prefix:<value> matches when <value> is a string prefix of the step ID or key; "+
+			"tag:<value> matches when the step has tag <value>. "+
+			"Selection also applies to group keys, so matching a group pulls in "+
+			"all of its sub-steps. "+
+			"prefix: and tag: are reserved, so a step keyed prefix:foo or tag:foo "+
+			"cannot be selected by a bare token. "+
+			"Defaults to the RAYCI_SELECT env var when empty.",
 	)
 	set.StringVar(
 		&flags.BuildkiteDir, "buildkite-dir", "",

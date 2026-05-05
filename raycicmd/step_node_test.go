@@ -165,6 +165,10 @@ func TestStepNodeSelectHit(t *testing.T) {
 		{selects: set("step-id", "step-key"), want: true},
 		{selects: set("step-id", "step-key", "other"), want: true},
 		{selects: set("other"), want: false},
+
+		// selectHit is exact match only; prefixes do not hit.
+		{selects: set("step-"), want: false},
+		{selects: set("s"), want: false},
 	} {
 		if got := n.selectHit(test.selects); got != test.want {
 			t.Errorf(
@@ -193,5 +197,63 @@ func TestStepNodeSelectHit(t *testing.T) {
 				test.selects, got, test.want,
 			)
 		}
+	}
+}
+
+func TestStepNodePrefixHit(t *testing.T) {
+	set := func(prefixes ...string) map[string]bool {
+		m := make(map[string]bool)
+		for _, p := range prefixes {
+			m[p] = true
+		}
+		return m
+	}
+
+	n := &stepNode{id: "step-id", key: "step-key"}
+	for _, test := range []struct {
+		prefixes map[string]bool
+		want     bool
+	}{
+		// exact strings still hit (a string is a prefix of itself).
+		{prefixes: set("step-id"), want: true},
+		{prefixes: set("step-key"), want: true},
+
+		// proper prefixes of id or key hit.
+		{prefixes: set("step-"), want: true},
+		{prefixes: set("s"), want: true},
+
+		// longer than both id and key: no hit.
+		{prefixes: set("step-key-extra"), want: false},
+
+		// not a prefix of id or key.
+		{prefixes: set("tep"), want: false},
+
+		// empty prefix is ignored: never hits.
+		{prefixes: set(""), want: false},
+
+		// at least one of multiple entries hits.
+		{prefixes: set("nope", "step-"), want: true},
+	} {
+		if got := n.prefixHit(test.prefixes); got != test.want {
+			t.Errorf(
+				"prefixHit %+v: got %v, want %v",
+				test.prefixes, got, test.want,
+			)
+		}
+	}
+
+	// id-only node: prefix on id hits.
+	if !(&stepNode{id: "step-id"}).prefixHit(set("step-")) {
+		t.Errorf("prefixHit on id-only node: want hit")
+	}
+
+	// key-only node: prefix on key hits.
+	if !(&stepNode{key: "step-key"}).prefixHit(set("step-")) {
+		t.Errorf("prefixHit on key-only node: want hit")
+	}
+
+	// empty node never hits.
+	if (&stepNode{}).prefixHit(set("step-")) {
+		t.Errorf("prefixHit on empty node: want miss")
 	}
 }
