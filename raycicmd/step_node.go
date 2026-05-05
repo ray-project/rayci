@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 func intersects(set1, set2 []string) bool {
@@ -109,6 +110,23 @@ func (n *stepNode) selectHit(selects map[string]bool) bool {
 	}
 	if n.key != "" {
 		if _, ok := selects[n.key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// prefixHit ignores empty entries in prefixes; newStepFilter also drops
+// them at parse time, so this is a defense-in-depth guard.
+func (n *stepNode) prefixHit(prefixes map[string]bool) bool {
+	for p := range prefixes {
+		if p == "" {
+			continue
+		}
+		if n.id != "" && strings.HasPrefix(n.id, p) {
+			return true
+		}
+		if n.key != "" && strings.HasPrefix(n.key, p) {
 			return true
 		}
 	}

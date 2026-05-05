@@ -17,8 +17,9 @@ type stepFilter struct {
 	tags   map[string]bool
 
 	// third pass: selecting steps
-	selects    map[string]bool // based on ID or key
-	tagSelects map[string]bool // or based on tags
+	selects       map[string]bool // exact match on ID or key
+	tagSelects    map[string]bool // exact match on tag (tag:<name>)
+	prefixSelects map[string]bool // string prefix of ID or key (prefix:<name>)
 
 	noTagMeansAlways bool
 }
@@ -32,12 +33,14 @@ func (f *stepFilter) accept(step *stepNode) bool {
 }
 
 func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
-	if f.selects == nil && f.tagSelects == nil {
+	if f.selects == nil && f.tagSelects == nil && f.prefixSelects == nil {
 		// no select filters, accept everything.
 		return true
 	}
 
-	return step.selectHit(f.selects) || step.hasTagInMap(f.tagSelects)
+	return step.selectHit(f.selects) ||
+		step.hasTagInMap(f.tagSelects) ||
+		step.prefixHit(f.prefixSelects)
 }
 
 func (f *stepFilter) acceptTagHit(step *stepNode) bool {
@@ -59,7 +62,11 @@ func (f *stepFilter) hit(step *stepNode) bool {
 }
 
 func newStepFilter(
-	skipTags, selects []string, filterCmd []string, testRulesFiles []string, envs Envs, lister ChangeLister,
+	skipTags, selects []string,
+	filterCmd []string,
+	testRulesFiles []string,
+	envs Envs,
+	lister ChangeLister,
 ) (*stepFilter, error) {
 	var setup *filterSetup
 
@@ -91,12 +98,19 @@ func newStepFilter(
 	if selects != nil {
 		filter.selects = make(map[string]bool)
 		filter.tagSelects = make(map[string]bool)
+		filter.prefixSelects = make(map[string]bool)
 
 		for _, k := range selects {
-			if strings.HasPrefix(k, "tag:") {
-				name := strings.TrimPrefix(k, "tag:")
-				filter.tagSelects[name] = true
-			} else {
+			switch {
+			case strings.HasPrefix(k, "tag:"):
+				if t := strings.TrimPrefix(k, "tag:"); t != "" {
+					filter.tagSelects[t] = true
+				}
+			case strings.HasPrefix(k, "prefix:"):
+				if p := strings.TrimPrefix(k, "prefix:"); p != "" {
+					filter.prefixSelects[p] = true
+				}
+			default:
 				filter.selects[k] = true
 			}
 		}
@@ -110,7 +124,11 @@ type filterSetup struct {
 	tags   map[string]bool
 }
 
-func filterFromRuleFiles(testRulesFiles []string, envs Envs, lister ChangeLister) (*filterSetup, error) {
+func filterFromRuleFiles(
+	testRulesFiles []string,
+	envs Envs,
+	lister ChangeLister,
+) (*filterSetup, error) {
 	tags, err := RunTagAnalysis(testRulesFiles, envs, lister)
 	if err != nil {
 		return nil, err
