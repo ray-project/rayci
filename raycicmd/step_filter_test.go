@@ -249,6 +249,89 @@ func TestStepFilter_selects(t *testing.T) {
 			t.Errorf("hit %+v", node)
 		}
 	}
+
+	// Bare tokens stay exact-match: "upload-rayturbo" must not match
+	// keys like "upload-rayturbo-staging" or "upload-rayturbo-prod".
+	filter, _ = newStepFilter(nil, []string{"upload-rayturbo"}, nil, nil, nil, nil)
+	for _, node := range []*stepNode{
+		{key: "upload-rayturbo"},
+		{id: "upload-rayturbo"},
+	} {
+		if !filter.accept(node) {
+			t.Errorf("exact select miss %+v", node)
+		}
+	}
+	for _, node := range []*stepNode{
+		{key: "upload-rayturbo-staging"},
+		{id: "upload-rayturbo-prod"},
+	} {
+		if filter.accept(node) {
+			t.Errorf("exact select should not match a prefix: %+v", node)
+		}
+	}
+}
+
+func TestStepFilter_prefixSelects(t *testing.T) {
+	// `prefix:` tokens hit when the value is a string prefix of either
+	// stepNode.id or stepNode.key. They are independent from bare tokens
+	// (exact match) and tag: tokens (exact tag match).
+	filter, _ := newStepFilter(
+		nil,
+		[]string{"prefix:upload-rayturbo", "exact-key", "tag:enabled"},
+		nil, nil, nil, nil,
+	)
+	for _, node := range []*stepNode{
+		// prefix hits on key.
+		{key: "upload-rayturbo-staging"},
+		{key: "upload-rayturbo-prod"},
+		{key: "upload-rayturbo"}, // prefix is reflexive: equal also hits.
+		// prefix hits on id.
+		{id: "upload-rayturbo-extra"},
+		// id wins via the bare exact path even when key would not match.
+		{id: "exact-key", key: "something-else"},
+		// exact key hit via the bare path even when prefix would not match.
+		{key: "exact-key"},
+		// tag hit via tag: path.
+		{id: "anything", tags: []string{"enabled"}},
+		// All three paths satisfied at once. Documents that OR semantics
+		// admit multiple-path hits; the single-path positive cases above
+		// are what guard against a || -> && regression.
+		{
+			id:   "exact-key",
+			key:  "upload-rayturbo-staging",
+			tags: []string{"enabled"},
+		},
+	} {
+		if !filter.accept(node) {
+			t.Errorf("miss %+v", node)
+		}
+	}
+	for _, node := range []*stepNode{
+		{key: "upload"},                           // key shorter than the prefix.
+		{key: "rayturbo-upload"},                  // prefix is not a leading substring of key.
+		{id: "rayturbo-upload"},                   // prefix is not a leading substring of id.
+		{id: "ex"},                                // bare select requires exact match.
+		{id: "anything", tags: []string{"other"}}, // tag mismatch.
+	} {
+		if filter.accept(node) {
+			t.Errorf("unexpected hit %+v", node)
+		}
+	}
+
+	// `prefix:` and `tag:` with nothing after the colon are dropped at
+	// parse time so they never match everything.
+	for _, token := range []string{"prefix:", "tag:"} {
+		filter, _ := newStepFilter(nil, []string{token}, nil, nil, nil, nil)
+		for _, node := range []*stepNode{
+			{key: "anything"},
+			{id: "anything"},
+			{id: "anything", tags: []string{"x"}},
+		} {
+			if filter.accept(node) {
+				t.Errorf("empty %q should not match %+v", token, node)
+			}
+		}
+	}
 }
 
 func TestStepFilter_tagSelects(t *testing.T) {
