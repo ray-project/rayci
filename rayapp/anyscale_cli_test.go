@@ -118,9 +118,16 @@ func TestRunAnyscaleCLI(t *testing.T) {
 			wantErrStr: "stdout: useful context",
 		},
 		{
-			name:       "exec failed with exit code in output",
+			name:       "exec failed with exit code in stdout",
 			script:     "#!/bin/sh\necho \"exec failed with exit code 1\"; exit 0",
 			args:       []string{"deploy"},
+			wantErrStr: "anyscale error: command failed:",
+		},
+		{
+			name: "exec failed with exit code in stderr",
+			script: "#!/bin/sh\necho 'time=\"2026-05-04T19:45:34Z\" " +
+				"level=fatal msg=\"exec failed with exit code 1\"' >&2; exit 0",
+			args:       []string{"workspace_v2", "run_command"},
 			wantErrStr: "anyscale error: command failed:",
 		},
 	}

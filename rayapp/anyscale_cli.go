@@ -57,15 +57,22 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 
 	err := cmd.Run()
 	stdout := stdoutBuf.String()
+	stderr := stderrBuf.String()
 	if err != nil {
-		stderr := stderrBuf.String()
 		return "", fmt.Errorf(
 			"anyscale error: %w\nstdout: %s\nstderr: %s",
 			err, stdout, stderr,
 		)
 	}
-	if strings.Contains(stdout, "exec failed with exit code") {
-		return "", fmt.Errorf("anyscale error: command failed: %s", stdout)
+	// The anyscale CLI sometimes exits 0 even when a remote `run_command`
+	// failed, logging `exec failed with exit code N` via logrus (stderr).
+	// Scan both streams so we don't miss it.
+	if strings.Contains(stdout, "exec failed with exit code") ||
+		strings.Contains(stderr, "exec failed with exit code") {
+		return "", fmt.Errorf(
+			"anyscale error: command failed:\nstdout: %s\nstderr: %s",
+			stdout, stderr,
+		)
 	}
 
 	return stdout, nil
