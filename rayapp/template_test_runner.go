@@ -202,7 +202,8 @@ func runTemplateTestsWithFilter(
 	}
 	if len(filteredTmpls) == 0 {
 		if skippedNoTest > 0 {
-			return fmt.Errorf("no templates with test configuration to run")
+			log.Println("No templates with test configuration to run")
+			return nil
 		}
 		return fmt.Errorf("no templates to test")
 	}
