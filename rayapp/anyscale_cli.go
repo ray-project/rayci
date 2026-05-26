@@ -40,11 +40,29 @@ func (ac *AnyscaleCLI) setRunFunc(f func(args []string) (string, error)) {
 // stdout and stderr for full diagnostic context.
 // Both streams are always displayed to the terminal.
 func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
+	stdout, _, err := ac.execAnyscale(args)
+	return stdout, err
+}
+
+// runAnyscaleCLICombined runs the anyscale CLI and returns stdout and stderr
+// merged into one string. Use this when you need to read CLI status messages
+// (e.g. "Workspace created successfully id: ...") that the CLI writes to
+// stderr.
+func (ac *AnyscaleCLI) runAnyscaleCLICombined(args []string) (string, error) {
+	stdout, stderr, err := ac.execAnyscale(args)
+	if err != nil {
+		return "", err
+	}
+	return stdout + stderr, nil
+}
+
+func (ac *AnyscaleCLI) execAnyscale(args []string) (string, string, error) {
 	if ac.runFunc != nil {
-		return ac.runFunc(args)
+		out, err := ac.runFunc(args)
+		return out, "", err
 	}
 	if !ac.isAnyscaleInstalled() {
-		return "", errors.New("anyscale is not installed")
+		return "", "", errors.New("anyscale is not installed")
 	}
 
 	fmt.Fprintf(os.Stdout, ">>> anyscale %s\n", strings.Join(args, " "))
@@ -59,7 +77,7 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	stdout := stdoutBuf.String()
 	stderr := stderrBuf.String()
 	if err != nil {
-		return "", fmt.Errorf(
+		return "", "", fmt.Errorf(
 			"anyscale error: %w\nstdout: %s\nstderr: %s",
 			err, stdout, stderr,
 		)
@@ -69,11 +87,11 @@ func (ac *AnyscaleCLI) runAnyscaleCLI(args []string) (string, error) {
 	// Scan both streams so we don't miss it.
 	if strings.Contains(stdout, "exec failed with exit code") ||
 		strings.Contains(stderr, "exec failed with exit code") {
-		return "", fmt.Errorf(
+		return "", "", fmt.Errorf(
 			"anyscale error: command failed:\nstdout: %s\nstderr: %s",
 			stdout, stderr,
 		)
 	}
 
-	return stdout, nil
+	return stdout, stderr, nil
 }

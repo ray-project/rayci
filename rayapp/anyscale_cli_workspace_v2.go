@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 )
 
 // WorkspaceState represents the state of an Anyscale workspace.
@@ -29,9 +30,21 @@ func (ws WorkspaceState) String() string {
 	return fmt.Sprintf("UNKNOWN(%d)", int(ws))
 }
 
-func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
+// workspaceCreatedIDRe matches the "Workspace created successfully id: ..."
+// status line that `anyscale workspace_v2 create` prints to stderr.
+var workspaceCreatedIDRe = regexp.MustCompile(
+	`Workspace created successfully id:\s+(expwrk_[A-Za-z0-9_-]+)`,
+)
+
+// createEmptyWorkspace creates a workspace and returns its id.
+//
+// The id is parsed from the CLI status line because every other workspace_v2
+// subcommand needs to address the workspace by --id rather than --name:
+// the by-name path on the Anyscale API has been observed to fail to find
+// newly-created workspaces, while the by-id path is reliable.
+func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) (string, error) {
 	if c.template == nil {
-		return fmt.Errorf("template is required")
+		return "", fmt.Errorf("template is required")
 	}
 	args := []string{"workspace_v2", "create"}
 	args = append(args, "--name", c.workspaceName)
@@ -51,7 +64,7 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
 				c.template.ClusterEnv,
 			)
 			if err != nil {
-				return fmt.Errorf("cluster env: %w", err)
+				return "", fmt.Errorf("cluster env: %w", err)
 			}
 			args = append(args, "--image-uri", imageURI)
 			// Nightly images don't need --ray-version; the version
@@ -66,29 +79,22 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
 		args = append(args, "--compute-config", c.computeConfig)
 	}
 
-	_, err := ac.runAnyscaleCLI(args)
+	out, err := ac.runAnyscaleCLICombined(args)
 	if err != nil {
-		return fmt.Errorf("create empty workspace failed: %w", err)
+		return "", fmt.Errorf("create empty workspace failed: %w", err)
 	}
-
-	return nil
+	m := workspaceCreatedIDRe.FindStringSubmatch(out)
+	if len(m) != 2 {
+		return "", fmt.Errorf(
+			"create empty workspace: could not parse workspace id from output",
+		)
+	}
+	return m[1], nil
 }
 
-func (ac *AnyscaleCLI) getWorkspaceID(workspaceName string) (string, error) {
-	workspaceDescription, err := ac.getWorkspaceDescription(workspaceName)
-	if err != nil {
-		return "", fmt.Errorf("get workspace description failed: %w", err)
-	}
-	workspaceID, ok := workspaceDescription["id"].(string)
-	if !ok {
-		return "", fmt.Errorf("workspace ID not found in description")
-	}
-	return workspaceID, nil
-}
-
-func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceName string) (map[string]any, error) {
+func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceID string) (map[string]any, error) {
 	output, err := ac.runAnyscaleCLI(
-		[]string{"workspace_v2", "get", "--name", workspaceName, "--json"},
+		[]string{"workspace_v2", "get", "--id", workspaceID, "--json"},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get workspace failed: %w", err)
@@ -100,17 +106,17 @@ func (ac *AnyscaleCLI) getWorkspaceDescription(workspaceName string) (map[string
 	return workspaceDescription, nil
 }
 
-func (ac *AnyscaleCLI) terminateWorkspace(workspaceName string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--name", workspaceName})
+func (ac *AnyscaleCLI) terminateWorkspace(workspaceID string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "terminate", "--id", workspaceID})
 	if err != nil {
 		return fmt.Errorf("terminate workspace failed: %w", err)
 	}
 	return nil
 }
 
-func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string) error {
+func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceID, localFilePath string) error {
 	_, err := ac.runAnyscaleCLI(
-		[]string{"workspace_v2", "push", "--name", workspaceName, "--local-dir", localFilePath},
+		[]string{"workspace_v2", "push", "--id", workspaceID, "--local-dir", localFilePath},
 	)
 	if err != nil {
 		return fmt.Errorf("push file to workspace failed: %w", err)
@@ -118,9 +124,9 @@ func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string
 	return nil
 }
 
-func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error {
+func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceID string, cmd string) error {
 	_, err := ac.runAnyscaleCLI(
-		[]string{"workspace_v2", "run_command", "--name", workspaceName, cmd},
+		[]string{"workspace_v2", "run_command", "--id", workspaceID, cmd},
 	)
 	if err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
@@ -128,16 +134,16 @@ func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error
 	return nil
 }
 
-func (ac *AnyscaleCLI) startWorkspace(workspaceName string) error {
-	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--name", workspaceName})
+func (ac *AnyscaleCLI) startWorkspace(workspaceID string) error {
+	_, err := ac.runAnyscaleCLI([]string{"workspace_v2", "start", "--id", workspaceID})
 	if err != nil {
 		return fmt.Errorf("start workspace failed: %w", err)
 	}
 	return nil
 }
 
-func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) {
-	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "status", "--name", workspaceName})
+func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceID string) (string, error) {
+	output, err := ac.runAnyscaleCLI([]string{"workspace_v2", "status", "--id", workspaceID})
 	if err != nil {
 		return "", fmt.Errorf("get workspace state failed: %w", err)
 	}
@@ -145,11 +151,11 @@ func (ac *AnyscaleCLI) getWorkspaceStatus(workspaceName string) (string, error) 
 }
 
 func (ac *AnyscaleCLI) waitForWorkspaceState(
-	workspaceName string,
+	workspaceID string,
 	state WorkspaceState,
 ) (string, error) {
 	output, err := ac.runAnyscaleCLI(
-		[]string{"workspace_v2", "wait", "--name", workspaceName, "--state", state.String()},
+		[]string{"workspace_v2", "wait", "--id", workspaceID, "--state", state.String()},
 	)
 	if err != nil {
 		return "", fmt.Errorf("wait for workspace state failed: %w", err)

@@ -109,13 +109,6 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 			wantErr: "create empty workspace failed",
 		},
 		{
-			name: "get workspace ID fails",
-			commandErrors: map[string]error{
-				"workspace_v2 get": fmt.Errorf("get failed"),
-			},
-			wantErr: "get workspace ID failed",
-		},
-		{
 			name: "start workspace fails",
 			commandErrors: map[string]error{
 				"workspace_v2 start": fmt.Errorf("start failed"),

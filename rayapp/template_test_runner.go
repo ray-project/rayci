@@ -241,23 +241,19 @@ func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
 		}
 	}
 
-	if err := c.anyscaleCLI.createEmptyWorkspace(c); err != nil {
-		c.errs = append(c.errs, fmt.Errorf("create empty workspace failed: %w", err))
-		return
-	}
-	workspaceID, err := c.anyscaleCLI.getWorkspaceID(c.workspaceName)
+	workspaceID, err := c.anyscaleCLI.createEmptyWorkspace(c)
 	if err != nil {
-		c.errs = append(c.errs, fmt.Errorf("get workspace ID failed: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("create empty workspace failed: %w", err))
 		return
 	}
 	c.workspaceID = workspaceID
 
-	if err := c.anyscaleCLI.startWorkspace(c.workspaceName); err != nil {
+	if err := c.anyscaleCLI.startWorkspace(c.workspaceID); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("start workspace failed: %w", err))
 		return
 	}
 
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceName, StateRunning); err != nil {
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceID, StateRunning); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("wait for workspace running state failed: %w", err))
 		return
 	}
@@ -275,13 +271,13 @@ func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
 		return
 	}
 
-	if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, templateZipDir); err != nil {
+	if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceID, templateZipDir); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("push template to workspace failed: %w", err))
 		return
 	}
 
 	unzipCmd := fmt.Sprintf("unzip -o %s.zip", c.tmplName)
-	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, unzipCmd); err != nil {
+	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceID, unzipCmd); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("unzip template failed: %w", err))
 		return
 	}
@@ -318,7 +314,7 @@ func (c *WorkspaceTestConfig) setupTemplateWorkspace() {
 	}
 	c.workspaceName = workspaceName
 	c.workspaceID = workspaceID
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceName, StateRunning); err != nil {
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceID, StateRunning); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("wait for workspace running state failed: %w", err))
 		return
 	}
@@ -326,11 +322,15 @@ func (c *WorkspaceTestConfig) setupTemplateWorkspace() {
 
 func (c *WorkspaceTestConfig) cleanup() {
 	log.Println("Cleaning up workspace...")
-	if err := c.anyscaleCLI.terminateWorkspace(c.workspaceName); err != nil {
+	if c.workspaceID == "" {
+		log.Println("Workspace was never created, nothing to clean up.")
+		return
+	}
+	if err := c.anyscaleCLI.terminateWorkspace(c.workspaceID); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("terminate workspace failed: %w", err))
 		return
 	}
-	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceName, StateTerminated); err != nil {
+	if _, err := c.anyscaleCLI.waitForWorkspaceState(c.workspaceID, StateTerminated); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("wait for workspace terminated state failed: %w", err))
 		return
 	}
@@ -387,13 +387,13 @@ func (c *WorkspaceTestConfig) Run() {
 		}
 
 		// Push test zip to workspace
-		if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceName, testZipDir); err != nil {
+		if err := c.anyscaleCLI.pushFolderToWorkspace(c.workspaceID, testZipDir); err != nil {
 			c.errs = append(c.errs, fmt.Errorf("push test zip to workspace failed: %w", err))
 			return
 		}
 
 		// Unzip test folder in workspace
-		if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, "unzip -o tests.zip"); err != nil {
+		if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceID, "unzip -o tests.zip"); err != nil {
 			c.errs = append(c.errs, fmt.Errorf("unzip tests in workspace failed: %w", err))
 			return
 		}
@@ -403,7 +403,7 @@ func (c *WorkspaceTestConfig) Run() {
 	// Escape single quotes to prevent command injection via bash -c '...'.
 	escapedCmd := strings.ReplaceAll(c.template.Test.Command, "'", "'\\''")
 	testCommand := fmt.Sprintf("timeout %d bash -c '%s'", c.template.Test.TimeoutInSec, escapedCmd)
-	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceName, testCommand); err != nil {
+	if err := c.anyscaleCLI.runCmdInWorkspace(c.workspaceID, testCommand); err != nil {
 		c.errs = append(c.errs, fmt.Errorf("run test command failed: %w", err))
 		return
 	}

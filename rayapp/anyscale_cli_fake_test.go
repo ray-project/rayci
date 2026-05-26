@@ -138,6 +138,10 @@ func parseName(opts []string) string {
 	return parseFlag(opts, "--name", "-n")
 }
 
+func parseWorkspaceID(opts []string) string {
+	return parseFlag(opts, "--id", "--workspace-id")
+}
+
 func (f *fakeAnyscale) workspaceCreate(opts []string) (string, error) {
 	name := parseName(opts)
 	id := fmt.Sprintf("expwrk_%s", name)
@@ -148,9 +152,9 @@ func (f *fakeAnyscale) workspaceCreate(opts []string) (string, error) {
 }
 
 func (f *fakeAnyscale) workspaceGet(opts []string) (string, error) {
-	name := parseName(opts)
+	id := parseWorkspaceID(opts)
 	for _, ws := range f.workspaces {
-		if ws.Name == name {
+		if ws.ID == id {
 			m := map[string]any{
 				"id":    ws.ID,
 				"name":  ws.Name,
@@ -163,49 +167,49 @@ func (f *fakeAnyscale) workspaceGet(opts []string) (string, error) {
 			return string(bs), nil
 		}
 	}
-	return "", fmt.Errorf("fake: workspace not found: %s", name)
+	return "", fmt.Errorf("fake: workspace not found: %s", id)
 }
 
 func (f *fakeAnyscale) workspaceTerminate(opts []string) (string, error) {
-	name := parseName(opts)
-	return fmt.Sprintf("Terminating workspace '%s'", name), nil
+	id := parseWorkspaceID(opts)
+	return fmt.Sprintf("Terminating workspace '%s'", id), nil
 }
 
 func (f *fakeAnyscale) workspacePush(opts []string) (string, error) {
-	name := parseName(opts)
+	id := parseWorkspaceID(opts)
 	localDir := parseFlag(opts, "--local-dir")
-	return fmt.Sprintf("Sending %s to workspace '%s'", localDir, name), nil
+	return fmt.Sprintf("Sending %s to workspace '%s'", localDir, id), nil
 }
 
 func (f *fakeAnyscale) workspaceRunCommand(opts []string) (string, error) {
-	name := parseName(opts)
-	return fmt.Sprintf("Running command in workspace '%s'", name), nil
+	id := parseWorkspaceID(opts)
+	return fmt.Sprintf("Running command in workspace '%s'", id), nil
 }
 
 func (f *fakeAnyscale) workspaceStart(opts []string) (string, error) {
-	name := parseName(opts)
-	return fmt.Sprintf("Starting workspace '%s'", name), nil
+	id := parseWorkspaceID(opts)
+	return fmt.Sprintf("Starting workspace '%s'", id), nil
 }
 
 func (f *fakeAnyscale) workspaceStatus(opts []string) (string, error) {
-	name := parseName(opts)
+	id := parseWorkspaceID(opts)
 	for _, ws := range f.workspaces {
-		if ws.Name == name {
+		if ws.ID == id {
 			return ws.State, nil
 		}
 	}
-	return "", fmt.Errorf("fake: workspace not found: %s", name)
+	return "", fmt.Errorf("fake: workspace not found: %s", id)
 }
 
 func (f *fakeAnyscale) workspaceWait(opts []string) (string, error) {
-	name := parseName(opts)
+	id := parseWorkspaceID(opts)
 	state := parseFlag(opts, "--state")
 	return strings.Join([]string{
 		fmt.Sprintf(
 			"Waiting for workspace '%s' to reach target state %s, currently in state: %s",
-			name, state, state,
+			id, state, state,
 		),
-		fmt.Sprintf("Workspace '%s' reached target state, exiting", name),
+		fmt.Sprintf("Workspace '%s' reached target state, exiting", id),
 	}, "\n"), nil
 }
 
