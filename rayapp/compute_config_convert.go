@@ -48,8 +48,14 @@ func convertNewComputeConfigToLegacy(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("compute config is missing the required 'head_node'")
 	}
 
-	workerNodes := toSlice(cc["worker_nodes"])
-	autoSelect := toBool(cc["auto_select_worker_config"])
+	workerNodes, err := sliceField(cc, "worker_nodes")
+	if err != nil {
+		return nil, err
+	}
+	autoSelect, err := boolField(cc, "auto_select_worker_config")
+	if err != nil {
+		return nil, err
+	}
 	// Head is schedulable only when it is the sole node in the cluster.
 	schedulableByDefault := len(workerNodes) == 0 && !autoSelect
 
@@ -84,7 +90,11 @@ func convertNewComputeConfigToLegacy(data []byte) ([]byte, error) {
 			flags[k] = v
 		}
 	}
-	flags["allow-cross-zone-autoscaling"] = toBool(cc["enable_cross_zone_scaling"])
+	crossZone, err := boolField(cc, "enable_cross_zone_scaling")
+	if err != nil {
+		return nil, err
+	}
+	flags["allow-cross-zone-autoscaling"] = crossZone
 	if v := cc["min_resources"]; isTruthy(v) {
 		flags["min_resources"] = v
 	}
@@ -94,8 +104,12 @@ func convertNewComputeConfigToLegacy(data []byte) ([]byte, error) {
 	legacy["flags"] = flags
 
 	// Omitted/empty zones == "any" on the backend, so only set when specific.
-	if z := toSlice(cc["zones"]); len(z) > 0 {
-		legacy["allowed_azs"] = z
+	zones, err := sliceField(cc, "zones")
+	if err != nil {
+		return nil, err
+	}
+	if len(zones) > 0 {
+		legacy["allowed_azs"] = zones
 	}
 	if adv := cc["advanced_instance_config"]; isTruthy(adv) {
 		legacy["advanced_configurations_json"] = adv
@@ -149,6 +163,9 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("worker node group 'max_nodes': %w", err)
 	}
+	if maxWorkers < minWorkers {
+		return nil, fmt.Errorf("worker node group max_nodes (%d) must be >= min_nodes (%d)", maxWorkers, minWorkers)
+	}
 	legacy["max_workers"] = maxWorkers
 
 	market := toString(w["market_type"])
@@ -196,7 +213,7 @@ func rejectUnknownKeys(m map[string]any, known map[string]bool, context string) 
 	}
 	if len(unknown) > 0 {
 		sort.Strings(unknown)
-		return fmt.Errorf("unrecognized key(s) %v in template %s", unknown, context)
+		return fmt.Errorf("unrecognized key(s) %v in %s", unknown, context)
 	}
 	return nil
 }
@@ -209,14 +226,30 @@ func keySet(keys ...string) map[string]bool {
 	return s
 }
 
-func toSlice(v any) []any {
-	s, _ := v.([]any)
-	return s
+// sliceField returns the list at key (nil if absent), erroring if present but not a list.
+func sliceField(m map[string]any, key string) ([]any, error) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return nil, nil
+	}
+	s, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("%q must be a list, got %T", key, v)
+	}
+	return s, nil
 }
 
-func toBool(v any) bool {
-	b, _ := v.(bool)
-	return b
+// boolField returns the bool at key (false if absent), erroring if present but not a bool.
+func boolField(m map[string]any, key string) (bool, error) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return false, nil
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("%q must be a boolean, got %T", key, v)
+	}
+	return b, nil
 }
 
 func toString(v any) string {

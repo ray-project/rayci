@@ -198,6 +198,9 @@ func TestConvertNewComputeConfigToLegacyErrors(t *testing.T) {
 		{"bad market_type", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, market_type: BOGUS}\n"},
 		{"missing head_node", "worker_nodes: []\n"},
 		{"non-integer min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: five}\n"},
+		{"auto_select not a bool", "head_node: {instance_type: m5.2xlarge}\nauto_select_worker_config: \"yes\"\n"},
+		{"zones not a list", "head_node: {instance_type: m5.2xlarge}\nzones: us-west-2a\n"},
+		{"max_nodes < min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: 5, max_nodes: 2}\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
