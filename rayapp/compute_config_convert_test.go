@@ -201,6 +201,14 @@ func TestConvertNewComputeConfigToLegacyErrors(t *testing.T) {
 		{"auto_select not a bool", "head_node: {instance_type: m5.2xlarge}\nauto_select_worker_config: \"yes\"\n"},
 		{"zones not a list", "head_node: {instance_type: m5.2xlarge}\nzones: us-west-2a\n"},
 		{"max_nodes < min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: 5, max_nodes: 2}\n"},
+		{"head_node not a mapping", "head_node: just-a-string\n"},
+		{"flags not a mapping", "head_node: {instance_type: m5.2xlarge}\nflags: not-a-map\n"},
+		{"worker name not a string", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {name: 123, instance_type: x}\n"},
+		{"worker instance_type not a string", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: 123}\n"},
+		{"worker market_type not a string", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, market_type: true}\n"},
+		{"negative min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: -1}\n"},
+		{"negative max_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, max_nodes: -1}\n"},
+		{"fractional min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: 1.5}\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
