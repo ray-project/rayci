@@ -89,14 +89,12 @@ func convertNewComputeConfigToLegacy(data []byte) ([]byte, error) {
 
 	// Cross-zone scaling lives in flags; the SDK always writes it (even when false).
 	flags := map[string]any{}
-	if v, ok := cc["flags"]; ok && v != nil {
-		f, ok := v.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("'flags' must be a mapping, got %T", v)
-		}
-		for k, fv := range f {
-			flags[k] = fv
-		}
+	topFlags, err := mapField(cc, "flags")
+	if err != nil {
+		return nil, err
+	}
+	for k, fv := range topFlags {
+		flags[k] = fv
 	}
 	crossZone, err := boolField(cc, "enable_cross_zone_scaling")
 	if err != nil {
@@ -134,7 +132,10 @@ func convertHeadNode(head map[string]any, schedulableByDefault bool) (map[string
 	if err := rejectUnknownKeys(head, newSchemaNodeKeys, "head_node"); err != nil {
 		return nil, err
 	}
-	legacy := convertNodeCommonFields(head)
+	legacy, err := convertNodeCommonFields(head)
+	if err != nil {
+		return nil, err
+	}
 	// New schema has no head name; backend requires one (SDK uses "head-node").
 	legacy["name"] = "head-node"
 	if res, ok := head["resources"]; ok && res != nil {
@@ -150,7 +151,10 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 	if err := rejectUnknownKeys(w, newSchemaWorkerNodeKeys, "worker_nodes entry"); err != nil {
 		return nil, err
 	}
-	legacy := convertNodeCommonFields(w)
+	legacy, err := convertNodeCommonFields(w)
+	if err != nil {
+		return nil, err
+	}
 
 	// Name defaults to the instance type (matches WorkerNodeGroupConfig).
 	name, err := stringField(w, "name")
@@ -210,7 +214,7 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 
 // convertNodeCommonFields maps fields shared by head and worker nodes (not
 // name/resources/scaling/market).
-func convertNodeCommonFields(node map[string]any) map[string]any {
+func convertNodeCommonFields(node map[string]any) (map[string]any, error) {
 	legacy := map[string]any{}
 	for _, k := range []string{"instance_type", "required_resources", "labels", "required_labels"} {
 		if v, ok := node[k]; ok && v != nil {
@@ -221,11 +225,16 @@ func convertNodeCommonFields(node map[string]any) map[string]any {
 		// Generic key; the launch path prefers it over aws_/gcp_ ones.
 		legacy["advanced_configurations_json"] = adv
 	}
-	if fl := node["flags"]; isTruthy(fl) {
+	// flags is copied through as-is, so validate it is a mapping (fail loud, like other fields).
+	fl, err := mapField(node, "flags")
+	if err != nil {
+		return nil, err
+	}
+	if len(fl) > 0 {
 		legacy["flags"] = fl
 	}
 	// cloud_deployment is meaningless for a template clone; dropped.
-	return legacy
+	return legacy, nil
 }
 
 func rejectUnknownKeys(m map[string]any, known map[string]bool, context string) error {
@@ -274,6 +283,19 @@ func boolField(m map[string]any, key string) (bool, error) {
 		return false, fmt.Errorf("%q must be a boolean, got %T", key, v)
 	}
 	return b, nil
+}
+
+// mapField returns the mapping at key (nil if absent), erroring if present but not a mapping.
+func mapField(m map[string]any, key string) (map[string]any, error) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return nil, nil
+	}
+	mm, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%q must be a mapping, got %T", key, v)
+	}
+	return mm, nil
 }
 
 // stringField returns the string at key ("" if absent), erroring if present but not a string.

@@ -209,6 +209,8 @@ func TestConvertNewComputeConfigToLegacyErrors(t *testing.T) {
 		{"negative min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: -1}\n"},
 		{"negative max_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, max_nodes: -1}\n"},
 		{"fractional min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: 1.5}\n"},
+		{"head flags not a mapping", "head_node: {instance_type: m5.2xlarge, flags: [a, b]}\n"},
+		{"worker flags not a mapping", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, flags: not-a-map}\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
