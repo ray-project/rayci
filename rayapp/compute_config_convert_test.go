@@ -197,6 +197,7 @@ func TestConvertNewComputeConfigToLegacyErrors(t *testing.T) {
 		{"unknown node key", "head_node: {instance_type: m5.2xlarge, bogus_node: 1}\n"},
 		{"bad market_type", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, market_type: BOGUS}\n"},
 		{"missing head_node", "worker_nodes: []\n"},
+		{"non-integer min_nodes", "head_node: {instance_type: m5.2xlarge}\nworker_nodes:\n- {instance_type: x, min_nodes: five}\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

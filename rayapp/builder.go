@@ -119,14 +119,13 @@ func (b *builder) build(outputDir string) error {
 		ComputeConfigBase64: make(map[string]string),
 	}
 	for cld, f := range b.tmpl.ComputeConfig {
-		fullPath := filepath.Join(b.baseDir, f)
-		bs, err := os.ReadFile(fullPath)
+		bs, err := os.ReadFile(filepath.Join(b.baseDir, f))
 		if err != nil {
 			return fmt.Errorf("read compute config %q: %w", f, err)
 		}
 		// Publish legacy-schema bundles: convert the new user-facing schema to
 		// legacy so the console clone path (which parses legacy) is unaffected.
-		legacy, err := isLegacyComputeConfigFormat(fullPath)
+		legacy, err := isLegacyComputeConfigData(bs)
 		if err != nil {
 			return fmt.Errorf("detect compute config schema %q: %w", f, err)
 		}

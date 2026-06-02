@@ -140,8 +140,16 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 	}
 	legacy["name"] = name
 
-	legacy["min_workers"] = intOrDefault(w["min_nodes"], 0)
-	legacy["max_workers"] = intOrDefault(w["max_nodes"], 10)
+	minWorkers, err := intOrDefault(w["min_nodes"], 0)
+	if err != nil {
+		return nil, fmt.Errorf("worker node group 'min_nodes': %w", err)
+	}
+	legacy["min_workers"] = minWorkers
+	maxWorkers, err := intOrDefault(w["max_nodes"], 10)
+	if err != nil {
+		return nil, fmt.Errorf("worker node group 'max_nodes': %w", err)
+	}
+	legacy["max_workers"] = maxWorkers
 
 	market := toString(w["market_type"])
 	if market == "" {
@@ -233,14 +241,20 @@ func isTruthy(v any) bool {
 	}
 }
 
-func intOrDefault(v any, def int) int {
+// intOrDefault returns def when v is absent (nil), the int value when v is an
+// integer, and an error when v is present but not an integer (fail loud rather
+// than silently dropping a misconfigured value).
+func intOrDefault(v any, def int) (int, error) {
 	switch t := v.(type) {
+	case nil:
+		return def, nil
 	case int:
-		return t
+		return t, nil
 	case int64:
-		return int(t)
+		return int(t), nil
 	case float64:
-		return int(t)
+		return int(t), nil
+	default:
+		return 0, fmt.Errorf("expected an integer, got %T", v)
 	}
-	return def
 }
