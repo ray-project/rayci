@@ -119,9 +119,22 @@ func (b *builder) build(outputDir string) error {
 		ComputeConfigBase64: make(map[string]string),
 	}
 	for cld, f := range b.tmpl.ComputeConfig {
-		bs, err := os.ReadFile(filepath.Join(b.baseDir, f))
+		fullPath := filepath.Join(b.baseDir, f)
+		bs, err := os.ReadFile(fullPath)
 		if err != nil {
 			return fmt.Errorf("read compute config %q: %w", f, err)
+		}
+		// Publish legacy-schema bundles: convert the new user-facing schema to
+		// legacy so the console clone path (which parses legacy) is unaffected.
+		legacy, err := isLegacyComputeConfigFormat(fullPath)
+		if err != nil {
+			return fmt.Errorf("detect compute config schema %q: %w", f, err)
+		}
+		if !legacy {
+			bs, err = convertNewComputeConfigToLegacy(bs)
+			if err != nil {
+				return fmt.Errorf("convert compute config %q: %w", f, err)
+			}
 		}
 		meta.ComputeConfigBase64[cld] = base64.StdEncoding.EncodeToString(bs)
 	}
