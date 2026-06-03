@@ -123,6 +123,18 @@ func (b *builder) build(outputDir string) error {
 		if err != nil {
 			return fmt.Errorf("read compute config %q: %w", f, err)
 		}
+		// Publish legacy-schema bundles: convert the new user-facing schema to
+		// legacy so the console clone path (which parses legacy) is unaffected.
+		legacy, err := isLegacyComputeConfigData(bs)
+		if err != nil {
+			return fmt.Errorf("detect compute config schema %q: %w", f, err)
+		}
+		if !legacy {
+			bs, err = convertNewComputeConfigToLegacy(bs)
+			if err != nil {
+				return fmt.Errorf("convert compute config %q: %w", f, err)
+			}
+		}
 		meta.ComputeConfigBase64[cld] = base64.StdEncoding.EncodeToString(bs)
 	}
 	if b.tmpl.ClusterEnv != nil {

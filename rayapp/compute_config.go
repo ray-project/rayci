@@ -37,7 +37,12 @@ func isLegacyComputeConfigFormat(configFilePath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to read config file: %w", err)
 	}
+	return isLegacyComputeConfigData(data)
+}
 
+// isLegacyComputeConfigData reports whether the compute config bytes use the legacy
+// format, via a "version=legacy" comment or legacy-style top-level keys.
+func isLegacyComputeConfigData(data []byte) (bool, error) {
 	for _, line := range strings.Split(string(data), "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
 		if len(trimmed) > 0 && trimmed[0] == '#' {
