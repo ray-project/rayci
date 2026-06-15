@@ -246,12 +246,13 @@ func makeRayDockerPlugin(
 }
 
 // makeAutomaticRetryConfig creates the retry configuration for rayci pipelines.
-// The retry configuration is to retry once for any unknown exit status or
-// test failures, and to retry 3 times for known exit statuses.
+// The retry configuration is to retry once for any unknown exit status and to
+// retry 3 times for known exit statuses. Test failures (exit_status 42) are not
+// retried here since bazel already retries those.
 func makeAutomaticRetryConfig(exitStatus []int) []any {
 	m := []any{
-		map[string]int{"exit_status": 1, "limit": 1},  // unknown exist status
-		map[string]int{"exit_status": 42, "limit": 1}, // test failures
+		map[string]int{"exit_status": 1, "limit": 1}, // unknown exist status
+		// exit_status 42 (test failures) omitted: bazel already retries those.
 	}
 	for _, s := range exitStatus {
 		m = append(m, map[string]any{"exit_status": s, "limit": 3})
