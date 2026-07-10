@@ -1005,7 +1005,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 
 			"aws_assume_role": role1,
 		}, {
-			"command": []any{"echo 5"},
+			"command": []any{"echo 4"},
 
 			"aws_assume_role": role1,
 		}, {
@@ -1080,7 +1080,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		{0, "commands", []string{awsChainSetupCommand, "echo 1"}},
 		{1, "command", []string{awsChainSetupCommand, "echo 2"}},
 		{2, "commands", []string{awsChainSetupCommand, "echo 3", "42", "true"}},
-		{3, "command", []string{awsChainSetupCommand, "echo 5"}},
+		{3, "command", []string{awsChainSetupCommand, "echo 4"}},
 		{4, "command", []string{awsChainSetupCommand, "echo a"}},
 		{4, "commands", []string{awsChainSetupCommand, "echo b"}},
 	} {
@@ -1208,7 +1208,32 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"commands":        []any{},
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
-		wantErr: "step has no command",
+		wantErr: "commands is empty",
+	}, {
+		// A present-but-empty commands key next to a real command is a
+		// conflict Buildkite may resolve as a no-op job; fail loudly.
+		name: "empty commands beside command",
+		step: map[string]any{
+			"command":         "echo 1",
+			"commands":        []any{},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "commands is empty",
+	}, {
+		name: "null commands beside command",
+		step: map[string]any{
+			"command":         "echo 1",
+			"commands":        nil,
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "commands is empty",
+	}, {
+		name: "role with ini comment char",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/team#prod",
+		},
+		wantErr: "unsupported characters",
 	}, {
 		// The generated config uses a Linux path and the chain needs
 		// IMDS reachability that is unverified on these job envs, so

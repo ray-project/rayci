@@ -203,7 +203,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		envKeys["AWS_STS_REGIONAL_ENDPOINTS"] = struct{}{}
 		awsEnvValues = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
-				[]byte(awsChainConfig(awsRoles, "rayci-"+c.info.buildID)),
+				[]byte(awsChainConfig(
+					awsRoles, awsSessionName(c.info.buildID),
+				)),
 			),
 			"AWS_CONFIG_FILE=" + awsConfigFilePath,
 			"AWS_SDK_LOAD_CONFIG=1",
@@ -303,15 +305,20 @@ func prependCommand(step map[string]any, line string) error {
 	prepended := false
 	for _, key := range []string{"commands", "command"} {
 		v, ok := step[key]
-		if !ok || v == nil {
+		if !ok {
 			continue
+		}
+		if v == nil {
+			return fmt.Errorf("%s is empty", key)
 		}
 		cmds, err := scalarStrings(v)
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
+		// A present-but-empty key is a conflict Buildkite may resolve
+		// as a command-less no-op job when the other key has content.
 		if len(cmds) == 0 {
-			continue
+			return fmt.Errorf("%s is empty", key)
 		}
 		step[key] = append([]string{line}, cmds...)
 		prepended = true

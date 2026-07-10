@@ -158,6 +158,37 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	}
 }
 
+func TestAWSSessionName(t *testing.T) {
+	for _, test := range []struct {
+		buildID string
+		want    string
+	}{
+		{buildID: "abc123", want: "rayci-abc123"},
+		{buildID: "", want: "rayci-"},
+		// STS session names allow only [\w+=,.@-]; anything else maps
+		// to "-" so an odd build ID cannot fail AssumeRole or inject
+		// INI lines.
+		{buildID: "a:b/c", want: "rayci-a-b-c"},
+		{buildID: "x\ny", want: "rayci-x-y"},
+		{
+			buildID: strings.Repeat("a", 70),
+			want:    "rayci-" + strings.Repeat("a", 58),
+		},
+	} {
+		got := awsSessionName(test.buildID)
+		if got != test.want {
+			t.Errorf(
+				"awsSessionName(%q) = %q, want %q",
+				test.buildID, got, test.want,
+			)
+		}
+		if len(got) > 64 {
+			t.Errorf("awsSessionName(%q) is %d chars, max 64",
+				test.buildID, len(got))
+		}
+	}
+}
+
 func TestStepAWSAssumeRoles(t *testing.T) {
 	const r1 = "arn:aws:iam::111111111111:role/r1"
 	const r2 = "arn:aws:iam::222222222222:role/r2"

@@ -110,7 +110,7 @@ func scalarStrings(v any) ([]string, error) {
 		return out, nil
 	}
 	if list, ok := v.([]string); ok {
-		return list, nil
+		return append([]string(nil), list...), nil
 	}
 	s, err := scalarString(v)
 	if err != nil {

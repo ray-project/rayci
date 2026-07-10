@@ -218,6 +218,18 @@ func TestCloneMap(t *testing.T) {
 	}
 }
 
+func TestScalarStrings_copies(t *testing.T) {
+	in := []string{"a", "b"}
+	got, err := scalarStrings(in)
+	if err != nil {
+		t.Fatalf("scalarStrings(%v): %v", in, err)
+	}
+	got[0] = "mutated"
+	if in[0] != "a" {
+		t.Errorf("scalarStrings aliases its input: in = %v", in)
+	}
+}
+
 func TestCloneMapExcept(t *testing.T) {
 	for _, test := range []struct {
 		m      map[string]any

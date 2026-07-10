@@ -64,17 +64,50 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 
 // checkAWSRoleARN rejects values that cannot work as a literal role ARN.
 // The value is rendered verbatim into the generated INI and base64-encoded
-// at generation time: whitespace would inject arbitrary config lines, and
-// Buildkite matrix tokens or $ env references are substituted only after
-// generation, where they cannot reach inside the base64 blob.
+// at generation time, so only characters legal in role ARNs pass:
+// whitespace or INI-special bytes would inject or truncate config lines,
+// and Buildkite matrix tokens or $ env references are substituted only
+// after generation, where they cannot reach inside the base64 blob.
 func checkAWSRoleARN(r string) error {
 	if !strings.HasPrefix(r, "arn:") {
 		return fmt.Errorf("role %q is not an ARN", r)
 	}
-	if strings.ContainsAny(r, " \t\n\r\"'$") || strings.Contains(r, "{{") {
-		return fmt.Errorf("role %q contains unsupported characters", r)
+	for _, c := range r {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z',
+			c >= '0' && c <= '9',
+			c == ':', c == '/', c == '+', c == '=',
+			c == ',', c == '.', c == '@', c == '_', c == '-':
+		default:
+			return fmt.Errorf("role %q contains unsupported characters", r)
+		}
 	}
 	return nil
+}
+
+// awsSessionName derives a valid STS role session name from the build ID:
+// STS restricts session names to 64 chars of [\w+=,.@-], and the name is
+// rendered verbatim into the generated INI. The build ID comes from
+// infrastructure rather than the step author, so invalid bytes map to "-"
+// instead of failing generation.
+func awsSessionName(buildID string) string {
+	const prefix = "rayci-"
+	b := []byte(buildID)
+	for i, c := range b {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z',
+			c >= '0' && c <= '9',
+			c == '+', c == '=', c == ',', c == '.',
+			c == '@', c == '_', c == '-':
+		default:
+			b[i] = '-'
+		}
+	}
+	name := prefix + string(b)
+	if len(name) > 64 {
+		name = name[:64]
+	}
+	return name
 }
 
 // awsChainConfig generates an AWS shared-config (INI) file that expresses
