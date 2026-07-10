@@ -76,10 +76,27 @@ func TestAWSChainConfig(t *testing.T) {
 	}
 }
 
+// TestAWSChainSetupCommand_noBareDollar ensures every $ in the setup command
+// is escaped as $$: rayci -upload pipes the pipeline through
+// "buildkite-agent pipeline upload", which interpolates bare $VAR references
+// against the uploader's environment (where these vars are unset), silently
+// emptying the command.
+func TestAWSChainSetupCommand_noBareDollar(t *testing.T) {
+	rest := strings.ReplaceAll(awsChainSetupCommand, "$$", "")
+	if strings.Contains(rest, "$") {
+		t.Errorf(
+			"awsChainSetupCommand has a bare $, which buildkite-agent"+
+				" interpolates away at upload: %q",
+			awsChainSetupCommand,
+		)
+	}
+}
+
 // TestAWSChainSetupCommand executes the prepended setup command with a real
-// shell, the way the docker plugin runs step commands, verifying that it
-// materializes the config byte-for-byte and clears static credentials that
-// would otherwise shadow the config-file chain.
+// shell, the way the docker plugin runs step commands after buildkite-agent
+// unescapes $$ to $ at upload, verifying that it materializes the config
+// byte-for-byte and clears static credentials that would otherwise shadow
+// the config-file chain.
 func TestAWSChainSetupCommand(t *testing.T) {
 	dir := t.TempDir()
 	configFile := filepath.Join(dir, "aws.config")
@@ -90,7 +107,8 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		"arn:aws:iam::222222222222:role/r2",
 	})
 
-	script := awsChainSetupCommand +
+	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
+	script := uploaded +
 		`; printf '%s' "${AWS_ACCESS_KEY_ID:-cleared}" > "` + leakFile + `"`
 	cmd := exec.Command("/bin/bash", "-ec", script)
 	cmd.Env = append(os.Environ(),

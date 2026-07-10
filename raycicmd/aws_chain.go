@@ -14,32 +14,79 @@ const (
 
 	// awsChainSetupCommand is prepended to a step's commands to write the
 	// generated chain config (delivered base64-encoded via the
-	// RAYCI_AWS_CONFIG_B64 step env var, so multi-line content cannot be
-	// mangled on its way through Buildkite and docker env propagation) to
-	// AWS_CONFIG_FILE, where AWS SDKs pick it up. The unset guards against
-	// image profile scripts: the docker plugin runs commands under a login
-	// shell, and any static AWS_* vars exported there would take precedence
-	// over the config-file chain in every SDK.
+	// RAYCI_AWS_CONFIG_B64 container env var, so multi-line content cannot
+	// be mangled on its way through docker env propagation) to
+	// AWS_CONFIG_FILE, where AWS SDKs pick it up. The unset list covers
+	// every credential source that ranks above the shared-config file in
+	// SDK default chains: the docker plugin runs commands under a login
+	// shell, and image profile scripts exporting any of these would
+	// silently shadow the chain. $ is escaped as $$ because
+	// "buildkite-agent pipeline upload" interpolates bare $VAR references
+	// against the uploader's environment.
 	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
 		` AWS_SESSION_TOKEN AWS_PROFILE AWS_DEFAULT_PROFILE` +
-		` && printf '%s' "$RAYCI_AWS_CONFIG_B64" | base64 -d > "$AWS_CONFIG_FILE"`
+		` AWS_SHARED_CREDENTIALS_FILE AWS_WEB_IDENTITY_TOKEN_FILE` +
+		` AWS_ROLE_ARN AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` +
+		` AWS_CONTAINER_CREDENTIALS_FULL_URI` +
+		` && printf '%s' "$$RAYCI_AWS_CONFIG_B64"` +
+		` | base64 -d > "$$AWS_CONFIG_FILE"`
 )
 
 // stepAWSAssumeRoles reads the aws_assume_role step key: a single role ARN
 // or a list of ARNs in assume order. Returns nil when the key is absent.
 func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 	v, ok := step["aws_assume_role"]
-	if !ok || v == nil {
+	if !ok {
 		return nil, nil
 	}
-	roles := toStringList(v)
-	if list, isList := v.([]any); isList && len(roles) != len(list) {
-		return nil, fmt.Errorf("aws_assume_role has non-string entries: %v", v)
+
+	var roles []string
+	switch v := v.(type) {
+	case string:
+		roles = []string{v}
+	case []string:
+		roles = v
+	case []any:
+		for _, item := range v {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf(
+					"aws_assume_role has non-string entry: %v", item,
+				)
+			}
+			roles = append(roles, s)
+		}
+	default:
+		return nil, fmt.Errorf(
+			"aws_assume_role must be a role ARN or a list of role ARNs,"+
+				" got %v", v,
+		)
 	}
 	if len(roles) == 0 {
 		return nil, fmt.Errorf("aws_assume_role is empty")
 	}
+	for _, r := range roles {
+		if err := checkAWSRoleARN(r); err != nil {
+			return nil, fmt.Errorf("aws_assume_role: %w", err)
+		}
+	}
 	return roles, nil
+}
+
+// checkAWSRoleARN rejects values that cannot work as a literal role ARN.
+// The value is rendered verbatim into the generated INI, base64-encoded at
+// generation time: whitespace would inject arbitrary config lines, and
+// Buildkite matrix tokens or $ env references can no longer be substituted
+// (matrix expansion and upload-time interpolation both run after generation
+// and cannot see inside the base64 blob).
+func checkAWSRoleARN(r string) error {
+	if !strings.HasPrefix(r, "arn:") {
+		return fmt.Errorf("role %q is not an ARN", r)
+	}
+	if strings.ContainsAny(r, " \t\n\r\"'$") || strings.Contains(r, "{{") {
+		return fmt.Errorf("role %q contains unsupported characters", r)
+	}
+	return nil
 }
 
 // awsChainConfig generates an AWS shared-config (INI) file that expresses

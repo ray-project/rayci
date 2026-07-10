@@ -162,6 +162,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("read aws_assume_role: %w", err)
 	}
+	var awsEnvs []string
 	if len(awsRoles) > 0 {
 		// The generated config uses a Linux path, and IMDS reachability
 		// from these job envs is unverified; fail at generation time
@@ -171,10 +172,20 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 				"aws_assume_role is not supported on job_env %q", jobEnv,
 			)
 		}
-		envMap["RAYCI_AWS_CONFIG_B64"] = base64.StdEncoding.EncodeToString(
-			[]byte(awsChainConfig(awsRoles)),
-		)
-		envMap["AWS_CONFIG_FILE"] = awsConfigFilePath
+		// Chain env goes into the docker plugin environment, not step
+		// env: step env applies to host-side job phases (hooks, artifact
+		// upload), where the config file does not exist and pointing
+		// AWS_CONFIG_FILE at it would change the host's credentials.
+		// AWS_REGION propagation replaces what the removed
+		// propagate-aws-auth-tokens flag used to carry.
+		awsEnvs = []string{
+			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
+				[]byte(awsChainConfig(awsRoles)),
+			),
+			"AWS_CONFIG_FILE=" + awsConfigFilePath,
+			"AWS_REGION",
+			"AWS_DEFAULT_REGION",
+		}
 		if err := prependCommand(result, awsChainSetupCommand); err != nil {
 			return nil, fmt.Errorf("set up aws_assume_role chain: %w", err)
 		}
@@ -197,6 +208,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		envKeyList = append(envKeyList, k)
 	}
 	sort.Strings(envKeyList)
+	envKeyList = append(envKeyList, awsEnvs...)
 
 	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
 	if d := c.config.DockerPlugin; d != nil {

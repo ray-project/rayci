@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 )
 
 func TestParseStepEnvs(t *testing.T) {
@@ -1039,29 +1040,30 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 			)
 		}
 
+		// The chain env lives only in the docker plugin environment, not
+		// step env: step env applies to host-side job phases (hooks,
+		// artifact upload), where the config file does not exist.
 		env := step["env"].(map[string]string)
+		for _, k := range []string{"AWS_CONFIG_FILE", "RAYCI_AWS_CONFIG_B64"} {
+			if v, ok := env[k]; ok {
+				t.Errorf("step %d: step env has %s=%q, want absent", i, k, v)
+			}
+		}
+
 		wantB64 := base64.StdEncoding.EncodeToString(
 			[]byte(awsChainConfig(roles)),
 		)
-		if got := env["RAYCI_AWS_CONFIG_B64"]; got != wantB64 {
-			t.Errorf(
-				"step %d: RAYCI_AWS_CONFIG_B64 = %q, want %q",
-				i, got, wantB64,
-			)
-		}
-		if got := env["AWS_CONFIG_FILE"]; got != awsConfigFilePath {
-			t.Errorf(
-				"step %d: AWS_CONFIG_FILE = %q, want %q",
-				i, got, awsConfigFilePath,
-			)
-		}
-
 		dockerEnvs := toStringList(docker["environment"])
-		for _, k := range []string{"RAYCI_AWS_CONFIG_B64", "AWS_CONFIG_FILE"} {
-			if !slices.Contains(dockerEnvs, k) {
+		for _, e := range []string{
+			"RAYCI_AWS_CONFIG_B64=" + wantB64,
+			"AWS_CONFIG_FILE=" + awsConfigFilePath,
+			"AWS_REGION",
+			"AWS_DEFAULT_REGION",
+		} {
+			if !slices.Contains(dockerEnvs, e) {
 				t.Errorf(
 					"step %d: docker environment misses %q: %v",
-					i, k, dockerEnvs,
+					i, e, dockerEnvs,
 				)
 			}
 		}
@@ -1102,32 +1104,89 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 	}, info)
 
 	for _, test := range []struct {
-		name string
-		step map[string]any
+		name    string
+		step    map[string]any
+		wantErr string
 	}{{
 		name: "empty role list",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": []any{},
 		},
+		wantErr: "aws_assume_role is empty",
 	}, {
 		name: "non-string role",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": []any{42},
 		},
+		wantErr: "non-string entry",
+	}, {
+		name: "null value",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": nil,
+		},
+		wantErr: "must be a role ARN",
+	}, {
+		name: "non-string scalar",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": 42,
+		},
+		wantErr: "must be a role ARN",
+	}, {
+		name: "empty string role",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "",
+		},
+		wantErr: "not an ARN",
+	}, {
+		name: "not an ARN",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "some-role-name",
+		},
+		wantErr: "not an ARN",
+	}, {
+		// A newline would inject arbitrary INI lines into the generated
+		// config; matrix tokens and $ references cannot survive the
+		// base64 bake (Buildkite substitutes them after generation).
+		name: "role with newline",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r\ncredential_process = evil",
+		},
+		wantErr: "unsupported characters",
+	}, {
+		name: "role with matrix token",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/{{matrix}}-role",
+		},
+		wantErr: "unsupported characters",
+	}, {
+		name: "role with env reference",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/$ROLE",
+		},
+		wantErr: "unsupported characters",
 	}, {
 		name: "no command",
 		step: map[string]any{
 			"label":           "no command",
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
+		wantErr: "step has no command",
 	}, {
 		name: "empty commands list",
 		step: map[string]any{
 			"commands":        []any{},
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
+		wantErr: "step has no command",
 	}, {
 		// The generated config uses a Linux path and the chain needs
 		// IMDS reachability that is unverified on these job envs, so
@@ -1138,6 +1197,7 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"job_env":         windowsJobEnv,
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
+		wantErr: "not supported on job_env",
 	}, {
 		name: "macos job env",
 		step: map[string]any{
@@ -1145,6 +1205,7 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"job_env":         macosJobEnv,
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
+		wantErr: "not supported on job_env",
 	}} {
 		t.Run(test.name, func(t *testing.T) {
 			g := &pipelineGroup{
@@ -1152,8 +1213,13 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 				Steps: []map[string]any{test.step},
 			}
 			filter := &stepFilter{runAll: true}
-			if _, err := convertSingleGroup(c, g, filter); err == nil {
-				t.Errorf("convert succeeded, want error")
+			_, err := convertSingleGroup(c, g, filter)
+			if err == nil {
+				t.Fatalf("convert succeeded, want error %q", test.wantErr)
+			}
+			if !strings.Contains(err.Error(), test.wantErr) {
+				t.Errorf("convert error = %q, want contains %q",
+					err, test.wantErr)
 			}
 		})
 	}
