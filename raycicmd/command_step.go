@@ -118,6 +118,11 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 
 	result := cloneMapExcept(step, commandStepDropKeys)
+	if len(result) == 0 {
+		return nil, fmt.Errorf(
+			"step has only rayci-processed keys (missing command?): %v", step,
+		)
+	}
 
 	if agentQueue != skipQueue { // queue type not supported, skip.
 		result["agents"] = newBkAgents(agentQueue)
@@ -156,11 +161,24 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		envMap["RAYCI_FETCH_FULL_HISTORY"] = "1"
 	}
 
+	result["env"] = envMap
+
+	envKeys := make(map[string]struct{})
+	for k := range envMap {
+		envKeys[k] = struct{}{}
+	}
+	for _, k := range c.config.HookEnvKeys {
+		envKeys[k] = struct{}{}
+	}
+	for _, k := range c.config.BuildEnvKeys {
+		envKeys[k] = struct{}{}
+	}
+
 	jobEnv, _ := stringInMap(step, "job_env")
 
 	awsRoles, err := stepAWSAssumeRoles(step)
 	if err != nil {
-		return nil, fmt.Errorf("read aws_assume_role: %w", err)
+		return nil, err
 	}
 	var awsEnvValues []string
 	if len(awsRoles) > 0 {
@@ -176,11 +194,16 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		// env: step env applies to host-side job phases (hooks, artifact
 		// upload), where the config file does not exist and pointing
 		// AWS_CONFIG_FILE at it would change the host's credentials.
+		// The container performs the chain's STS AssumeRole calls itself,
+		// so it needs the host's region and STS-endpoint settings, and
 		// AWS_SDK_LOAD_CONFIG makes aws-sdk-go v1 tools read the config
 		// file at all.
+		envKeys["AWS_REGION"] = struct{}{}
+		envKeys["AWS_DEFAULT_REGION"] = struct{}{}
+		envKeys["AWS_STS_REGIONAL_ENDPOINTS"] = struct{}{}
 		awsEnvValues = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
-				[]byte(awsChainConfig(awsRoles)),
+				[]byte(awsChainConfig(awsRoles, "rayci-"+c.info.buildID)),
 			),
 			"AWS_CONFIG_FILE=" + awsConfigFilePath,
 			"AWS_SDK_LOAD_CONFIG=1",
@@ -190,25 +213,6 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		}
 	}
 
-	result["env"] = envMap
-
-	envKeys := make(map[string]struct{})
-	for k := range envMap {
-		envKeys[k] = struct{}{}
-	}
-	for _, k := range c.config.HookEnvKeys {
-		envKeys[k] = struct{}{}
-	}
-	for _, k := range c.config.BuildEnvKeys {
-		envKeys[k] = struct{}{}
-	}
-	if len(awsRoles) > 0 {
-		// The container performs the chain's STS AssumeRole calls itself,
-		// so it needs the host's region and STS-endpoint settings.
-		envKeys["AWS_REGION"] = struct{}{}
-		envKeys["AWS_DEFAULT_REGION"] = struct{}{}
-		envKeys["AWS_STS_REGIONAL_ENDPOINTS"] = struct{}{}
-	}
 	var envKeyList []string
 	for k := range envKeys {
 		envKeyList = append(envKeyList, k)
@@ -302,7 +306,7 @@ func prependCommand(step map[string]any, line string) error {
 		if !ok || v == nil {
 			continue
 		}
-		cmds, err := commandStrings(v)
+		cmds, err := scalarStrings(v)
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
@@ -316,41 +320,4 @@ func prependCommand(step map[string]any, line string) error {
 		return fmt.Errorf("step has no command")
 	}
 	return nil
-}
-
-// commandStrings normalizes a step command value to a string list, coercing
-// scalar entries to strings the way Buildkite coerces unquoted YAML numbers
-// and booleans. Unlike the lossy toStringList, which silently drops
-// non-string entries, this is strict: a command entry that cannot be
-// coerced is an error, because dropping one would run a different script.
-func commandStrings(v any) ([]string, error) {
-	if list, ok := v.([]any); ok {
-		var cmds []string
-		for _, item := range list {
-			s, err := commandString(item)
-			if err != nil {
-				return nil, err
-			}
-			cmds = append(cmds, s)
-		}
-		return cmds, nil
-	}
-	if list, ok := v.([]string); ok {
-		return list, nil
-	}
-	s, err := commandString(v)
-	if err != nil {
-		return nil, err
-	}
-	return []string{s}, nil
-}
-
-func commandString(v any) (string, error) {
-	switch v := v.(type) {
-	case string:
-		return v, nil
-	case int, int64, uint64, float64, bool:
-		return fmt.Sprintf("%v", v), nil
-	}
-	return "", fmt.Errorf("unsupported command entry %v of type %T", v, v)
 }

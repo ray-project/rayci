@@ -14,6 +14,8 @@ import (
 )
 
 func TestAWSChainConfig(t *testing.T) {
+	const session = "rayci-abc123"
+
 	for _, test := range []struct {
 		name  string
 		roles []string
@@ -24,6 +26,7 @@ func TestAWSChainConfig(t *testing.T) {
 		want: strings.Join([]string{
 			"[default]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
+			"role_session_name = rayci-abc123",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 		}, "\n"),
@@ -36,10 +39,12 @@ func TestAWSChainConfig(t *testing.T) {
 		want: strings.Join([]string{
 			"[profile chain_0]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
+			"role_session_name = rayci-abc123",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 			"[default]",
 			"role_arn = arn:aws:iam::222222222222:role/r2",
+			"role_session_name = rayci-abc123",
 			"source_profile = chain_0",
 			"",
 		}, "\n"),
@@ -53,20 +58,23 @@ func TestAWSChainConfig(t *testing.T) {
 		want: strings.Join([]string{
 			"[profile chain_0]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
+			"role_session_name = rayci-abc123",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 			"[profile chain_1]",
 			"role_arn = arn:aws:iam::222222222222:role/r2",
+			"role_session_name = rayci-abc123",
 			"source_profile = chain_0",
 			"",
 			"[default]",
 			"role_arn = arn:aws:iam::333333333333:role/r3",
+			"role_session_name = rayci-abc123",
 			"source_profile = chain_1",
 			"",
 		}, "\n"),
 	}} {
 		t.Run(test.name, func(t *testing.T) {
-			got := awsChainConfig(test.roles)
+			got := awsChainConfig(test.roles, session)
 			if got != test.want {
 				t.Errorf(
 					"awsChainConfig(%v) = %q, want %q",
@@ -106,7 +114,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	content := awsChainConfig([]string{
 		"arn:aws:iam::111111111111:role/r1",
 		"arn:aws:iam::222222222222:role/r2",
-	})
+	}, "rayci-abc123")
 
 	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
 	script := uploaded + `; printf '%s\n'` +
@@ -196,7 +204,7 @@ func TestAWSChainConfig_parsedBySDK(t *testing.T) {
 	}
 
 	file := filepath.Join(t.TempDir(), "aws.config")
-	content := awsChainConfig(roles)
+	content := awsChainConfig(roles, "rayci-abc123")
 	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -219,6 +227,12 @@ func TestAWSChainConfig_parsedBySDK(t *testing.T) {
 	root := load("chain_0")
 	if root.RoleARN != roles[0] {
 		t.Errorf("chain_0 role_arn = %q, want %q", root.RoleARN, roles[0])
+	}
+	if root.RoleSessionName != "rayci-abc123" {
+		t.Errorf(
+			"chain_0 role_session_name = %q, want rayci-abc123",
+			root.RoleSessionName,
+		)
 	}
 	if root.CredentialSource != "Ec2InstanceMetadata" {
 		t.Errorf(

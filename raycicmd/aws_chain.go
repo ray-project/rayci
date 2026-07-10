@@ -47,29 +47,9 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 		return nil, nil
 	}
 
-	var roles []string
-	switch v := v.(type) {
-	case string:
-		roles = []string{v}
-	case []string:
-		// YAML sequences decode as []any; Go-constructed step maps
-		// carry []string.
-		roles = v
-	case []any:
-		for _, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				return nil, fmt.Errorf(
-					"aws_assume_role has non-string entry: %v", item,
-				)
-			}
-			roles = append(roles, s)
-		}
-	default:
-		return nil, fmt.Errorf(
-			"aws_assume_role must be a role ARN or a list of role ARNs,"+
-				" got %v", v,
-		)
+	roles, err := scalarStrings(v)
+	if err != nil {
+		return nil, fmt.Errorf("aws_assume_role: %w", err)
 	}
 	if len(roles) == 0 {
 		return nil, fmt.Errorf("aws_assume_role is empty")
@@ -83,11 +63,10 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 }
 
 // checkAWSRoleARN rejects values that cannot work as a literal role ARN.
-// The value is rendered verbatim into the generated INI, base64-encoded at
-// generation time: whitespace would inject arbitrary config lines, and
-// Buildkite matrix tokens or $ env references can no longer be substituted
-// (matrix expansion and upload-time interpolation both run after generation
-// and cannot see inside the base64 blob).
+// The value is rendered verbatim into the generated INI and base64-encoded
+// at generation time: whitespace would inject arbitrary config lines, and
+// Buildkite matrix tokens or $ env references are substituted only after
+// generation, where they cannot reach inside the base64 blob.
 func checkAWSRoleARN(r string) error {
 	if !strings.HasPrefix(r, "arn:") {
 		return fmt.Errorf("role %q is not an ARN", r)
@@ -104,8 +83,9 @@ func checkAWSRoleARN(r string) error {
 // from instance metadata (IMDS), each subsequent role from the previous one,
 // and the last role is the [default] profile that SDKs run as. Because the
 // chain roots at IMDS, SDKs re-derive the whole chain before expiry instead
-// of holding frozen credentials.
-func awsChainConfig(roles []string) string {
+// of holding frozen credentials. sessionName labels every hop's STS session
+// so CloudTrail entries map back to the build.
+func awsChainConfig(roles []string, sessionName string) string {
 	profile := func(i int) string {
 		if i == len(roles)-1 {
 			return "default"
@@ -120,6 +100,7 @@ func awsChainConfig(roles []string) string {
 		}
 		fmt.Fprintf(b, "[%s]\n", profile(i))
 		fmt.Fprintf(b, "role_arn = %s\n", role)
+		fmt.Fprintf(b, "role_session_name = %s\n", sessionName)
 		if i == 0 {
 			fmt.Fprintln(b, "credential_source = Ec2InstanceMetadata")
 		} else {

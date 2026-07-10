@@ -1052,7 +1052,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		}
 
 		wantB64 := base64.StdEncoding.EncodeToString(
-			[]byte(awsChainConfig(roles)),
+			[]byte(awsChainConfig(roles, "rayci-"+buildID)),
 		)
 		dockerEnvs := toStringList(docker["environment"])
 		for _, e := range []string{
@@ -1120,26 +1120,28 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		},
 		wantErr: "aws_assume_role is empty",
 	}, {
+		// Scalars coerce like command entries do, then fail ARN
+		// validation with the coerced value in the message.
 		name: "non-string role",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": []any{42},
 		},
-		wantErr: "non-string entry",
+		wantErr: "not an ARN",
 	}, {
 		name: "null value",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": nil,
 		},
-		wantErr: "must be a role ARN",
+		wantErr: "unsupported entry",
 	}, {
 		name: "non-string scalar",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": 42,
 		},
-		wantErr: "must be a role ARN",
+		wantErr: "not an ARN",
 	}, {
 		name: "empty string role",
 		step: map[string]any{
@@ -1192,14 +1194,14 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		step: map[string]any{
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
-		wantErr: "step has no command",
+		wantErr: "only rayci-processed keys",
 	}, {
 		name: "composite command entry",
 		step: map[string]any{
 			"commands":        []any{"echo 1", map[string]any{"k": "v"}},
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
-		wantErr: "unsupported command entry",
+		wantErr: "unsupported entry",
 	}, {
 		name: "empty commands list",
 		step: map[string]any{
@@ -1226,6 +1228,15 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
 		wantErr: "not supported on job_env",
+	}, {
+		// A misconfigured step with only rayci-processed keys and no
+		// aws_assume_role must also fail loudly rather than upload as a
+		// silently-green command-less job.
+		name: "only dropped keys without aws",
+		step: map[string]any{
+			"queue": "default",
+		},
+		wantErr: "only rayci-processed keys",
 	}} {
 		t.Run(test.name, func(t *testing.T) {
 			g := &pipelineGroup{

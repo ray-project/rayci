@@ -92,6 +92,43 @@ func checkStepKeys(m map[string]any, allowed []string) error {
 	return nil
 }
 
+// scalarStrings normalizes a step value to a string list, coercing scalar
+// entries to strings the way Buildkite coerces unquoted YAML numbers and
+// booleans. Unlike the lossy toStringList, which silently drops non-string
+// entries, this is strict: an entry that cannot be coerced is an error,
+// because dropping one would change the step's meaning.
+func scalarStrings(v any) ([]string, error) {
+	if list, ok := v.([]any); ok {
+		var out []string
+		for _, item := range list {
+			s, err := scalarString(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, s)
+		}
+		return out, nil
+	}
+	if list, ok := v.([]string); ok {
+		return list, nil
+	}
+	s, err := scalarString(v)
+	if err != nil {
+		return nil, err
+	}
+	return []string{s}, nil
+}
+
+func scalarString(v any) (string, error) {
+	switch v := v.(type) {
+	case string:
+		return v, nil
+	case int, int64, uint64, float64, bool:
+		return fmt.Sprintf("%v", v), nil
+	}
+	return "", fmt.Errorf("unsupported entry %v of type %T", v, v)
+}
+
 func toStringList(v any) []string {
 	switch v := v.(type) {
 	case nil:
