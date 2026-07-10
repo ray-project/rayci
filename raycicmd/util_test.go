@@ -229,14 +229,16 @@ func TestCloneMapExcept(t *testing.T) {
 		m: map[string]any{"a": "b"}, except: nil,
 		want: map[string]any{"a": "b"},
 	}, {
+		// Callers write into the result, so an all-keys-dropped clone
+		// must be an empty writable map, not nil.
 		m: map[string]any{"a": "b"}, except: []string{"a"},
-		want: nil,
+		want: map[string]any{},
 	}, {
 		m: map[string]any{"a": "b", "c": "d"}, except: []string{"a"},
 		want: map[string]any{"c": "d"},
 	}, {
 		m: map[string]any{"a": "b", "c": "d"}, except: []string{"a", "c"},
-		want: nil,
+		want: map[string]any{},
 	}, {
 		m: map[string]any{"a": "b", "c": "d"}, except: []string{"b"},
 		want: map[string]any{"a": "b", "c": "d"},

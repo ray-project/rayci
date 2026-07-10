@@ -76,9 +76,6 @@ func cloneMapExcept(m map[string]any, except []string) map[string]any {
 			res[k] = v
 		}
 	}
-	if len(res) == 0 {
-		return nil
-	}
 	return res
 }
 

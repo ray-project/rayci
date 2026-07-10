@@ -118,11 +118,6 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 
 	result := cloneMapExcept(step, commandStepDropKeys)
-	if result == nil {
-		// cloneMapExcept returns nil when every key was dropped; keep a
-		// writable map so such steps get validation errors, not panics.
-		result = make(map[string]any)
-	}
 
 	if agentQueue != skipQueue { // queue type not supported, skip.
 		result["agents"] = newBkAgents(agentQueue)
@@ -167,7 +162,7 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if err != nil {
 		return nil, fmt.Errorf("read aws_assume_role: %w", err)
 	}
-	var awsEnvs []string
+	var awsEnvValues []string
 	if len(awsRoles) > 0 {
 		// The generated config uses a Linux path, and IMDS reachability
 		// from these job envs is unverified; fail at generation time
@@ -181,19 +176,14 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		// env: step env applies to host-side job phases (hooks, artifact
 		// upload), where the config file does not exist and pointing
 		// AWS_CONFIG_FILE at it would change the host's credentials.
-		// The container performs the chain's STS AssumeRole calls itself,
-		// so it needs the host's region and STS-endpoint settings;
 		// AWS_SDK_LOAD_CONFIG makes aws-sdk-go v1 tools read the config
 		// file at all.
-		awsEnvs = []string{
+		awsEnvValues = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
 				[]byte(awsChainConfig(awsRoles)),
 			),
 			"AWS_CONFIG_FILE=" + awsConfigFilePath,
 			"AWS_SDK_LOAD_CONFIG=1",
-			"AWS_REGION",
-			"AWS_DEFAULT_REGION",
-			"AWS_STS_REGIONAL_ENDPOINTS",
 		}
 		if err := prependCommand(result, awsChainSetupCommand); err != nil {
 			return nil, fmt.Errorf("set up aws_assume_role chain: %w", err)
@@ -212,12 +202,19 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	for _, k := range c.config.BuildEnvKeys {
 		envKeys[k] = struct{}{}
 	}
+	if len(awsRoles) > 0 {
+		// The container performs the chain's STS AssumeRole calls itself,
+		// so it needs the host's region and STS-endpoint settings.
+		envKeys["AWS_REGION"] = struct{}{}
+		envKeys["AWS_DEFAULT_REGION"] = struct{}{}
+		envKeys["AWS_STS_REGIONAL_ENDPOINTS"] = struct{}{}
+	}
 	var envKeyList []string
 	for k := range envKeys {
 		envKeyList = append(envKeyList, k)
 	}
 	sort.Strings(envKeyList)
-	envKeyList = append(envKeyList, awsEnvs...)
+	envKeyList = append(envKeyList, awsEnvValues...)
 
 	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
 	if d := c.config.DockerPlugin; d != nil {
@@ -291,4 +288,69 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 
 	return result, nil
+}
+
+// prependCommand inserts line before a step's existing command(s). Both
+// "command" and "commands" are patched when a step carries both — Buildkite
+// honors either key, and the setup line must precede whichever one runs.
+// The docker plugin runs all command lines in a single shell invocation, so
+// files written by line are visible to the rest.
+func prependCommand(step map[string]any, line string) error {
+	prepended := false
+	for _, key := range []string{"commands", "command"} {
+		v, ok := step[key]
+		if !ok || v == nil {
+			continue
+		}
+		cmds, err := commandStrings(v)
+		if err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		if len(cmds) == 0 {
+			continue
+		}
+		step[key] = append([]string{line}, cmds...)
+		prepended = true
+	}
+	if !prepended {
+		return fmt.Errorf("step has no command")
+	}
+	return nil
+}
+
+// commandStrings normalizes a step command value to a string list, coercing
+// scalar entries to strings the way Buildkite coerces unquoted YAML numbers
+// and booleans. Unlike the lossy toStringList, which silently drops
+// non-string entries, this is strict: a command entry that cannot be
+// coerced is an error, because dropping one would run a different script.
+func commandStrings(v any) ([]string, error) {
+	if list, ok := v.([]any); ok {
+		var cmds []string
+		for _, item := range list {
+			s, err := commandString(item)
+			if err != nil {
+				return nil, err
+			}
+			cmds = append(cmds, s)
+		}
+		return cmds, nil
+	}
+	if list, ok := v.([]string); ok {
+		return list, nil
+	}
+	s, err := commandString(v)
+	if err != nil {
+		return nil, err
+	}
+	return []string{s}, nil
+}
+
+func commandString(v any) (string, error) {
+	switch v := v.(type) {
+	case string:
+		return v, nil
+	case int, int64, uint64, float64, bool:
+		return fmt.Sprintf("%v", v), nil
+	}
+	return "", fmt.Errorf("unsupported command entry %v of type %T", v, v)
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -110,6 +111,8 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
 	script := uploaded + `; printf '%s\n'` +
 		` "${AWS_ACCESS_KEY_ID:-cleared}"` +
+		` "${AWS_SECRET_KEY:-cleared}"` +
+		` "${AWS_ENDPOINT_URL:-cleared}"` +
 		` "${AWS_EC2_METADATA_DISABLED:-cleared}"` +
 		` "${AWS_SHARED_CREDENTIALS_FILE:-unset}"` +
 		` > "` + leakFile + `"`
@@ -119,6 +122,8 @@ func TestAWSChainSetupCommand(t *testing.T) {
 			base64.StdEncoding.EncodeToString([]byte(content)),
 		"AWS_CONFIG_FILE="+configFile,
 		"AWS_ACCESS_KEY_ID=AKIAFAKESTATICKEY",
+		"AWS_SECRET_KEY=legacy-alias-secret",
+		"AWS_ENDPOINT_URL=http://localstack:4566",
 		"AWS_EC2_METADATA_DISABLED=true",
 		"AWS_SHARED_CREDENTIALS_FILE=/etc/fake-creds",
 	)
@@ -139,9 +144,44 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		t.Fatalf("read leak file: %v", err)
 	}
 	// /dev/null, not unset — see the awsChainSetupCommand doc comment.
-	want := "cleared\ncleared\n/dev/null\n"
+	want := "cleared\ncleared\ncleared\ncleared\n/dev/null\n"
 	if string(leak) != want {
 		t.Errorf("env after setup = %q, want %q", leak, want)
+	}
+}
+
+func TestStepAWSAssumeRoles(t *testing.T) {
+	const r1 = "arn:aws:iam::111111111111:role/r1"
+	const r2 = "arn:aws:iam::222222222222:role/r2"
+
+	for _, test := range []struct {
+		name  string
+		value any
+		want  []string
+	}{
+		{name: "string", value: r1, want: []string{r1}},
+		{name: "any list", value: []any{r1, r2}, want: []string{r1, r2}},
+		// Go-constructed step maps carry []string, not YAML's []any.
+		{name: "string list", value: []string{r1, r2}, want: []string{r1, r2}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := stepAWSAssumeRoles(map[string]any{
+				"aws_assume_role": test.value,
+			})
+			if err != nil {
+				t.Fatalf("stepAWSAssumeRoles(%v): %v", test.value, err)
+			}
+			if !slices.Equal(got, test.want) {
+				t.Errorf(
+					"stepAWSAssumeRoles(%v) = %v, want %v",
+					test.value, got, test.want,
+				)
+			}
+		})
+	}
+
+	if got, err := stepAWSAssumeRoles(map[string]any{}); err != nil || got != nil {
+		t.Errorf("stepAWSAssumeRoles(absent) = %v, %v, want nil, nil", got, err)
 	}
 }
 

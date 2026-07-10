@@ -27,11 +27,13 @@ const (
 	// "buildkite-agent pipeline upload" interpolates bare $VAR references
 	// against the uploader's environment.
 	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
-		` AWS_SESSION_TOKEN AWS_PROFILE AWS_DEFAULT_PROFILE` +
+		` AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN` +
+		` AWS_PROFILE AWS_DEFAULT_PROFILE` +
 		` AWS_WEB_IDENTITY_TOKEN_FILE` +
 		` AWS_ROLE_ARN AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` +
 		` AWS_CONTAINER_CREDENTIALS_FULL_URI` +
 		` AWS_EC2_METADATA_DISABLED AWS_EC2_METADATA_SERVICE_ENDPOINT` +
+		` AWS_ENDPOINT_URL AWS_ENDPOINT_URL_STS` +
 		` && export AWS_SHARED_CREDENTIALS_FILE=/dev/null` +
 		` && printf '%s' "$$RAYCI_AWS_CONFIG_B64"` +
 		` | base64 -d > "$$AWS_CONFIG_FILE"`
@@ -49,6 +51,10 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 	switch v := v.(type) {
 	case string:
 		roles = []string{v}
+	case []string:
+		// YAML sequences decode as []any; Go-constructed step maps
+		// carry []string.
+		roles = v
 	case []any:
 		for _, item := range v {
 			s, ok := item.(string)
@@ -121,69 +127,4 @@ func awsChainConfig(roles []string) string {
 		}
 	}
 	return b.String()
-}
-
-// prependCommand inserts line before a step's existing command(s). Both
-// "command" and "commands" are patched when a step carries both — Buildkite
-// honors either key, and the setup line must precede whichever one runs.
-// The docker plugin runs all command lines in a single shell invocation, so
-// files written by line are visible to the rest.
-func prependCommand(step map[string]any, line string) error {
-	prepended := false
-	for _, key := range []string{"commands", "command"} {
-		v, ok := step[key]
-		if !ok || v == nil {
-			continue
-		}
-		cmds, err := commandStrings(v)
-		if err != nil {
-			return fmt.Errorf("%s: %w", key, err)
-		}
-		if len(cmds) == 0 {
-			continue
-		}
-		step[key] = append([]string{line}, cmds...)
-		prepended = true
-	}
-	if !prepended {
-		return fmt.Errorf("step has no command")
-	}
-	return nil
-}
-
-// commandStrings normalizes a step command value to a string list, coercing
-// scalar entries to strings the way Buildkite coerces unquoted YAML numbers
-// and booleans. Unlike the lossy toStringList, which silently drops
-// non-string entries, this is strict: a command entry that cannot be
-// coerced is an error, because dropping one would run a different script.
-func commandStrings(v any) ([]string, error) {
-	if list, ok := v.([]any); ok {
-		var cmds []string
-		for _, item := range list {
-			s, err := commandString(item)
-			if err != nil {
-				return nil, err
-			}
-			cmds = append(cmds, s)
-		}
-		return cmds, nil
-	}
-	if list, ok := v.([]string); ok {
-		return list, nil
-	}
-	s, err := commandString(v)
-	if err != nil {
-		return nil, err
-	}
-	return []string{s}, nil
-}
-
-func commandString(v any) (string, error) {
-	switch v := v.(type) {
-	case string:
-		return v, nil
-	case int, int64, uint64, float64, bool:
-		return fmt.Sprintf("%v", v), nil
-	}
-	return "", fmt.Errorf("unsupported command entry %v of type %T", v, v)
 }
