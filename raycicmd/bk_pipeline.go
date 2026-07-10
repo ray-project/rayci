@@ -150,8 +150,6 @@ type stepDockerPluginConfig struct {
 
 	mountBuildkiteAgent bool
 	mountSSHAgent       bool
-
-	propagateAWSAuthTokens bool
 }
 
 func dockerPluginEnvList(config *stepDockerPluginConfig) []string {
@@ -184,9 +182,6 @@ func makeRayWindowsDockerPlugin(config *stepDockerPluginConfig) map[string]any {
 	}
 	if config.network != "" {
 		m["network"] = config.network
-	}
-	if config.propagateAWSAuthTokens {
-		m["propagate-aws-auth-tokens"] = true
 	}
 
 	return m
@@ -237,9 +232,6 @@ func makeRayDockerPlugin(
 	}
 	if config.network != "" {
 		m["network"] = config.network
-	}
-	if config.propagateAWSAuthTokens {
-		m["propagate-aws-auth-tokens"] = true
 	}
 
 	return m

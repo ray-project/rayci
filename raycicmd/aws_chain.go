@@ -5,6 +5,36 @@ import (
 	"strings"
 )
 
+const (
+	// awsConfigFilePath is where awsChainSetupCommand materializes the
+	// generated chain config inside the container.
+	awsConfigFilePath = "/tmp/rayci-aws.config"
+
+	// awsChainSetupCommand is prepended to a step's commands to write the
+	// generated chain config (delivered via the RAYCI_AWS_CONFIG step env
+	// var) to AWS_CONFIG_FILE, where AWS SDKs pick it up. The container
+	// never receives static AWS_* credentials, so SDKs fall through to the
+	// config-file chain.
+	awsChainSetupCommand = `printf '%s' "$RAYCI_AWS_CONFIG" > "$AWS_CONFIG_FILE"`
+)
+
+// stepAWSAssumeRoles reads the aws_assume_role step key: a single role ARN
+// or a list of ARNs in assume order. Returns nil when the key is absent.
+func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
+	v, ok := step["aws_assume_role"]
+	if !ok || v == nil {
+		return nil, nil
+	}
+	roles := toStringList(v)
+	if list, isList := v.([]any); isList && len(roles) != len(list) {
+		return nil, fmt.Errorf("aws_assume_role has non-string entries: %v", v)
+	}
+	if len(roles) == 0 {
+		return nil, fmt.Errorf("aws_assume_role is empty")
+	}
+	return roles, nil
+}
+
 // awsChainConfig generates an AWS shared-config (INI) file that expresses
 // roles as an assume-role chain rooted at the EC2 instance profile. roles
 // must be non-empty and listed in assume order: the first role is assumed
@@ -34,4 +64,26 @@ func awsChainConfig(roles []string) string {
 		}
 	}
 	return b.String()
+}
+
+// prependCommand inserts line before a step's existing command(s). The
+// docker plugin runs all command lines in a single shell invocation, so
+// files written and variables exported by line are visible to the rest.
+func prependCommand(step map[string]any, line string) error {
+	for _, key := range []string{"commands", "command"} {
+		v, ok := step[key]
+		if !ok || v == nil {
+			continue
+		}
+		cmds := toStringList(v)
+		if list, isList := v.([]any); isList && len(cmds) != len(list) {
+			return fmt.Errorf("%s has non-string entries: %v", key, v)
+		}
+		if len(cmds) == 0 {
+			continue
+		}
+		step[key] = append([]string{line}, cmds...)
+		return nil
+	}
+	return fmt.Errorf("step has no command")
 }

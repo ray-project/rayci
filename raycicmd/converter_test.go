@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 )
 
 func TestParseStepEnvs(t *testing.T) {
@@ -60,10 +61,6 @@ func findPlugin(plugins []any, name string) (map[string]any, bool) {
 
 func findDockerPlugin(plugins []any) (map[string]any, bool) {
 	return findPlugin(plugins, dockerPlugin)
-}
-
-func findAWSAssumeRolePlugin(plugins []any) (map[string]any, bool) {
-	return findPlugin(plugins, awsAssumeRolePlugin)
 }
 
 func findMacosSandboxPlugin(plugins []any) bool {
@@ -982,15 +979,22 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		RunnerQueues: map[string]string{"default": "fakerunner"},
 	}, info)
 
-	const role = "arn:aws:iam::123456789012:role/test-role"
+	const role1 = "arn:aws:iam::123456789012:role/hop-role"
+	const role2 = "arn:aws:iam::123456789012:role/dst-role"
 
 	g := &pipelineGroup{
 		Group: "fancy",
 		Steps: []map[string]any{{
 			"commands": []string{"echo 1"},
 
-			"aws_assume_role":                  role,
+			"aws_assume_role": role1,
+			// Accepted but ignored; the IMDS-rooted chain self-refreshes,
+			// so sessions have no fixed duration to configure.
 			"aws_assume_role_duration_seconds": 3600,
+		}, {
+			"command": "echo 2",
+
+			"aws_assume_role": []any{role1, role2},
 		}},
 	}
 
@@ -1000,24 +1004,109 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		t.Fatalf("convert: %v", err)
 	}
 
-	plugins := bk.Steps[0].(map[string]any)["plugins"].([]any)
-	assumeRole, ok := findAWSAssumeRolePlugin(plugins)
-	if !ok {
-		t.Errorf("aws assume role plugin not found in step 0")
-	} else {
-		if v, _ := stringInMap(assumeRole, "role"); v != role {
-			t.Errorf("step 0: got aws assume role %q, want %q", v, role)
+	for i, roles := range [][]string{{role1}, {role1, role2}} {
+		step := bk.Steps[i].(map[string]any)
+
+		plugins := step["plugins"].([]any)
+		if len(plugins) != 1 {
+			t.Errorf(
+				"step %d: got %d plugins, want 1 (docker only)",
+				i, len(plugins),
+			)
 		}
-		if v, _ := intInMap(assumeRole, "duration"); v != 3600 {
-			t.Errorf("step 0: got aws assume role duration %q, want 3600", v)
+
+		docker, ok := findDockerPlugin(plugins)
+		if !ok {
+			t.Fatalf("docker plugin not found in step %d", i)
+		}
+		if v, ok := boolInMap(docker, "propagate-aws-auth-tokens"); v || ok {
+			t.Errorf(
+				"step %d: propagate-aws-auth-tokens = %v, %v, want unset",
+				i, v, ok,
+			)
+		}
+
+		env := step["env"].(map[string]string)
+		if got, want := env["RAYCI_AWS_CONFIG"], awsChainConfig(roles); got != want {
+			t.Errorf("step %d: RAYCI_AWS_CONFIG = %q, want %q", i, got, want)
+		}
+		if got := env["AWS_CONFIG_FILE"]; got != awsConfigFilePath {
+			t.Errorf(
+				"step %d: AWS_CONFIG_FILE = %q, want %q",
+				i, got, awsConfigFilePath,
+			)
+		}
+
+		dockerEnvs := toStringList(docker["environment"])
+		for _, k := range []string{"RAYCI_AWS_CONFIG", "AWS_CONFIG_FILE"} {
+			if !slices.Contains(dockerEnvs, k) {
+				t.Errorf(
+					"step %d: docker environment misses %q: %v",
+					i, k, dockerEnvs,
+				)
+			}
 		}
 	}
 
-	docker, ok := findDockerPlugin(plugins)
-	if !ok {
-		t.Errorf("docker plugin not found in step 0")
-	} else if v, _ := boolInMap(docker, "propagate-aws-auth-tokens"); !v {
-		t.Errorf("step 0: docker plugin does not have propagate-aws-auth-tokens set")
+	cmds0 := toStringList(bk.Steps[0].(map[string]any)["commands"])
+	want0 := []string{awsChainSetupCommand, "echo 1"}
+	if !reflect.DeepEqual(cmds0, want0) {
+		t.Errorf("step 0 commands = %v, want %v", cmds0, want0)
+	}
+
+	cmds1 := toStringList(bk.Steps[1].(map[string]any)["command"])
+	want1 := []string{awsChainSetupCommand, "echo 2"}
+	if !reflect.DeepEqual(cmds1, want1) {
+		t.Errorf("step 1 command = %v, want %v", cmds1, want1)
+	}
+}
+
+func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
+	const buildID = "abc123"
+	info := &buildInfo{
+		buildID: buildID,
+	}
+
+	c := newConverter(&config{
+		ArtifactsBucket: "artifacts_bucket",
+		CITemp:          "s3://ci-temp/",
+		CIWorkRepo:      "fakeecr",
+
+		RunnerQueues: map[string]string{"default": "fakerunner"},
+	}, info)
+
+	for _, test := range []struct {
+		name string
+		step map[string]any
+	}{{
+		name: "empty role list",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": []any{},
+		},
+	}, {
+		name: "non-string role",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": []any{42},
+		},
+	}, {
+		name: "no command",
+		step: map[string]any{
+			"label":           "no command",
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+	}} {
+		t.Run(test.name, func(t *testing.T) {
+			g := &pipelineGroup{
+				Group: "fancy",
+				Steps: []map[string]any{test.step},
+			}
+			filter := &stepFilter{runAll: true}
+			if _, err := convertSingleGroup(c, g, filter); err == nil {
+				t.Errorf("convert succeeded, want error")
+			}
+		})
 	}
 }
 

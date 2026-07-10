@@ -60,8 +60,7 @@ func (c *commandConverter) jobEnvImage(name string) string {
 }
 
 const (
-	dockerPlugin        = "docker#v5.8.0"
-	awsAssumeRolePlugin = "cultureamp/aws-assume-role#v0.2.0"
+	dockerPlugin = "docker#v5.8.0"
 
 	macosSandboxPlugin = "ray-project/macos-sandbox#v1.0.7"
 	macosJobEnv        = "MACOS"
@@ -148,8 +147,6 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		}
 	}
 
-	assumeRole, _ := stringInMap(step, "aws_assume_role")
-
 	envMap := copyEnvMap(c.envMap)
 	if id != "" {
 		envMap["RAYCI_STEP_ID"] = id
@@ -157,6 +154,19 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if v, _ := boolInMap(step, "fetch_full_history"); v {
 		envMap["RAYCI_FETCH_FULL_HISTORY"] = "1"
 	}
+
+	awsRoles, err := stepAWSAssumeRoles(step)
+	if err != nil {
+		return nil, fmt.Errorf("read aws_assume_role: %w", err)
+	}
+	if len(awsRoles) > 0 {
+		envMap["RAYCI_AWS_CONFIG"] = awsChainConfig(awsRoles)
+		envMap["AWS_CONFIG_FILE"] = awsConfigFilePath
+		if err := prependCommand(result, awsChainSetupCommand); err != nil {
+			return nil, fmt.Errorf("set up aws_assume_role chain: %w", err)
+		}
+	}
+
 	result["env"] = envMap
 
 	envKeys := make(map[string]struct{})
@@ -191,9 +201,6 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		}
 		dockerPluginConfig.addCaps = d.AddCaps
 	}
-	if assumeRole != "" {
-		dockerPluginConfig.propagateAWSAuthTokens = true
-	}
 
 	publishPortsStr, _ := stringInMap(step, "docker_publish_tcp_ports")
 	if publishPortsStr != "" {
@@ -221,25 +228,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	default:
 		// default Linux Job env.
 		jobEnvImage := c.jobEnvImage(jobEnv)
-		var plugins []any
-		if assumeRole != "" {
-			duration, ok := intInMap(step, "aws_assume_role_duration_seconds")
-			if !ok {
-				duration = 900 // min value to assume role
-			}
-			plugins = append(plugins, map[string]any{
-				awsAssumeRolePlugin: map[string]any{
-					"role":     assumeRole,
-					"duration": duration,
-				},
-			})
-		}
-
-		plugins = append(plugins, map[string]any{
+		result["plugins"] = []any{map[string]any{
 			dockerPlugin: makeRayDockerPlugin(jobEnvImage, dockerPluginConfig),
-		})
-
-		result["plugins"] = plugins
+		}}
 		result["artifact_paths"] = defaultArtifactPaths
 	}
 
