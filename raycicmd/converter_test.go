@@ -996,6 +996,16 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 			"command": "echo 2",
 
 			"aws_assume_role": []any{role1, role2},
+		}, {
+			// YAML parsing yields []any, not []string; both list keys
+			// must normalize.
+			"commands": []any{"echo 3", "echo 4"},
+
+			"aws_assume_role": role1,
+		}, {
+			"command": []any{"echo 5"},
+
+			"aws_assume_role": role1,
 		}},
 	}
 
@@ -1005,7 +1015,9 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		t.Fatalf("convert: %v", err)
 	}
 
-	for i, roles := range [][]string{{role1}, {role1, role2}} {
+	for i, roles := range [][]string{
+		{role1}, {role1, role2}, {role1}, {role1},
+	} {
 		step := bk.Steps[i].(map[string]any)
 
 		plugins := step["plugins"].([]any)
@@ -1055,16 +1067,23 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		}
 	}
 
-	cmds0 := toStringList(bk.Steps[0].(map[string]any)["commands"])
-	want0 := []string{awsChainSetupCommand, "echo 1"}
-	if !reflect.DeepEqual(cmds0, want0) {
-		t.Errorf("step 0 commands = %v, want %v", cmds0, want0)
-	}
-
-	cmds1 := toStringList(bk.Steps[1].(map[string]any)["command"])
-	want1 := []string{awsChainSetupCommand, "echo 2"}
-	if !reflect.DeepEqual(cmds1, want1) {
-		t.Errorf("step 1 command = %v, want %v", cmds1, want1)
+	for _, test := range []struct {
+		step int
+		key  string
+		want []string
+	}{
+		{0, "commands", []string{awsChainSetupCommand, "echo 1"}},
+		{1, "command", []string{awsChainSetupCommand, "echo 2"}},
+		{2, "commands", []string{awsChainSetupCommand, "echo 3", "echo 4"}},
+		{3, "command", []string{awsChainSetupCommand, "echo 5"}},
+	} {
+		got := toStringList(bk.Steps[test.step].(map[string]any)[test.key])
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf(
+				"step %d %s = %v, want %v",
+				test.step, test.key, got, test.want,
+			)
+		}
 	}
 }
 
@@ -1101,6 +1120,12 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		name: "no command",
 		step: map[string]any{
 			"label":           "no command",
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+	}, {
+		name: "empty commands list",
+		step: map[string]any{
+			"commands":        []any{},
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
 	}, {
