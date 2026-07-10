@@ -7,15 +7,22 @@ import (
 
 const (
 	// awsConfigFilePath is where awsChainSetupCommand materializes the
-	// generated chain config inside the container.
+	// generated chain config inside the container. /tmp rather than the
+	// workdir: the workdir is the source tree, and a file appearing there
+	// can invalidate build caches or leak into artifacts.
 	awsConfigFilePath = "/tmp/rayci-aws.config"
 
 	// awsChainSetupCommand is prepended to a step's commands to write the
-	// generated chain config (delivered via the RAYCI_AWS_CONFIG step env
-	// var) to AWS_CONFIG_FILE, where AWS SDKs pick it up. The container
-	// never receives static AWS_* credentials, so SDKs fall through to the
-	// config-file chain.
-	awsChainSetupCommand = `printf '%s' "$RAYCI_AWS_CONFIG" > "$AWS_CONFIG_FILE"`
+	// generated chain config (delivered base64-encoded via the
+	// RAYCI_AWS_CONFIG_B64 step env var, so multi-line content cannot be
+	// mangled on its way through Buildkite and docker env propagation) to
+	// AWS_CONFIG_FILE, where AWS SDKs pick it up. The unset guards against
+	// image profile scripts: the docker plugin runs commands under a login
+	// shell, and any static AWS_* vars exported there would take precedence
+	// over the config-file chain in every SDK.
+	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
+		` AWS_SESSION_TOKEN AWS_PROFILE AWS_DEFAULT_PROFILE` +
+		` && printf '%s' "$RAYCI_AWS_CONFIG_B64" | base64 -d > "$AWS_CONFIG_FILE"`
 )
 
 // stepAWSAssumeRoles reads the aws_assume_role step key: a single role ARN

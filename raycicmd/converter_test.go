@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"testing"
 
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -1027,8 +1028,14 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		}
 
 		env := step["env"].(map[string]string)
-		if got, want := env["RAYCI_AWS_CONFIG"], awsChainConfig(roles); got != want {
-			t.Errorf("step %d: RAYCI_AWS_CONFIG = %q, want %q", i, got, want)
+		wantB64 := base64.StdEncoding.EncodeToString(
+			[]byte(awsChainConfig(roles)),
+		)
+		if got := env["RAYCI_AWS_CONFIG_B64"]; got != wantB64 {
+			t.Errorf(
+				"step %d: RAYCI_AWS_CONFIG_B64 = %q, want %q",
+				i, got, wantB64,
+			)
 		}
 		if got := env["AWS_CONFIG_FILE"]; got != awsConfigFilePath {
 			t.Errorf(
@@ -1038,7 +1045,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		}
 
 		dockerEnvs := toStringList(docker["environment"])
-		for _, k := range []string{"RAYCI_AWS_CONFIG", "AWS_CONFIG_FILE"} {
+		for _, k := range []string{"RAYCI_AWS_CONFIG_B64", "AWS_CONFIG_FILE"} {
 			if !slices.Contains(dockerEnvs, k) {
 				t.Errorf(
 					"step %d: docker environment misses %q: %v",
@@ -1094,6 +1101,23 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		name: "no command",
 		step: map[string]any{
 			"label":           "no command",
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+	}, {
+		// The generated config uses a Linux path and the chain needs
+		// IMDS reachability that is unverified on these job envs, so
+		// fail at generation time rather than silently at runtime.
+		name: "windows job env",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"job_env":         windowsJobEnv,
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+	}, {
+		name: "macos job env",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"job_env":         macosJobEnv,
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
 	}} {

@@ -1,6 +1,7 @@
 package raycicmd
 
 import (
+	"encoding/base64"
 	"fmt"
 	"sort"
 	"strconv"
@@ -155,12 +156,24 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		envMap["RAYCI_FETCH_FULL_HISTORY"] = "1"
 	}
 
+	jobEnv, _ := stringInMap(step, "job_env")
+
 	awsRoles, err := stepAWSAssumeRoles(step)
 	if err != nil {
 		return nil, fmt.Errorf("read aws_assume_role: %w", err)
 	}
 	if len(awsRoles) > 0 {
-		envMap["RAYCI_AWS_CONFIG"] = awsChainConfig(awsRoles)
+		// The generated config uses a Linux path, and IMDS reachability
+		// from these job envs is unverified; fail at generation time
+		// rather than silently at runtime.
+		if jobEnv == windowsJobEnv || jobEnv == macosJobEnv {
+			return nil, fmt.Errorf(
+				"aws_assume_role is not supported on job_env %q", jobEnv,
+			)
+		}
+		envMap["RAYCI_AWS_CONFIG_B64"] = base64.StdEncoding.EncodeToString(
+			[]byte(awsChainConfig(awsRoles)),
+		)
 		envMap["AWS_CONFIG_FILE"] = awsConfigFilePath
 		if err := prependCommand(result, awsChainSetupCommand); err != nil {
 			return nil, fmt.Errorf("set up aws_assume_role chain: %w", err)
@@ -185,7 +198,6 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 	sort.Strings(envKeyList)
 
-	jobEnv, _ := stringInMap(step, "job_env")
 	dockerPluginConfig := &stepDockerPluginConfig{extraEnvs: envKeyList}
 	if d := c.config.DockerPlugin; d != nil {
 		if d.AllowMountBuildkiteAgent {

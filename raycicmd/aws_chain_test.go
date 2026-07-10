@@ -2,7 +2,9 @@ package raycicmd
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -71,6 +73,50 @@ func TestAWSChainConfig(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// TestAWSChainSetupCommand executes the prepended setup command with a real
+// shell, the way the docker plugin runs step commands, verifying that it
+// materializes the config byte-for-byte and clears static credentials that
+// would otherwise shadow the config-file chain.
+func TestAWSChainSetupCommand(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "aws.config")
+	leakFile := filepath.Join(dir, "leak")
+
+	content := awsChainConfig([]string{
+		"arn:aws:iam::111111111111:role/r1",
+		"arn:aws:iam::222222222222:role/r2",
+	})
+
+	script := awsChainSetupCommand +
+		`; printf '%s' "${AWS_ACCESS_KEY_ID:-cleared}" > "` + leakFile + `"`
+	cmd := exec.Command("/bin/bash", "-ec", script)
+	cmd.Env = append(os.Environ(),
+		"RAYCI_AWS_CONFIG_B64="+
+			base64.StdEncoding.EncodeToString([]byte(content)),
+		"AWS_CONFIG_FILE="+configFile,
+		"AWS_ACCESS_KEY_ID=AKIAFAKESTATICKEY",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run setup command: %v, output: %s", err, out)
+	}
+
+	got, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	if string(got) != content {
+		t.Errorf("config file = %q, want %q", got, content)
+	}
+
+	leak, err := os.ReadFile(leakFile)
+	if err != nil {
+		t.Fatalf("read leak file: %v", err)
+	}
+	if string(leak) != "cleared" {
+		t.Errorf("AWS_ACCESS_KEY_ID after setup = %q, want cleared", leak)
 	}
 }
 
