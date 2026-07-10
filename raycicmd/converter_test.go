@@ -1127,7 +1127,7 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": []any{42},
 		},
-		wantErr: "not an ARN",
+		wantErr: "not an IAM role ARN",
 	}, {
 		name: "null value",
 		step: map[string]any{
@@ -1141,21 +1141,51 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": 42,
 		},
-		wantErr: "not an ARN",
+		wantErr: "not an IAM role ARN",
 	}, {
 		name: "empty string role",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": "",
 		},
-		wantErr: "not an ARN",
+		wantErr: "not an IAM role ARN",
 	}, {
 		name: "not an ARN",
 		step: map[string]any{
 			"commands":        []string{"echo 1"},
 			"aws_assume_role": "some-role-name",
 		},
-		wantErr: "not an ARN",
+		wantErr: "not an IAM role ARN",
+	}, {
+		// Five colon-separated fields instead of six — a dropped
+		// empty-region colon is an easy typo.
+		name: "arn with missing field",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam:123456789012:role/r",
+		},
+		wantErr: "not an IAM role ARN",
+	}, {
+		name: "non-iam arn",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:s3:::my-bucket",
+		},
+		wantErr: "not an IAM role ARN",
+	}, {
+		name: "iam arn but not a role",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:user/x",
+		},
+		wantErr: "not an IAM role ARN",
+	}, {
+		name: "non-numeric account id",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::12345678901x:role/r",
+		},
+		wantErr: "not an IAM role ARN",
 	}, {
 		// A newline would inject arbitrary INI lines into the generated
 		// config; matrix tokens and $ references cannot survive the

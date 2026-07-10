@@ -141,8 +141,10 @@ var buildkiteEnvs = []string{
 }
 
 type stepDockerPluginConfig struct {
-	workDir   string
-	addCaps   []string
+	workDir string
+	addCaps []string
+	// extraEnvs entries use docker --env syntax: a bare NAME propagates
+	// the host value, NAME=VALUE sets a literal.
 	extraEnvs []string
 	network   string
 

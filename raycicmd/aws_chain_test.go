@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 )
@@ -27,6 +28,7 @@ func TestAWSChainConfig(t *testing.T) {
 			"[default]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 		}, "\n"),
@@ -40,11 +42,13 @@ func TestAWSChainConfig(t *testing.T) {
 			"[profile chain_0]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 			"[default]",
 			"role_arn = arn:aws:iam::222222222222:role/r2",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"source_profile = chain_0",
 			"",
 		}, "\n"),
@@ -59,16 +63,19 @@ func TestAWSChainConfig(t *testing.T) {
 			"[profile chain_0]",
 			"role_arn = arn:aws:iam::111111111111:role/r1",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"credential_source = Ec2InstanceMetadata",
 			"",
 			"[profile chain_1]",
 			"role_arn = arn:aws:iam::222222222222:role/r2",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"source_profile = chain_0",
 			"",
 			"[default]",
 			"role_arn = arn:aws:iam::333333333333:role/r3",
 			"role_session_name = rayci-abc123",
+			"duration_seconds = 3600",
 			"source_profile = chain_1",
 			"",
 		}, "\n"),
@@ -108,8 +115,11 @@ func TestAWSChainSetupCommand_noBareDollar(t *testing.T) {
 // the config-file chain.
 func TestAWSChainSetupCommand(t *testing.T) {
 	dir := t.TempDir()
-	configFile := filepath.Join(dir, "aws.config")
 	leakFile := filepath.Join(dir, "leak")
+
+	// The command writes to the fixed awsConfigFilePath regardless of any
+	// AWS_CONFIG_FILE an image profile script exported first.
+	t.Cleanup(func() { os.Remove(awsConfigFilePath) })
 
 	content := awsChainConfig([]string{
 		"arn:aws:iam::111111111111:role/r1",
@@ -123,12 +133,15 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		` "${AWS_ENDPOINT_URL:-cleared}"` +
 		` "${AWS_EC2_METADATA_DISABLED:-cleared}"` +
 		` "${AWS_SHARED_CREDENTIALS_FILE:-unset}"` +
+		` "${AWS_CONFIG_FILE:-unset}"` +
 		` > "` + leakFile + `"`
 	cmd := exec.Command("/bin/bash", "-ec", script)
 	cmd.Env = append(os.Environ(),
 		"RAYCI_AWS_CONFIG_B64="+
 			base64.StdEncoding.EncodeToString([]byte(content)),
-		"AWS_CONFIG_FILE="+configFile,
+		// Hostile value a profile script could have exported; the setup
+		// command must clobber it, not honor it.
+		"AWS_CONFIG_FILE=/nonexistent-dir/aws.config",
 		"AWS_ACCESS_KEY_ID=AKIAFAKESTATICKEY",
 		"AWS_SECRET_KEY=legacy-alias-secret",
 		"AWS_ENDPOINT_URL=http://localstack:4566",
@@ -139,7 +152,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		t.Fatalf("run setup command: %v, output: %s", err, out)
 	}
 
-	got, err := os.ReadFile(configFile)
+	got, err := os.ReadFile(awsConfigFilePath)
 	if err != nil {
 		t.Fatalf("read config file: %v", err)
 	}
@@ -152,7 +165,8 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		t.Fatalf("read leak file: %v", err)
 	}
 	// /dev/null, not unset — see the awsChainSetupCommand doc comment.
-	want := "cleared\ncleared\ncleared\ncleared\n/dev/null\n"
+	want := "cleared\ncleared\ncleared\ncleared\n/dev/null\n" +
+		awsConfigFilePath + "\n"
 	if string(leak) != want {
 		t.Errorf("env after setup = %q, want %q", leak, want)
 	}
@@ -263,6 +277,13 @@ func TestAWSChainConfig_parsedBySDK(t *testing.T) {
 		t.Errorf(
 			"chain_0 role_session_name = %q, want rayci-abc123",
 			root.RoleSessionName,
+		)
+	}
+	if root.RoleDurationSeconds == nil ||
+		*root.RoleDurationSeconds != time.Hour {
+		t.Errorf(
+			"chain_0 duration_seconds = %v, want 1h",
+			root.RoleDurationSeconds,
 		)
 	}
 	if root.CredentialSource != "Ec2InstanceMetadata" {

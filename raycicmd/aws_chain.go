@@ -16,16 +16,17 @@ const (
 	// generated chain config (delivered base64-encoded via the
 	// RAYCI_AWS_CONFIG_B64 container env var, so multi-line content cannot
 	// be mangled on its way through docker env propagation) to
-	// AWS_CONFIG_FILE, where AWS SDKs pick it up. The unset list covers
+	// awsConfigFilePath, where AWS SDKs pick it up. The unset list covers
 	// every credential or IMDS override that ranks above the shared-config
 	// file in SDK default chains: the docker plugin runs commands under a
 	// login shell, and image profile scripts exporting any of these would
-	// silently shadow or break the chain. AWS_SHARED_CREDENTIALS_FILE is
-	// redirected to /dev/null rather than unset — unsetting it would
-	// re-enable the default ~/.aws/credentials lookup, where baked-in
-	// static keys shadow the chain. $ is escaped as $$ because
-	// "buildkite-agent pipeline upload" interpolates bare $VAR references
-	// against the uploader's environment.
+	// silently shadow or break the chain. For the same reason
+	// AWS_CONFIG_FILE is force-exported to the literal path, and
+	// AWS_SHARED_CREDENTIALS_FILE is redirected to /dev/null rather than
+	// unset — unsetting it would re-enable the default ~/.aws/credentials
+	// lookup, where baked-in static keys shadow the chain. $ is escaped as
+	// $$ because "buildkite-agent pipeline upload" interpolates bare $VAR
+	// references against the uploader's environment.
 	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
 		` AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN` +
 		` AWS_PROFILE AWS_DEFAULT_PROFILE` +
@@ -35,8 +36,9 @@ const (
 		` AWS_EC2_METADATA_DISABLED AWS_EC2_METADATA_SERVICE_ENDPOINT` +
 		` AWS_ENDPOINT_URL AWS_ENDPOINT_URL_STS` +
 		` && export AWS_SHARED_CREDENTIALS_FILE=/dev/null` +
+		` AWS_CONFIG_FILE=` + awsConfigFilePath +
 		` && printf '%s' "$$RAYCI_AWS_CONFIG_B64"` +
-		` | base64 -d > "$$AWS_CONFIG_FILE"`
+		` | base64 -d > ` + awsConfigFilePath
 )
 
 // stepAWSAssumeRoles reads the aws_assume_role step key: a single role ARN
@@ -62,27 +64,41 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 	return roles, nil
 }
 
-// checkAWSRoleARN rejects values that cannot work as a literal role ARN.
+// checkAWSRoleARN rejects values that cannot work as a literal IAM role
+// ARN of the shape arn:<partition>:iam::<12-digit account>:role/<name>.
 // The value is rendered verbatim into the generated INI and base64-encoded
-// at generation time, so only characters legal in role ARNs pass:
-// whitespace or INI-special bytes would inject or truncate config lines,
-// and Buildkite matrix tokens or $ env references are substituted only
-// after generation, where they cannot reach inside the base64 blob.
+// at generation time, so only ARN-legal characters pass: whitespace or
+// INI-special bytes would inject or truncate config lines, and Buildkite
+// matrix tokens or $ env references are substituted only after generation,
+// where they cannot reach inside the base64 blob.
 func checkAWSRoleARN(r string) error {
-	if !strings.HasPrefix(r, "arn:") {
-		return fmt.Errorf("role %q is not an ARN", r)
+	parts := strings.SplitN(r, ":", 6)
+	if len(parts) != 6 || parts[0] != "arn" || parts[1] == "" ||
+		parts[2] != "iam" || parts[3] != "" ||
+		len(parts[4]) != 12 ||
+		strings.Trim(parts[4], "0123456789") != "" ||
+		!strings.HasPrefix(parts[5], "role/") ||
+		parts[5] == "role/" {
+		return fmt.Errorf("role %q is not an IAM role ARN", r)
 	}
-	for _, c := range r {
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z',
-			c >= '0' && c <= '9',
-			c == ':', c == '/', c == '+', c == '=',
-			c == ',', c == '.', c == '@', c == '_', c == '-':
-		default:
+	for i := 0; i < len(r); i++ {
+		if c := r[i]; !isSTSNameByte(c) && c != ':' && c != '/' {
 			return fmt.Errorf("role %q contains unsupported characters", r)
 		}
 	}
 	return nil
+}
+
+// isSTSNameByte reports whether c is in the STS name charset [\w+=,.@-],
+// shared by role session names and the non-separator bytes of role ARNs.
+func isSTSNameByte(c byte) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9',
+		c == '+', c == '=', c == ',', c == '.',
+		c == '@', c == '_', c == '-':
+		return true
+	}
+	return false
 }
 
 // awsSessionName derives a valid STS role session name from the build ID:
@@ -94,12 +110,7 @@ func awsSessionName(buildID string) string {
 	const prefix = "rayci-"
 	b := []byte(buildID)
 	for i, c := range b {
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z',
-			c >= '0' && c <= '9',
-			c == '+', c == '=', c == ',', c == '.',
-			c == '@', c == '_', c == '-':
-		default:
+		if !isSTSNameByte(c) {
 			b[i] = '-'
 		}
 	}
@@ -134,6 +145,11 @@ func awsChainConfig(roles []string, sessionName string) string {
 		fmt.Fprintf(b, "[%s]\n", profile(i))
 		fmt.Fprintf(b, "role_arn = %s\n", role)
 		fmt.Fprintf(b, "role_session_name = %s\n", sessionName)
+		// Chained-hop sessions cap at one hour; requesting the cap keeps
+		// credentials that consumers snapshot out of the SDK refresh loop
+		// (exported to subprocesses or remote workers) alive as long as
+		// STS allows.
+		fmt.Fprintln(b, "duration_seconds = 3600")
 		if i == 0 {
 			fmt.Fprintln(b, "credential_source = Ec2InstanceMetadata")
 		} else {

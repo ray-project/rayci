@@ -249,6 +249,9 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	if dockerNetwork != "" {
 		dockerPluginConfig.network = dockerNetwork
 	}
+	// Non-default cases must stay in sync with the aws_assume_role
+	// job_env guard above: a job env added here without extending the
+	// guard would silently receive chain env it cannot use.
 	switch jobEnv {
 	case windowsJobEnv: // a special job env for windows
 		result["plugins"] = []any{map[string]any{
@@ -309,7 +312,7 @@ func prependCommand(step map[string]any, line string) error {
 			continue
 		}
 		if v == nil {
-			return fmt.Errorf("%s is empty", key)
+			v = []any{}
 		}
 		cmds, err := scalarStrings(v)
 		if err != nil {
