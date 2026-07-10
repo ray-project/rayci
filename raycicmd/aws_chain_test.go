@@ -116,10 +116,10 @@ func TestAWSChainSetupCommand_noBareDollar(t *testing.T) {
 func TestAWSChainSetupCommand(t *testing.T) {
 	dir := t.TempDir()
 	leakFile := filepath.Join(dir, "leak")
-
-	// The command writes to the fixed awsConfigFilePath regardless of any
-	// AWS_CONFIG_FILE an image profile script exported first.
-	t.Cleanup(func() { os.Remove(awsConfigFilePath) })
+	// The command hardcodes awsConfigFilePath, which is machine-global;
+	// substitute a per-test path so parallel test runs on one host cannot
+	// race on the real file. Everything else runs verbatim.
+	configFile := filepath.Join(dir, "rayci-aws.config")
 
 	content := awsChainConfig([]string{
 		"arn:aws:iam::111111111111:role/r1",
@@ -127,6 +127,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	}, "rayci-abc123")
 
 	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
+	uploaded = strings.ReplaceAll(uploaded, awsConfigFilePath, configFile)
 	script := uploaded + `; printf '%s\n'` +
 		` "${AWS_ACCESS_KEY_ID:-cleared}"` +
 		` "${AWS_SECRET_KEY:-cleared}"` +
@@ -152,7 +153,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		t.Fatalf("run setup command: %v, output: %s", err, out)
 	}
 
-	got, err := os.ReadFile(awsConfigFilePath)
+	got, err := os.ReadFile(configFile)
 	if err != nil {
 		t.Fatalf("read config file: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	}
 	// /dev/null, not unset — see the awsChainSetupCommand doc comment.
 	want := "cleared\ncleared\ncleared\ncleared\n/dev/null\n" +
-		awsConfigFilePath + "\n"
+		configFile + "\n"
 	if string(leak) != want {
 		t.Errorf("env after setup = %q, want %q", leak, want)
 	}

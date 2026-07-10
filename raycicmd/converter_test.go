@@ -1187,6 +1187,38 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		},
 		wantErr: "not an IAM role ARN",
 	}, {
+		// Extra colons land in the resource field via SplitN and must
+		// not slip past as ARN-legal separators.
+		name: "colon suffix in resource",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/name:extra",
+		},
+		wantErr: "unsupported characters",
+	}, {
+		name: "invalid partition",
+		step: map[string]any{
+			"commands":        []string{"echo 1"},
+			"aws_assume_role": "arn:a=b:iam::123456789012:role/x",
+		},
+		wantErr: "not an IAM role ARN",
+	}, {
+		// An empty-string command would upload a job that runs only the
+		// credential-setup line and exits green.
+		name: "empty string command",
+		step: map[string]any{
+			"command":         "",
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "command is empty",
+	}, {
+		name: "blank commands",
+		step: map[string]any{
+			"commands":        []any{"", "  "},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "commands is empty",
+	}, {
 		// A newline would inject arbitrary INI lines into the generated
 		// config; matrix tokens and $ references cannot survive the
 		// base64 bake (Buildkite substitutes them after generation).

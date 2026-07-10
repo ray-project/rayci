@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -312,15 +313,18 @@ func prependCommand(step map[string]any, line string) error {
 			continue
 		}
 		if v == nil {
-			v = []any{}
+			return fmt.Errorf("%s is empty", key)
 		}
 		cmds, err := scalarStrings(v)
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
-		// A present-but-empty key is a conflict Buildkite may resolve
-		// as a command-less no-op job when the other key has content.
-		if len(cmds) == 0 {
+		// A present-but-blank key would upload a job that runs only the
+		// prepended setup line and exits green, or — beside a non-empty
+		// sibling key — a conflict Buildkite may resolve as a no-op job.
+		if !slices.ContainsFunc(cmds, func(c string) bool {
+			return strings.TrimSpace(c) != ""
+		}) {
 			return fmt.Errorf("%s is empty", key)
 		}
 		step[key] = append([]string{line}, cmds...)

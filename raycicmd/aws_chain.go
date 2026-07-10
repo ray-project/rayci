@@ -73,7 +73,8 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 // where they cannot reach inside the base64 blob.
 func checkAWSRoleARN(r string) error {
 	parts := strings.SplitN(r, ":", 6)
-	if len(parts) != 6 || parts[0] != "arn" || parts[1] == "" ||
+	if len(parts) != 6 || parts[0] != "arn" ||
+		!isARNPartition(parts[1]) ||
 		parts[2] != "iam" || parts[3] != "" ||
 		len(parts[4]) != 12 ||
 		strings.Trim(parts[4], "0123456789") != "" ||
@@ -81,12 +82,29 @@ func checkAWSRoleARN(r string) error {
 		parts[5] == "role/" {
 		return fmt.Errorf("role %q is not an IAM role ARN", r)
 	}
-	for i := 0; i < len(r); i++ {
-		if c := r[i]; !isSTSNameByte(c) && c != ':' && c != '/' {
+	// SplitN leaves any extra colons in the resource field, so checking
+	// the role path/name bytes also rejects colon-suffixed values.
+	name := strings.TrimPrefix(parts[5], "role/")
+	for i := 0; i < len(name); i++ {
+		if c := name[i]; !isSTSNameByte(c) && c != '/' {
 			return fmt.Errorf("role %q contains unsupported characters", r)
 		}
 	}
 	return nil
+}
+
+// isARNPartition reports whether s looks like an ARN partition
+// (aws, aws-cn, aws-us-gov): lowercase letters and hyphens.
+func isARNPartition(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; !(c >= 'a' && c <= 'z' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // isSTSNameByte reports whether c is in the STS name charset [\w+=,.@-],
