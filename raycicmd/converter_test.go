@@ -1040,12 +1040,6 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		if !ok {
 			t.Fatalf("docker plugin not found in step %d", i)
 		}
-		if v, ok := boolInMap(docker, "propagate-aws-auth-tokens"); v || ok {
-			t.Errorf(
-				"step %d: propagate-aws-auth-tokens = %v, %v, want unset",
-				i, v, ok,
-			)
-		}
 
 		// The chain env lives only in the docker plugin environment, not
 		// step env: step env applies to host-side job phases (hooks,
@@ -1188,6 +1182,14 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		name: "no command",
 		step: map[string]any{
 			"label":           "no command",
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "step has no command",
+	}, {
+		// Every key is rayci-processed and dropped, so the cloned result
+		// map starts empty; must error, not panic.
+		name: "only dropped keys",
+		step: map[string]any{
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
 		wantErr: "step has no command",

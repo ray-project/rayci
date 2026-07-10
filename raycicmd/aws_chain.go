@@ -49,8 +49,6 @@ func stepAWSAssumeRoles(step map[string]any) ([]string, error) {
 	switch v := v.(type) {
 	case string:
 		roles = []string{v}
-	case []string:
-		roles = v
 	case []any:
 		for _, item := range v {
 			s, ok := item.(string)
@@ -155,7 +153,9 @@ func prependCommand(step map[string]any, line string) error {
 
 // commandStrings normalizes a step command value to a string list, coercing
 // scalar entries to strings the way Buildkite coerces unquoted YAML numbers
-// and booleans.
+// and booleans. Unlike the lossy toStringList, which silently drops
+// non-string entries, this is strict: a command entry that cannot be
+// coerced is an error, because dropping one would run a different script.
 func commandStrings(v any) ([]string, error) {
 	if list, ok := v.([]any); ok {
 		var cmds []string

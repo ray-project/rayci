@@ -138,9 +138,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read leak file: %v", err)
 	}
-	// AWS_SHARED_CREDENTIALS_FILE is redirected to /dev/null rather than
-	// unset: unsetting it would re-enable the default ~/.aws/credentials
-	// lookup, where baked-in static keys shadow the config-file chain.
+	// /dev/null, not unset — see the awsChainSetupCommand doc comment.
 	want := "cleared\ncleared\n/dev/null\n"
 	if string(leak) != want {
 		t.Errorf("env after setup = %q, want %q", leak, want)

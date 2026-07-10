@@ -118,6 +118,11 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 	}
 
 	result := cloneMapExcept(step, commandStepDropKeys)
+	if result == nil {
+		// cloneMapExcept returns nil when every key was dropped; keep a
+		// writable map so such steps get validation errors, not panics.
+		result = make(map[string]any)
+	}
 
 	if agentQueue != skipQueue { // queue type not supported, skip.
 		result["agents"] = newBkAgents(agentQueue)
@@ -176,9 +181,10 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		// env: step env applies to host-side job phases (hooks, artifact
 		// upload), where the config file does not exist and pointing
 		// AWS_CONFIG_FILE at it would change the host's credentials.
-		// Region and STS-endpoint propagation replace what the removed
-		// propagate-aws-auth-tokens flag used to carry; AWS_SDK_LOAD_CONFIG
-		// makes aws-sdk-go v1 tools read the config file at all.
+		// The container performs the chain's STS AssumeRole calls itself,
+		// so it needs the host's region and STS-endpoint settings;
+		// AWS_SDK_LOAD_CONFIG makes aws-sdk-go v1 tools read the config
+		// file at all.
 		awsEnvs = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
 				[]byte(awsChainConfig(awsRoles)),
