@@ -108,14 +108,19 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	})
 
 	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
-	script := uploaded +
-		`; printf '%s' "${AWS_ACCESS_KEY_ID:-cleared}" > "` + leakFile + `"`
+	script := uploaded + `; printf '%s\n'` +
+		` "${AWS_ACCESS_KEY_ID:-cleared}"` +
+		` "${AWS_EC2_METADATA_DISABLED:-cleared}"` +
+		` "${AWS_SHARED_CREDENTIALS_FILE:-unset}"` +
+		` > "` + leakFile + `"`
 	cmd := exec.Command("/bin/bash", "-ec", script)
 	cmd.Env = append(os.Environ(),
 		"RAYCI_AWS_CONFIG_B64="+
 			base64.StdEncoding.EncodeToString([]byte(content)),
 		"AWS_CONFIG_FILE="+configFile,
 		"AWS_ACCESS_KEY_ID=AKIAFAKESTATICKEY",
+		"AWS_EC2_METADATA_DISABLED=true",
+		"AWS_SHARED_CREDENTIALS_FILE=/etc/fake-creds",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("run setup command: %v, output: %s", err, out)
@@ -133,8 +138,12 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read leak file: %v", err)
 	}
-	if string(leak) != "cleared" {
-		t.Errorf("AWS_ACCESS_KEY_ID after setup = %q, want cleared", leak)
+	// AWS_SHARED_CREDENTIALS_FILE is redirected to /dev/null rather than
+	// unset: unsetting it would re-enable the default ~/.aws/credentials
+	// lookup, where baked-in static keys shadow the config-file chain.
+	want := "cleared\ncleared\n/dev/null\n"
+	if string(leak) != want {
+		t.Errorf("env after setup = %q, want %q", leak, want)
 	}
 }
 

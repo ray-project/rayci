@@ -176,15 +176,18 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		// env: step env applies to host-side job phases (hooks, artifact
 		// upload), where the config file does not exist and pointing
 		// AWS_CONFIG_FILE at it would change the host's credentials.
-		// AWS_REGION propagation replaces what the removed
-		// propagate-aws-auth-tokens flag used to carry.
+		// Region and STS-endpoint propagation replace what the removed
+		// propagate-aws-auth-tokens flag used to carry; AWS_SDK_LOAD_CONFIG
+		// makes aws-sdk-go v1 tools read the config file at all.
 		awsEnvs = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
 				[]byte(awsChainConfig(awsRoles)),
 			),
 			"AWS_CONFIG_FILE=" + awsConfigFilePath,
+			"AWS_SDK_LOAD_CONFIG=1",
 			"AWS_REGION",
 			"AWS_DEFAULT_REGION",
+			"AWS_STS_REGIONAL_ENDPOINTS",
 		}
 		if err := prependCommand(result, awsChainSetupCommand); err != nil {
 			return nil, fmt.Errorf("set up aws_assume_role chain: %w", err)

@@ -999,12 +999,19 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 			"aws_assume_role": []any{role1, role2},
 		}, {
 			// YAML parsing yields []any, not []string; both list keys
-			// must normalize.
-			"commands": []any{"echo 3", "echo 4"},
+			// must normalize. Unquoted YAML scalars coerce to strings
+			// the way Buildkite coerces them.
+			"commands": []any{"echo 3", 42, true},
 
 			"aws_assume_role": role1,
 		}, {
 			"command": []any{"echo 5"},
+
+			"aws_assume_role": role1,
+		}, {
+			// Buildkite honors either key, so both get the setup line.
+			"command":  "echo a",
+			"commands": []any{"echo b"},
 
 			"aws_assume_role": role1,
 		}},
@@ -1017,7 +1024,7 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	}
 
 	for i, roles := range [][]string{
-		{role1}, {role1, role2}, {role1}, {role1},
+		{role1}, {role1, role2}, {role1}, {role1}, {role1},
 	} {
 		step := bk.Steps[i].(map[string]any)
 
@@ -1057,8 +1064,10 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 		for _, e := range []string{
 			"RAYCI_AWS_CONFIG_B64=" + wantB64,
 			"AWS_CONFIG_FILE=" + awsConfigFilePath,
+			"AWS_SDK_LOAD_CONFIG=1",
 			"AWS_REGION",
 			"AWS_DEFAULT_REGION",
+			"AWS_STS_REGIONAL_ENDPOINTS",
 		} {
 			if !slices.Contains(dockerEnvs, e) {
 				t.Errorf(
@@ -1076,8 +1085,10 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 	}{
 		{0, "commands", []string{awsChainSetupCommand, "echo 1"}},
 		{1, "command", []string{awsChainSetupCommand, "echo 2"}},
-		{2, "commands", []string{awsChainSetupCommand, "echo 3", "echo 4"}},
+		{2, "commands", []string{awsChainSetupCommand, "echo 3", "42", "true"}},
 		{3, "command", []string{awsChainSetupCommand, "echo 5"}},
+		{4, "command", []string{awsChainSetupCommand, "echo a"}},
+		{4, "commands", []string{awsChainSetupCommand, "echo b"}},
 	} {
 		got := toStringList(bk.Steps[test.step].(map[string]any)[test.key])
 		if !reflect.DeepEqual(got, test.want) {
@@ -1180,6 +1191,13 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
 		},
 		wantErr: "step has no command",
+	}, {
+		name: "composite command entry",
+		step: map[string]any{
+			"commands":        []any{"echo 1", map[string]any{"k": "v"}},
+			"aws_assume_role": "arn:aws:iam::123456789012:role/r",
+		},
+		wantErr: "unsupported command entry",
 	}, {
 		name: "empty commands list",
 		step: map[string]any{

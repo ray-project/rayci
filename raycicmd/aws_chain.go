@@ -17,17 +17,22 @@ const (
 	// RAYCI_AWS_CONFIG_B64 container env var, so multi-line content cannot
 	// be mangled on its way through docker env propagation) to
 	// AWS_CONFIG_FILE, where AWS SDKs pick it up. The unset list covers
-	// every credential source that ranks above the shared-config file in
-	// SDK default chains: the docker plugin runs commands under a login
-	// shell, and image profile scripts exporting any of these would
-	// silently shadow the chain. $ is escaped as $$ because
+	// every credential or IMDS override that ranks above the shared-config
+	// file in SDK default chains: the docker plugin runs commands under a
+	// login shell, and image profile scripts exporting any of these would
+	// silently shadow or break the chain. AWS_SHARED_CREDENTIALS_FILE is
+	// redirected to /dev/null rather than unset — unsetting it would
+	// re-enable the default ~/.aws/credentials lookup, where baked-in
+	// static keys shadow the chain. $ is escaped as $$ because
 	// "buildkite-agent pipeline upload" interpolates bare $VAR references
 	// against the uploader's environment.
 	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
 		` AWS_SESSION_TOKEN AWS_PROFILE AWS_DEFAULT_PROFILE` +
-		` AWS_SHARED_CREDENTIALS_FILE AWS_WEB_IDENTITY_TOKEN_FILE` +
+		` AWS_WEB_IDENTITY_TOKEN_FILE` +
 		` AWS_ROLE_ARN AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` +
 		` AWS_CONTAINER_CREDENTIALS_FULL_URI` +
+		` AWS_EC2_METADATA_DISABLED AWS_EC2_METADATA_SERVICE_ENDPOINT` +
+		` && export AWS_SHARED_CREDENTIALS_FILE=/dev/null` +
 		` && printf '%s' "$$RAYCI_AWS_CONFIG_B64"` +
 		` | base64 -d > "$$AWS_CONFIG_FILE"`
 )
@@ -120,24 +125,65 @@ func awsChainConfig(roles []string) string {
 	return b.String()
 }
 
-// prependCommand inserts line before a step's existing command(s). The
-// docker plugin runs all command lines in a single shell invocation, so
-// files written and variables exported by line are visible to the rest.
+// prependCommand inserts line before a step's existing command(s). Both
+// "command" and "commands" are patched when a step carries both — Buildkite
+// honors either key, and the setup line must precede whichever one runs.
+// The docker plugin runs all command lines in a single shell invocation, so
+// files written by line are visible to the rest.
 func prependCommand(step map[string]any, line string) error {
+	prepended := false
 	for _, key := range []string{"commands", "command"} {
 		v, ok := step[key]
 		if !ok || v == nil {
 			continue
 		}
-		cmds := toStringList(v)
-		if list, isList := v.([]any); isList && len(cmds) != len(list) {
-			return fmt.Errorf("%s has non-string entries: %v", key, v)
+		cmds, err := commandStrings(v)
+		if err != nil {
+			return fmt.Errorf("%s: %w", key, err)
 		}
 		if len(cmds) == 0 {
 			continue
 		}
 		step[key] = append([]string{line}, cmds...)
-		return nil
+		prepended = true
 	}
-	return fmt.Errorf("step has no command")
+	if !prepended {
+		return fmt.Errorf("step has no command")
+	}
+	return nil
+}
+
+// commandStrings normalizes a step command value to a string list, coercing
+// scalar entries to strings the way Buildkite coerces unquoted YAML numbers
+// and booleans.
+func commandStrings(v any) ([]string, error) {
+	if list, ok := v.([]any); ok {
+		var cmds []string
+		for _, item := range list {
+			s, err := commandString(item)
+			if err != nil {
+				return nil, err
+			}
+			cmds = append(cmds, s)
+		}
+		return cmds, nil
+	}
+	if list, ok := v.([]string); ok {
+		return list, nil
+	}
+	s, err := commandString(v)
+	if err != nil {
+		return nil, err
+	}
+	return []string{s}, nil
+}
+
+func commandString(v any) (string, error) {
+	switch v := v.(type) {
+	case string:
+		return v, nil
+	case int, int64, uint64, float64, bool:
+		return fmt.Sprintf("%v", v), nil
+	}
+	return "", fmt.Errorf("unsupported command entry %v of type %T", v, v)
 }
