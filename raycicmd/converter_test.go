@@ -1272,8 +1272,8 @@ func TestConvertPipelineGroup_awsAssumeRoleErrors(t *testing.T) {
 		},
 		wantErr: "commands is empty",
 	}, {
-		// A present-but-empty commands key next to a real command is a
-		// conflict Buildkite may resolve as a no-op job; fail loudly.
+		// A present-but-blank key fails even beside a non-empty sibling
+		// key, matching the standalone blank-key case.
 		name: "empty commands beside command",
 		step: map[string]any{
 			"command":         "echo 1",

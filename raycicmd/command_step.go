@@ -320,8 +320,7 @@ func prependCommand(step map[string]any, line string) error {
 			return fmt.Errorf("%s: %w", key, err)
 		}
 		// A present-but-blank key would upload a job that runs only the
-		// prepended setup line and exits green, or — beside a non-empty
-		// sibling key — a conflict Buildkite may resolve as a no-op job.
+		// prepended setup line and exits green.
 		if !slices.ContainsFunc(cmds, func(c string) bool {
 			return strings.TrimSpace(c) != ""
 		}) {

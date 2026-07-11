@@ -16,7 +16,10 @@ const (
 	// generated chain config (delivered base64-encoded via the
 	// RAYCI_AWS_CONFIG_B64 container env var, so multi-line content cannot
 	// be mangled on its way through docker env propagation) to
-	// awsConfigFilePath, where AWS SDKs pick it up. The unset list covers
+	// awsConfigFilePath, where AWS SDKs pick it up. The leading test -n
+	// fails the step outright if the variable arrives empty — decoding an
+	// empty value would write an empty config and the SDKs would silently
+	// fall through to raw instance-profile credentials. The unset list covers
 	// every credential or IMDS override that ranks above the shared-config
 	// file in SDK default chains: the docker plugin runs commands under a
 	// login shell, and image profile scripts exporting any of these would
@@ -27,7 +30,8 @@ const (
 	// lookup, where baked-in static keys shadow the chain. $ is escaped as
 	// $$ because "buildkite-agent pipeline upload" interpolates bare $VAR
 	// references against the uploader's environment.
-	awsChainSetupCommand = `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
+	awsChainSetupCommand = `test -n "$$RAYCI_AWS_CONFIG_B64"` +
+		` && unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` +
 		` AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN` +
 		` AWS_PROFILE AWS_DEFAULT_PROFILE` +
 		` AWS_WEB_IDENTITY_TOKEN_FILE` +

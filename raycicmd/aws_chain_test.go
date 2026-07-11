@@ -173,6 +173,23 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	}
 }
 
+// TestAWSChainSetupCommand_emptyConfig proves the step fails loudly when the
+// chain config variable arrives empty: decoding an empty value would write
+// an empty config, and SDKs would silently fall through to raw
+// instance-profile credentials.
+func TestAWSChainSetupCommand_emptyConfig(t *testing.T) {
+	uploaded := strings.ReplaceAll(awsChainSetupCommand, "$$", "$")
+	uploaded = strings.ReplaceAll(
+		uploaded, awsConfigFilePath,
+		filepath.Join(t.TempDir(), "rayci-aws.config"),
+	)
+	cmd := exec.Command("/bin/bash", "-ec", uploaded)
+	cmd.Env = append(os.Environ(), "RAYCI_AWS_CONFIG_B64=")
+	if err := cmd.Run(); err == nil {
+		t.Error("setup command succeeded with empty RAYCI_AWS_CONFIG_B64")
+	}
+}
+
 func TestAWSSessionName(t *testing.T) {
 	for _, test := range []struct {
 		buildID string

@@ -61,10 +61,9 @@ func cloneMap(m map[string]any) map[string]any {
 	return res
 }
 
+// cloneMapExcept always returns a writable map — callers assign into the
+// result — even for nil or fully-excluded inputs.
 func cloneMapExcept(m map[string]any, except []string) map[string]any {
-	if m == nil {
-		return nil
-	}
 	exceptMap := make(map[string]bool, len(except))
 	for _, k := range except {
 		exceptMap[k] = true

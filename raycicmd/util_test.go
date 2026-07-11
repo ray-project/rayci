@@ -218,25 +218,13 @@ func TestCloneMap(t *testing.T) {
 	}
 }
 
-func TestScalarStrings_copies(t *testing.T) {
-	in := []string{"a", "b"}
-	got, err := scalarStrings(in)
-	if err != nil {
-		t.Fatalf("scalarStrings(%v): %v", in, err)
-	}
-	got[0] = "mutated"
-	if in[0] != "a" {
-		t.Errorf("scalarStrings aliases its input: in = %v", in)
-	}
-}
-
 func TestCloneMapExcept(t *testing.T) {
 	for _, test := range []struct {
 		m      map[string]any
 		except []string
 		want   map[string]any
 	}{{
-		m: nil, except: nil, want: nil,
+		m: nil, except: nil, want: map[string]any{},
 	}, {
 		m: map[string]any{"a": "b"}, except: nil,
 		want: map[string]any{"a": "b"},
@@ -302,6 +290,18 @@ func TestCheckStepKeys(t *testing.T) {
 				test.step, test.allowed, got, test.ok,
 			)
 		}
+	}
+}
+
+func TestScalarStrings_copies(t *testing.T) {
+	in := []string{"a", "b"}
+	got, err := scalarStrings(in)
+	if err != nil {
+		t.Fatalf("scalarStrings(%v): %v", in, err)
+	}
+	got[0] = "mutated"
+	if in[0] != "a" {
+		t.Errorf("scalarStrings aliases its input: in = %v", in)
 	}
 }
 
