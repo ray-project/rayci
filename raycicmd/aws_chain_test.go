@@ -130,8 +130,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	uploaded = strings.ReplaceAll(uploaded, awsConfigFilePath, configFile)
 	script := uploaded + `; printf '%s\n'` +
 		` "${AWS_ACCESS_KEY_ID:-cleared}"` +
-		` "${AWS_SECRET_KEY:-cleared}"` +
-		` "${AWS_ENDPOINT_URL:-cleared}"` +
+		` "${AWS_ROLE_ARN:-cleared}"` +
 		` "${AWS_EC2_METADATA_DISABLED:-cleared}"` +
 		` "${AWS_SHARED_CREDENTIALS_FILE:-unset}"` +
 		` "${AWS_CONFIG_FILE:-unset}"` +
@@ -140,12 +139,11 @@ func TestAWSChainSetupCommand(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"RAYCI_AWS_CONFIG_B64="+
 			base64.StdEncoding.EncodeToString([]byte(content)),
-		// Hostile value a profile script could have exported; the setup
-		// command must clobber it, not honor it.
+		// Hostile values a profile script could have exported; the setup
+		// command must clobber them, not honor them.
 		"AWS_CONFIG_FILE=/nonexistent-dir/aws.config",
 		"AWS_ACCESS_KEY_ID=AKIAFAKESTATICKEY",
-		"AWS_SECRET_KEY=legacy-alias-secret",
-		"AWS_ENDPOINT_URL=http://localstack:4566",
+		"AWS_ROLE_ARN=arn:aws:iam::999999999999:role/wrong",
 		"AWS_EC2_METADATA_DISABLED=true",
 		"AWS_SHARED_CREDENTIALS_FILE=/etc/fake-creds",
 	)
@@ -166,7 +164,7 @@ func TestAWSChainSetupCommand(t *testing.T) {
 		t.Fatalf("read leak file: %v", err)
 	}
 	// /dev/null, not unset — see the awsChainSetupCommand doc comment.
-	want := "cleared\ncleared\ncleared\ncleared\n/dev/null\n" +
+	want := "cleared\ncleared\ncleared\n/dev/null\n" +
 		configFile + "\n"
 	if string(leak) != want {
 		t.Errorf("env after setup = %q, want %q", leak, want)

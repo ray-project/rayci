@@ -1061,7 +1061,6 @@ func TestConvertPipelineGroup_awsAssumeRole(t *testing.T) {
 			"AWS_SDK_LOAD_CONFIG=1",
 			"AWS_REGION",
 			"AWS_DEFAULT_REGION",
-			"AWS_STS_REGIONAL_ENDPOINTS",
 		} {
 			if !slices.Contains(dockerEnvs, e) {
 				t.Errorf(

@@ -196,12 +196,10 @@ func (c *commandConverter) convert(id string, step map[string]any) (
 		// upload), where the config file does not exist and pointing
 		// AWS_CONFIG_FILE at it would change the host's credentials.
 		// The container performs the chain's STS AssumeRole calls itself,
-		// so it needs the host's region and STS-endpoint settings, and
-		// AWS_SDK_LOAD_CONFIG makes aws-sdk-go v1 tools read the config
-		// file at all.
+		// so it needs the host's region settings, and AWS_SDK_LOAD_CONFIG
+		// makes aws-sdk-go v1 tools read the config file at all.
 		envKeys["AWS_REGION"] = struct{}{}
 		envKeys["AWS_DEFAULT_REGION"] = struct{}{}
-		envKeys["AWS_STS_REGIONAL_ENDPOINTS"] = struct{}{}
 		awsEnvValues = []string{
 			"RAYCI_AWS_CONFIG_B64=" + base64.StdEncoding.EncodeToString(
 				[]byte(awsChainConfig(
