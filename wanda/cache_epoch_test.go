@@ -17,7 +17,7 @@ func TestDefaultCacheEpoch(t *testing.T) {
 	}{{
 		name:     "saturday",
 		now:      morningOf(2025, time.May, 31), // Saturday
-		expected: "202522b",
+		expected: "202522d",
 	}, {
 		name:     "sunday",
 		now:      morningOf(2025, time.June, 1), // Sunday
@@ -29,19 +29,19 @@ func TestDefaultCacheEpoch(t *testing.T) {
 	}, {
 		name:     "tuesday",
 		now:      morningOf(2025, time.June, 3), // Tuesday
-		expected: "202523a",
+		expected: "202523b",
 	}, {
 		name:     "wednesday",
 		now:      morningOf(2025, time.June, 4), // Wednesday
-		expected: "202523a",
+		expected: "202523b",
 	}, {
 		name:     "thursday",
 		now:      morningOf(2025, time.June, 5), // Thursday
-		expected: "202523b",
+		expected: "202523c",
 	}, {
 		name:     "friday",
 		now:      morningOf(2025, time.June, 6), // Friday
-		expected: "202523b",
+		expected: "202523c",
 	}, {
 		name:     "year boundary",
 		now:      morningOf(2023, time.December, 31), // Sunday
