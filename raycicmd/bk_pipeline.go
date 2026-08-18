@@ -138,6 +138,13 @@ var buildkiteEnvs = []string{
 	"BUILDKITE_TRIGGERED_FROM_BUILD_ID",
 	"BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER",
 	"BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG",
+
+	// Which package index CI resolves from, set per fleet in the agent
+	// environment rather than here: the URL differs between the fleets a
+	// pipeline can run on, and each one is reachable only from inside its own
+	// VPC. Forwarded by name only, so nothing fleet-specific lives in this
+	// repo, and an unset value leaves pip and uv on their defaults.
+	"RAYCI_PYPI_MIRROR_URL",
 }
 
 type stepDockerPluginConfig struct {
