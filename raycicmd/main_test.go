@@ -153,6 +153,8 @@ func TestMakeBuildInfo(t *testing.T) {
 		"BUILDKITE_BUILD_CREATOR_EMAIL": "reef@anyscale.com",
 		"RAYCI_BRANCH":                  "foobar",
 		"RAYCI_SELECT":                  "foo,bar,taz",
+		// Pinned so the expectations below do not depend on the clock.
+		"RAYCI_CACHE_EPOCH": "202533b",
 	})
 
 	info, err := makeBuildInfo(flags, envs)
@@ -166,6 +168,7 @@ func TestMakeBuildInfo(t *testing.T) {
 		launcherBranch:   "foobar",
 		gitCommit:        "abc123",
 		selects:          []string{"foo", "bar", "taz"},
+		cacheEpoch:       "202533b",
 	}
 	if !reflect.DeepEqual(info, want) {
 		t.Errorf("got %+v, want %+v", info, want)
@@ -182,6 +185,7 @@ func TestMakeBuildInfo(t *testing.T) {
 		launcherBranch:   "foobar",
 		gitCommit:        "abc123",
 		selects:          []string{"gee", "goo"},
+		cacheEpoch:       "202533b",
 	}
 	if !reflect.DeepEqual(info, want) {
 		t.Errorf("got %+v, want %+v", info, want)
