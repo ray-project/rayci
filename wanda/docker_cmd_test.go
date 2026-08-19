@@ -74,6 +74,33 @@ func TestDockerCmdBuild(t *testing.T) {
 	}
 }
 
+func TestDockerCmdBuild_hostNetwork(t *testing.T) {
+	// RAYCI_BUILD_NETWORK exists so a wanda build can reach a service on the agent it
+	// runs on -- a package index, say -- which is otherwise outside the build's network
+	// namespace. This checks the flag reaches docker and a build still succeeds with it;
+	// what it cannot check here is reachability, which depends on the agent.
+	t.Setenv("RAYCI_BUILD_NETWORK", "host")
+
+	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
+
+	ts := newTarStream()
+	ts.addFile("Dockerfile.hello", nil, "testdata/Dockerfile.hello")
+
+	const tag = "cr.ray.io/rayproject/wanda-test-hostnet"
+
+	input := newBuildInput(ts, []string{"MESSAGE=host network"})
+	input.addTag(tag)
+
+	core, err := input.makeCore("Dockerfile.hello", nil)
+	if err != nil {
+		t.Fatalf("make build input core: %v", err)
+	}
+
+	if err := cmd.build(input, core, newBuildInputHints(nil, nil)); err != nil {
+		t.Fatalf("build with host network: %v", err)
+	}
+}
+
 func TestDockerCmdBuild_withHints(t *testing.T) {
 	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 
