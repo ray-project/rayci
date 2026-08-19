@@ -2,6 +2,7 @@ package rayapp
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -489,37 +490,102 @@ func TestTerminateWorkspace(t *testing.T) {
 	})
 }
 
+// TestWithRemoteExitStatusInShell runs the wrapped command through a real
+// shell, the way the workspace does, to check the reported status survives
+// the wrappers the test runner builds (timeout, nested quoting, `exit N`).
+func TestWithRemoteExitStatusInShell(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+
+	tests := []struct {
+		name string
+		cmd  string
+		want string
+	}{
+		{"success", "echo hi", "0"},
+		{"explicit exit", "exit 3", "3"},
+		{"timeout wrapper failing", `timeout 5 bash -c 'echo hi; exit 7'`, "7"},
+		{"timeout wrapper ok", `timeout 5 bash -c 'echo hi'`, "0"},
+		{"quotes in command", `bash -c 'echo '\''a b'\''; exit 4'`, "4"},
+		{"command not found", "definitely-not-a-real-binary", "127"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			out, _ := exec.Command(
+				"bash", "-c", withRemoteExitStatus(test.cmd),
+			).CombinedOutput()
+			if !strings.Contains(string(out), remoteExitPrefix+test.want) {
+				t.Errorf("output = %q, want status %s", out, test.want)
+			}
+			err := checkRemoteExitStatus(string(out))
+			if gotOK, wantOK := err == nil, test.want == "0"; gotOK != wantOK {
+				t.Errorf("checkRemoteExitStatus() err = %v, want ok = %v", err, wantOK)
+			}
+		})
+	}
+}
+
 func TestRunCmdInWorkspace(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		fake := &fakeAnyscale{}
-		pairs := [][2]string{{"--name", "test-workspace"}}
-		cli := NewAnyscaleCLI()
-		cli.setRunFunc(func(args []string) (string, error) {
+	pairs := [][2]string{{"--name", "test-workspace"}}
+
+	// checkCmd asserts the remote command is the caller's command plus the
+	// exit-status echo, and returns output ending in the given status.
+	checkCmd := func(t *testing.T, wantCmd, status string) func([]string) (string, error) {
+		return func(args []string) (string, error) {
 			checkArgs(t, args, []string{"workspace_v2", "run_command"}, nil, pairs)
 			positional := findPositionalArgs(args[2:], nil, pairs)
-			want := []string{"echo hello"}
+			want := []string{withRemoteExitStatus(wantCmd)}
 			if !slices.Equal(positional, want) {
 				t.Errorf("positional args = %v, want %v", positional, want)
 			}
-			return fake.run(args)
-		})
+			return "some output\n" + remoteExitPrefix + status + "\n", nil
+		}
+	}
 
-		err := cli.runCmdInWorkspace("test-workspace", "echo hello")
-		if err != nil {
+	t.Run("success", func(t *testing.T) {
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(checkCmd(t, "echo hello", "0"))
+
+		if err := cli.runCmdInWorkspace("test-workspace", "echo hello"); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
+	// The CLI exits 0 even when the remote command failed, so a non-zero
+	// status in the output is the only signal on Kubernetes clouds.
+	t.Run("nonzero remote status with cli success", func(t *testing.T) {
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(checkCmd(t, "failing-command", "3"))
+
+		err := cli.runCmdInWorkspace("test-workspace", "failing-command")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "exited with status 3") {
+			t.Errorf("error %q should contain 'exited with status 3'", err.Error())
+		}
+	})
+
+	t.Run("missing remote status", func(t *testing.T) {
+		cli := NewAnyscaleCLI()
+		cli.setRunFunc(func(args []string) (string, error) {
+			return "output with no status tag\n", nil
+		})
+
+		err := cli.runCmdInWorkspace("test-workspace", "some-command")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "did not report an exit status") {
+			t.Errorf("error %q should contain 'did not report an exit status'", err.Error())
+		}
+	})
+
 	t.Run("failure", func(t *testing.T) {
-		pairs := [][2]string{{"--name", "test-workspace"}}
 		cli := NewAnyscaleCLI()
 		cli.setRunFunc(func(args []string) (string, error) {
 			checkArgs(t, args, []string{"workspace_v2", "run_command"}, nil, pairs)
-			positional := findPositionalArgs(args[2:], nil, pairs)
-			want := []string{"failing-command"}
-			if !slices.Equal(positional, want) {
-				t.Errorf("positional args = %v, want %v", positional, want)
-			}
 			return "", fmt.Errorf("exit status 1")
 		})
 
