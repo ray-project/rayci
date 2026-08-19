@@ -194,18 +194,24 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInpu
 	if !c.useLegacyEngine {
 		args = append(args, "--progress=plain")
 	}
-	// RAYCI_BUILD_NETWORK selects the network for RUN steps. It exists for one reason:
-	// a wanda step runs directly on the agent rather than in a container, so a package
-	// index or cache running on that agent is unreachable from the build's own network
-	// namespace. With host networking the build shares the agent's, and 127.0.0.1 inside
-	// a RUN is the agent -- a constant, rather than an address that has to be discovered
-	// and that differs per agent.
+	// Give the build a name for the agent it runs on. A wanda step runs directly on the
+	// agent rather than in a container, so a service listening there -- a package index,
+	// say -- is outside the build's own network namespace and otherwise unreachable from a
+	// RUN.
 	//
-	// Opt-in rather than default: host networking gives a build reach into whatever else
-	// listens on the agent, which is a change nobody should get by accident.
-	if network := os.Getenv("RAYCI_BUILD_NETWORK"); network != "" {
-		args = append(args, "--network", network)
-	}
+	// A name rather than an address, because docker resolves host-gateway itself. Inferring
+	// the address instead is what broke every ray wheel build (ray postmerge 19281): the
+	// docker bridge gateway was read from `docker network inspect bridge`, the build could
+	// not reach it, and an index that cannot be reached fails a build outright rather than
+	// falling back.
+	//
+	// The same name ci/ray_ci/linux_container.py already passes to `docker run`, so a
+	// service is addressed identically from a test container and from an image build.
+	//
+	// Deliberately not --network=host, which would also work: that shares the agent's
+	// network namespace with the build, exposing whatever else listens there, including on
+	// loopback. This adds one hosts entry and leaves the namespace intact.
+	args = append(args, "--add-host", "rayci.localhost:host-gateway")
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {
