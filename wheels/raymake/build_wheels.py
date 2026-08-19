@@ -35,7 +35,7 @@ def read_version(script_dir: Path) -> str:
     that cuts the release.
     """
     version_file = script_dir / "VERSION"
-    match = VERSION_PATTERN.search(version_file.read_text())
+    match = VERSION_PATTERN.search(version_file.read_text(encoding="utf-8"))
     if match is None:
         raise RuntimeError(f"{version_file} does not declare __version__")
     return match.group(1)
