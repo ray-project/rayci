@@ -44,7 +44,7 @@ def read_version(script_dir: Path) -> str:
 def write_version_file(script_dir: Path, version: str) -> str:
     """Write VERSION, for building a version other than the checked-in one."""
     version_file = script_dir / "VERSION"
-    version_file.write_text(f'__version__ = "{version}"\n')
+    version_file.write_text(f'__version__ = "{version}"\\n', encoding="utf-8")
     print(f"Wrote VERSION file: {version}")
     return version
 
