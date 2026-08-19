@@ -7,6 +7,5 @@ __pycache__
 .hypothesis
 
 /_release/
-wheels/raymake/VERSION
 
 /.claude/

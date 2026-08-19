@@ -10,36 +10,42 @@ Usage:
 
     # Build specific platform
     uv run pypi/raymake/build_wheels.py --platform darwin-arm64
+
+    # Package a version other than the one in VERSION
+    uv run pypi/raymake/build_wheels.py --version 0.48.0
 """
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
-
-def get_version_from_git() -> str:
-    """Extract version from git tag (e.g., v0.27.0 -> 0.27.0)."""
-    try:
-        result = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        version = result.stdout.strip().lstrip("v")
-        return version
-    except subprocess.CalledProcessError:
-        return "0.0.0"
+VERSION_PATTERN = re.compile(r'^__version__ = "([^"]+)"$', re.MULTILINE)
 
 
-def write_version_file(script_dir: Path) -> str:
-    """Generate VERSION file from git tag."""
-    version = get_version_from_git()
+def read_version(script_dir: Path) -> str:
+    """Read the version to package from the checked-in VERSION file.
+
+    The version is checked in rather than taken from `git describe --tags`, which is
+    where it used to come from. The release build runs on an untagged commit, so
+    describe answered with the *previous* tag: every wheel published under v0.47.0
+    declares 0.46.0, and v0.45.0 shipped 0.44.0. Bump VERSION in the pull request
+    that cuts the release.
+    """
+    version_file = script_dir / "VERSION"
+    match = VERSION_PATTERN.search(version_file.read_text())
+    if match is None:
+        raise RuntimeError(f"{version_file} does not declare __version__")
+    return match.group(1)
+
+
+def write_version_file(script_dir: Path, version: str) -> str:
+    """Write VERSION, for building a version other than the checked-in one."""
     version_file = script_dir / "VERSION"
     version_file.write_text(f'__version__ = "{version}"\n')
-    print(f"Generated VERSION file: {version}")
+    print(f"Wrote VERSION file: {version}")
     return version
 
 
@@ -128,6 +134,10 @@ def main():
         default=Path(__file__).parent.parent.parent / "_release",
         help="Output directory for wheels (default: _release/)",
     )
+    parser.add_argument(
+        "--version",
+        help="Version to package, overriding the checked-in VERSION file",
+    )
     args = parser.parse_args()
 
     if args.platform == "all":
@@ -135,10 +145,13 @@ def main():
     else:
         platforms = [args.platform]
 
-    # Generate VERSION file from git tag
     script_dir = Path(__file__).parent
-    write_version_file(script_dir)
+    if args.version:
+        version = write_version_file(script_dir, args.version)
+    else:
+        version = read_version(script_dir)
 
+    print(f"Packaging raymake {version}")
     print(f"Building wheels for: {', '.join(platforms)}")
     print(f"Output directory: {args.output_dir}")
 
