@@ -194,6 +194,18 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInpu
 	if !c.useLegacyEngine {
 		args = append(args, "--progress=plain")
 	}
+	// RAYCI_BUILD_NETWORK selects the network for RUN steps. It exists for one reason:
+	// a wanda step runs directly on the agent rather than in a container, so a package
+	// index or cache running on that agent is unreachable from the build's own network
+	// namespace. With host networking the build shares the agent's, and 127.0.0.1 inside
+	// a RUN is the agent -- a constant, rather than an address that has to be discovered
+	// and that differs per agent.
+	//
+	// Opt-in rather than default: host networking gives a build reach into whatever else
+	// listens on the agent, which is a change nobody should get by accident.
+	if network := os.Getenv("RAYCI_BUILD_NETWORK"); network != "" {
+		args = append(args, "--network", network)
+	}
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {
