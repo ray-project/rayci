@@ -214,6 +214,10 @@ func makeRayDockerPlugin(
 		"add-caps":      addCaps,
 		"security-opts": []string{"apparmor=unconfined"},
 
+		// Reach agent-side services (e.g. the package index proxy) by the
+		// same name wanda and ci/ray_ci pass.
+		"add-host": []string{"rayci.localhost:host-gateway"},
+
 		"volumes": []string{
 			"/var/run/docker.sock:/var/run/docker.sock",
 			"/tmp/artifacts:/artifact-mount",
