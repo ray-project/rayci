@@ -91,6 +91,12 @@ func main() {
 		*envFile = os.Getenv("RAYCI_ENV_FILE")
 		*artifactsDir = os.Getenv("RAYCI_ARTIFACTS_DIR")
 
+		// Prefer the epoch rayci pinned for the whole build. Falling back to
+		// the clock would let a build that straddles an epoch boundary compute
+		// two different cache keys for the same image.
+		if *epoch == "" {
+			*epoch = os.Getenv("RAYCI_WANDA_EPOCH")
+		}
 		if *epoch == "" {
 			*epoch = wanda.DefaultCacheEpoch()
 		}
@@ -99,7 +105,9 @@ func main() {
 	var input string
 	if !*rayCI {
 		if fs.NArg() != 1 {
-			log.Fatal("needs exactly one argument for the spec file in local mode. Run with -help for usage.")
+			log.Fatal(
+				"needs exactly one argument for the spec file in local mode. Run with -help for usage.",
+			)
 		}
 		input = fs.Arg(0)
 	} else {
