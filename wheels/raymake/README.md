@@ -29,6 +29,13 @@ pip install raymake
 raymake spec.wanda.yaml
 ```
 
+## Releasing
+
+The packaged version is `VERSION`, and it is checked in. Bump it in the pull
+request that cuts a release, so the wheels built from that commit carry the
+version the release will be tagged with — the release build runs before the tag
+exists, so it cannot learn the version from git.
+
 ## Distribution
 
 Distributed as a pre-compiled Go binary via the wheel `scripts` data directory
