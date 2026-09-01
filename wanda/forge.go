@@ -235,9 +235,18 @@ func (f *Forge) resolveBases(froms []string) (map[string]*imageSource, error) {
 		}
 
 		// A normal remote image that we need to pull from the network.
+		// Try local image first, fallback to remote if not found locally.
+localSrc, localErr := resolveDockerImage(f.docker, from, from)
+		if localErr == nil {
+			log.Printf("using local image for %s", from)
+			m[from] = localSrc
+			continue
+		}
+
+		// Local image not found, try remote
 		src, err := resolveRemoteImage(from, from, f.remoteOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("resolve remote image %s: %w", from, err)
+return nil, fmt.Errorf("resolve remote image %s: %w", from, err)
 		}
 		m[from] = src
 	}
