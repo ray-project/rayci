@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // WorkspaceState represents the state of an Anyscale workspace.
@@ -118,11 +119,53 @@ func (ac *AnyscaleCLI) pushFolderToWorkspace(workspaceName, localFilePath string
 	return nil
 }
 
+// remoteExitPrefix tags the exit status we append to every remote command.
+//
+// `anyscale workspace_v2 run_command` discards the remote status and always
+// exits 0, so the only failure signal is the `exec failed with exit code N`
+// line runAnyscaleCLI scans for. That line comes from the exec shim on VM
+// clusters; Kubernetes clouds (AKS/EKS/GKE) ssh straight into the pod, so
+// nothing reports the status and a failing command reads as a pass. Echoing
+// the status ourselves works on both.
+const remoteExitPrefix = "__rayapp_remote_exit__="
+
+// withRemoteExitStatus appends an echo of the command's exit status, so the
+// caller can recover a status the CLI drops. The command runs in a subshell
+// so that a test script ending in `exit N` reports N instead of killing the
+// shell before the echo.
+func withRemoteExitStatus(cmd string) string {
+	return fmt.Sprintf("( %s ); printf '\\n%s%%s\\n' \"$?\"", cmd, remoteExitPrefix)
+}
+
+// checkRemoteExitStatus reports an error unless the output ends with a
+// zero status tag. A missing tag is a failure: the remote shell died before
+// the echo, which is exactly the silent-pass case this guards.
+func checkRemoteExitStatus(output string) error {
+	idx := strings.LastIndex(output, remoteExitPrefix)
+	if idx < 0 {
+		return fmt.Errorf(
+			"remote command did not report an exit status; "+
+				"it may have died before completing:\n%s", output,
+		)
+	}
+	status := strings.TrimSpace(output[idx+len(remoteExitPrefix):])
+	if status == "0" {
+		return nil
+	}
+	return fmt.Errorf("remote command exited with status %s:\n%s", status, output)
+}
+
 func (ac *AnyscaleCLI) runCmdInWorkspace(workspaceName string, cmd string) error {
-	_, err := ac.runAnyscaleCLI(
-		[]string{"workspace_v2", "run_command", "--name", workspaceName, cmd},
+	out, err := ac.runAnyscaleCLI(
+		[]string{
+			"workspace_v2", "run_command", "--name", workspaceName,
+			withRemoteExitStatus(cmd),
+		},
 	)
 	if err != nil {
+		return fmt.Errorf("run command in workspace failed: %w", err)
+	}
+	if err := checkRemoteExitStatus(out); err != nil {
 		return fmt.Errorf("run command in workspace failed: %w", err)
 	}
 	return nil

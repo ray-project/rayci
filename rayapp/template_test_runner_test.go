@@ -193,7 +193,7 @@ func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 	var capturedCmd string
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.Contains(args[4], "timeout") {
 			capturedCmd = args[4]
 		}
 		return fake.run(args)
@@ -219,7 +219,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.Contains(args[4], "timeout") {
 			return "", fmt.Errorf("test execution failed")
 		}
 		return fake.run(args)
@@ -521,7 +521,7 @@ func TestProbe_RunsTestCommand(t *testing.T) {
 	var capturedCmd string
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.Contains(args[4], "timeout") {
 			capturedCmd = args[4]
 		}
 		return fake.run(args)
@@ -549,7 +549,7 @@ func TestProbe_TestCommandFails(t *testing.T) {
 
 	cli.setRunFunc(func(args []string) (string, error) {
 		cmd := fmt.Sprintf("%s %s", args[0], args[1])
-		if cmd == "workspace_v2 run_command" && strings.HasPrefix(args[4], "timeout") {
+		if cmd == "workspace_v2 run_command" && strings.Contains(args[4], "timeout") {
 			return "", fmt.Errorf("test execution failed")
 		}
 		return fake.run(args)
