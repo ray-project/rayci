@@ -29,6 +29,11 @@ var branchPipelineConfig = &config{
 		"medium-arm64":   "runner_queue_arm64_medium_branch",
 		"release":        "release_queue_small",
 		"release-medium": "release_queue_medium",
+
+		// Experimental queues.
+		"gpu-experimental":       "gpu_experimental_runner_queue_branch",
+		"gpu-large-experimental": "gpu_large_experimental_runner_queue_branch",
+		"g6-large-experimental":  "g6_large_experimental_runner_queue_branch",
 	},
 
 	Env: map[string]string{
@@ -75,6 +80,11 @@ func makePRPipelineConfig(name string) *config {
 			"macos-arm64": "macos-pr-arm64",
 
 			"medium-arm64": "runner_queue_arm64_medium_pr",
+
+			// Experimental queues.
+			"gpu-experimental":       "gpu_experimental_runner_queue_pr",
+			"gpu-large-experimental": "gpu_large_experimental_runner_queue_pr",
+			"g6-large-experimental":  "g6_large_experimental_runner_queue_pr",
 		},
 
 		BuilderPriority: 1,
