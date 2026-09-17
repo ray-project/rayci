@@ -118,11 +118,57 @@ func (b *builder) build(outputDir string) error {
 		Name:                b.tmpl.Name,
 		ComputeConfigBase64: make(map[string]string),
 	}
+	sources := make(map[string][]byte, len(b.tmpl.ComputeConfig))
+	names := make(map[string]string, len(b.tmpl.ComputeConfig))
 	for cld, f := range b.tmpl.ComputeConfig {
+		// `K8S: auto` asks for a derived config instead of naming a file; it
+		// is handled below, once the file-backed configs have been read.
+		if cld == k8sComputeConfigKey && f == k8sAutoValue {
+			continue
+		}
 		bs, err := os.ReadFile(filepath.Join(b.baseDir, f))
 		if err != nil {
 			return fmt.Errorf("read compute config %q: %w", f, err)
 		}
+		sources[cld] = bs
+		names[cld] = f
+	}
+
+	// AWS and GCP are packaged exactly as before. Whatever a template puts
+	// under the K8S key is packaged declaratively, because a K8s-stack cloud
+	// cannot honor a named instance type -- those are per-cluster
+	// registrations, while required_resources resolves server-side into a free
+	// pod. `K8S: auto` derives that config from AWS; a named file goes through
+	// the same translation, which is a no-op for a config already written
+	// declaratively and converts any instance_type it still names. A template
+	// that mentions no K8S key gets no K8S config, as before.
+	if k8sValue, ok := b.tmpl.ComputeConfig[k8sComputeConfigKey]; ok {
+		src, from := sources[k8sComputeConfigKey], names[k8sComputeConfigKey]
+		if k8sValue == k8sAutoValue {
+			aws, ok := sources[awsComputeConfigKey]
+			if !ok {
+				return fmt.Errorf(
+					"compute config %q: %q needs an %s config to derive from",
+					k8sComputeConfigKey, k8sAutoValue, awsComputeConfigKey,
+				)
+			}
+			src, from = aws, names[awsComputeConfigKey]
+		}
+		declarative, err := deriveK8SComputeConfig(src)
+		if err != nil {
+			// The template asked for a K8S config, so silence is the wrong answer.
+			return fmt.Errorf(
+				"package %s compute config from %q: %w", k8sComputeConfigKey, from, err,
+			)
+		}
+		sources[k8sComputeConfigKey] = declarative
+		if k8sValue == k8sAutoValue {
+			names[k8sComputeConfigKey] = "(derived from " + from + ")"
+		}
+	}
+
+	for cld, bs := range sources {
+		f := names[cld]
 		// Publish legacy-schema bundles: convert the new user-facing schema to
 		// legacy so the console clone path (which parses legacy) is unaffected.
 		legacy, err := isLegacyComputeConfigData(bs)
