@@ -2,9 +2,13 @@ package rayapp
 
 import (
 	"fmt"
+	"math"
 	"sort"
+	"strings"
 
+	"gopkg.in/inf.v0"
 	yaml "gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Convert the new user-facing ComputeConfig schema (head_node/worker_nodes/...) to the
@@ -178,7 +182,10 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 		return nil, fmt.Errorf("worker node group 'min_nodes': %w", err)
 	}
 	if minWorkers < 0 {
-		return nil, fmt.Errorf("worker node group 'min_nodes' (%d) must be non-negative", minWorkers)
+		return nil, fmt.Errorf(
+			"worker node group 'min_nodes' (%d) must be non-negative",
+			minWorkers,
+		)
 	}
 	legacy["min_workers"] = minWorkers
 	maxWorkers, err := intOrDefault(w["max_nodes"], 10)
@@ -186,10 +193,17 @@ func convertWorkerNode(w map[string]any) (map[string]any, error) {
 		return nil, fmt.Errorf("worker node group 'max_nodes': %w", err)
 	}
 	if maxWorkers < 0 {
-		return nil, fmt.Errorf("worker node group 'max_nodes' (%d) must be non-negative", maxWorkers)
+		return nil, fmt.Errorf(
+			"worker node group 'max_nodes' (%d) must be non-negative",
+			maxWorkers,
+		)
 	}
 	if maxWorkers < minWorkers {
-		return nil, fmt.Errorf("worker node group max_nodes (%d) must be >= min_nodes (%d)", maxWorkers, minWorkers)
+		return nil, fmt.Errorf(
+			"worker node group max_nodes (%d) must be >= min_nodes (%d)",
+			maxWorkers,
+			minWorkers,
+		)
 	}
 	legacy["max_workers"] = maxWorkers
 
@@ -221,6 +235,13 @@ func convertNodeCommonFields(node map[string]any) (map[string]any, error) {
 			legacy[k] = v
 		}
 	}
+	if rr, ok := legacy["required_resources"]; ok {
+		normalized, err := normalizeRequiredResources(rr)
+		if err != nil {
+			return nil, err
+		}
+		legacy["required_resources"] = normalized
+	}
 	if adv := node["advanced_instance_config"]; isTruthy(adv) {
 		// Generic key; the launch path prefers it over aws_/gcp_ ones.
 		legacy["advanced_configurations_json"] = adv
@@ -235,6 +256,120 @@ func convertNodeCommonFields(node map[string]any) (map[string]any, error) {
 	}
 	// cloud_deployment is meaningless for a template clone; dropped.
 	return legacy, nil
+}
+
+// normalizeRequiredResources returns required_resources with `memory` as an
+// integer number of bytes.
+//
+// The API takes memory as bytes, but the user-facing schema also allows a
+// Kubernetes quantity string ("8Gi"). The SDK converts on the way to the API
+// (PhysicalResources.to_dict(for_api=True) -> _parse_memory_string); the
+// published bundle never touches the SDK — the console clone path parses it
+// straight into the backend's PhysicalResources, whose `memory` is an int —
+// so a string that passes `compute-config create -f` 422s at launch unless we
+// convert here too.
+func normalizeRequiredResources(v any) (any, error) {
+	rr, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("'required_resources' must be a mapping, got %T", v)
+	}
+	mem, ok := rr["memory"]
+	if !ok || mem == nil {
+		return rr, nil
+	}
+	bytes, err := parseMemoryBytes(mem)
+	if err != nil {
+		return nil, fmt.Errorf("'required_resources.memory': %w", err)
+	}
+	// Copy rather than mutate: the caller's parsed YAML is not ours to edit.
+	out := make(map[string]any, len(rr))
+	for k, val := range rr {
+		out[k] = val
+	}
+	out["memory"] = bytes
+	return out, nil
+}
+
+// parseMemoryBytes converts a memory value to bytes, accepting either an
+// integer (already bytes) or a Kubernetes quantity string.
+func parseMemoryBytes(v any) (int64, error) {
+	switch t := v.(type) {
+	case int:
+		return nonNegativeBytes(int64(t))
+	case int64:
+		return nonNegativeBytes(t)
+	case float64:
+		// YAML gives a float only when the value was written as one; bytes are
+		// whole, so a fraction is a mistake rather than something to round.
+		if t != math.Trunc(t) {
+			return 0, fmt.Errorf("expected a whole number of bytes, got %v", t)
+		}
+		if t > math.MaxInt64 || t < math.MinInt64 {
+			return 0, fmt.Errorf("value %v is out of range", t)
+		}
+		return nonNegativeBytes(int64(t))
+	case string:
+		return parseMemoryQuantity(t)
+	default:
+		return 0, fmt.Errorf(
+			"expected an integer number of bytes or a quantity string "+
+				"like \"8Gi\", got %T", v,
+		)
+	}
+}
+
+// nonNegativeBytes rejects a negative byte count. Nothing downstream does:
+// the backend's PhysicalResources only range-checks int64, so it would reach
+// launch as a nonsense pod request.
+func nonNegativeBytes(b int64) (int64, error) {
+	if b < 0 {
+		return 0, fmt.Errorf("must not be negative, got %d bytes", b)
+	}
+	return b, nil
+}
+
+// parseMemoryQuantity converts a Kubernetes quantity string to bytes, using
+// the same parser Kubernetes itself uses so the accepted grammar cannot drift
+// from the one the docs describe.
+//
+// The value must come out as a whole number of bytes. Kubernetes tolerates a
+// fractional one -- "100m" is 100 *milli*bytes -- but, as its docs put it,
+// "this isn't useful to specify since you must always assign whole numbers of
+// bytes", and the backend's PhysicalResources.memory is an int, so a fraction
+// could not survive the trip anyway. Requiring it whole also removes the one
+// place this parser and the SDK's disagree: ParseQuantity().Value() rounds up
+// where the SDK's int(Decimal) truncates, and that difference only exists for
+// values we now reject.
+func parseMemoryQuantity(s string) (int64, error) {
+	// ParseQuantity reads a bare suffix ("Gi", "k", ".") as zero, so a typo
+	// would silently become no memory at all. The SDK rejects those, and so
+	// do we.
+	if !strings.ContainsAny(s, "0123456789") {
+		return 0, fmt.Errorf("invalid memory quantity %q: no number in it", s)
+	}
+	q, err := resource.ParseQuantity(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid memory quantity %q: %w", s, err)
+	}
+	if q.Sign() < 0 {
+		return 0, fmt.Errorf("memory quantity %q must not be negative", s)
+	}
+
+	dec := q.AsDec()
+	whole := new(inf.Dec).Round(dec, 0, inf.RoundDown)
+	if whole.Cmp(dec) != 0 {
+		return 0, fmt.Errorf(
+			"memory quantity %q is %s bytes, which is not a whole number of bytes",
+			s, dec.String(),
+		)
+	}
+	b, ok := whole.Unscaled()
+	if !ok || b == math.MaxInt64 {
+		// Quantity saturates at int64 max rather than reporting an overflow,
+		// so a value that lands exactly there is treated as out of range.
+		return 0, fmt.Errorf("memory quantity %q is too large", s)
+	}
+	return b, nil
 }
 
 func rejectUnknownKeys(m map[string]any, known map[string]bool, context string) error {
