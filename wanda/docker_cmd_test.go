@@ -74,6 +74,31 @@ func TestDockerCmdBuild(t *testing.T) {
 	}
 }
 
+func TestDockerCmdBuild_addHost(t *testing.T) {
+	// Builds get a name for the agent they run on, so a service listening there is
+	// reachable from a RUN. This checks the flag reaches docker and a build still
+	// succeeds with it; reachability itself depends on the agent and cannot be asserted
+	// here.
+	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
+
+	ts := newTarStream()
+	ts.addFile("Dockerfile.hello", nil, "testdata/Dockerfile.hello")
+
+	const tag = "cr.ray.io/rayproject/wanda-test-addhost"
+
+	input := newBuildInput(ts, []string{"MESSAGE=add host"})
+	input.addTag(tag)
+
+	core, err := input.makeCore("Dockerfile.hello", nil)
+	if err != nil {
+		t.Fatalf("make build input core: %v", err)
+	}
+
+	if err := cmd.build(input, core, newBuildInputHints(nil, nil)); err != nil {
+		t.Fatalf("build with add-host: %v", err)
+	}
+}
+
 func TestDockerCmdBuild_withHints(t *testing.T) {
 	cmd := newDockerCmd(&dockerCmdConfig{}) // uses real docker client
 

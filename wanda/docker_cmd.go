@@ -194,6 +194,24 @@ func (c *dockerCmd) build(in *buildInput, core *buildInputCore, hints *buildInpu
 	if !c.useLegacyEngine {
 		args = append(args, "--progress=plain")
 	}
+	// Give the build a name for the agent it runs on. A wanda step runs directly on the
+	// agent rather than in a container, so a service listening there -- a package index,
+	// say -- is outside the build's own network namespace and otherwise unreachable from a
+	// RUN.
+	//
+	// A name rather than an address, because docker resolves host-gateway itself. Inferring
+	// the address instead is what broke every ray wheel build (ray postmerge 19281): the
+	// docker bridge gateway was read from `docker network inspect bridge`, the build could
+	// not reach it, and an index that cannot be reached fails a build outright rather than
+	// falling back.
+	//
+	// The same name ci/ray_ci/linux_container.py already passes to `docker run`, so a
+	// service is addressed identically from a test container and from an image build.
+	//
+	// Deliberately not --network=host, which would also work: that shares the agent's
+	// network namespace with the build, exposing whatever else listens there, including on
+	// loopback. This adds one hosts entry and leaves the namespace intact.
+	args = append(args, "--add-host", "rayci.localhost:host-gateway")
 	args = append(args, "-f", core.Dockerfile)
 
 	for _, t := range in.tagList() {

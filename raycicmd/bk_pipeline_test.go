@@ -32,6 +32,20 @@ func TestMakeRayDockerPlugin_mountSSHAgent(t *testing.T) {
 	})
 }
 
+func TestMakeRayDockerPlugin_addHost(t *testing.T) {
+	config := &stepDockerPluginConfig{}
+	m := makeRayDockerPlugin("test-image:latest", config)
+	got, ok := m["add-host"]
+	if !ok {
+		t.Fatal("makeRayDockerPlugin() missing add-host key")
+	}
+	want := []string{"rayci.localhost:host-gateway"}
+	list, ok := got.([]string)
+	if !ok || len(list) != len(want) || list[0] != want[0] {
+		t.Errorf("makeRayDockerPlugin() add-host = %#v, want %#v", got, want)
+	}
+}
+
 func makeGroup(name string, n int) *bkPipelineGroup {
 	steps := make([]any, n)
 	for i := range steps {
