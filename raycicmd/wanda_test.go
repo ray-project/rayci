@@ -142,3 +142,33 @@ func TestWandaStep_envfile(t *testing.T) {
 		})
 	}
 }
+
+func TestWandaStep_cacheEpoch(t *testing.T) {
+	newStep := func(epoch string) map[string]any {
+		s := &wandaStep{
+			name:       "forge",
+			file:       "ci/forge.wanda.yaml",
+			buildID:    "abc123",
+			cacheEpoch: epoch,
+			ciConfig:   &config{},
+		}
+		return s.buildkiteStep()
+	}
+
+	bk := newStep("202533b")
+	envs, ok := bk["env"].(map[string]string)
+	if !ok {
+		t.Fatalf("buildkiteStep() env = %v, want a map", bk["env"])
+	}
+	if got := envs["RAYCI_WANDA_EPOCH"]; got != "202533b" {
+		t.Errorf("RAYCI_WANDA_EPOCH = %q, want `202533b`", got)
+	}
+
+	// With no epoch pinned, the var is left unset so wanda keeps its own
+	// default rather than seeing an empty epoch.
+	bk = newStep("")
+	envs, _ = bk["env"].(map[string]string)
+	if got, ok := envs["RAYCI_WANDA_EPOCH"]; ok {
+		t.Errorf("RAYCI_WANDA_EPOCH = %q, want unset", got)
+	}
+}

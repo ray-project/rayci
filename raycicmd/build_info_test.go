@@ -2,6 +2,8 @@ package raycicmd
 
 import (
 	"testing"
+
+	"github.com/ray-project/rayci/wanda"
 )
 
 func TestBuildID(t *testing.T) {
@@ -40,4 +42,28 @@ func TestGitCommit(t *testing.T) {
 	if want := "123abcdefg"; got != want {
 		t.Errorf("gitCommit: got %q, want %q", got, want)
 	}
+}
+
+func TestMakeCacheEpoch(t *testing.T) {
+	t.Run("override", func(t *testing.T) {
+		env := newEnvsMap(map[string]string{"RAYCI_CACHE_EPOCH": "202533b"})
+		if got := makeCacheEpoch(env); got != "202533b" {
+			t.Errorf("makeCacheEpoch() = %q, want `202533b`", got)
+		}
+	})
+
+	t.Run("default matches wanda", func(t *testing.T) {
+		env := newEnvsMap(map[string]string{})
+		got := makeCacheEpoch(env)
+		if want := wanda.DefaultCacheEpoch(); got != want {
+			t.Errorf("makeCacheEpoch() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("empty override falls back", func(t *testing.T) {
+		env := newEnvsMap(map[string]string{"RAYCI_CACHE_EPOCH": ""})
+		if got := makeCacheEpoch(env); got == "" {
+			t.Error("makeCacheEpoch() = \"\", want a resolved epoch")
+		}
+	})
 }

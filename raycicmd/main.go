@@ -132,6 +132,7 @@ func makeBuildInfo(flags *Flags, envs Envs) (*buildInfo, error) {
 		launcherBranch:   rayciBranch,
 		gitCommit:        commit,
 		selects:          selects,
+		cacheEpoch:       makeCacheEpoch(envs),
 	}, nil
 }
 
