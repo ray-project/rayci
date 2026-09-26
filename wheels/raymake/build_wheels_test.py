@@ -3,51 +3,48 @@
 import tempfile
 import zipfile
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
 from build_wheels import (
     PLATFORM_MAP,
-    get_version_from_git,
+    read_version,
     write_version_file,
 )
 
 
-class TestGetVersionFromGit:
-    """Tests for get_version_from_git()."""
+class TestReadVersion:
+    """Tests for read_version()."""
 
-    def test_strips_v_prefix(self):
-        """Version extraction strips the v prefix."""
-        mock_result = mock.Mock()
-        mock_result.stdout = "v0.27.0\n"
+    def test_reads_checked_in_version(self):
+        """Version comes from the VERSION file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_dir = Path(tmpdir)
+            (script_dir / "VERSION").write_text('__version__ = "0.47.0"\n')
 
-        with mock.patch("build_wheels.subprocess.run", return_value=mock_result):
-            got = get_version_from_git()
-            want = "0.27.0"
-            assert got == want, f"get_version_from_git() = {got!r}, want {want!r}"
+            got = read_version(script_dir)
+            want = "0.47.0"
+            assert got == want, f"read_version() = {got!r}, want {want!r}"
 
-    def test_handles_version_without_prefix(self):
-        """Version extraction handles versions without v prefix."""
-        mock_result = mock.Mock()
-        mock_result.stdout = "1.2.3\n"
+    def test_raises_when_version_undeclared(self):
+        """A VERSION file without __version__ is an error, not a default."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_dir = Path(tmpdir)
+            (script_dir / "VERSION").write_text("0.47.0\n")
 
-        with mock.patch("build_wheels.subprocess.run", return_value=mock_result):
-            got = get_version_from_git()
-            want = "1.2.3"
-            assert got == want, f"get_version_from_git() = {got!r}, want {want!r}"
+            with pytest.raises(RuntimeError):
+                read_version(script_dir)
 
-    def test_returns_default_on_git_error(self):
-        """Version extraction returns 0.0.0 on git error."""
-        import subprocess
+    def test_raises_when_version_file_missing(self):
+        """A missing VERSION file is an error, not a default."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(FileNotFoundError):
+                read_version(Path(tmpdir))
 
-        with mock.patch(
-            "build_wheels.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "git"),
-        ):
-            got = get_version_from_git()
-            want = "0.0.0"
-            assert got == want, f"get_version_from_git() = {got!r}, want {want!r}"
+    def test_reads_the_repo_version(self):
+        """The checked-in VERSION file parses."""
+        got = read_version(Path(__file__).parent)
+        assert got, "read_version() returned an empty version"
 
 
 class TestWriteVersionFile:
@@ -58,11 +55,7 @@ class TestWriteVersionFile:
         with tempfile.TemporaryDirectory() as tmpdir:
             script_dir = Path(tmpdir)
 
-            mock_result = mock.Mock()
-            mock_result.stdout = "v1.0.0\n"
-
-            with mock.patch("build_wheels.subprocess.run", return_value=mock_result):
-                got_version = write_version_file(script_dir)
+            got_version = write_version_file(script_dir, "1.0.0")
 
             want_version = "1.0.0"
             assert got_version == want_version, (
@@ -77,6 +70,16 @@ class TestWriteVersionFile:
             assert got_content == want_content, (
                 f"VERSION content = {got_content!r}, want {want_content!r}"
             )
+
+    def test_round_trips_with_read_version(self):
+        """What write_version_file writes, read_version reads."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_dir = Path(tmpdir)
+            write_version_file(script_dir, "2.3.4")
+
+            got = read_version(script_dir)
+            want = "2.3.4"
+            assert got == want, f"read_version() = {got!r}, want {want!r}"
 
 
 class TestPlatformMap:
