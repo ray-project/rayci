@@ -177,9 +177,13 @@ func (f *fakeAnyscale) workspacePush(opts []string) (string, error) {
 	return fmt.Sprintf("Sending %s to workspace '%s'", localDir, name), nil
 }
 
+// workspaceRunCommand echoes the exit-status tag the real remote command
+// appends (see withRemoteExitStatus), reporting success.
 func (f *fakeAnyscale) workspaceRunCommand(opts []string) (string, error) {
 	name := parseName(opts)
-	return fmt.Sprintf("Running command in workspace '%s'", name), nil
+	return fmt.Sprintf(
+		"Running command in workspace '%s'\n%s0\n", name, remoteExitPrefix,
+	), nil
 }
 
 func (f *fakeAnyscale) workspaceStart(opts []string) (string, error) {
