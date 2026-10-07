@@ -24,9 +24,24 @@ func main() {
 	testBuildFile := testFlags.String("build", "BUILD.yaml", "build file")
 	testRayVersion := testFlags.String("ray-version", "", "ray version to test against")
 	testNightly := testFlags.Bool("nightly", false, "test against nightly ray image")
+	testCloud := testFlags.String(
+		"cloud",
+		"",
+		"Anyscale cloud to test on (default: the CLI's default cloud)",
+	)
+	testComputeConfig := testFlags.String(
+		"compute-config",
+		"",
+		"compute_config key to test with, e.g. GCP or K8S (default: AWS)",
+	)
 
 	probeFlags := flag.NewFlagSet("probe", flag.ExitOnError)
 	probeBuildFile := probeFlags.String("build", "BUILD.yaml", "build file")
+	probeCloud := probeFlags.String(
+		"cloud",
+		"",
+		"Anyscale cloud to probe on (default: the CLI's default cloud)",
+	)
 
 	switch os.Args[1] {
 	case "build":
@@ -50,15 +65,19 @@ func main() {
 		if len(args) < 1 {
 			log.Fatal("test requires <template-name> or 'all'")
 		}
+		target := rayapp.TestTarget{
+			Cloud:         *testCloud,
+			ComputeConfig: *testComputeConfig,
+		}
 		if args[0] == "all" {
 			if err := rayapp.RunAllTemplateTests(
-				*testBuildFile, *testRayVersion, *testNightly,
+				*testBuildFile, *testRayVersion, *testNightly, target,
 			); err != nil {
 				log.Fatal(err)
 			}
 		} else {
 			if err := rayapp.RunTemplateTest(
-				args[0], *testBuildFile, *testRayVersion, *testNightly,
+				args[0], *testBuildFile, *testRayVersion, *testNightly, target,
 			); err != nil {
 				log.Fatal(err)
 			}
@@ -69,7 +88,8 @@ func main() {
 		if len(args) < 1 {
 			log.Fatal("probe requires <template-name>")
 		}
-		if err := rayapp.RunProbe(args[0], *probeBuildFile); err != nil {
+		target := rayapp.TestTarget{Cloud: *probeCloud}
+		if err := rayapp.RunProbe(args[0], *probeBuildFile, target); err != nil {
 			log.Fatal(err)
 		}
 	case "help":
@@ -97,4 +117,13 @@ func printUsage() {
 	fmt.Println("  --build string       Build file (default \"BUILD.yaml\")")
 	fmt.Println("  --ray-version string ray version to test against")
 	fmt.Println("  --nightly            test against nightly ray image")
+	fmt.Println("  --cloud string       Anyscale cloud to test on (default: CLI's default cloud)")
+	fmt.Println("  --compute-config string")
+	fmt.Println(
+		"                       compute_config key to test with, e.g. GCP or K8S (default \"AWS\")",
+	)
+	fmt.Println()
+	fmt.Println("Probe flags (probe):")
+	fmt.Println("  --build string       Build file (default \"BUILD.yaml\")")
+	fmt.Println("  --cloud string       Anyscale cloud to probe on (default: CLI's default cloud)")
 }

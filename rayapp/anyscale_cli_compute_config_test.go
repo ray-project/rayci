@@ -3,9 +3,12 @@ package rayapp
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v2"
 )
 
 func TestCreateComputeConfig(t *testing.T) {
@@ -47,7 +50,7 @@ func TestCreateComputeConfig(t *testing.T) {
 			return fake.run(args)
 		})
 
-		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		err = cli.CreateComputeConfig("my-config", tmpFile.Name(), "")
 		if err != nil {
 			t.Errorf("CreateComputeConfig() error = %v", err)
 		}
@@ -77,7 +80,7 @@ func TestCreateComputeConfig(t *testing.T) {
 		})
 
 		err := cli.CreateComputeConfig(
-			"my-config", "/path/to/config.yaml",
+			"my-config", "/path/to/config.yaml", "",
 		)
 		if err != nil {
 			t.Errorf(
@@ -134,7 +137,7 @@ func TestCreateComputeConfig(t *testing.T) {
 			return fake.run(args)
 		})
 
-		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		err = cli.CreateComputeConfig("my-config", tmpFile.Name(), "")
 		if err != nil {
 			t.Errorf("CreateComputeConfig() error = %v", err)
 		}
@@ -216,7 +219,7 @@ func TestCreateComputeConfig(t *testing.T) {
 			return fake.run(args)
 		})
 
-		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		err = cli.CreateComputeConfig("my-config", tmpFile.Name(), "")
 		if err != nil {
 			t.Errorf("CreateComputeConfig() error = %v", err)
 		}
@@ -268,7 +271,7 @@ func TestCreateComputeConfig(t *testing.T) {
 			return fake.run(args)
 		})
 
-		err = cli.CreateComputeConfig("my-config", tmpFile.Name())
+		err = cli.CreateComputeConfig("my-config", tmpFile.Name(), "")
 		if err == nil {
 			t.Fatal(
 				"CreateComputeConfig() error = nil," +
@@ -286,6 +289,84 @@ func TestCreateComputeConfig(t *testing.T) {
 			)
 		}
 	})
+}
+
+func TestCreateComputeConfig_CloudOverride(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   []string
+		wantFlag string
+	}{
+		{
+			name: "new format gains cloud key",
+			config: []string{
+				"head_node:", "  instance_type: m5.xlarge", "",
+			},
+			wantFlag: "-f",
+		},
+		{
+			name: "legacy cloud key is replaced",
+			config: []string{
+				"cloud: old-cloud",
+				"head_node_type:",
+				"  name: head", "  instance_type: m5.large", "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(
+				src, []byte(strings.Join(tt.config, "\n")), 0644,
+			); err != nil {
+				t.Fatal(err)
+			}
+
+			var gotCloud any
+			var created bool
+			fake := &fakeAnyscale{
+				onCreateComputeConfig: func(args []string) (string, error) {
+					created = true
+					path := args[len(args)-1]
+					if tt.wantFlag != "" && args[len(args)-2] != tt.wantFlag {
+						t.Errorf("args %v: config path should follow %q", args, tt.wantFlag)
+					}
+					if path == src {
+						t.Errorf("created from the source file, want a temp copy")
+					}
+					data, err := os.ReadFile(path)
+					if err != nil {
+						return "", err
+					}
+					var m map[string]any
+					if err := yaml.Unmarshal(data, &m); err != nil {
+						return "", err
+					}
+					gotCloud = m["cloud"]
+					return "created compute config", nil
+				},
+			}
+			cli := newTestCLI(fake)
+
+			if err := cli.CreateComputeConfig("my-config", src, "k8s-cloud"); err != nil {
+				t.Fatalf("CreateComputeConfig() error = %v", err)
+			}
+			if !created {
+				t.Fatal("compute config was not created")
+			}
+			if gotCloud != "k8s-cloud" {
+				t.Errorf("cloud = %v, want k8s-cloud", gotCloud)
+			}
+			data, err := os.ReadFile(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != strings.Join(tt.config, "\n") {
+				t.Errorf("source config was modified:\n%s", data)
+			}
+		})
+	}
 }
 
 func TestListComputeConfigs(t *testing.T) {

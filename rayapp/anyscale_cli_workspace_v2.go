@@ -62,6 +62,9 @@ func (ac *AnyscaleCLI) createEmptyWorkspace(c *WorkspaceTestConfig) error {
 		}
 	}
 
+	if c.target.Cloud != "" {
+		args = append(args, "--cloud", c.target.Cloud)
+	}
 	if c.computeConfig != "" {
 		args = append(args, "--compute-config", c.computeConfig)
 	}
