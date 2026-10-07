@@ -36,6 +36,7 @@ type fakeWorkspace struct {
 // subcommands based on its fake data fields.
 type fakeAnyscale struct {
 	defaultCloud   *fakeCloud
+	clouds         []*fakeCloud
 	defaultProject *fakeProject
 	computeConfigs []*fakeComputeConfig
 	workspaces     []*fakeWorkspace
@@ -66,6 +67,8 @@ func (f *fakeAnyscale) run(args []string) (string, error) {
 	switch cmd {
 	case "cloud get-default":
 		return f.cloudGetDefault()
+	case "cloud get":
+		return f.cloudGet(args[2:])
 	case "project get-default":
 		return f.projectGetDefault()
 	case "compute-config list":
@@ -108,6 +111,23 @@ func (f *fakeAnyscale) cloudGetDefault() (string, error) {
 		fmt.Sprintf("id: %s", f.defaultCloud.ID),
 		"",
 	}, "\n"), nil
+}
+
+// cloudGet mirrors "anyscale cloud get": an unknown name is logged, not
+// returned as an error, so stdout is empty and the exit status is 0.
+func (f *fakeAnyscale) cloudGet(opts []string) (string, error) {
+	name := parseName(opts)
+	for _, c := range f.clouds {
+		if c.Name == name {
+			return strings.Join([]string{
+				fmt.Sprintf("name: %s", c.Name),
+				fmt.Sprintf("id: %s", c.ID),
+				"resources: []",
+				"",
+			}, "\n"), nil
+		}
+	}
+	return "", nil
 }
 
 func (f *fakeAnyscale) projectGetDefault() (string, error) {

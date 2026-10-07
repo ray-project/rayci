@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -71,7 +72,7 @@ func Test_newWorkspaceTestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := &Template{Name: tt.tmplName}
-			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir, false)
+			config := newWorkspaceTestConfig(tmpl, cli, nil, tt.buildDir, TestTarget{}, false)
 
 			if config == nil {
 				t.Fatal("expected non-nil WorkspaceTestConfig")
@@ -166,7 +167,7 @@ func TestWorkspaceTestConfigRun(t *testing.T) {
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
 				func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
-				"", false, cli, api,
+				"", false, TestTarget{}, cli, api,
 			)
 
 			if tt.wantErr == "" {
@@ -202,7 +203,7 @@ func TestWorkspaceTestConfigRun_EscapesSingleQuotes(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
-		"", false, cli, api,
+		"", false, TestTarget{}, cli, api,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -228,7 +229,7 @@ func TestWorkspaceTestConfigRun_TestCommandFails(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
-		"", false, cli, api,
+		"", false, TestTarget{}, cli, api,
 	)
 	if err == nil {
 		t.Fatal("expected error when test command fails")
@@ -249,7 +250,7 @@ func TestRunTemplateTest_Failure(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
-		"", false, cli, api,
+		"", false, TestTarget{}, cli, api,
 	)
 	if err == nil {
 		t.Fatal("expected error")
@@ -266,7 +267,7 @@ func TestRunTemplateTest_SkipsTemplateWithNoTestConfig(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "reefy-ray" },
-		"", false, nil, nil,
+		"", false, TestTarget{}, nil, nil,
 	)
 	if err != nil {
 		t.Fatalf("expected no error when matched template has no test config, got: %v", err)
@@ -277,7 +278,7 @@ func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "nonexistent-template" },
-		"", false, nil, nil,
+		"", false, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when no templates match filter")
@@ -288,7 +289,15 @@ func TestRunTemplateTest_NoTemplatesToTest(t *testing.T) {
 }
 
 func TestRunTemplateTest_ReadTemplatesFailed(t *testing.T) {
-	err := runTemplateTestsWithFilter("nonexistent/BUILD.yaml", nil, "", false, nil, nil)
+	err := runTemplateTestsWithFilter(
+		"nonexistent/BUILD.yaml",
+		nil,
+		"",
+		false,
+		TestTarget{},
+		nil,
+		nil,
+	)
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
 	}
@@ -305,7 +314,7 @@ func TestRunTemplateTest_FilterSelectsSingleTemplate(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
-		"", false, cli, api,
+		"", false, TestTarget{}, cli, api,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -317,7 +326,7 @@ func TestRunAllTemplateTests_Success(t *testing.T) {
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
 
-	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, "", false, cli, api)
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, "", false, TestTarget{}, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -326,7 +335,7 @@ func TestRunAllTemplateTests_Success(t *testing.T) {
 func TestRunAllTemplateTests_NoTemplatesToTest(t *testing.T) {
 	f := createEmptyBuildFile(t)
 
-	err := runTemplateTestsWithFilter(f, nil, "", false, nil, nil)
+	err := runTemplateTestsWithFilter(f, nil, "", false, TestTarget{}, nil, nil)
 	if err == nil {
 		t.Fatal("expected error when build file has no templates")
 	}
@@ -343,7 +352,7 @@ func TestRunAllTemplateTests_PartialFailure(t *testing.T) {
 	cli := newTestCLI(fake)
 	api := newFakeAnyscaleAPI(t)
 
-	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, "", false, cli, api)
+	err := runTemplateTestsWithFilter("testdata/BUILD.yaml", nil, "", false, TestTarget{}, cli, api)
 	if err == nil {
 		t.Fatal("expected error when some templates fail")
 	}
@@ -360,7 +369,7 @@ func TestWorkspaceTestConfigRun_WithTestsPath(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "testy-ray" },
-		"", false, cli, api,
+		"", false, TestTarget{}, cli, api,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -472,7 +481,7 @@ func TestProbe(t *testing.T) {
 			cli := newTestCLI(fake)
 			api := newProbeTestAPI(t, tt.launchResult, tt.launchStatus)
 
-			err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
+			err := probe("fishy-ray", "testdata/BUILD.yaml", TestTarget{}, cli, api)
 
 			if tt.wantErr == "" {
 				if err != nil {
@@ -501,7 +510,7 @@ func TestProbe_CleanupFails(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", TestTarget{}, cli, api)
 	if err == nil {
 		t.Fatal("expected error when cleanup fails")
 	}
@@ -527,7 +536,7 @@ func TestProbe_RunsTestCommand(t *testing.T) {
 		return fake.run(args)
 	})
 
-	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", TestTarget{}, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -555,7 +564,7 @@ func TestProbe_TestCommandFails(t *testing.T) {
 		return fake.run(args)
 	})
 
-	err := probe("fishy-ray", "testdata/BUILD.yaml", cli, api)
+	err := probe("fishy-ray", "testdata/BUILD.yaml", TestTarget{}, cli, api)
 	if err == nil {
 		t.Fatal("expected error when test command fails")
 	}
@@ -572,7 +581,7 @@ func TestProbe_WithTestsPath(t *testing.T) {
 		"id":   "expwrk_test",
 	}, 0)
 
-	err := probe("testy-ray", "testdata/BUILD.yaml", cli, api)
+	err := probe("testy-ray", "testdata/BUILD.yaml", TestTarget{}, cli, api)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -621,7 +630,7 @@ func TestRunTemplateTestsWithRayVersionOverride(t *testing.T) {
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
 				func(tmpl *Template) bool { return tmpl.Name == tt.tmplName },
-				tt.rayVersion, false, cli, api,
+				tt.rayVersion, false, TestTarget{}, cli, api,
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -648,7 +657,7 @@ func TestRunTemplateTestsWithFilter_InvalidRayVersion(t *testing.T) {
 	for _, tt := range invalidVersions {
 		t.Run(tt.name, func(t *testing.T) {
 			err := runTemplateTestsWithFilter(
-				"testdata/BUILD.yaml", nil, tt.rayVersion, false, nil, nil,
+				"testdata/BUILD.yaml", nil, tt.rayVersion, false, TestTarget{}, nil, nil,
 			)
 			if err == nil {
 				t.Fatal("expected error for invalid ray version")
@@ -664,7 +673,7 @@ func TestRunTemplateTestsWithRayVersionOverride_SkipsBYODImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
-		"2.44.0", false, nil, nil,
+		"2.44.0", false, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when BYOD image is skipped")
@@ -678,7 +687,7 @@ func TestRunTemplateTestsWithRayVersionOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "custom-image" },
-		"2.44.0", false, nil, nil,
+		"2.44.0", false, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when non-ray image_uri is skipped")
@@ -728,7 +737,7 @@ func TestRunTemplateTestsWithNightlyOverride(t *testing.T) {
 			err := runTemplateTestsWithFilter(
 				"testdata/BUILD.yaml",
 				func(tmpl *Template) bool { return tmpl.Name == tt.tmplName },
-				"", true, cli, api,
+				"", true, TestTarget{}, cli, api,
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -744,7 +753,7 @@ func TestRunTemplateTestsWithNightlyOverride_SkipsBYODImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "byod-ray" },
-		"", true, nil, nil,
+		"", true, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when BYOD image is skipped")
@@ -758,7 +767,7 @@ func TestRunTemplateTestsWithNightlyOverride_SkipsNonRayImage(t *testing.T) {
 	err := runTemplateTestsWithFilter(
 		"testdata/BUILD.yaml",
 		func(tmpl *Template) bool { return tmpl.Name == "custom-image" },
-		"", true, nil, nil,
+		"", true, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when non-ray image_uri is skipped")
@@ -770,7 +779,7 @@ func TestRunTemplateTestsWithNightlyOverride_SkipsNonRayImage(t *testing.T) {
 
 func TestRunTemplateTestsWithFilter_NightlyAndRayVersionMutuallyExclusive(t *testing.T) {
 	err := runTemplateTestsWithFilter(
-		"testdata/BUILD.yaml", nil, "2.44.0", true, nil, nil,
+		"testdata/BUILD.yaml", nil, "2.44.0", true, TestTarget{}, nil, nil,
 	)
 	if err == nil {
 		t.Fatal("expected error when both nightly and ray-version are set")
@@ -781,7 +790,7 @@ func TestRunTemplateTestsWithFilter_NightlyAndRayVersionMutuallyExclusive(t *tes
 }
 
 func TestProbe_TemplateNotFound(t *testing.T) {
-	err := probe("nonexistent", "testdata/BUILD.yaml", nil, nil)
+	err := probe("nonexistent", "testdata/BUILD.yaml", TestTarget{}, nil, nil)
 	if err == nil {
 		t.Fatal("expected error when template not found")
 	}
@@ -791,11 +800,174 @@ func TestProbe_TemplateNotFound(t *testing.T) {
 }
 
 func TestProbe_ReadTemplatesFails(t *testing.T) {
-	err := probe("any", "nonexistent/BUILD.yaml", nil, nil)
+	err := probe("any", "nonexistent/BUILD.yaml", TestTarget{}, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid build file")
 	}
 	if !strings.Contains(err.Error(), "read templates failed") {
 		t.Errorf("error %q should contain 'read templates failed'", err.Error())
+	}
+}
+
+func TestRunTemplateTestsWithTarget(t *testing.T) {
+	fake := newDefaultFake()
+	var configName, configPath, configCloud string
+	fake.onCreateComputeConfig = func(args []string) (string, error) {
+		configName = parseFlag(args, "-n")
+		configPath = args[len(args)-1]
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return "", err
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if v, ok := strings.CutPrefix(line, "cloud: "); ok {
+				configCloud = v
+			}
+		}
+		return "created compute config", nil
+	}
+	var wsArgs []string
+	fake.onCreateWorkspace = func(args []string) (string, error) {
+		wsArgs = args
+		return fake.workspaceCreate(args[2:])
+	}
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		"", false,
+		TestTarget{Cloud: "k8s cloud", ComputeConfig: "GCP"},
+		cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The cloud is slugified into the name so configs created from the same
+	// file in different clouds do not collide.
+	if want := "configs-gcp-k8s-cloud"; configName != want {
+		t.Errorf("compute config name = %q, want %q", configName, want)
+	}
+	if configCloud != "k8s cloud" {
+		t.Errorf("compute config cloud = %q, want %q", configCloud, "k8s cloud")
+	}
+	checkArgs(t, wsArgs,
+		[]string{"workspace_v2", "create"}, nil,
+		[][2]string{
+			{"--cloud", "k8s cloud"},
+			{"--compute-config", "configs-gcp-k8s-cloud"},
+		},
+	)
+}
+
+func TestRunTemplateTestsWithTarget_DefaultsToAWS(t *testing.T) {
+	fake := newDefaultFake()
+	var configName string
+	fake.onCreateComputeConfig = func(args []string) (string, error) {
+		configName = parseFlag(args, "-n")
+		return "created compute config", nil
+	}
+	var wsArgs []string
+	fake.onCreateWorkspace = func(args []string) (string, error) {
+		wsArgs = args
+		return fake.workspaceCreate(args[2:])
+	}
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		"", false, TestTarget{}, cli, api,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := "configs-aws"; configName != want {
+		t.Errorf("compute config name = %q, want %q", configName, want)
+	}
+	if slices.Contains(wsArgs, "--cloud") {
+		t.Errorf("workspace create args %v should not set --cloud", wsArgs)
+	}
+}
+
+func TestRunTemplateTestsWithTarget_MissingComputeConfig(t *testing.T) {
+	fake := newDefaultFake()
+	fake.onCreateWorkspace = func(args []string) (string, error) {
+		t.Errorf("workspace should not be created, got %v", args)
+		return "", nil
+	}
+	cli := newTestCLI(fake)
+	api := newFakeAnyscaleAPI(t)
+
+	err := runTemplateTestsWithFilter(
+		"testdata/BUILD.yaml",
+		func(tmpl *Template) bool { return tmpl.Name == "fishy-ray" },
+		"", false, TestTarget{ComputeConfig: "K8S"}, cli, api,
+	)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `template "fishy-ray" has no "K8S" compute config`) {
+		t.Errorf("error %q should name the missing compute config", err.Error())
+	}
+}
+
+func TestProbe_WithCloud(t *testing.T) {
+	tests := []struct {
+		name        string
+		cloud       string
+		wantCloudID string
+		wantErr     string
+	}{
+		{name: "default cloud", wantCloudID: "cld_test"},
+		{name: "named cloud", cloud: "k8s-cloud", wantCloudID: "cld_k8s"},
+		{name: "unknown cloud", cloud: "missing", wantErr: `cloud "missing" not found`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := newDefaultFake()
+			fake.clouds = []*fakeCloud{{Name: "k8s-cloud", ID: "cld_k8s"}}
+			cli := newTestCLI(fake)
+
+			var gotCloudID string
+			server := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodPost {
+						var payload map[string]any
+						json.NewDecoder(r.Body).Decode(&payload)
+						gotCloudID, _ = payload["cloud_id"].(string)
+						w.Write([]byte(`{"result":{"name":"ws-test","id":"expwrk_test"}}`))
+						return
+					}
+					w.Write([]byte("{}"))
+				},
+			))
+			t.Cleanup(server.Close)
+			api, err := newAnyscaleAPI(server.URL, "test-token")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = probe(
+				"fishy-ray", "testdata/BUILD.yaml",
+				TestTarget{Cloud: tt.cloud}, cli, api,
+			)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotCloudID != tt.wantCloudID {
+				t.Errorf("launched in cloud %q, want %q", gotCloudID, tt.wantCloudID)
+			}
+		})
 	}
 }

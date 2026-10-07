@@ -10,6 +10,23 @@ import (
 	"time"
 )
 
+// defaultComputeConfigKey is the compute_config entry tests use unless
+// TestTarget.ComputeConfig overrides it.
+const defaultComputeConfigKey = "AWS"
+
+// TestTarget selects where a template test or probe runs. The zero value
+// runs on the CLI's default cloud with the AWS compute config.
+type TestTarget struct {
+	// Cloud is the name of the Anyscale cloud to run on. Empty means the
+	// CLI's default cloud.
+	Cloud string
+
+	// ComputeConfig is the key of the template's compute_config entry to
+	// test with (e.g. "AWS", "GCP", "K8S"). Empty means AWS. Probes ignore
+	// it: the backend picks the entry that matches the cloud.
+	ComputeConfig string
+}
+
 // WorkspaceTestConfig contains all the details to test a workspace.
 type WorkspaceTestConfig struct {
 	anyscaleAPI   *anyscaleAPI
@@ -23,6 +40,7 @@ type WorkspaceTestConfig struct {
 	imageURI      string
 	rayVersion    string
 	template      *Template
+	target        TestTarget
 	probe         bool
 	success       bool
 	errs          []error
@@ -35,6 +53,7 @@ func newWorkspaceTestConfig(
 	anyscaleCLI *AnyscaleCLI,
 	anyscaleAPI *anyscaleAPI,
 	buildDir string,
+	target TestTarget,
 	probe bool,
 ) *WorkspaceTestConfig {
 	tmplCopy := *t
@@ -43,6 +62,7 @@ func newWorkspaceTestConfig(
 		tmplName:      t.Name,
 		anyscaleCLI:   anyscaleCLI,
 		anyscaleAPI:   anyscaleAPI,
+		target:        target,
 		probe:         probe,
 		success:       false,
 		errs:          nil,
@@ -54,16 +74,21 @@ func newWorkspaceTestConfig(
 
 // RunProbe launches a template into a workspace, runs tests if configured,
 // and cleans up.
-func RunProbe(tmplName, buildFile string) error {
+func RunProbe(tmplName, buildFile string, target TestTarget) error {
 	cli := NewAnyscaleCLI()
 	api, err := newAnyscaleAPI(os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN"))
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return probe(tmplName, buildFile, cli, api)
+	return probe(tmplName, buildFile, target, cli, api)
 }
 
-func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error {
+func probe(
+	tmplName, buildFile string,
+	target TestTarget,
+	cli *AnyscaleCLI,
+	api *anyscaleAPI,
+) error {
 	tmpls, err := readTemplates(buildFile)
 	if err != nil {
 		return fmt.Errorf("read templates failed: %w", err)
@@ -84,7 +109,7 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	}
 
 	buildDir := filepath.Dir(buildFile)
-	c := newWorkspaceTestConfig(tmpl, cli, api, buildDir, true)
+	c := newWorkspaceTestConfig(tmpl, cli, api, buildDir, target, true)
 	c.Run()
 	if !c.success {
 		return errors.Join(c.errs...)
@@ -92,17 +117,23 @@ func probe(tmplName, buildFile string, cli *AnyscaleCLI, api *anyscaleAPI) error
 	return nil
 }
 
-func RunAllTemplateTests(buildFile, rayVersion string, nightly bool) error {
+func RunAllTemplateTests(
+	buildFile, rayVersion string, nightly bool, target TestTarget,
+) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
 	if err != nil {
 		return fmt.Errorf("new anyscale api failed: %w", err)
 	}
-	return runTemplateTestsWithFilter(buildFile, nil, rayVersion, nightly, cli, api)
+	return runTemplateTestsWithFilter(
+		buildFile, nil, rayVersion, nightly, target, cli, api,
+	)
 }
 
-func RunTemplateTest(tmplName, buildFile, rayVersion string, nightly bool) error {
+func RunTemplateTest(
+	tmplName, buildFile, rayVersion string, nightly bool, target TestTarget,
+) error {
 	cli := NewAnyscaleCLI()
 	host, token := os.Getenv("ANYSCALE_HOST"), os.Getenv("ANYSCALE_CLI_TOKEN")
 	api, err := newAnyscaleAPI(host, token)
@@ -111,7 +142,7 @@ func RunTemplateTest(tmplName, buildFile, rayVersion string, nightly bool) error
 	}
 	return runTemplateTestsWithFilter(buildFile, func(tmpl *Template) bool {
 		return tmpl.Name == tmplName
-	}, rayVersion, nightly, cli, api)
+	}, rayVersion, nightly, target, cli, api)
 }
 
 func runTemplateTestsWithFilter(
@@ -119,6 +150,7 @@ func runTemplateTestsWithFilter(
 	filter func(tmpl *Template) bool,
 	rayVersion string,
 	nightly bool,
+	target TestTarget,
 	cli *AnyscaleCLI,
 	api *anyscaleAPI,
 ) error {
@@ -210,7 +242,7 @@ func runTemplateTestsWithFilter(
 
 	var failed []string
 	for _, t := range filteredTmpls {
-		c := newWorkspaceTestConfig(t, cli, api, buildDir, false)
+		c := newWorkspaceTestConfig(t, cli, api, buildDir, target, false)
 
 		log.Println("Testing template:", c.tmplName)
 		c.Run()
@@ -232,10 +264,32 @@ func runTemplateTestsWithFilter(
 // setupEmptyWorkspace creates an empty workspace, starts it, and pushes
 // template files into it.
 func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
-	if awsConfigPath, ok := c.template.ComputeConfig["AWS"]; ok {
-		c.computeConfig = generateComputeConfigName(awsConfigPath)
-		resolvedPath := filepath.Join(c.buildDir, awsConfigPath)
-		if err := c.anyscaleCLI.CreateComputeConfig(c.computeConfig, resolvedPath); err != nil {
+	key := c.target.ComputeConfig
+	if key == "" {
+		key = defaultComputeConfigKey
+	}
+	configPath, ok := c.template.ComputeConfig[key]
+	if !ok && c.target.ComputeConfig != "" {
+		// An explicit key the template lacks is a typo or a template that
+		// does not support that cloud; testing without it would quietly
+		// fall back to the workspace's default compute config.
+		c.errs = append(c.errs, fmt.Errorf(
+			"template %q has no %q compute config", c.tmplName, key,
+		))
+		return
+	}
+	if ok {
+		c.computeConfig = generateComputeConfigName(configPath)
+		if c.target.Cloud != "" {
+			// Compute config names are shared across clouds, so a config
+			// already created from this file in another cloud would be
+			// reused here and fail to launch.
+			c.computeConfig += "-" + slugify(c.target.Cloud)
+		}
+		resolvedPath := filepath.Join(c.buildDir, configPath)
+		if err := c.anyscaleCLI.CreateComputeConfig(
+			c.computeConfig, resolvedPath, c.target.Cloud,
+		); err != nil {
 			c.errs = append(c.errs, fmt.Errorf("create compute config failed: %w", err))
 			return
 		}
@@ -290,9 +344,15 @@ func (c *WorkspaceTestConfig) setupEmptyWorkspace() {
 // setupTemplateWorkspace launches a workspace from a template via the
 // Anyscale API.
 func (c *WorkspaceTestConfig) setupTemplateWorkspace() {
-	cloudInfo, err := c.anyscaleCLI.GetDefaultCloud()
+	var cloudInfo *CloudInfo
+	var err error
+	if c.target.Cloud != "" {
+		cloudInfo, err = c.anyscaleCLI.GetCloud(c.target.Cloud)
+	} else {
+		cloudInfo, err = c.anyscaleCLI.GetDefaultCloud()
+	}
 	if err != nil {
-		c.errs = append(c.errs, fmt.Errorf("get default cloud failed: %w", err))
+		c.errs = append(c.errs, fmt.Errorf("get cloud failed: %w", err))
 		return
 	}
 

@@ -22,7 +22,10 @@ type ComputeConfigListItem struct {
 // have the cloud added to it if missing.
 // name: the name for the compute config (without version tag)
 // configFilePath: path to the YAML config file
-func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
+// cloud: if non-empty, the cloud to create the config in, overriding any
+// cloud set in the file; in either format, since the new format otherwise
+// lands in the default cloud.
+func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath, cloud string) error {
 	foundComputeConfigs, err := ac.ListComputeConfigs(&name)
 	if err != nil {
 		return fmt.Errorf("list compute configs failed: %w", err)
@@ -38,40 +41,44 @@ func (ac *AnyscaleCLI) CreateComputeConfig(name, configFilePath string) error {
 		return fmt.Errorf("failed to check config format: %w", err)
 	}
 
-	// If old format, create a temp copy, add cloud key if missing, then use the copy
-	actualConfigPath := configFilePath
-	if isOldFormat {
+	// If a cloud is given, or the old format is missing its cloud key, set
+	// the cloud key on a temp copy and use the copy.
+	if cloud == "" && isOldFormat {
 		fmt.Printf("Detected old compute config format, using temp copy...\n")
 
-		hasCloud, err := hasCloudKey(actualConfigPath)
+		hasCloud, err := hasCloudKey(configFilePath)
 		if err != nil {
 			return fmt.Errorf("failed to check cloud key: %w", err)
 		}
-
 		if !hasCloud {
-			tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
-			if err != nil {
-				return fmt.Errorf("failed to create temp file: %w", err)
-			}
-			tmpPath := tmpFile.Name()
-			if err := tmpFile.Close(); err != nil {
-				return fmt.Errorf("failed to close temp file: %w", err)
-			}
-			defer os.Remove(tmpPath)
-
-			if err := CopyFile(actualConfigPath, tmpPath); err != nil {
-				return fmt.Errorf("failed to copy config file: %w", err)
-			}
 			cloudInfo, err := ac.GetDefaultCloud()
 			if err != nil {
 				return fmt.Errorf("failed to get default cloud: %w", err)
 			}
-			if err := addCloudKey(tmpPath, cloudInfo.Name); err != nil {
-				return fmt.Errorf("failed to add cloud key: %w", err)
-			}
-			actualConfigPath = tmpPath
-			fmt.Printf("Temp copy: %s\n", actualConfigPath)
+			cloud = cloudInfo.Name
 		}
+	}
+
+	actualConfigPath := configFilePath
+	if cloud != "" {
+		tmpFile, err := os.CreateTemp("", "compute-config-*.yaml")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file: %w", err)
+		}
+		tmpPath := tmpFile.Name()
+		if err := tmpFile.Close(); err != nil {
+			return fmt.Errorf("failed to close temp file: %w", err)
+		}
+		defer os.Remove(tmpPath)
+
+		if err := CopyFile(configFilePath, tmpPath); err != nil {
+			return fmt.Errorf("failed to copy config file: %w", err)
+		}
+		if err := addCloudKey(tmpPath, cloud); err != nil {
+			return fmt.Errorf("failed to add cloud key: %w", err)
+		}
+		actualConfigPath = tmpPath
+		fmt.Printf("Temp copy: %s\n", actualConfigPath)
 	}
 
 	// Create the compute config
