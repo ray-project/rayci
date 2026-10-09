@@ -483,6 +483,34 @@ func TestForgeWithRemoteWorkRepo(t *testing.T) {
 		t.Fatalf("got hello %d layers, want 2", len(layers))
 	}
 
+	config.BuildID = "ghi789"
+	config.PerBuildManifest = true
+	perBuildForge, err := NewForge(config)
+	if err != nil {
+		t.Fatalf("make per-build manifest forge: %v", err)
+	}
+	if err := perBuildForge.Build(helloSpec); err != nil {
+		t.Fatalf("rebuild hello with per-build manifest: %v", err)
+	}
+	if hit := perBuildForge.cacheHit(); hit != 1 {
+		t.Errorf("got %d cache hits, want 1", hit)
+	}
+	shared, err := remote.Head(helloRef)
+	if err != nil {
+		t.Fatalf("head shared hello manifest: %v", err)
+	}
+	perBuildRef, err := name.ParseReference(fmt.Sprintf("%s/work:ghi789-hello-test", crAddr))
+	if err != nil {
+		t.Fatalf("parse per-build hello reference: %v", err)
+	}
+	perBuild, err := remote.Head(perBuildRef)
+	if err != nil {
+		t.Fatalf("head per-build hello manifest: %v", err)
+	}
+	if perBuild.Digest == shared.Digest {
+		t.Errorf("per-build hello digest = shared digest %s, want its own", shared.Digest)
+	}
+
 	config.Epoch = "2"
 	forge2, err := NewForge(config)
 	if err != nil {
