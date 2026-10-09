@@ -436,7 +436,7 @@ func (f *Forge) Build(spec *Spec) error {
 				f.cacheHitCount++
 
 				log.Printf("tag output as %s", workTag)
-				if f.config.PerBuildManifest {
+				if f.config.PerBuildManifest && f.config.BuildID != "" {
 					err = putWorkManifest(wt, desc, f.config.BuildID, f.remoteOpts...)
 				} else {
 					err = remote.Tag(wt, desc, f.remoteOpts...)
