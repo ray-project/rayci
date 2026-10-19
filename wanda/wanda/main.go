@@ -63,6 +63,10 @@ func main() {
 	readOnly := fs.Bool("read_only", false, "read-only cache repository")
 	epoch := fs.String("epoch", "", "epoch for the image tag")
 	rebuild := fs.Bool("rebuild", false, "always rebuild the image")
+	perBuildManifest := fs.Bool(
+		"per_build_manifest", false,
+		"on cache hit, tag a per-build copy of the cached manifest",
+	)
 	wandaSpecsFile := fs.String(
 		"wanda_specs_file", "",
 		"file listing spec directories; if empty, uses .wandaspecs under work_dir",
@@ -88,6 +92,7 @@ func main() {
 		*buildID = os.Getenv("RAYCI_BUILD_ID")
 		*namePrefix = os.Getenv("RAYCI_FORGE_PREFIX")
 		*rebuild = os.Getenv("RAYCI_WANDA_ALWAYS_REBUILD") == "true"
+		*perBuildManifest = os.Getenv("RAYCI_WANDA_PER_BUILD_MANIFEST") == "true"
 		*envFile = os.Getenv("RAYCI_ENV_FILE")
 		*artifactsDir = os.Getenv("RAYCI_ARTIFACTS_DIR")
 
@@ -121,6 +126,8 @@ func main() {
 		Rebuild: *rebuild,
 
 		ReadOnlyCache: *readOnly,
+
+		PerBuildManifest: *perBuildManifest,
 	}
 
 	if digest {

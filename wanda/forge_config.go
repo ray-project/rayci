@@ -61,6 +61,10 @@ type ForgeConfig struct {
 	Rebuild bool
 
 	ReadOnlyCache bool
+
+	// PerBuildManifest gives each cache-hit build its own manifest copy
+	// instead of adding a tag to the shared cached one.
+	PerBuildManifest bool
 }
 
 func (c *ForgeConfig) isRemote() bool { return c.WorkRepo != "" }
