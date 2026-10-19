@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+
+	"github.com/ray-project/rayci/wanda"
 )
 
 type buildInfo struct {
@@ -15,6 +17,21 @@ type buildInfo struct {
 	launcherBranch   string
 	gitCommit        string
 	selects          []string
+
+	// cacheEpoch is resolved once here and handed to every wanda step, so
+	// that a build straddling an epoch boundary does not have its steps
+	// disagreeing about the cache key.
+	cacheEpoch string
+}
+
+// makeCacheEpoch resolves the wanda cache epoch for a build. It calls into
+// wanda rather than reimplementing the rule, so the pipeline and the builders
+// can never drift apart on it.
+func makeCacheEpoch(envs Envs) string {
+	if v, ok := envs.Lookup("RAYCI_CACHE_EPOCH"); ok && v != "" {
+		return v
+	}
+	return wanda.DefaultCacheEpoch()
 }
 
 func makeBuildID(envs Envs) (string, error) {

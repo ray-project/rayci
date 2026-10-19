@@ -16,6 +16,7 @@ type wandaStep struct {
 	file         string
 	envFile      string
 	buildID      string
+	cacheEpoch   string
 	label        string
 	instanceType string
 
@@ -56,6 +57,9 @@ func (s *wandaStep) buildkiteStep() map[string]any {
 	envs["RAYCI_WANDA_FILE"] = s.file
 	if s.envFile != "" {
 		envs["RAYCI_ENV_FILE"] = s.envFile
+	}
+	if s.cacheEpoch != "" {
+		envs["RAYCI_WANDA_EPOCH"] = s.cacheEpoch
 	}
 
 	label := s.label
@@ -211,6 +215,7 @@ func (c *wandaConverter) convert(id string, step map[string]any) (
 		file:           file,
 		envFile:        envFile,
 		buildID:        c.info.buildID,
+		cacheEpoch:     c.info.cacheEpoch,
 		envs:           envs,
 		ciConfig:       c.config,
 		matrix:         matrix,
