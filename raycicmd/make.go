@@ -62,12 +62,20 @@ func listCIYamlFiles(dir string) ([]string, error) {
 const rulesFileSuffix = ".rules.txt"
 
 func listRulesFiles(dir string) ([]string, error) {
+	return listFilesWithSuffix(dir, rulesFileSuffix)
+}
+
+func listLabelRulesFiles(dir string) ([]string, error) {
+	return listFilesWithSuffix(dir, labelRulesFileSuffix)
+}
+
+func listFilesWithSuffix(dir, suffix string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("read rules dir: %w", err)
+		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
 	var paths []string
@@ -76,8 +84,7 @@ func listRulesFiles(dir string) ([]string, error) {
 			continue
 		}
 		name := entry.Name()
-		isRulesFile := strings.HasSuffix(name, rulesFileSuffix)
-		if !isRulesFile {
+		if !strings.HasSuffix(name, suffix) {
 			continue
 		}
 
@@ -157,6 +164,23 @@ func makePipeline(ctx *pipelineContext) (
 	}
 
 	filter.noTagMeansAlways = ctx.config.NoTagMeansAlways
+
+	var labelRulesFiles []string
+	for _, bkDir := range bkDirs {
+		fullDir := filepath.Join(ctx.repoDir, bkDir)
+		files, err := listLabelRulesFiles(fullDir)
+		if err != nil {
+			return nil, fmt.Errorf("list label rules files in %s: %w", bkDir, err)
+		}
+		labelRulesFiles = append(labelRulesFiles, files...)
+	}
+	labelRules, err := loadLabelRules(labelRulesFiles)
+	if err != nil {
+		return nil, fmt.Errorf("load label rules: %w", err)
+	}
+	if len(labelRules) > 0 {
+		applyLabelRules(filter, labelRules, prLabels(ctx.envs))
+	}
 
 	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {
