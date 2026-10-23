@@ -2,7 +2,9 @@ package raycicmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -46,10 +48,16 @@ func parseLabelRulesFile(file string) ([]*labelRule, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(bs))
 	dec.KnownFields(true)
 	if err := dec.Decode(&rules); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil // empty or comment-only file: no rules
+		}
 		return nil, fmt.Errorf("unmarshal label rules file %s: %w", file, err)
 	}
 
 	for i, r := range rules {
+		if r == nil {
+			return nil, fmt.Errorf("label rule %d in %s: rule is null", i, file)
+		}
 		if r.Label == "" {
 			return nil, fmt.Errorf("label rule %d in %s: label is empty", i, file)
 		}

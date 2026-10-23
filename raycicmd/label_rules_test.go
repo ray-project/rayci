@@ -47,6 +47,9 @@ func TestParseLabelRulesFile_errors(t *testing.T) {
 	}, {
 		name:    "unknown field",
 		content: "- label: docstring-only\n  keep_tags: [always]",
+	}, {
+		name:    "null element",
+		content: "- label: docstring-only\n  keep_only_tags: [always]\n- null",
 	}} {
 		t.Run(test.name, func(t *testing.T) {
 			p := writeLabelRules(t, t.TempDir(), test.content)
@@ -54,6 +57,19 @@ func TestParseLabelRulesFile_errors(t *testing.T) {
 				t.Errorf("parseLabelRulesFile(%q) = nil error, want error", test.content)
 			}
 		})
+	}
+}
+
+func TestParseLabelRulesFile_noRules(t *testing.T) {
+	for _, content := range []string{"", "\n", "# no rules yet\n"} {
+		p := writeLabelRules(t, t.TempDir(), content)
+		got, err := parseLabelRulesFile(p)
+		if err != nil {
+			t.Fatalf("parseLabelRulesFile(%q): %v", content, err)
+		}
+		if got != nil {
+			t.Errorf("parseLabelRulesFile(%q) = %v, want nil", content, got)
+		}
 	}
 }
 
