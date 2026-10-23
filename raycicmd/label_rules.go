@@ -21,6 +21,19 @@ type labelRule struct {
 	// of these tags. Steps outside the set are not selected, but they are not
 	// rejected either, so steps that depend on them are unaffected.
 	KeepOnlyTags []string `yaml:"keep_only_tags"`
+
+	// SkipTagsUnlessPresent skips steps carrying these tags unless the label
+	// is present, and SkipTagsWhenPresent skips them when it is. Both work
+	// like configured skip tags: a skipped step is rejected, and so is every
+	// step that depends on it.
+	SkipTagsUnlessPresent []string `yaml:"skip_tags_unless_present"`
+	SkipTagsWhenPresent   []string `yaml:"skip_tags_when_present"`
+}
+
+func (r *labelRule) empty() bool {
+	return len(r.KeepOnlyTags) == 0 &&
+		len(r.SkipTagsUnlessPresent) == 0 &&
+		len(r.SkipTagsWhenPresent) == 0
 }
 
 func parseLabelRulesFile(file string) ([]*labelRule, error) {
@@ -40,9 +53,9 @@ func parseLabelRulesFile(file string) ([]*labelRule, error) {
 		if r.Label == "" {
 			return nil, fmt.Errorf("label rule %d in %s: label is empty", i, file)
 		}
-		if len(r.KeepOnlyTags) == 0 {
+		if r.empty() {
 			return nil, fmt.Errorf(
-				"label rule %q in %s: no tags to keep", r.Label, file,
+				"label rule %q in %s: no tags to keep or skip", r.Label, file,
 			)
 		}
 	}
@@ -74,22 +87,50 @@ func prLabels(envs Envs) map[string]bool {
 	return labels
 }
 
-// applyLabelRules adjusts the filter by the rules whose label is present.
-// When more than one keep-only rule applies, a step needs a tag from any of
-// them.
+// applyLabelRules adjusts the filter by the rules whose label is present or
+// absent. When more than one keep-only rule applies, a step needs a tag from
+// any of them.
 func applyLabelRules(filter *stepFilter, rules []*labelRule, labels map[string]bool) {
 	for _, r := range rules {
 		if !labels[r.Label] {
+			addSkipTags(filter, r.SkipTagsUnlessPresent)
+			if len(r.SkipTagsUnlessPresent) > 0 {
+				log.Printf(
+					"label %q absent: skip tags: %s",
+					r.Label, strings.Join(r.SkipTagsUnlessPresent, " "),
+				)
+			}
 			continue
 		}
-		if filter.keepOnlyTags == nil {
-			filter.keepOnlyTags = make(map[string]bool)
+
+		addSkipTags(filter, r.SkipTagsWhenPresent)
+		if len(r.SkipTagsWhenPresent) > 0 {
+			log.Printf(
+				"label %q: skip tags: %s", r.Label, strings.Join(r.SkipTagsWhenPresent, " "),
+			)
 		}
-		for _, t := range r.KeepOnlyTags {
-			filter.keepOnlyTags[t] = true
+		if len(r.KeepOnlyTags) > 0 {
+			if filter.keepOnlyTags == nil {
+				filter.keepOnlyTags = make(map[string]bool)
+			}
+			for _, t := range r.KeepOnlyTags {
+				filter.keepOnlyTags[t] = true
+			}
+			log.Printf(
+				"label %q: keep only tags: %s", r.Label, strings.Join(r.KeepOnlyTags, " "),
+			)
 		}
-		log.Printf(
-			"label %q: keep only tags: %s", r.Label, strings.Join(r.KeepOnlyTags, " "),
-		)
+	}
+}
+
+func addSkipTags(filter *stepFilter, tags []string) {
+	if len(tags) == 0 {
+		return
+	}
+	if filter.skipTags == nil {
+		filter.skipTags = make(map[string]bool)
+	}
+	for _, t := range tags {
+		filter.skipTags[t] = true
 	}
 }

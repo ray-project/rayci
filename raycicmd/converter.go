@@ -231,8 +231,17 @@ func (c *converter) convertGroups(gs []*pipelineGroup, filter *stepFilter) (
 			hits[g.id] = struct{}{}
 		}
 	}
-	set.markDeps(hits)
+	// Reject first, so that a step depending on a rejected step is rejected
+	// too, and then mark dependencies only from the hits that remain. Marking
+	// first would pull in a rejected step's own dependencies, such as its
+	// images, through a hit that depends on it.
 	set.rejectDeps(rejects)
+	for id := range hits {
+		if n, ok := set.byID(id); ok && n.rejected {
+			delete(hits, id)
+		}
+	}
+	set.markDeps(hits)
 
 	// Finalize the conversion.
 	var bkGroups []*bkPipelineGroup
