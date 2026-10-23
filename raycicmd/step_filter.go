@@ -22,6 +22,10 @@ type stepFilter struct {
 	prefixSelects map[string]bool // string prefix of ID or key (prefix:<name>)
 
 	noTagMeansAlways bool
+
+	// fourth pass: when set, a step must also carry one of these tags.
+	// Set by label rules; see applyLabelRules.
+	keepOnlyTags map[string]bool
 }
 
 func (f *stepFilter) reject(step *stepNode) bool {
@@ -29,7 +33,14 @@ func (f *stepFilter) reject(step *stepNode) bool {
 }
 
 func (f *stepFilter) accept(step *stepNode) bool {
-	return f.acceptSelectHit(step) && f.acceptTagHit(step)
+	return f.acceptSelectHit(step) && f.acceptTagHit(step) && f.acceptKeepOnly(step)
+}
+
+func (f *stepFilter) acceptKeepOnly(step *stepNode) bool {
+	if f.keepOnlyTags == nil {
+		return true
+	}
+	return step.hasTagInMap(f.keepOnlyTags)
 }
 
 func (f *stepFilter) acceptSelectHit(step *stepNode) bool {
