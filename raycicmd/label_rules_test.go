@@ -303,3 +303,104 @@ func TestMakePipeline_labelRules(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLabelRulesFile_skipForms(t *testing.T) {
+	p := writeLabelRules(t, t.TempDir(), strings.Join([]string{
+		"- label: docs-example-test",
+		"  skip_tags_unless_present: [doc_example_optin]",
+		"- label: no-gpu",
+		"  skip_tags_when_present: [gpu]",
+	}, "\n"))
+
+	got, err := parseLabelRulesFile(p)
+	if err != nil {
+		t.Fatalf("parseLabelRulesFile: %v", err)
+	}
+	want := []*labelRule{
+		{Label: "docs-example-test", SkipTagsUnlessPresent: []string{"doc_example_optin"}},
+		{Label: "no-gpu", SkipTagsWhenPresent: []string{"gpu"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseLabelRulesFile() = %+v, want %+v", got, want)
+	}
+}
+
+func TestConvertPipelineGroups_skipForms(t *testing.T) {
+	groups := func() []*pipelineGroup {
+		return []*pipelineGroup{{
+			Group: "images",
+			Steps: []map[string]any{
+				{"name": "shared-image", "wanda": "shared.yaml"},
+				{"name": "optin-image", "wanda": "optin.yaml"},
+			},
+		}, {
+			Group: "tests",
+			Steps: []map[string]any{{
+				"key":        "unit",
+				"commands":   []string{"unit"},
+				"tags":       []any{"doc"},
+				"depends_on": "shared-image",
+			}, {
+				"key":        "optin",
+				"commands":   []string{"optin"},
+				"tags":       []any{"doc", "optin"},
+				"depends_on": []any{"shared-image", "optin-image"},
+			}, {
+				"key":        "after-optin",
+				"commands":   []string{"after"},
+				"tags":       []any{"doc"},
+				"depends_on": "optin",
+			}},
+		}}
+	}
+	all := []string{"after-optin", "optin", "optin-image", "shared-image", "unit"}
+	// Skipping optin drops the image only it needs, keeps the shared image,
+	// and rejects the step that depends on it, as a configured skip tag would.
+	skipped := []string{"shared-image", "unit"}
+
+	for _, test := range []struct {
+		name   string
+		rule   *labelRule
+		labels map[string]bool
+		want   []string
+	}{{
+		name:   "unless present, label absent",
+		rule:   &labelRule{Label: "run-optin", SkipTagsUnlessPresent: []string{"optin"}},
+		labels: map[string]bool{"go": true},
+		want:   skipped,
+	}, {
+		name:   "unless present, label present",
+		rule:   &labelRule{Label: "run-optin", SkipTagsUnlessPresent: []string{"optin"}},
+		labels: map[string]bool{"run-optin": true},
+		want:   all,
+	}, {
+		name:   "when present, label present",
+		rule:   &labelRule{Label: "no-optin", SkipTagsWhenPresent: []string{"optin"}},
+		labels: map[string]bool{"no-optin": true},
+		want:   skipped,
+	}, {
+		name:   "when present, label absent",
+		rule:   &labelRule{Label: "no-optin", SkipTagsWhenPresent: []string{"optin"}},
+		labels: map[string]bool{},
+		want:   all,
+	}} {
+		t.Run(test.name, func(t *testing.T) {
+			c := newConverter(&config{
+				ArtifactsBucket: "artifacts_bucket",
+				CITemp:          "s3://ci-temp/",
+				RunnerQueues:    map[string]string{"default": "runner"},
+			}, &buildInfo{buildID: "abc123"})
+
+			filter := &stepFilter{tags: stringSet("doc")}
+			applyLabelRules(filter, []*labelRule{test.rule}, test.labels)
+
+			bk, err := c.convertGroups(groups(), filter)
+			if err != nil {
+				t.Fatalf("convertGroups: %v", err)
+			}
+			if got := emittedKeys(bk); !reflect.DeepEqual(got, test.want) {
+				t.Errorf("emitted keys = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
