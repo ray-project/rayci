@@ -3,11 +3,16 @@ tags:
   - array-test
 steps:
   # Array step with 6 values - only "linux-1" and "macos-1" should be run
-  # when filtered (others are skipped)
+  # when filtered (others are skipped). Non-PR builds run all tags, so every
+  # variant runs there and the check only applies to PR builds.
   - label: "Array {{array.os}}-{{array.variant}}"
     key: array-step
     command: |
       echo "Running os={{array.os}} variant={{array.variant}}"
+      if [[ "$${BUILDKITE_PULL_REQUEST:-false}" == "false" ]]; then
+        echo "Not a PR build: all variants run, skipping the filter check"
+        exit 0
+      fi
       if [[ "{{array.os}}" != "linux" && "{{array.os}}" != "macos" ]]; then
         echo "ERROR: unexpected os={{array.os}}"
         exit 1
