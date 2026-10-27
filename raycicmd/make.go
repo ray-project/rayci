@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -62,12 +63,20 @@ func listCIYamlFiles(dir string) ([]string, error) {
 const rulesFileSuffix = ".rules.txt"
 
 func listRulesFiles(dir string) ([]string, error) {
+	return listFilesWithSuffix(dir, rulesFileSuffix)
+}
+
+func listLabelRulesFiles(dir string) ([]string, error) {
+	return listFilesWithSuffix(dir, labelRulesFileSuffix)
+}
+
+func listFilesWithSuffix(dir, suffix string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("read rules dir: %w", err)
+		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
 	var paths []string
@@ -76,8 +85,7 @@ func listRulesFiles(dir string) ([]string, error) {
 			continue
 		}
 		name := entry.Name()
-		isRulesFile := strings.HasSuffix(name, rulesFileSuffix)
-		if !isRulesFile {
+		if !strings.HasSuffix(name, suffix) {
 			continue
 		}
 
@@ -157,6 +165,30 @@ func makePipeline(ctx *pipelineContext) (
 	}
 
 	filter.noTagMeansAlways = ctx.config.NoTagMeansAlways
+
+	var labelRulesFiles []string
+	for _, bkDir := range bkDirs {
+		fullDir := filepath.Join(ctx.repoDir, bkDir)
+		files, err := listLabelRulesFiles(fullDir)
+		if err != nil {
+			return nil, fmt.Errorf("list label rules files in %s: %w", bkDir, err)
+		}
+		labelRulesFiles = append(labelRulesFiles, files...)
+	}
+	labelRules, err := loadLabelRules(labelRulesFiles)
+	if err != nil {
+		return nil, fmt.Errorf("load label rules: %w", err)
+	}
+	// Label rules apply only to pull request builds. A non-PR build has no
+	// labels, so a skip_tags_unless_present rule would otherwise skip its
+	// steps there, unlike an `if:` gate that also allows postmerge.
+	if len(labelRules) > 0 {
+		if isPullRequest(ctx.envs) {
+			applyLabelRules(filter, labelRules, prLabels(ctx.envs))
+		} else {
+			log.Printf("not a pull request build: label rules not applied")
+		}
+	}
 
 	var groups []*pipelineGroup
 	for _, bkDir := range bkDirs {
