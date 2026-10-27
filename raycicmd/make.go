@@ -3,6 +3,7 @@ package raycicmd
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -178,8 +179,15 @@ func makePipeline(ctx *pipelineContext) (
 	if err != nil {
 		return nil, fmt.Errorf("load label rules: %w", err)
 	}
+	// Label rules apply only to pull request builds. A non-PR build has no
+	// labels, so a skip_tags_unless_present rule would otherwise skip its
+	// steps there, unlike an `if:` gate that also allows postmerge.
 	if len(labelRules) > 0 {
-		applyLabelRules(filter, labelRules, prLabels(ctx.envs))
+		if isPullRequest(ctx.envs) {
+			applyLabelRules(filter, labelRules, prLabels(ctx.envs))
+		} else {
+			log.Printf("not a pull request build: label rules not applied")
+		}
 	}
 
 	var groups []*pipelineGroup

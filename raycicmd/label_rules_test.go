@@ -258,6 +258,10 @@ func TestMakePipeline_labelRules(t *testing.T) {
 		"    key: examples",
 		"    tags: [ data, docstring ]",
 		"    commands: [ 'echo examples' ]",
+		"  - label: optin",
+		"    key: optin",
+		"    tags: [ data, optin ]",
+		"    commands: [ 'echo optin' ]",
 	}, "\n")
 	if err := os.WriteFile(
 		filepath.Join(bkDir, "test.rayci.yaml"), []byte(pipeline), 0o600,
@@ -271,17 +275,27 @@ func TestMakePipeline_labelRules(t *testing.T) {
 	writeLabelRules(t, bkDir, strings.Join([]string{
 		"- label: docstring-only",
 		"  keep_only_tags: [ docstring ]",
+		"- label: run-optin",
+		"  skip_tags_unless_present: [ optin ]",
 	}, "\n"))
 
 	lister, envs := setupGitRepoInDir(t, tmp, []string{"src/file.py"})
 
+	all := []string{"examples", "optin", "tests"}
 	for _, test := range []struct {
+		pr     string
 		labels string
 		want   []string
 	}{
-		{labels: "", want: []string{"examples", "tests"}},
-		{labels: "go,docstring-only", want: []string{"examples"}},
+		{pr: "123", labels: "", want: []string{"examples", "tests"}},
+		{pr: "123", labels: "go,docstring-only", want: []string{"examples"}},
+		{pr: "123", labels: "run-optin", want: all},
+		// Label rules don't apply to non-PR builds, so nothing is skipped
+		// for a missing label and nothing is narrowed for a present one.
+		{pr: "false", labels: "", want: all},
+		{pr: "false", labels: "docstring-only", want: all},
 	} {
+		envs.m["BUILDKITE_PULL_REQUEST"] = test.pr
 		envs.m["BUILDKITE_PULL_REQUEST_LABELS"] = test.labels
 		got, err := makePipeline(&pipelineContext{
 			repoDir:      tmp,
@@ -299,7 +313,10 @@ func TestMakePipeline_labelRules(t *testing.T) {
 			t.Fatalf("makePipeline: %v", err)
 		}
 		if keys := emittedKeys(got.Steps); !reflect.DeepEqual(keys, test.want) {
-			t.Errorf("labels %q: emitted keys = %v, want %v", test.labels, keys, test.want)
+			t.Errorf(
+				"pr %q, labels %q: emitted keys = %v, want %v",
+				test.pr, test.labels, keys, test.want,
+			)
 		}
 	}
 }
